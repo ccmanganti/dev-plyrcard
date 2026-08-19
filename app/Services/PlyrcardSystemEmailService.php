@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
 
 class PlyrcardSystemEmailService
 {
@@ -19,10 +20,7 @@ class PlyrcardSystemEmailService
 
         $user->loadMissing('activeWebsite');
 
-        $html = view('emails.plyrcard-registration-verification', [
-            'user' => $user,
-            'verificationUrl' => $verificationUrl,
-        ])->render();
+        $html = $this->renderRegistrationEmail($user, $verificationUrl);
 
         return $this->sendHtml(
             user: $user,
@@ -50,13 +48,13 @@ class PlyrcardSystemEmailService
             ? 'Someone viewed your PLYRCARD'
             : 'Someone clicked your ' . ucfirst($platform) . ' link';
 
-        $html = view('emails.plyrcard-player-activity', [
-            'player' => $player,
-            'website' => $website,
-            'activityType' => $activityType,
-            'platform' => $platform,
-            'viewerEmail' => $viewerEmail,
-        ])->render();
+        $html = $this->renderActivityEmail(
+            player: $player,
+            website: $website,
+            activityType: $activityType,
+            platform: $platform,
+            viewerEmail: $viewerEmail,
+        );
 
         return $this->sendHtml(
             user: $player,
@@ -91,6 +89,107 @@ class PlyrcardSystemEmailService
             html: $html,
             purpose: 'native_mail_test',
         );
+    }
+
+    protected function renderRegistrationEmail(User $user, string $verificationUrl): string
+    {
+        $viewName = 'emails.plyrcard-registration-verification';
+
+        if (View::exists($viewName)) {
+            return view($viewName, [
+                'user' => $user,
+                'verificationUrl' => $verificationUrl,
+            ])->render();
+        }
+
+        Log::warning('PLYRCARD registration email Blade view is missing; using built-in fallback template.', [
+            'view' => $viewName,
+            'expected_path' => resource_path('views/emails/plyrcard-registration-verification.blade.php'),
+            'user_id' => $user->getKey(),
+        ]);
+
+        $firstName = $this->escape((string) ($user->first_name ?: 'Player'));
+        $profileUrl = $this->playerUrl($user->activeWebsite);
+        $profileUrlEscaped = $this->escape($profileUrl);
+        $verificationUrlEscaped = $this->escape($verificationUrl);
+
+        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<title>Welcome to PLYRCARD</title></head>'
+            . '<body style="margin:0;padding:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,Helvetica,sans-serif">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0C0E11"><tr><td align="center" style="padding:32px 12px">'
+            . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px">'
+            . '<tr><td style="padding:0 34px 22px;font-size:19px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></td></tr>'
+            . '<tr><td bgcolor="#131619" style="background:#131619;border:1px solid #1E242A;border-radius:14px">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
+            . '<tr><td style="padding:38px 34px 0"><div style="font-family:Courier New,monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#FF5A3C">Account created</div>'
+            . '<h1 style="margin:12px 0 0;font-size:32px;line-height:1.1;color:#F2F0ED">Welcome to PLYRCARD, ' . $firstName . '.</h1>'
+            . '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#868E99">Your account is ready. You can start building and sharing your player profile now.</p></td></tr>'
+            . ($profileUrl !== ''
+                ? '<tr><td style="padding:28px 34px 0"><table role="presentation" width="100%" bgcolor="#1A1E23" style="background:#1A1E23;border:1px solid #262C33;border-radius:12px"><tr><td style="padding:22px"><div style="font-family:Courier New,monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#868E99">Your PLYRSITE</div><div style="margin-top:11px;font-size:20px;font-weight:800;color:#F2F0ED;word-break:break-all">' . $profileUrlEscaped . '</div></td></tr></table></td></tr>'
+                : '')
+            . ($verificationUrl !== ''
+                ? '<tr><td style="padding:26px 34px 0"><a href="' . $verificationUrlEscaped . '" style="display:inline-block;padding:14px 28px;background:#FF5A3C;border-radius:10px;color:#0C0E11;text-decoration:none;font-weight:700">Verify email (optional)</a><p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:#5E6670">Verification is optional and does not block access to your account.</p></td></tr>'
+                : '')
+            . '<tr><td style="padding:28px 34px 34px;font-size:14px;line-height:1.6;color:#868E99">Questions? Reply to this email.<div style="margin-top:16px;font-weight:600;color:#F2F0ED">This is your journey. It has to come from you.<br><span style="color:#FF5A3C">Authenticity is Key.</span></div></td></tr>'
+            . '</table></td></tr>'
+            . '<tr><td align="center" style="padding:24px 34px 0;font-size:11.5px;line-height:1.7;color:#5E6670">You are receiving this because a PLYRCARD account was created with this address.<br>&copy; 2026 PLYRCARD.</td></tr>'
+            . '</table></td></tr></table></body></html>';
+    }
+
+    protected function renderActivityEmail(
+        User $player,
+        Website $website,
+        string $activityType,
+        string $platform,
+        ?string $viewerEmail,
+    ): string {
+        $viewName = 'emails.plyrcard-player-activity';
+
+        if (View::exists($viewName)) {
+            return view($viewName, [
+                'player' => $player,
+                'website' => $website,
+                'activityType' => $activityType,
+                'platform' => $platform,
+                'viewerEmail' => $viewerEmail,
+            ])->render();
+        }
+
+        Log::warning('PLYRCARD activity email Blade view is missing; using built-in fallback template.', [
+            'view' => $viewName,
+            'expected_path' => resource_path('views/emails/plyrcard-player-activity.blade.php'),
+            'user_id' => $player->getKey(),
+        ]);
+
+        $isProfile = $activityType === 'profile_view';
+        $label = $isProfile ? 'PROFILE VIEW' : strtoupper($platform) . ' CLICK';
+        $title = $isProfile
+            ? 'Someone viewed your PLYRCARD.'
+            : 'Someone clicked your ' . ucfirst($platform) . ' link.';
+        $description = $isProfile
+            ? 'Your profile got another visit.'
+            : 'A visitor moved from your PLYRCARD to your ' . $platform . ' destination.';
+        $viewer = $viewerEmail ? 'Visitor: ' . $viewerEmail : 'Visitor: anonymous / direct';
+        $profileUrl = $this->playerUrl($website);
+
+        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<title>PLYRCARD activity</title></head>'
+            . '<body style="margin:0;padding:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,Helvetica,sans-serif">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0C0E11"><tr><td align="center" style="padding:32px 12px">'
+            . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px">'
+            . '<tr><td style="padding:0 34px 22px;font-size:19px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></td></tr>'
+            . '<tr><td bgcolor="#131619" style="background:#131619;border:1px solid #1E242A;border-radius:14px"><table role="presentation" width="100%">'
+            . '<tr><td style="padding:38px 34px 0"><div style="font-family:Courier New,monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#FF5A3C">' . $this->escape($label) . '</div>'
+            . '<h1 style="margin:12px 0 0;font-size:32px;line-height:1.1;color:#F2F0ED">' . $this->escape($title) . '</h1>'
+            . '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#868E99">' . $this->escape($description) . '</p></td></tr>'
+            . '<tr><td style="padding:26px 34px 0"><table role="presentation" width="100%" bgcolor="#1A1E23" style="background:#1A1E23;border:1px solid #262C33;border-radius:12px"><tr><td style="padding:22px"><div style="font-family:Courier New,monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#868E99">Activity</div><div style="margin-top:10px;font-size:15px;color:#F2F0ED">' . $this->escape($viewer) . '</div><div style="margin-top:8px;font-size:13px;color:#868E99">' . $this->escape(now()->format('M j, Y g:i A T')) . '</div></td></tr></table></td></tr>'
+            . ($profileUrl !== ''
+                ? '<tr><td style="padding:26px 34px 0"><a href="' . $this->escape($profileUrl) . '" style="display:inline-block;padding:15px 34px;background:#FF5A3C;border-radius:10px;color:#0C0E11;text-decoration:none;font-weight:700">View my PLYRCARD</a></td></tr>'
+                : '')
+            . '<tr><td style="padding:28px 34px 34px;font-size:14px;line-height:1.6;color:#868E99">Keep your film, stats, schedule, and contact details current so every visit lands on your strongest profile.</td></tr>'
+            . '</table></td></tr>'
+            . '<tr><td align="center" style="padding:24px 34px 0;font-size:11.5px;line-height:1.7;color:#5E6670">PLYRCARD profile activity notification<br>&copy; 2026 PLYRCARD.</td></tr>'
+            . '</table></td></tr></table></body></html>';
     }
 
     protected function sendHtml(User $user, string $recipient, string $subject, string $html, string $purpose): array
@@ -258,6 +357,30 @@ class PlyrcardSystemEmailService
         }
 
         return 'PHP mail() returned false. The hosting server did not accept the message.';
+    }
+
+    protected function playerUrl(?Website $website): string
+    {
+        if (! $website) {
+            return '';
+        }
+
+        if (filled($website->domain)) {
+            $domain = preg_replace('/^https?:\/\//i', '', trim((string) $website->domain));
+
+            return $domain ? 'https://' . ltrim($domain, '/') : '';
+        }
+
+        if (filled($website->slug)) {
+            return url('/' . ltrim((string) $website->slug, '/'));
+        }
+
+        return '';
+    }
+
+    protected function escape(string $value): string
+    {
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     protected function logFailure(User $user, string $recipient, string $subject, string $purpose, array $result): void
