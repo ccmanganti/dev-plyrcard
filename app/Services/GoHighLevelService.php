@@ -3206,6 +3206,260 @@ class GoHighLevelService
         return '';
     }
 
+    /**
+     * Fetch every email message for this player's HighLevel location through the
+     * official location-level message export endpoint and count delivered outbound
+     * emails. This is intentionally message-level (not conversation-level), so
+     * direct emails, campaign emails, custom emails, and other outbound email
+     * variants are all counted once by message ID.
+     *
+     * HighLevel documents /conversations/messages/export as cursor-paginated and
+     * requires channel=Email to include email rows.
+     */
+    public function getDeliveredOutboundEmailsForUser(User $user, array $options = []): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = trim((string) ($credentials['location_id'] ?? ''));
+        $token = $this->tokenForLocation($locationId, $credentials['token_override'] ?? null);
+
+        if ($locationId === '' || ! $token) {
+            return [
+                'success' => false,
+                'delivered' => 0,
+                'outbound_email_messages' => 0,
+                'pages_fetched' => 0,
+                'messages_scanned' => 0,
+                'error' => 'Missing recruiting data connection.',
+            ];
+        }
+
+        $limit = min(max((int) ($options['limit'] ?? 100), 1), 100);
+        $maxPages = min(max((int) ($options['max_pages'] ?? 2000), 1), 5000);
+        $maxRows = min(max((int) ($options['max_rows'] ?? 200000), $limit), 500000);
+
+        $cursor = null;
+        $seenCursors = [];
+        $seenMessages = [];
+        $pagesFetched = 0;
+        $messagesScanned = 0;
+        $outboundEmailMessages = 0;
+        $delivered = 0;
+        $statusCounts = [];
+        $typeCounts = [];
+        $lastStatus = null;
+        $lastError = null;
+
+        do {
+            $params = [
+                'locationId' => $locationId,
+                'channel' => 'Email',
+                'limit' => $limit,
+            ];
+
+            if (filled($cursor)) {
+                $params['cursor'] = $cursor;
+            }
+
+            try {
+                $response = Http::withHeaders(['Version' => 'v3'])
+                    ->timeout((int) config('ghl.timeout', 20))
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->get("{$this->baseUrl}/conversations/messages/export", $params);
+            } catch (\Throwable $exception) {
+                $lastError = $exception->getMessage();
+                break;
+            }
+
+            $lastStatus = $response->status();
+            $data = $response->json() ?? [];
+
+            if ($response->failed()) {
+                $lastError = trim((string) ($data['message'] ?? $data['error'] ?? $response->body()));
+                Log::warning('Recruiting delivered-email export request failed.', [
+                    'user_id' => $user->getKey(),
+                    'location_id' => $locationId,
+                    'status' => $lastStatus,
+                    'page' => $pagesFetched + 1,
+                    'has_cursor' => filled($cursor),
+                    'error' => $lastError,
+                ]);
+                break;
+            }
+
+            $rawItems = data_get($data, 'messages')
+                ?? data_get($data, 'data.messages')
+                ?? data_get($data, 'data')
+                ?? data_get($data, 'items')
+                ?? data_get($data, 'results')
+                ?? [];
+
+            $items = $this->normalizeResponseList($rawItems, [
+                'id', '_id', 'messageId', 'messageType', 'direction', 'status', 'conversationId', 'contactId',
+            ]);
+
+            $pagesFetched++;
+            $newUnique = 0;
+
+            foreach ($items as $message) {
+                if (! is_array($message)) {
+                    continue;
+                }
+
+                $messagesScanned++;
+
+                $messageId = trim((string) (
+                    $message['id']
+                    ?? $message['_id']
+                    ?? $message['messageId']
+                    ?? $message['emailMessageId']
+                    ?? data_get($message, 'emailMessage.id')
+                    ?? ''
+                ));
+
+                if ($messageId === '') {
+                    $messageId = hash('sha256', json_encode([
+                        $message['conversationId'] ?? null,
+                        $message['contactId'] ?? null,
+                        $message['dateAdded'] ?? $message['createdAt'] ?? null,
+                        $message['subject'] ?? data_get($message, 'meta.email.subject'),
+                        $message['direction'] ?? null,
+                        $message['status'] ?? null,
+                    ]) ?: serialize($message));
+                }
+
+                if (isset($seenMessages[$messageId])) {
+                    continue;
+                }
+
+                $seenMessages[$messageId] = true;
+                $newUnique++;
+
+                $direction = strtolower(trim((string) (
+                    $message['direction']
+                    ?? $message['messageDirection']
+                    ?? data_get($message, 'meta.direction')
+                    ?? data_get($message, 'meta.email.direction')
+                    ?? ''
+                )));
+                $direction = preg_replace('/[^a-z]+/', '_', $direction) ?: '';
+
+                $isOutbound = str_starts_with($direction, 'outbound')
+                    || in_array($direction, ['outgoing', 'sent', 'send', 'out'], true);
+
+                $messageType = strtolower(trim((string) (
+                    $message['messageType']
+                    ?? $message['message_type']
+                    ?? $message['type']
+                    ?? data_get($message, 'meta.type')
+                    ?? ''
+                )));
+                $normalizedType = preg_replace('/[^a-z0-9]+/', '_', $messageType) ?: '';
+                $isEmail = str_contains($normalizedType, 'email');
+
+                if (! $isOutbound || ! $isEmail) {
+                    continue;
+                }
+
+                $outboundEmailMessages++;
+                $typeCounts[$normalizedType ?: 'unknown'] = ($typeCounts[$normalizedType ?: 'unknown'] ?? 0) + 1;
+
+                $status = strtolower(trim((string) (
+                    $message['status']
+                    ?? $message['messageStatus']
+                    ?? data_get($message, 'emailMessage.status')
+                    ?? data_get($message, 'meta.email.status')
+                    ?? ''
+                )));
+                $normalizedStatus = preg_replace('/[^a-z0-9]+/', '_', $status) ?: 'unknown';
+                $statusCounts[$normalizedStatus] = ($statusCounts[$normalizedStatus] ?? 0) + 1;
+
+                // Once an email is opened/clicked/read/replied it necessarily reached
+                // the recipient, so those states are also treated as delivered.
+                $deliveredByStatus = in_array($normalizedStatus, [
+                    'delivered', 'opened', 'clicked', 'read', 'replied',
+                ], true);
+
+                $deliveredEventCount = $this->firstNumericValue($message, [
+                    'events.delivered',
+                    'meta.events.delivered',
+                    'meta.email.events.delivered',
+                    'emailMessage.events.delivered',
+                    'delivery.events.delivered',
+                    'stats.delivered',
+                    'statistics.delivered',
+                ]);
+
+                if ($deliveredByStatus || $deliveredEventCount > 0) {
+                    $delivered++;
+                }
+            }
+
+            $nextCursor = trim((string) (
+                data_get($data, 'nextCursor')
+                ?? data_get($data, 'next_cursor')
+                ?? data_get($data, 'cursor.next')
+                ?? data_get($data, 'pagination.nextCursor')
+                ?? data_get($data, 'pagination.next_cursor')
+                ?? data_get($data, 'meta.nextCursor')
+                ?? data_get($data, 'meta.next_cursor')
+                ?? ''
+            ));
+
+            Log::info('Recruiting delivered-email export page loaded.', [
+                'user_id' => $user->getKey(),
+                'location_id' => $locationId,
+                'page' => $pagesFetched,
+                'rows' => count($items),
+                'new_unique' => $newUnique,
+                'unique_total' => count($seenMessages),
+                'outbound_email_messages' => $outboundEmailMessages,
+                'delivered_so_far' => $delivered,
+                'has_next_cursor' => $nextCursor !== '',
+            ]);
+
+            if ($nextCursor === ''
+                || isset($seenCursors[$nextCursor])
+                || $pagesFetched >= $maxPages
+                || count($seenMessages) >= $maxRows) {
+                $cursor = null;
+                break;
+            }
+
+            $seenCursors[$nextCursor] = true;
+            $cursor = $nextCursor;
+        } while ($cursor !== null);
+
+        if ($pagesFetched === 0) {
+            return [
+                'success' => false,
+                'delivered' => 0,
+                'outbound_email_messages' => 0,
+                'pages_fetched' => 0,
+                'messages_scanned' => $messagesScanned,
+                'error' => $lastError ?: 'Unable to export email messages.',
+                'status' => $lastStatus,
+            ];
+        }
+
+        ksort($statusCounts);
+        ksort($typeCounts);
+
+        return [
+            'success' => true,
+            'delivered' => $delivered,
+            'outbound_email_messages' => $outboundEmailMessages,
+            'pages_fetched' => $pagesFetched,
+            'messages_scanned' => $messagesScanned,
+            'unique_messages' => count($seenMessages),
+            'status_counts' => $statusCounts,
+            'type_counts' => $typeCounts,
+            'pagination_truncated' => $pagesFetched >= $maxPages || count($seenMessages) >= $maxRows,
+            'source' => 'conversations_messages_export_email',
+            'error' => null,
+        ];
+    }
+
     public function getConversationsForUser(User $user, array $query = []): array
     {
         $credentials = $this->credentialsForUser($user);

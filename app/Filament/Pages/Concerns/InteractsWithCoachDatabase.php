@@ -518,7 +518,7 @@ trait InteractsWithCoachDatabase
 
         if (! $user) {
             $this->dashboardEmailFetchError = 'No authenticated user is available.';
-            $this->dashboardEmailFetchStatus = 'Unable to refresh sent emails.';
+            $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
             $this->isFetchingDashboardEmailsSent = false;
             return;
         }
@@ -531,31 +531,24 @@ trait InteractsWithCoachDatabase
         }
 
         try {
-            Log::info('Dashboard all-Inbox-conversations sent-email count started.', [
-                'user_id' => $user->getKey(),
-            ]);
-
-            // v144: use the exact SAME function that populates Inbox conversations.
-            // fetch_all=true makes that normal Inbox loader page through every available
-            // conversation using its proven skip-based request shape. No message-detail
-            // endpoint and no separate email-export endpoint are used here.
-            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
-                'fetch_all' => true,
+            // v146: stop deriving an email total from conversation summaries or campaign
+            // list metadata. HighLevel exposes a location-level email-message export with
+            // cursor pagination. Scan every email row and count only outbound messages
+            // whose delivery state proves they reached the recipient. Campaign email rows
+            // are included naturally (TYPE_CAMPAIGN_EMAIL), so there is no campaign add-on
+            // and therefore no campaign/direct double counting.
+            $result = app(GoHighLevelService::class)->getDeliveredOutboundEmailsForUser($user, [
                 'limit' => 100,
-                'max_rows' => 25000,
-                'max_pages' => 250,
-                'status' => 'all',
-                'search' => '',
-                'sortBy' => 'last_message_date',
-                'sort' => 'desc',
+                'max_rows' => 200000,
+                'max_pages' => 2000,
             ]);
 
             if (! ($result['success'] ?? false)) {
-                $error = trim((string) ($result['error'] ?? 'Unable to load Inbox conversations.'));
-                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to load Inbox conversations.';
+                $error = trim((string) ($result['error'] ?? 'Unable to load delivered email activity.'));
+                $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to load delivered email activity.';
                 $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
-                Log::warning('Dashboard Inbox-conversation sent-email count failed.', [
+                Log::warning('Dashboard delivered-email export failed.', [
                     'user_id' => $user->getKey(),
                     'status' => $result['status'] ?? null,
                     'error' => $this->dashboardEmailFetchError,
@@ -564,69 +557,7 @@ trait InteractsWithCoachDatabase
                 return;
             }
 
-            $conversations = collect($result['conversations'] ?? [])
-                ->filter(fn ($row): bool => is_array($row))
-                ->values();
-
-            $outbound = 0;
-            $inbound = 0;
-            $unknownDirection = 0;
-            $nonEmail = 0;
-
-            foreach ($conversations as $row) {
-                $direction = strtolower(trim((string) (
-                    $row['last_message_direction']
-                    ?? $row['lastMessageDirection']
-                    ?? $row['message_direction']
-                    ?? $row['direction']
-                    ?? ''
-                )));
-                $direction = preg_replace('/[^a-z]+/', '_', $direction) ?: '';
-
-                $messageType = strtolower(trim((string) (
-                    $row['last_message_type']
-                    ?? $row['lastMessageType']
-                    ?? $row['message_type']
-                    ?? $row['type']
-                    ?? ''
-                )));
-                $messageType = preg_replace('/[^a-z0-9]+/', '_', $messageType) ?: '';
-
-                $isEmail = str_contains($messageType, 'email')
-                    || in_array($messageType, ['type_email', 'mail'], true);
-
-                if (! $isEmail) {
-                    $nonEmail++;
-                    continue;
-                }
-
-                $isOutbound = str_starts_with($direction, 'outbound')
-                    || in_array($direction, ['outgoing', 'sent', 'send', 'out'], true);
-                $isInbound = str_starts_with($direction, 'inbound')
-                    || in_array($direction, ['incoming', 'received', 'receive', 'in'], true);
-
-                if ($isOutbound) {
-                    $outbound++;
-                } elseif ($isInbound) {
-                    $inbound++;
-                } else {
-                    $unknownDirection++;
-                }
-            }
-
-            // Conversation rows represent the player's direct/personal outbound email
-            // activity. Marketing campaigns are a separate HighLevel email source and
-            // must be added as recipient-level sends, not merely as one count per campaign.
-            $campaignResult = app(GoHighLevelService::class)->getEmailCampaignActivityForUser($user);
-            $campaignEmailsSent = ($campaignResult['success'] ?? false)
-                ? max(0, (int) ($campaignResult['emails_sent'] ?? 0))
-                : 0;
-            $campaignsSent = ($campaignResult['success'] ?? false)
-                ? max(0, (int) ($campaignResult['campaigns_sent'] ?? 0))
-                : 0;
-
-            $personalOutboundEmails = $outbound;
-            $count = $personalOutboundEmails + $campaignEmailsSent;
+            $count = max(0, (int) ($result['delivered'] ?? 0));
 
             $user->forceFill(['total_emails_sent' => $count])->save();
             $user->refresh();
@@ -639,29 +570,23 @@ trait InteractsWithCoachDatabase
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
-            Log::info('Dashboard all-Inbox-conversations sent-email count completed.', [
+            Log::info('Dashboard delivered-email export completed.', [
                 'user_id' => $user->getKey(),
-                'conversations_loaded' => $conversations->count(),
-                'api_total' => $result['total'] ?? $conversations->count(),
-                'pages_fetched' => $result['pages_fetched'] ?? null,
-                'pagination_mode' => $result['pagination_mode'] ?? null,
-                'pagination_stopped_on_duplicate_page' => $result['pagination_stopped_on_duplicate_page'] ?? false,
+                'delivered_emails' => $count,
+                'outbound_email_messages' => $result['outbound_email_messages'] ?? 0,
+                'messages_scanned' => $result['messages_scanned'] ?? 0,
+                'unique_messages' => $result['unique_messages'] ?? 0,
+                'pages_fetched' => $result['pages_fetched'] ?? 0,
                 'pagination_truncated' => $result['pagination_truncated'] ?? false,
-                'personal_outbound_email_conversations' => $personalOutboundEmails,
-                'campaign_emails_sent' => $campaignEmailsSent,
-                'campaigns_sent' => $campaignsSent,
-                'combined_emails_sent' => $count,
-                'campaign_lookup_success' => (bool) ($campaignResult['success'] ?? false),
-                'campaign_lookup_error' => $campaignResult['error'] ?? null,
-                'inbound_email_conversations' => $inbound,
-                'unknown_direction_email_conversations' => $unknownDirection,
-                'non_email_conversations' => $nonEmail,
+                'status_counts' => $result['status_counts'] ?? [],
+                'type_counts' => $result['type_counts'] ?? [],
+                'source' => $result['source'] ?? 'conversations_messages_export_email',
             ]);
         } catch (\Throwable $exception) {
             $this->dashboardEmailFetchError = $exception->getMessage();
             $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
-            Log::warning('Dashboard Inbox-conversation sent-email count threw an exception.', [
+            Log::warning('Dashboard delivered-email export threw an exception.', [
                 'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);
