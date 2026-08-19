@@ -538,9 +538,11 @@ trait InteractsWithCoachDatabase
             // are included naturally (TYPE_CAMPAIGN_EMAIL), so there is no campaign add-on
             // and therefore no campaign/direct double counting.
             $result = app(GoHighLevelService::class)->getDeliveredOutboundEmailsForUser($user, [
-                'limit' => 100,
-                'max_rows' => 200000,
+                'limit' => 500,
+                'max_rows' => 500000,
                 'max_pages' => 2000,
+                'campaign_page_size' => 20,
+                'max_campaigns' => 5000,
             ]);
 
             if (! ($result['success'] ?? false)) {
@@ -573,6 +575,15 @@ trait InteractsWithCoachDatabase
             Log::info('Dashboard delivered-email export completed.', [
                 'user_id' => $user->getKey(),
                 'delivered_emails' => $count,
+                'direct_delivered' => $result['direct_delivered'] ?? 0,
+                'marketing_delivered' => $result['marketing_delivered'] ?? 0,
+                'campaign_delivered' => $result['campaign_delivered'] ?? 0,
+                'workflow_delivered' => $result['workflow_delivered'] ?? 0,
+                'bulk_action_delivered' => $result['bulk_action_delivered'] ?? 0,
+                'campaigns_scanned' => $result['campaigns_scanned'] ?? 0,
+                'campaign_stats_loaded' => $result['campaign_stats_loaded'] ?? 0,
+                'export_success' => $result['export_success'] ?? false,
+                'marketing_success' => $result['marketing_success'] ?? false,
                 'outbound_email_messages' => $result['outbound_email_messages'] ?? 0,
                 'messages_scanned' => $result['messages_scanned'] ?? 0,
                 'unique_messages' => $result['unique_messages'] ?? 0,

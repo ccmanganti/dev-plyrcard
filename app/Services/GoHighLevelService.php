@@ -3226,16 +3226,59 @@ class GoHighLevelService
             return [
                 'success' => false,
                 'delivered' => 0,
-                'outbound_email_messages' => 0,
-                'pages_fetched' => 0,
-                'messages_scanned' => 0,
+                'direct_delivered' => 0,
+                'marketing_delivered' => 0,
                 'error' => 'Missing recruiting data connection.',
             ];
         }
 
-        $limit = min(max((int) ($options['limit'] ?? 100), 1), 100);
+        // v147: use two authoritative HighLevel sources without double-counting:
+        // 1) Conversations message export for direct/app/API outbound email messages.
+        // 2) Email campaign statistics for campaign, workflow, and bulk-action delivery totals.
+        // HighLevel's export endpoint is channel-filtered already, so do not reject an
+        // exported Email row just because messageType is absent or normalized differently.
+        $export = $this->getDeliveredDirectEmailsFromMessageExport($user, $locationId, $token, $options);
+        $marketing = $this->getDeliveredMarketingEmailStatsForLocation($locationId, $token, $options);
+
+        $directDelivered = max(0, (int) ($export['delivered'] ?? 0));
+        $marketingDelivered = max(0, (int) ($marketing['delivered'] ?? 0));
+        $total = $directDelivered + $marketingDelivered;
+
+        // A campaign-stats result is independently useful even if the message-export
+        // endpoint is unavailable for this token. Only fail when neither source could run.
+        $success = (bool) ($export['success'] ?? false) || (bool) ($marketing['success'] ?? false);
+
+        return [
+            'success' => $success,
+            'delivered' => $total,
+            'direct_delivered' => $directDelivered,
+            'marketing_delivered' => $marketingDelivered,
+            'campaign_delivered' => (int) ($marketing['campaign_delivered'] ?? 0),
+            'workflow_delivered' => (int) ($marketing['workflow_delivered'] ?? 0),
+            'bulk_action_delivered' => (int) ($marketing['bulk_action_delivered'] ?? 0),
+            'campaigns_scanned' => (int) ($marketing['campaigns_scanned'] ?? 0),
+            'campaign_stats_loaded' => (int) ($marketing['stats_loaded'] ?? 0),
+            'outbound_email_messages' => (int) ($export['outbound_email_messages'] ?? 0),
+            'messages_scanned' => (int) ($export['messages_scanned'] ?? 0),
+            'unique_messages' => (int) ($export['unique_messages'] ?? 0),
+            'pages_fetched' => (int) ($export['pages_fetched'] ?? 0),
+            'status_counts' => $export['status_counts'] ?? [],
+            'type_counts' => $export['type_counts'] ?? [],
+            'source_counts' => $export['source_counts'] ?? [],
+            'pagination_truncated' => (bool) ($export['pagination_truncated'] ?? false),
+            'export_success' => (bool) ($export['success'] ?? false),
+            'marketing_success' => (bool) ($marketing['success'] ?? false),
+            'marketing_debug' => $marketing['debug'] ?? [],
+            'source' => 'ghl_message_export_plus_campaign_stats',
+            'error' => $success ? null : trim((string) (($export['error'] ?? '') ?: ($marketing['error'] ?? 'Unable to load delivered email activity.'))),
+        ];
+    }
+
+    protected function getDeliveredDirectEmailsFromMessageExport(User $user, string $locationId, string $token, array $options = []): array
+    {
+        $limit = min(max((int) ($options['limit'] ?? 500), 10), 500);
         $maxPages = min(max((int) ($options['max_pages'] ?? 2000), 1), 5000);
-        $maxRows = min(max((int) ($options['max_rows'] ?? 200000), $limit), 500000);
+        $maxRows = min(max((int) ($options['max_rows'] ?? 500000), $limit), 1000000);
 
         $cursor = null;
         $seenCursors = [];
@@ -3246,6 +3289,7 @@ class GoHighLevelService
         $delivered = 0;
         $statusCounts = [];
         $typeCounts = [];
+        $sourceCounts = [];
         $lastStatus = null;
         $lastError = null;
 
@@ -3254,6 +3298,8 @@ class GoHighLevelService
                 'locationId' => $locationId,
                 'channel' => 'Email',
                 'limit' => $limit,
+                'sortBy' => 'createdAt',
+                'sortOrder' => 'desc',
             ];
 
             if (filled($cursor)) {
@@ -3287,44 +3333,27 @@ class GoHighLevelService
                 break;
             }
 
-            $rawItems = data_get($data, 'messages')
-                ?? data_get($data, 'data.messages')
-                ?? data_get($data, 'data')
-                ?? data_get($data, 'items')
-                ?? data_get($data, 'results')
-                ?? [];
-
-            $items = $this->normalizeResponseList($rawItems, [
-                'id', '_id', 'messageId', 'messageType', 'direction', 'status', 'conversationId', 'contactId',
-            ]);
+            // Official v3 schema: { messages: [...], nextCursor: string|null, total: number }.
+            $items = collect(is_array($data['messages'] ?? null) ? $data['messages'] : [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->values()
+                ->all();
 
             $pagesFetched++;
             $newUnique = 0;
 
             foreach ($items as $message) {
-                if (! is_array($message)) {
-                    continue;
-                }
-
                 $messagesScanned++;
 
-                $messageId = trim((string) (
-                    $message['id']
-                    ?? $message['_id']
-                    ?? $message['messageId']
-                    ?? $message['emailMessageId']
-                    ?? data_get($message, 'emailMessage.id')
-                    ?? ''
-                ));
-
+                $messageId = trim((string) ($message['id'] ?? $message['_id'] ?? $message['messageId'] ?? ''));
                 if ($messageId === '') {
                     $messageId = hash('sha256', json_encode([
                         $message['conversationId'] ?? null,
                         $message['contactId'] ?? null,
                         $message['dateAdded'] ?? $message['createdAt'] ?? null,
-                        $message['subject'] ?? data_get($message, 'meta.email.subject'),
                         $message['direction'] ?? null,
                         $message['status'] ?? null,
+                        $message['source'] ?? null,
                     ]) ?: serialize($message));
                 }
 
@@ -3335,76 +3364,39 @@ class GoHighLevelService
                 $seenMessages[$messageId] = true;
                 $newUnique++;
 
-                $direction = strtolower(trim((string) (
-                    $message['direction']
-                    ?? $message['messageDirection']
-                    ?? data_get($message, 'meta.direction')
-                    ?? data_get($message, 'meta.email.direction')
-                    ?? ''
-                )));
-                $direction = preg_replace('/[^a-z]+/', '_', $direction) ?: '';
-
-                $isOutbound = str_starts_with($direction, 'outbound')
-                    || in_array($direction, ['outgoing', 'sent', 'send', 'out'], true);
-
-                $messageType = strtolower(trim((string) (
-                    $message['messageType']
-                    ?? $message['message_type']
-                    ?? $message['type']
-                    ?? data_get($message, 'meta.type')
-                    ?? ''
-                )));
-                $normalizedType = preg_replace('/[^a-z0-9]+/', '_', $messageType) ?: '';
-                $isEmail = str_contains($normalizedType, 'email');
-
-                if (! $isOutbound || ! $isEmail) {
+                $direction = strtolower(trim((string) ($message['direction'] ?? '')));
+                if ($direction !== 'outbound') {
                     continue;
                 }
 
                 $outboundEmailMessages++;
-                $typeCounts[$normalizedType ?: 'unknown'] = ($typeCounts[$normalizedType ?: 'unknown'] ?? 0) + 1;
 
-                $status = strtolower(trim((string) (
-                    $message['status']
-                    ?? $message['messageStatus']
-                    ?? data_get($message, 'emailMessage.status')
-                    ?? data_get($message, 'meta.email.status')
-                    ?? ''
-                )));
+                $messageType = strtolower(trim((string) ($message['messageType'] ?? $message['message_type'] ?? 'email')));
+                $normalizedType = preg_replace('/[^a-z0-9]+/', '_', $messageType) ?: 'email';
+                $typeCounts[$normalizedType] = ($typeCounts[$normalizedType] ?? 0) + 1;
+
+                $source = strtolower(trim((string) ($message['source'] ?? '')));
+                $normalizedSource = preg_replace('/[^a-z0-9]+/', '_', $source) ?: 'unknown';
+                $sourceCounts[$normalizedSource] = ($sourceCounts[$normalizedSource] ?? 0) + 1;
+
+                // Campaign/workflow/bulk-action deliveries are counted from HighLevel's
+                // campaign-statistics endpoint below. Exclude them here to avoid duplicates.
+                if (in_array($normalizedSource, ['campaign', 'workflow', 'bulk_actions', 'bulk_action'], true)) {
+                    continue;
+                }
+
+                $status = strtolower(trim((string) ($message['status'] ?? '')));
                 $normalizedStatus = preg_replace('/[^a-z0-9]+/', '_', $status) ?: 'unknown';
                 $statusCounts[$normalizedStatus] = ($statusCounts[$normalizedStatus] ?? 0) + 1;
 
-                // Once an email is opened/clicked/read/replied it necessarily reached
-                // the recipient, so those states are also treated as delivered.
-                $deliveredByStatus = in_array($normalizedStatus, [
-                    'delivered', 'opened', 'clicked', 'read', 'replied',
-                ], true);
-
-                $deliveredEventCount = $this->firstNumericValue($message, [
-                    'events.delivered',
-                    'meta.events.delivered',
-                    'meta.email.events.delivered',
-                    'emailMessage.events.delivered',
-                    'delivery.events.delivered',
-                    'stats.delivered',
-                    'statistics.delivered',
-                ]);
-
-                if ($deliveredByStatus || $deliveredEventCount > 0) {
+                // Official message statuses include delivered/opened/read/clicked. Any of
+                // opened/read/clicked necessarily implies that delivery already occurred.
+                if (in_array($normalizedStatus, ['delivered', 'opened', 'read', 'clicked'], true)) {
                     $delivered++;
                 }
             }
 
-            $nextCursor = trim((string) (
-                data_get($data, 'nextCursor')
-                ?? data_get($data, 'next_cursor')
-                ?? data_get($data, 'cursor.next')
-                ?? data_get($data, 'pagination.nextCursor')
-                ?? data_get($data, 'pagination.next_cursor')
-                ?? data_get($data, 'meta.nextCursor')
-                ?? data_get($data, 'meta.next_cursor')
-                ?? ''
-            ));
+            $nextCursor = trim((string) ($data['nextCursor'] ?? ''));
 
             Log::info('Recruiting delivered-email export page loaded.', [
                 'user_id' => $user->getKey(),
@@ -3413,8 +3405,9 @@ class GoHighLevelService
                 'rows' => count($items),
                 'new_unique' => $newUnique,
                 'unique_total' => count($seenMessages),
+                'reported_total' => (int) ($data['total'] ?? 0),
                 'outbound_email_messages' => $outboundEmailMessages,
-                'delivered_so_far' => $delivered,
+                'direct_delivered_so_far' => $delivered,
                 'has_next_cursor' => $nextCursor !== '',
             ]);
 
@@ -3430,23 +3423,12 @@ class GoHighLevelService
             $cursor = $nextCursor;
         } while ($cursor !== null);
 
-        if ($pagesFetched === 0) {
-            return [
-                'success' => false,
-                'delivered' => 0,
-                'outbound_email_messages' => 0,
-                'pages_fetched' => 0,
-                'messages_scanned' => $messagesScanned,
-                'error' => $lastError ?: 'Unable to export email messages.',
-                'status' => $lastStatus,
-            ];
-        }
-
         ksort($statusCounts);
         ksort($typeCounts);
+        ksort($sourceCounts);
 
         return [
-            'success' => true,
+            'success' => $pagesFetched > 0,
             'delivered' => $delivered,
             'outbound_email_messages' => $outboundEmailMessages,
             'pages_fetched' => $pagesFetched,
@@ -3454,10 +3436,171 @@ class GoHighLevelService
             'unique_messages' => count($seenMessages),
             'status_counts' => $statusCounts,
             'type_counts' => $typeCounts,
+            'source_counts' => $sourceCounts,
             'pagination_truncated' => $pagesFetched >= $maxPages || count($seenMessages) >= $maxRows,
-            'source' => 'conversations_messages_export_email',
-            'error' => null,
+            'error' => $pagesFetched > 0 ? null : ($lastError ?: 'Unable to export email messages.'),
+            'status' => $lastStatus,
         ];
+    }
+
+    protected function getDeliveredMarketingEmailStatsForLocation(string $locationId, string $token, array $options = []): array
+    {
+        $pageSize = min(max((int) ($options['campaign_page_size'] ?? 20), 1), 20);
+        $maxCampaigns = min(max((int) ($options['max_campaigns'] ?? 2000), 1), 10000);
+
+        $sources = [
+            'email-campaigns' => [
+                'label' => 'campaign',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/campaigns/emails",
+                'delivered_key' => 'campaign_delivered',
+            ],
+            'workflow-campaigns' => [
+                'label' => 'workflow',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/campaigns/workflows",
+                'delivered_key' => 'workflow_delivered',
+            ],
+            'bulk-actions' => [
+                'label' => 'bulk_action',
+                'url' => "{$this->baseUrl}/emails/locations/{$locationId}/campaigns/bulk-actions",
+                'delivered_key' => 'bulk_action_delivered',
+            ],
+        ];
+
+        $totals = [
+            'campaign_delivered' => 0,
+            'workflow_delivered' => 0,
+            'bulk_action_delivered' => 0,
+        ];
+        $campaignsScanned = 0;
+        $statsLoaded = 0;
+        $anyListSuccess = false;
+        $debug = [];
+
+        foreach ($sources as $statsSource => $sourceConfig) {
+            $offset = 0;
+            $seenIds = [];
+
+            while ($campaignsScanned < $maxCampaigns) {
+                try {
+                    $response = Http::withHeaders(['Version' => 'v3'])
+                        ->timeout((int) config('ghl.timeout', 20))
+                        ->withToken($token)
+                        ->acceptJson()
+                        ->get($sourceConfig['url'], [
+                            'limit' => $pageSize,
+                            'offset' => $offset,
+                        ]);
+                } catch (\Throwable $exception) {
+                    $debug[] = [
+                        'source' => $statsSource,
+                        'stage' => 'list',
+                        'offset' => $offset,
+                        'error' => $exception->getMessage(),
+                    ];
+                    break;
+                }
+
+                $data = $response->json() ?? [];
+                $campaigns = collect(is_array($data['campaigns'] ?? null) ? $data['campaigns'] : [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values();
+
+                $debug[] = [
+                    'source' => $statsSource,
+                    'stage' => 'list',
+                    'status' => $response->status(),
+                    'offset' => $offset,
+                    'rows' => $campaigns->count(),
+                    'total' => (int) ($data['total'] ?? 0),
+                ];
+
+                if ($response->failed()) {
+                    break;
+                }
+
+                $anyListSuccess = true;
+
+                foreach ($campaigns as $campaign) {
+                    $campaignId = trim((string) ($campaign['id'] ?? $campaign['_id'] ?? $campaign['campaignId'] ?? $campaign['sourceId'] ?? ''));
+                    if ($campaignId === '' || isset($seenIds[$campaignId])) {
+                        continue;
+                    }
+
+                    $seenIds[$campaignId] = true;
+                    $campaignsScanned++;
+
+                    // HighLevel statistics sourceId is the campaign/workflow/bulk-action ID.
+                    // Prefer sourceId when supplied by the listing, otherwise use id.
+                    $statsId = trim((string) ($campaign['sourceId'] ?? $campaign['id'] ?? $campaign['_id'] ?? $campaign['campaignId'] ?? ''));
+                    if ($statsId === '') {
+                        continue;
+                    }
+
+                    $statsParams = [];
+                    $subSourceId = trim((string) ($campaign['subSourceId'] ?? $campaign['sub_source_id'] ?? ''));
+                    if ($statsSource === 'workflow-campaigns' && $subSourceId !== '') {
+                        $statsParams['subSourceId'] = $subSourceId;
+                    }
+
+                    try {
+                        $statsResponse = Http::withHeaders(['Version' => 'v3'])
+                            ->timeout((int) config('ghl.timeout', 20))
+                            ->withToken($token)
+                            ->acceptJson()
+                            ->get("{$this->baseUrl}/emails/locations/{$locationId}/campaigns/stats/{$statsSource}/" . rawurlencode($statsId), $statsParams);
+                    } catch (\Throwable $exception) {
+                        $debug[] = [
+                            'source' => $statsSource,
+                            'stage' => 'stats',
+                            'campaign_id' => $statsId,
+                            'error' => $exception->getMessage(),
+                        ];
+                        continue;
+                    }
+
+                    $statsData = $statsResponse->json() ?? [];
+                    if ($statsResponse->failed()) {
+                        $debug[] = [
+                            'source' => $statsSource,
+                            'stage' => 'stats',
+                            'campaign_id' => $statsId,
+                            'status' => $statsResponse->status(),
+                            'error' => trim((string) ($statsData['message'] ?? $statsData['error'] ?? '')),
+                        ];
+                        continue;
+                    }
+
+                    $delivered = (int) (
+                        data_get($statsData, 'stats.delivered')
+                        ?? data_get($statsData, 'data.stats.delivered')
+                        ?? data_get($statsData, 'delivered')
+                        ?? 0
+                    );
+
+                    $totals[$sourceConfig['delivered_key']] += max(0, $delivered);
+                    $statsLoaded++;
+                }
+
+                $count = $campaigns->count();
+                $reportedTotal = (int) ($data['total'] ?? 0);
+                $offset += $pageSize;
+
+                if ($count < $pageSize || ($reportedTotal > 0 && $offset >= $reportedTotal)) {
+                    break;
+                }
+            }
+        }
+
+        $delivered = array_sum($totals);
+
+        return array_merge($totals, [
+            'success' => $anyListSuccess,
+            'delivered' => $delivered,
+            'campaigns_scanned' => $campaignsScanned,
+            'stats_loaded' => $statsLoaded,
+            'debug' => $debug,
+            'error' => $anyListSuccess ? null : 'Unable to load email campaign statistics.',
+        ]);
     }
 
     public function getConversationsForUser(User $user, array $query = []): array
