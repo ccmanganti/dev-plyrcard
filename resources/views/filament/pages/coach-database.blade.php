@@ -7601,37 +7601,86 @@
         @endif
 
         <script>
-            window.rcFilterCoachEngagement = function (source, platform) {
-                const normalized = ['instagram', 'youtube', 'x'].includes(String(platform || '').toLowerCase())
-                    ? String(platform).toLowerCase()
-                    : '';
-                const drawer = source?.closest?.('[data-rc-modal-id="coach-engagement"]')
-                    || document.querySelector('[data-rc-modal-id="coach-engagement"]');
+            (function () {
+                window.__rcCoachEngagementFilter = window.__rcCoachEngagementFilter || '';
 
-                if (!drawer) return;
+                window.rcApplyCoachEngagementFilter = function () {
+                    const normalized = ['instagram', 'youtube', 'x'].includes(String(window.__rcCoachEngagementFilter || '').toLowerCase())
+                        ? String(window.__rcCoachEngagementFilter).toLowerCase()
+                        : '';
+                    const drawer = document.querySelector('[data-rc-modal-id="coach-engagement"]');
 
-                drawer.dataset.engagementPlatform = normalized;
+                    if (!drawer) return;
 
-                drawer.querySelectorAll('[data-engagement-filter]').forEach((card) => {
-                    const active = card.dataset.engagementFilter === normalized;
-                    card.classList.toggle('is-filter-active', active);
-                    card.setAttribute('aria-pressed', active ? 'true' : 'false');
-                });
+                    drawer.dataset.engagementPlatform = normalized;
 
-                drawer.querySelectorAll('[data-engagement-row]').forEach((row) => {
-                    const rowPlatform = String(row.dataset.platform || '').toLowerCase();
-                    row.hidden = normalized !== '' && rowPlatform !== normalized;
-                });
+                    drawer.querySelectorAll('[data-engagement-filter]').forEach((card) => {
+                        const active = card.dataset.engagementFilter === normalized;
+                        card.classList.toggle('is-filter-active', active);
+                        card.setAttribute('aria-pressed', active ? 'true' : 'false');
+                    });
 
-                const title = drawer.querySelector('[data-engagement-table-title]');
-                if (title) {
-                    const labels = { instagram: 'Instagram', youtube: 'YouTube', x: 'X (Twitter)' };
-                    title.textContent = normalized ? `Clicks — ${labels[normalized]}` : "Who's Clicking";
+                    drawer.querySelectorAll('[data-engagement-row]').forEach((row) => {
+                        const rowPlatform = String(row.dataset.platform || '').toLowerCase();
+                        row.hidden = normalized !== '' && rowPlatform !== normalized;
+                    });
+
+                    const title = drawer.querySelector('[data-engagement-table-title]');
+                    if (title) {
+                        const labels = { instagram: 'Instagram', youtube: 'YouTube', x: 'X (Twitter)' };
+                        title.textContent = normalized ? `Clicks — ${labels[normalized]}` : "Who's Clicking";
+                    }
+
+                    const clear = drawer.querySelector('[data-engagement-clear]');
+                    if (clear) clear.hidden = normalized === '';
+                };
+
+                window.rcFilterCoachEngagement = function (source, platform) {
+                    const normalized = ['instagram', 'youtube', 'x'].includes(String(platform || '').toLowerCase())
+                        ? String(platform).toLowerCase()
+                        : '';
+
+                    window.__rcCoachEngagementFilter = normalized;
+                    window.rcApplyCoachEngagementFilter();
+                };
+
+                if (!window.__rcCoachEngagementFilterObserverBound) {
+                    window.__rcCoachEngagementFilterObserverBound = true;
+                    let scheduled = false;
+                    const scheduleApply = () => {
+                        if (scheduled) return;
+                        scheduled = true;
+                        window.requestAnimationFrame(() => {
+                            scheduled = false;
+                            window.rcApplyCoachEngagementFilter?.();
+                        });
+                    };
+
+                    const observer = new MutationObserver((mutations) => {
+                        if (!window.__rcCoachEngagementFilter) return;
+                        if (mutations.some((mutation) => mutation.type === 'childList')) scheduleApply();
+                    });
+
+                    const bindObserver = () => {
+                        if (!document.body) return;
+                        observer.disconnect();
+                        observer.observe(document.body, { childList: true, subtree: true });
+                        scheduleApply();
+                    };
+
+                    document.addEventListener('DOMContentLoaded', bindObserver, { once: true });
+                    document.addEventListener('livewire:navigated', scheduleApply);
+                    document.addEventListener('livewire:init', () => {
+                        if (window.Livewire?.hook) {
+                            window.Livewire.hook('morph.updated', scheduleApply);
+                        }
+                    }, { once: true });
+
+                    if (document.body) bindObserver();
                 }
 
-                const clear = drawer.querySelector('[data-engagement-clear]');
-                if (clear) clear.hidden = normalized === '';
-            };
+                window.rcApplyCoachEngagementFilter();
+            })();
         </script>
 
         <style>

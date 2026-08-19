@@ -2962,8 +2962,12 @@ class GoHighLevelService
         $conversationResult = $this->getConversationsForUser($user, [
             'fetch_all' => true,
             'limit' => 100,
-            'max_rows' => (int) config('ghl.sent_email_count_max_conversations', 5000),
-            'max_pages' => (int) config('ghl.sent_email_count_max_conversation_pages', 50),
+            'max_rows' => (int) config('ghl.sent_email_count_max_conversations', 10000),
+            'max_pages' => (int) config('ghl.sent_email_count_max_conversation_pages', 100),
+            'status' => 'all',
+            'search' => '',
+            'sortBy' => 'last_message_date',
+            'sort' => 'desc',
         ]);
 
         if (! ($conversationResult['success'] ?? false)) {
@@ -2973,9 +2977,12 @@ class GoHighLevelService
                 'conversations_scanned' => 0,
                 'conversations_failed' => 0,
                 'messages_scanned' => 0,
+                'outbound_rows_seen' => 0,
+                'inbound_rows_seen' => 0,
+                'unknown_direction_rows' => 0,
                 'outbound_emails_counted' => 0,
-                'source' => 'ghl_conversations',
-                'error' => $conversationResult['error'] ?? 'Unable to retrieve GHL conversations.',
+                'source' => 'conversations_message_scan',
+                'error' => $conversationResult['error'] ?? 'Unable to retrieve conversations.',
             ];
         }
 
@@ -2984,6 +2991,9 @@ class GoHighLevelService
         $conversationsFailed = 0;
         $messagesScanned = 0;
         $outboundRows = 0;
+        $inboundRows = 0;
+        $unknownDirectionRows = 0;
+        $messagePagesScanned = 0;
 
         foreach ($conversationResult['conversations'] ?? [] as $conversation) {
             if (! is_array($conversation)) {
@@ -3005,9 +3015,11 @@ class GoHighLevelService
             $lastMessageId = null;
             $pageGuard = 0;
             $conversationFailed = false;
+            $seenPageCursors = [];
 
             do {
                 $pageGuard++;
+                $messagePagesScanned++;
 
                 $result = $this->getConversationMessagesForUser(
                     user: $user,
@@ -3020,9 +3032,8 @@ class GoHighLevelService
                     $conversationFailed = true;
                     $conversationsFailed++;
 
-                    Log::warning('GHL sent-email sync could not read one conversation.', [
+                    Log::warning('Sent-email reconciliation could not read one conversation.', [
                         'user_id' => $user->getKey(),
-                        'location_id' => $user->ghl_location_id,
                         'conversation_id' => $conversationId,
                         'page' => $pageGuard,
                         'error' => $result['error'] ?? 'Unable to load conversation messages.',
@@ -3037,35 +3048,35 @@ class GoHighLevelService
 
                     $messagesScanned++;
 
-                    // getConversationMessagesForUser() already requests TYPE_EMAIL,
-                    // but retain the check so a malformed API row cannot inflate the total.
                     $type = strtolower(trim((string) (
                         $message['type']
                         ?? $message['messageType']
                         ?? $message['message_type']
-                        ?? 'TYPE_EMAIL'
+                        ?? ''
                     )));
 
+                    // The endpoint is requested with TYPE_EMAIL. Still reject an explicit
+                    // non-email row so SMS/call activity can never inflate this metric.
                     if ($type !== '' && ! str_contains($type, 'email')) {
                         continue;
                     }
 
-                    $direction = $this->extractGhlMessageDirection($message);
-                    $isOutbound = $direction === 'outbound';
+                    $direction = $this->normalizedEmailDirection($message);
 
-                    // Some normalized Inbox rows carry sender/recipient data but no
-                    // explicit direction. Use the same sender inference rather than
-                    // silently dropping a real outbound email.
-                    if ($direction === 'unknown') {
-                        $isOutbound = $this->isLikelyOutboundEmailMessage($message, $user);
+                    if ($direction === 'inbound') {
+                        $inboundRows++;
+                        continue;
                     }
 
-                    if (! $isOutbound) {
+                    // Accuracy is more important than guessing. Unknown direction rows are
+                    // deliberately excluded instead of inferring outbound from sender fields.
+                    if ($direction !== 'outbound') {
+                        $unknownDirectionRows++;
                         continue;
                     }
 
                     $outboundRows++;
-                    $id = $this->extractGhlMessageUniqueId($message);
+                    $id = $this->emailMessageUniqueId($message);
 
                     if ($id === '') {
                         $id = hash('sha256', json_encode([
@@ -3082,10 +3093,18 @@ class GoHighLevelService
                 }
 
                 $next = trim((string) ($result['last_message_id'] ?? ''));
+                $cursorRepeated = $next !== '' && isset($seenPageCursors[$next]);
+
+                if ($next !== '') {
+                    $seenPageCursors[$next] = true;
+                }
+
                 $hasMore = (bool) ($result['has_more'] ?? false)
                     && $next !== ''
                     && $next !== (string) $lastMessageId
+                    && ! $cursorRepeated
                     && $pageGuard < (int) config('ghl.sent_email_count_max_message_pages_per_conversation', 200);
+
                 $lastMessageId = $next !== '' ? $next : null;
             } while ($hasMore);
 
@@ -3094,8 +3113,7 @@ class GoHighLevelService
             }
         }
 
-        // Never replace a known good total with a partial scan. One failed
-        // conversation means the location-wide total is incomplete.
+        // A partial scan is not allowed to replace a previously known complete total.
         if ($conversationsFailed > 0) {
             return [
                 'success' => false,
@@ -3103,22 +3121,30 @@ class GoHighLevelService
                 'conversations_scanned' => $conversationsScanned,
                 'conversations_failed' => $conversationsFailed,
                 'messages_scanned' => $messagesScanned,
+                'message_pages_scanned' => $messagePagesScanned,
+                'outbound_rows_seen' => $outboundRows,
+                'inbound_rows_seen' => $inboundRows,
+                'unknown_direction_rows' => $unknownDirectionRows,
                 'outbound_emails_counted' => count($seen),
-                'source' => 'ghl_conversations',
-                'error' => 'One or more GHL conversations could not be fully scanned. Existing sent-email total was preserved.',
+                'source' => 'conversations_message_scan',
+                'error' => 'One or more conversations could not be fully scanned. Existing sent-email total was preserved.',
             ];
         }
 
         $total = count($seen);
         $user->forceFill(['total_emails_sent' => $total])->save();
 
-        Log::info('GHL sent-email count synchronized from Conversations API.', [
+        Log::info('Sent-email count synchronized from conversation messages.', [
             'user_id' => $user->getKey(),
-            'location_id' => $user->ghl_location_id,
             'conversations_available' => (int) ($conversationResult['total'] ?? 0),
+            'conversation_pages_fetched' => $conversationResult['pages_fetched'] ?? null,
+            'conversation_pagination_truncated' => $conversationResult['pagination_truncated'] ?? false,
             'conversations_scanned' => $conversationsScanned,
+            'message_pages_scanned' => $messagePagesScanned,
             'messages_scanned' => $messagesScanned,
             'outbound_rows_seen' => $outboundRows,
+            'inbound_rows_seen' => $inboundRows,
+            'unknown_direction_rows' => $unknownDirectionRows,
             'outbound_emails_counted' => $total,
         ]);
 
@@ -3128,10 +3154,56 @@ class GoHighLevelService
             'conversations_scanned' => $conversationsScanned,
             'conversations_failed' => 0,
             'messages_scanned' => $messagesScanned,
+            'message_pages_scanned' => $messagePagesScanned,
+            'outbound_rows_seen' => $outboundRows,
+            'inbound_rows_seen' => $inboundRows,
+            'unknown_direction_rows' => $unknownDirectionRows,
             'outbound_emails_counted' => $total,
-            'source' => 'ghl_conversations',
+            'source' => 'conversations_message_scan',
             'error' => null,
         ];
+    }
+
+    protected function normalizedEmailDirection(array $message): string
+    {
+        $raw = strtolower(trim((string) (
+            $message['direction']
+            ?? $message['messageDirection']
+            ?? $message['message_direction']
+            ?? data_get($message, 'emailMessage.direction')
+            ?? data_get($message, 'meta.email.direction')
+            ?? ''
+        )));
+
+        $normalized = preg_replace('/[^a-z]+/', '_', $raw) ?: '';
+
+        if (str_starts_with($normalized, 'outbound') || in_array($normalized, ['outgoing', 'sent', 'send', 'out'], true)) {
+            return 'outbound';
+        }
+
+        if (str_starts_with($normalized, 'inbound') || in_array($normalized, ['incoming', 'received', 'receive', 'in'], true)) {
+            return 'inbound';
+        }
+
+        return 'unknown';
+    }
+
+    protected function emailMessageUniqueId(array $message): string
+    {
+        foreach ([
+            $message['email_message_id'] ?? null,
+            $message['emailMessageId'] ?? null,
+            $message['messageId'] ?? null,
+            $message['message_id'] ?? null,
+            $message['id'] ?? null,
+            $message['_id'] ?? null,
+        ] as $candidate) {
+            if (is_scalar($candidate) && trim((string) $candidate) !== '') {
+                return trim((string) $candidate);
+            }
+        }
+
+        return '';
     }
 
     public function getConversationsForUser(User $user, array $query = []): array
@@ -3144,13 +3216,10 @@ class GoHighLevelService
             return ['success' => false, 'conversations' => [], 'error' => 'Missing recruiting data connection.'];
         }
 
-        $requestedLimit = (int) ($query['limit'] ?? 100);
-        $requestedLimit = min(max($requestedLimit, 1), 100);
+        $requestedLimit = min(max((int) ($query['limit'] ?? 100), 1), 100);
         $fetchAll = (bool) ($query['fetch_all'] ?? false);
-        $maxRows = (int) ($query['max_rows'] ?? 500);
-        $maxRows = min(max($maxRows, $requestedLimit), 10000);
-        $maxPages = (int) ($query['max_pages'] ?? 10);
-        $maxPages = min(max($maxPages, 1), 100);
+        $maxRows = min(max((int) ($query['max_rows'] ?? 500), $requestedLimit), 10000);
+        $maxPages = min(max((int) ($query['max_pages'] ?? 10), 1), 100);
 
         $baseParams = array_filter([
             'locationId' => $locationId,
@@ -3177,7 +3246,7 @@ class GoHighLevelService
             $page = 0;
             $pageSuccess = false;
             $total = 0;
-            $paginationStoppedOnDuplicatePage = false;
+            $stoppedOnDuplicatePage = false;
             $paginationTruncated = false;
 
             do {
@@ -3212,51 +3281,36 @@ class GoHighLevelService
 
                 $pageSuccess = true;
                 $items = $this->extractConversationsFromResponse($data);
-                $uniqueBefore = count($allItems);
+                $before = count($allItems);
 
                 foreach ($items as $item) {
-                    if (is_array($item)) {
-                        $id = (string) ($item['id'] ?? $item['_id'] ?? $item['conversationId'] ?? md5(json_encode($item) ?: uniqid('', true)));
-                        $allItems[$id] = $item;
+                    if (! is_array($item)) {
+                        continue;
                     }
+
+                    $id = (string) ($item['id'] ?? $item['_id'] ?? $item['conversationId'] ?? md5(json_encode($item) ?: uniqid('', true)));
+                    $allItems[$id] = $item;
                 }
 
-                $uniqueAfter = count($allItems);
-                $newUniqueRows = max(0, $uniqueAfter - $uniqueBefore);
-
-                // Prefer nested/meta totals when present. Some response shapes expose a
-                // top-level `total` that can equal only the current page size (often 100),
-                // which previously caused fetch_all to stop after page one.
-                $reportedTotal = data_get($data, 'meta.total')
-                    ?? data_get($data, 'conversations.total')
-                    ?? data_get($data, 'data.total')
-                    ?? ($data['total'] ?? null);
-                if (is_numeric($reportedTotal)) {
-                    $total = max($total, (int) $reportedTotal);
-                }
-
+                $newUnique = count($allItems) - $before;
+                $total = max($total, (int) ($data['total'] ?? $data['meta']['total'] ?? data_get($data, 'conversations.total') ?? 0));
                 $count = count($items);
-                $skip += $requestedLimit;
                 $page++;
 
-                // For fetch_all, page until the API returns a short page. Do not trust a
-                // `total` field to decide whether another page exists because some API
-                // versions report the page count there. Also stop safely if the API ignores
-                // `skip` and gives us a duplicate page, preventing a 100-page loop.
-                $paginationStoppedOnDuplicatePage = $fetchAll
-                    && $count > 0
-                    && $newUniqueRows === 0;
-
-                $paginationTruncated = $fetchAll
-                    && $count >= $requestedLimit
-                    && ! $paginationStoppedOnDuplicatePage
-                    && (count($allItems) >= $maxRows || $page >= $maxPages);
+                // HighLevel accounts have been observed returning a page-sized `total`
+                // even when more pages exist. Never use total as the stop condition.
+                $stoppedOnDuplicatePage = $fetchAll && $count >= $requestedLimit && $newUnique === 0;
+                $skip += $count > 0 ? $count : $requestedLimit;
 
                 $hasMore = $fetchAll
                     && $count >= $requestedLimit
-                    && $newUniqueRows > 0
+                    && $newUnique > 0
                     && count($allItems) < $maxRows
                     && $page < $maxPages;
+
+                if (! $hasMore && $fetchAll && $count >= $requestedLimit && ! $stoppedOnDuplicatePage) {
+                    $paginationTruncated = count($allItems) >= $maxRows || $page >= $maxPages;
+                }
             } while ($hasMore);
 
             if ($pageSuccess) {
@@ -3272,7 +3326,7 @@ class GoHighLevelService
                     'conversations' => $conversations,
                     'total' => max($total, count($conversations)),
                     'pages_fetched' => $page,
-                    'pagination_stopped_on_duplicate_page' => $paginationStoppedOnDuplicatePage,
+                    'pagination_stopped_on_duplicate_page' => $stoppedOnDuplicatePage,
                     'pagination_truncated' => $paginationTruncated,
                     'error' => null,
                 ];
@@ -5385,8 +5439,6 @@ class GoHighLevelService
         $contact = is_array($item['contact'] ?? null) ? $item['contact'] : [];
         $lastMessage = is_array($item['lastMessage'] ?? null) ? $item['lastMessage'] : [];
         $lastBody = $lastMessage['body'] ?? $lastMessage['message'] ?? $lastMessage['text'] ?? $item['lastMessageBody'] ?? $item['lastMessage'] ?? '';
-        $lastDirection = (string) ($item['lastMessageDirection'] ?? $item['last_message_direction'] ?? $item['direction'] ?? $item['messageDirection'] ?? $lastMessage['direction'] ?? $lastMessage['messageDirection'] ?? '');
-        $lastType = (string) ($item['lastMessageType'] ?? $item['last_message_type'] ?? $item['messageType'] ?? $item['message_type'] ?? $item['type'] ?? $lastMessage['type'] ?? $lastMessage['messageType'] ?? '');
 
         $rawForAssets = json_encode($item) ?: '';
         $hasImage = (bool) preg_match('/<img\b|\.(png|jpe?g|gif|webp)(\?|\"|\'|$)/i', $rawForAssets);
@@ -5400,10 +5452,6 @@ class GoHighLevelService
             'status' => (string) ($item['status'] ?? (($item['unreadCount'] ?? 0) ? 'Unread' : 'Open')),
             'last_message' => trim(strip_tags((string) $lastBody)),
             'last_message_at' => $item['lastMessageDate'] ?? $item['lastMessageAt'] ?? $item['last_message_date'] ?? $item['updatedAt'] ?? null,
-            'last_message_direction' => $lastDirection,
-            'direction' => $lastDirection,
-            'last_message_type' => $lastType,
-            'message_type' => $lastType,
             'unread_count' => (int) ($item['unreadCount'] ?? $item['unread_count'] ?? 0),
             'has_image' => $hasImage,
             'has_file' => $hasFile,

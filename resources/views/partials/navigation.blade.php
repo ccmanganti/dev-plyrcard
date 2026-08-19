@@ -771,6 +771,13 @@
         #site-header.plyrcard-site-header .desktop-nav { display: flex !important; }
         #site-header.plyrcard-site-header .menu-btn { display: none !important; }
         #mobile-nav.plyrcard-mobile-nav { display: none !important; }
+
+        /* Desktop uses the normal header/admin navigation. The Locker Room pull-up
+           navigation remains available on phones/tablets only. */
+        #plyrcard-action-drawer,
+        .plyrcard-action-drawer {
+          display: none !important;
+        }
       }
 
       @media (max-width: 767px) {
@@ -2667,7 +2674,7 @@
       <a data-nav href="/book-demo" class="{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book a Demo</a>
       @auth
         @unless($plyrOnRegistrationPage)
-          <a href="#" data-plyrcard-open-drawer>Dashboard</a>
+          <a data-nav href="{{ url('/admin/coach-database') }}">Dashboard</a>
         @endunless
       @else
         @unless($plyrOnRegistrationPage)

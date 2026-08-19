@@ -513,12 +513,12 @@ trait InteractsWithCoachDatabase
         $user = Auth::user();
 
         $this->dashboardEmailFetchError = null;
-        $this->dashboardEmailFetchStatus = 'Fetching all conversations from GHL…';
+        $this->dashboardEmailFetchStatus = 'Updating sent email count…';
         $this->isFetchingDashboardEmailsSent = true;
 
         if (! $user) {
             $this->dashboardEmailFetchError = 'No authenticated user is available.';
-            $this->dashboardEmailFetchStatus = 'Unable to fetch sent emails.';
+            $this->dashboardEmailFetchStatus = 'Unable to refresh sent emails.';
             $this->isFetchingDashboardEmailsSent = false;
             return;
         }
@@ -531,49 +531,35 @@ trait InteractsWithCoachDatabase
         }
 
         try {
-            Log::info('Dashboard conversation procurement started for local sent-email count.', [
+            Log::info('Dashboard sent-email reconciliation started.', [
                 'user_id' => $user->getKey(),
             ]);
 
-            // v137: use the exact same conversation procurement method as Inbox.
-            // Do not call the per-conversation messages endpoint and do not use the
-            // export endpoint. Fetch every available conversation first, then count
-            // outbound email rows locally from the normalized conversation payload.
-            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
-                'fetch_all' => true,
-                'limit' => 100,
-                'max_rows' => 10000,
-                'max_pages' => 100,
-                'status' => 'all',
-                'search' => '',
-                'sortBy' => 'last_message_date',
-                'sort' => 'desc',
-            ]);
+            // Count every unique TYPE_EMAIL message with an explicit outbound direction.
+            // This uses the same Conversations API family as Inbox, scans all conversation
+            // pages and all message pages, and excludes inbound/unknown-direction rows.
+            $result = app(GoHighLevelService::class)->syncTotalEmailsSentFromGhl($user);
 
             if (! ($result['success'] ?? false)) {
                 $error = trim((string) ($result['error'] ?? 'Unable to refresh email activity.'));
                 $this->dashboardEmailFetchError = $error !== '' ? $error : 'Unable to refresh email activity.';
                 $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
-                Log::warning('Dashboard conversation procurement failed.', [
+                Log::warning('Dashboard sent-email reconciliation failed.', [
                     'user_id' => $user->getKey(),
-                    'status' => $result['status'] ?? null,
+                    'conversations_scanned' => $result['conversations_scanned'] ?? null,
+                    'conversations_failed' => $result['conversations_failed'] ?? null,
+                    'messages_scanned' => $result['messages_scanned'] ?? null,
+                    'outbound_rows_seen' => $result['outbound_rows_seen'] ?? null,
+                    'inbound_rows_seen' => $result['inbound_rows_seen'] ?? null,
+                    'unknown_direction_rows' => $result['unknown_direction_rows'] ?? null,
                     'error' => $this->dashboardEmailFetchError,
                 ]);
 
                 return;
             }
 
-            $conversations = collect($result['conversations'] ?? [])
-                ->filter(fn ($row): bool => is_array($row))
-                ->values()
-                ->all();
-
-            $count = $this->countOutboundEmailConversationsLocally($conversations);
-
-            // The count is derived locally from the freshly procured API rows. Persist
-            // only the final result so the existing Dashboard metric remains compatible.
-            $user->forceFill(['total_emails_sent' => $count])->save();
+            $count = max(0, (int) ($result['count'] ?? 0));
             $user->refresh();
             Auth::setUser($user);
 
@@ -584,72 +570,27 @@ trait InteractsWithCoachDatabase
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
-            Log::info('Dashboard sent-email count calculated locally from conversations.', [
+            Log::info('Dashboard sent-email reconciliation completed.', [
                 'user_id' => $user->getKey(),
-                'conversations_procured' => count($conversations),
-                'api_total' => $result['total'] ?? count($conversations),
-                'pages_fetched' => $result['pages_fetched'] ?? null,
-                'pagination_stopped_on_duplicate_page' => $result['pagination_stopped_on_duplicate_page'] ?? false,
-                'pagination_truncated' => $result['pagination_truncated'] ?? false,
+                'conversations_scanned' => $result['conversations_scanned'] ?? null,
+                'messages_scanned' => $result['messages_scanned'] ?? null,
+                'message_pages_scanned' => $result['message_pages_scanned'] ?? null,
+                'outbound_rows_seen' => $result['outbound_rows_seen'] ?? null,
+                'inbound_rows_seen' => $result['inbound_rows_seen'] ?? null,
+                'unknown_direction_rows' => $result['unknown_direction_rows'] ?? null,
                 'outbound_emails_counted' => $count,
-                'source' => 'conversations_local_count',
             ]);
         } catch (\Throwable $exception) {
             $this->dashboardEmailFetchError = $exception->getMessage();
-            $this->dashboardEmailFetchStatus = 'Conversation fetch failed.';
+            $this->dashboardEmailFetchStatus = 'Unable to refresh email activity.';
 
-            Log::warning('Dashboard local conversation sent-email count threw an exception.', [
+            Log::warning('Dashboard sent-email reconciliation threw an exception.', [
                 'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);
         } finally {
             $this->isFetchingDashboardEmailsSent = false;
         }
-    }
-
-    /**
-     * Count outbound email activity only from conversation rows already returned by
-     * GoHighLevelService::getConversationsForUser(). No additional API calls happen here.
-     */
-    protected function countOutboundEmailConversationsLocally(array $conversations): int
-    {
-        return collect($conversations)
-            ->filter(fn ($row): bool => is_array($row))
-            ->filter(function (array $row): bool {
-                $direction = strtolower(trim((string) (
-                    $row['last_message_direction']
-                    ?? $row['lastMessageDirection']
-                    ?? $row['message_direction']
-                    ?? $row['direction']
-                    ?? ''
-                )));
-                $direction = preg_replace('/[^a-z]+/', '_', $direction) ?: '';
-
-                $isOutbound = str_starts_with($direction, 'outbound')
-                    || in_array($direction, ['outgoing', 'sent', 'send', 'out'], true);
-
-                if (! $isOutbound) {
-                    return false;
-                }
-
-                $messageType = strtolower(trim((string) (
-                    $row['last_message_type']
-                    ?? $row['lastMessageType']
-                    ?? $row['message_type']
-                    ?? $row['type']
-                    ?? ''
-                )));
-
-                // Emails Sent must be strict: count only rows that are explicitly both
-                // outbound and email. If the conversation payload omits the channel/type,
-                // do not guess, because that could count SMS, calls, or other outbound activity.
-                $isEmail = $messageType !== ''
-                    && (str_contains($messageType, 'email')
-                        || in_array($messageType, ['type_email', 'mail'], true));
-
-                return $isEmail;
-            })
-            ->count();
     }
 
     /** Backwards-compatible alias for older callers. */

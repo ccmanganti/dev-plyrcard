@@ -1425,6 +1425,19 @@ class AdminPanelProvider extends PanelProvider
                                         </svg>
                                         <span>Settings</span>
                                     </a>
+
+                                    <div class="plyr-sidebar-user-actions-separator" aria-hidden="true"></div>
+
+                                    <form method="POST" action="{{ $logoutUrl }}" style="margin:0;">
+                                        @csrf
+                                        <button type="submit" class="plyr-sidebar-user-action-button plyr-sidebar-user-action-danger">
+                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                                <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                                                <path d="M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                            <span>Sign Out</span>
+                                        </button>
+                                    </form>
                                 </div>
 
                                 <button type="button" class="plyr-sidebar-profile plyr-sidebar-account-trigger" x-on:click="open = ! open" x-on:keydown.escape.window="open = false" aria-label="Open account menu">
