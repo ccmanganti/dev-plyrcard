@@ -33,6 +33,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
         $leagues = $this->canonicalLeagueQuery()->orderBy('name')->get();
         $programs = $this->activeClubLeagueQuery()->with(['club', 'league'])->get();
+        $programsByLeague = $programs->groupBy('league_id');
 
         return view('pages.registration', [
             'planKey' => $planKey,
@@ -41,30 +42,61 @@ class RegistrationController extends PublicPlayerIntakeController
             'sportPositions' => $this->sportPositions,
             'states' => $this->states(),
             'ageGroups' => $this->getAgeGroupOptions(),
-            'leagueDirectory' => $leagues->map(function (League $league) {
-                $genders = collect($league->genders ?: [$league->gender])
-                    ->map(fn ($value) => $this->normalizeGender($value))
-                    ->filter()->unique()->values()->all();
+            // Registration is intentionally strict here: a league must have
+            // explicit gender support either on the League itself or through one
+            // of its active ClubLeague records. Missing gender metadata is not
+            // treated as "all genders".
+            'leagueDirectory' => $leagues->map(function (League $league) use ($programsByLeague) {
+                $leaguePrograms = $programsByLeague->get($league->id, collect());
+
+                $genders = $leaguePrograms
+                    ->flatMap(fn (ClubLeague $program) => $this->registrationGenderValues(
+                        $program->genders ?: $league->genders ?: [$league->gender]
+                    ))
+                    ->merge($this->registrationGenderValues($league->genders ?: [$league->gender]))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                $sports = $leaguePrograms
+                    ->map(fn (ClubLeague $program) => filled($program->sport)
+                        ? strtolower(trim((string) $program->sport))
+                        : (filled($league->sport) ? strtolower(trim((string) $league->sport)) : null))
+                    ->filter()
+                    ->unique()
+                    ->values();
+
+                if ($sports->isEmpty() && filled($league->sport)) {
+                    $sports->push(strtolower(trim((string) $league->sport)));
+                }
+
                 return [
                     'id' => (string) $league->id,
                     'name' => $league->name,
-                    'genders' => $genders,
-                    'sport' => filled($league->sport) ? strtolower((string) $league->sport) : null,
+                    'genders' => $genders->all(),
+                    'sports' => $sports->all(),
                 ];
-            })->values(),
+            })
+                ->filter(fn (array $row) => filled($row['id']) && filled($row['name']) && ! empty($row['genders']))
+                ->values(),
             'clubDirectory' => $programs->map(function (ClubLeague $program) {
-                $genders = collect($program->genders ?: $program->league?->genders ?: [$program->league?->gender])
-                    ->map(fn ($value) => $this->normalizeGender($value))
-                    ->filter()->unique()->values()->all();
+                $genders = $this->registrationGenderValues(
+                    $program->genders ?: $program->league?->genders ?: [$program->league?->gender]
+                );
+
                 return [
                     'id' => (string) $program->club_id,
                     'name' => $program->club?->name,
                     'league_id' => (string) $program->league_id,
                     'club_league_id' => (string) $program->id,
                     'genders' => $genders,
-                    'sport' => filled($program->sport) ? strtolower((string) $program->sport) : (filled($program->league?->sport) ? strtolower((string) $program->league->sport) : null),
+                    'sport' => filled($program->sport)
+                        ? strtolower(trim((string) $program->sport))
+                        : (filled($program->league?->sport) ? strtolower(trim((string) $program->league->sport)) : null),
                 ];
-            })->filter(fn ($row) => filled($row['id']) && filled($row['name']))->values(),
+            })
+                ->filter(fn (array $row) => filled($row['id']) && filled($row['name']) && ! empty($row['genders']))
+                ->values(),
             'trackingParams' => array_filter($request->only([
                 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
                 'utm_club_id', 'utm_league_id', 'utm_team_name',
@@ -789,8 +821,10 @@ class RegistrationController extends PublicPlayerIntakeController
     ): array {
         $league = $this->canonicalLeagueQuery()->findOrFail($leagueId);
 
-        if (! $league->supportsGender($gender) || ! $this->isLeagueSportCompatible($league->sport, $sport)) {
-            throw ValidationException::withMessages(['league_id' => 'The selected league does not match the athlete gender and sport.']);
+        if (! $this->registrationLeagueSupports($league, $gender, $sport)) {
+            throw ValidationException::withMessages([
+                'league_id' => 'The selected league does not match the athlete gender and sport.',
+            ]);
         }
 
         if ($clubId === '__other__') {
@@ -808,11 +842,16 @@ class RegistrationController extends PublicPlayerIntakeController
             $program = $club ? $this->activeClubLeagueQuery()
                 ->where('club_id', $club->id)
                 ->where('league_id', $league->id)
-                ->where(function ($query) use ($sport) { $query->whereNull('sport')->orWhere('sport', $sport); })
-                ->first() : null;
-            if ($program && ! $this->gendersContain($program->genders ?: $league->genders ?: [$league->gender], $gender)) {
-                $program = null;
-            }
+                ->where(function ($query) use ($sport) {
+                    $query->whereNull('sport')->orWhere('sport', $sport);
+                })
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->first(fn (ClubLeague $candidate) => $this->registrationGendersContain(
+                    $candidate->genders ?: $league->genders ?: [$league->gender],
+                    $gender,
+                )) : null;
             if (! $club || ! $program) {
                 throw ValidationException::withMessages(['club_id' => 'The selected club does not match the selected gender, sport, and league.']);
             }
@@ -826,6 +865,65 @@ class RegistrationController extends PublicPlayerIntakeController
         }
 
         return [$league, $club, $program, $teamName];
+    }
+
+    /**
+     * Normalize registration directory genders while preserving coed/mixed
+     * programs. The parent controller's normalizeGender() intentionally returns
+     * only male/female, which is not enough for a cascading registration list.
+     */
+    protected function normalizeRegistrationDirectoryGender(?string $gender): ?string
+    {
+        $gender = strtolower(trim((string) $gender));
+
+        return match ($gender) {
+            'female', 'girls', 'girl', 'women', 'woman', 'womens', "women's" => 'female',
+            'male', 'boys', 'boy', 'men', 'man', 'mens', "men's" => 'male',
+            'coed', 'co-ed', 'mixed', 'mixed gender', 'mixed-gender' => 'coed',
+            default => null,
+        };
+    }
+
+    protected function registrationGenderValues($genders): array
+    {
+        return collect(is_array($genders) ? $genders : [$genders])
+            ->map(fn ($value) => $this->normalizeRegistrationDirectoryGender($value))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function registrationGendersContain($genders, string $gender): bool
+    {
+        $target = $this->normalizeRegistrationGender($gender);
+        $values = $this->registrationGenderValues($genders);
+
+        return in_array($target, $values, true) || in_array('coed', $values, true);
+    }
+
+    protected function registrationLeagueSupports(League $league, string $gender, string $sport): bool
+    {
+        $leagueGenderMatch = $this->registrationGendersContain(
+            $league->genders ?: [$league->gender],
+            $gender,
+        );
+
+        if ($leagueGenderMatch && $this->isLeagueSportCompatible($league->sport, $sport)) {
+            return true;
+        }
+
+        return $this->activeClubLeagueQuery()
+            ->where('league_id', $league->id)
+            ->get()
+            ->contains(function (ClubLeague $program) use ($league, $gender, $sport) {
+                $programSport = filled($program->sport) ? $program->sport : $league->sport;
+
+                return $this->registrationGendersContain(
+                    $program->genders ?: $league->genders ?: [$league->gender],
+                    $gender,
+                ) && $this->isLeagueSportCompatible($programSport, $sport);
+            });
     }
 
     protected function generateAutomaticHandle(string $firstName, string $lastName): string
