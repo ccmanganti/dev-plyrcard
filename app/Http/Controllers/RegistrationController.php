@@ -10,12 +10,12 @@ use App\Models\School;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\GoHighLevelService;
+use App\Services\PlyrcardSystemEmailService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -525,18 +525,28 @@ class RegistrationController extends PublicPlayerIntakeController
         $request->session()->regenerate();
         $request->session()->regenerateToken();
 
+        $verificationEmailResult = ['success' => false, 'error' => 'Verification email was not attempted.'];
+
         try {
             $verificationUrl = URL::temporarySignedRoute(
                 'registration.verify-email',
                 now()->addHours(72),
                 ['user' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
             );
-            Mail::to($user->email)->send(new \App\Mail\RegistrationVerificationMail($user, $verificationUrl));
-            if (Schema::hasColumn('users', 'email_verification_sent_at')) {
+
+            $verificationEmailResult = app(PlyrcardSystemEmailService::class)
+                ->sendRegistrationVerification($user, $verificationUrl);
+
+            if (($verificationEmailResult['success'] ?? false) && Schema::hasColumn('users', 'email_verification_sent_at')) {
                 $user->forceFill(['email_verification_sent_at' => now()])->saveQuietly();
             }
         } catch (\Throwable $exception) {
-            Log::warning('Registration verification email could not be sent.', [
+            $verificationEmailResult = [
+                'success' => false,
+                'error' => $exception->getMessage(),
+            ];
+
+            Log::error('Registration verification email could not be sent through GHL.', [
                 'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);
@@ -554,12 +564,13 @@ class RegistrationController extends PublicPlayerIntakeController
             'payment_form_url' => $paymentFormUrl,
             // Keep payment_url for compatibility with older registration JavaScript.
             'payment_url' => $paymentFormUrl,
+            'verification_email_sent' => (bool) ($verificationEmailResult['success'] ?? false),
             'redirect_url' => url('/admin/my-profile'),
             'message' => $isPaid
                 ? ($paymentFormUrl
                     ? 'Your account is ready. Enter your card details below to complete payment.'
                     : 'Your account was created, but the payment form could not be opened. Please try again.')
-                : 'Your free PLYRCARD account is ready. Check your email to verify your address.',
+                : 'Your free PLYRCARD account is ready.',
         ]);
     }
 
