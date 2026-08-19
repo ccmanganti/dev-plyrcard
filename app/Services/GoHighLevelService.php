@@ -3242,33 +3242,20 @@ class GoHighLevelService
 
         foreach ($versions as $version) {
             $allItems = [];
+            $skip = 0;
             $page = 0;
             $pageSuccess = false;
-            $total = 0;
-            $offset = 0;
-            $cursorDate = null;
-            $cursorId = null;
-            $paginationMode = 'first_page';
+            $reportedTotal = 0;
             $stoppedOnDuplicatePage = false;
             $paginationTruncated = false;
-            $pageDiagnostics = [];
 
             while (true) {
+                // v144: use the exact same /conversations/search request shape Inbox uses.
+                // Pagination is deliberately skip-based only. Do not add cursor parameters
+                // that can make otherwise-working Inbox requests fail on some accounts.
                 $params = array_merge($baseParams, ['limit' => $requestedLimit]);
-
-                // HighLevel's conversation search is cursor-friendly. After page one,
-                // use the last conversation's date + id so we move past that exact row.
-                // Keep skip as a compatibility fallback for accounts/API versions that
-                // still honor offset pagination.
-                if ($page > 0) {
-                    if (filled($cursorDate) && filled($cursorId)) {
-                        $params['startAfterDate'] = $cursorDate;
-                        $params['startAfterId'] = $cursorId;
-                        $paginationMode = 'cursor';
-                    } else {
-                        $params['skip'] = $offset;
-                        $paginationMode = 'skip';
-                    }
+                if ($skip > 0) {
+                    $params['skip'] = $skip;
                 }
 
                 $response = Http::withHeaders(['Version' => $version])
@@ -3281,29 +3268,6 @@ class GoHighLevelService
                 $lastRaw = $data;
 
                 if ($response->failed()) {
-                    // If a version rejects cursor parameters, retry the same page once
-                    // with skip. This preserves compatibility without silently returning
-                    // only page one.
-                    if ($page > 0 && isset($params['startAfterDate'], $params['startAfterId'])) {
-                        $fallbackParams = array_merge($baseParams, [
-                            'limit' => $requestedLimit,
-                            'skip' => $offset,
-                        ]);
-
-                        $response = Http::withHeaders(['Version' => $version])
-                            ->timeout((int) config('ghl.timeout', 20))
-                            ->withToken($token)
-                            ->acceptJson()
-                            ->get("{$this->baseUrl}/conversations/search", $fallbackParams);
-
-                        $data = $response->json() ?? [];
-                        $lastRaw = $data;
-                        $params = $fallbackParams;
-                        $paginationMode = 'skip_fallback';
-                    }
-                }
-
-                if ($response->failed()) {
                     $lastStatus = $response->status();
                     $lastError = $response->body();
 
@@ -3311,11 +3275,13 @@ class GoHighLevelService
                         'status' => $response->status(),
                         'version' => $version,
                         'page' => $page + 1,
-                        'pagination_mode' => $paginationMode,
-                        'params' => $params,
+                        'skip' => $skip,
                         'body' => $response->body(),
                     ]);
 
+                    // If even page one failed, try the next supported API version.
+                    // If a later page failed, this version is incomplete and must not
+                    // be returned as a successful "all conversations" result.
                     break;
                 }
 
@@ -3333,13 +3299,14 @@ class GoHighLevelService
                     if ($id === '') {
                         $id = md5(json_encode($item) ?: uniqid('', true));
                     }
+
                     $allItems[$id] = $item;
                 }
 
                 $newUnique = count($allItems) - $before;
                 $page++;
-                $offset += $count;
-                $reportedTotal = (int) (
+
+                $pageReportedTotal = (int) (
                     $data['total']
                     ?? $data['totalCount']
                     ?? data_get($data, 'meta.total')
@@ -3347,58 +3314,30 @@ class GoHighLevelService
                     ?? data_get($data, 'conversations.total')
                     ?? 0
                 );
-                $total = max($total, $reportedTotal);
+                $reportedTotal = max($reportedTotal, $pageReportedTotal);
 
-                $lastItem = null;
-                for ($i = count($items) - 1; $i >= 0; $i--) {
-                    if (is_array($items[$i])) {
-                        $lastItem = $items[$i];
-                        break;
-                    }
-                }
-
-                if (is_array($lastItem)) {
-                    $cursorId = trim((string) (
-                        $lastItem['id']
-                        ?? $lastItem['_id']
-                        ?? $lastItem['conversationId']
-                        ?? ''
-                    ));
-                    $cursorDate = $lastItem['lastMessageDate']
-                        ?? $lastItem['lastMessageAt']
-                        ?? $lastItem['last_message_date']
-                        ?? $lastItem['updatedAt']
-                        ?? $lastItem['dateUpdated']
-                        ?? null;
-                }
-
-                $pageDiagnostics[] = [
+                Log::info('Recruiting conversations page loaded.', [
+                    'user_id' => $user->getKey(),
+                    'version' => $version,
                     'page' => $page,
-                    'mode' => $paginationMode,
+                    'skip' => $skip,
                     'rows' => $count,
                     'new_unique' => $newUnique,
                     'unique_total' => count($allItems),
-                    'reported_total' => $reportedTotal,
-                    'has_cursor' => filled($cursorDate) && filled($cursorId),
-                ];
-
-                Log::info('Recruiting conversations page loaded.', end([
-                    'user_id' => $user->getKey(),
-                    'version' => $version,
-                ]) + $pageDiagnostics[array_key_last($pageDiagnostics)]);
+                    'reported_total' => $pageReportedTotal,
+                ]);
 
                 if (! $fetchAll) {
                     break;
                 }
 
-                // A short page is the only normal end-of-data signal we trust. Do not
-                // stop merely because the API's `total` equals 100 or equals this page.
+                // A short page is the reliable end-of-data signal. Never stop because
+                // the API says total=100; that value has proved unreliable for paging.
                 if ($count < $requestedLimit) {
                     break;
                 }
 
-                // If the API returned a full page but none of it was new, cursor/skip
-                // was ignored and continuing would loop forever. Mark this explicitly.
+                // A full repeated page means the upstream endpoint ignored skip.
                 if ($newUnique === 0) {
                     $stoppedOnDuplicatePage = true;
                     $paginationTruncated = true;
@@ -3409,6 +3348,9 @@ class GoHighLevelService
                     $paginationTruncated = true;
                     break;
                 }
+
+                // Advance by the actual number returned, not the requested limit.
+                $skip += $count;
             }
 
             if ($pageSuccess) {
@@ -3422,12 +3364,11 @@ class GoHighLevelService
                 return [
                     'success' => true,
                     'conversations' => $conversations,
-                    'total' => max($total, count($conversations)),
+                    'total' => max($reportedTotal, count($conversations)),
                     'pages_fetched' => $page,
-                    'pagination_mode' => $paginationMode,
+                    'pagination_mode' => 'skip',
                     'pagination_stopped_on_duplicate_page' => $stoppedOnDuplicatePage,
                     'pagination_truncated' => $paginationTruncated,
-                    'page_diagnostics' => $pageDiagnostics,
                     'error' => null,
                 ];
             }

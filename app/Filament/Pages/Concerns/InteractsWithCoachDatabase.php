@@ -531,14 +531,14 @@ trait InteractsWithCoachDatabase
         }
 
         try {
-            Log::info('Dashboard Inbox-conversation sent-email count started.', [
+            Log::info('Dashboard all-Inbox-conversations sent-email count started.', [
                 'user_id' => $user->getKey(),
             ]);
 
-            // v142: use the SAME function that populates Inbox conversations.
-            // Do not call /conversations/{id}/messages and do not call export.
-            // We fetch all conversation rows through /conversations/search and
-            // count rows whose latest message is explicitly outbound + email.
+            // v144: use the exact SAME function that populates Inbox conversations.
+            // fetch_all=true makes that normal Inbox loader page through every available
+            // conversation using its proven skip-based request shape. No message-detail
+            // endpoint and no separate email-export endpoint are used here.
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
                 'fetch_all' => true,
                 'limit' => 100,
@@ -627,7 +627,7 @@ trait InteractsWithCoachDatabase
 
             $this->dispatch('rc-email-sent-count-updated', count: $count);
 
-            Log::info('Dashboard Inbox-conversation sent-email count completed.', [
+            Log::info('Dashboard all-Inbox-conversations sent-email count completed.', [
                 'user_id' => $user->getKey(),
                 'conversations_loaded' => $conversations->count(),
                 'api_total' => $result['total'] ?? $conversations->count(),
