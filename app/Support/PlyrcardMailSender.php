@@ -2,8 +2,6 @@
 
 namespace App\Support;
 
-use Illuminate\Mail\Mailables\Address;
-
 final class PlyrcardMailSender
 {
     public static function email(): string
@@ -17,12 +15,12 @@ final class PlyrcardMailSender
         return 'support@plyrcard.com';
     }
 
-    public static function address(): Address
+    public static function name(): string
     {
-        return new Address(static::email(), 'PLYRCARD Support');
+        return 'PLYRCARD Support';
     }
 
-    private static function currentHost(): string
+    public static function currentHost(): string
     {
         $host = '';
 
@@ -34,13 +32,14 @@ final class PlyrcardMailSender
             $host = '';
         }
 
-        if ($host !== '') {
-            return $host;
+        if ($host === '') {
+            $host = strtolower(trim((string) parse_url((string) config('app.url'), PHP_URL_HOST)));
         }
 
-        $configuredHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+        $host = preg_replace('/:\d+$/', '', $host) ?: $host;
+        $host = preg_replace('/^www\./', '', $host) ?: $host;
 
-        return strtolower(trim((string) $configuredHost));
+        return $host;
     }
 
     private static function isDevelopmentHost(string $host): bool
@@ -49,10 +48,6 @@ final class PlyrcardMailSender
             return true;
         }
 
-        if ($host === 'dev.plyrcard.com' || str_ends_with($host, '.dev.plyrcard.com')) {
-            return true;
-        }
-
-        return app()->environment(['local', 'development', 'testing']);
+        return $host === 'dev.plyrcard.com' || str_ends_with($host, '.dev.plyrcard.com');
     }
 }

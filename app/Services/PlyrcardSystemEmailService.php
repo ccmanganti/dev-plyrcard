@@ -5,16 +5,10 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Website;
 use App\Support\PlyrcardMailSender;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 
 class PlyrcardSystemEmailService
 {
-    public function __construct(
-        protected GoHighLevelService $ghl,
-    ) {}
-
     public function sendRegistrationVerification(User $user, string $verificationUrl): array
     {
         $recipient = $this->recipientFor($user);
@@ -33,9 +27,9 @@ class PlyrcardSystemEmailService
         return $this->sendHtml(
             user: $user,
             recipient: $recipient,
-            subject: 'Confirm your PLYRCARD account',
+            subject: 'Welcome to PLYRCARD',
             html: $html,
-            purpose: 'registration_verification',
+            purpose: 'registration_welcome',
         );
     }
 
@@ -69,7 +63,9 @@ class PlyrcardSystemEmailService
             recipient: $recipient,
             subject: $subject,
             html: $html,
-            purpose: $activityType === 'profile_view' ? 'profile_view_notification' : 'social_click_notification',
+            purpose: $activityType === 'profile_view'
+                ? 'profile_view_notification'
+                : 'social_click_notification',
         );
     }
 
@@ -81,174 +77,135 @@ class PlyrcardSystemEmailService
             return ['success' => false, 'error' => 'The player does not have a valid email address.'];
         }
 
-        $html = '<div style="font-family:Arial,sans-serif;background:#0C0E11;color:#F2F0ED;padding:32px">'
-            . '<h2 style="margin:0 0 12px">PLYRCARD email test</h2>'
-            . '<p style="margin:0;color:#aab0b7">If you received this, the PLYRCARD GHL system-email delivery path is working.</p>'
-            . '</div>';
+        $html = '<!doctype html><html><body style="margin:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,sans-serif">'
+            . '<div style="max-width:600px;margin:0 auto;padding:36px">'
+            . '<div style="font-size:20px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></div>'
+            . '<h2 style="margin:28px 0 10px">Native mail test</h2>'
+            . '<p style="margin:0;color:#AAB0B7;line-height:1.6">If you received this message, the hosting server accepted a PLYRCARD email through PHP mail().</p>'
+            . '</div></body></html>';
 
         return $this->sendHtml(
             user: $user,
             recipient: $recipient,
-            subject: 'PLYRCARD email test',
+            subject: 'PLYRCARD native mail test',
             html: $html,
-            purpose: 'system_email_test',
+            purpose: 'native_mail_test',
         );
     }
 
     protected function sendHtml(User $user, string $recipient, string $subject, string $html, string $purpose): array
     {
-        $locationId = filled($user->ghl_location_id)
-            ? trim((string) $user->ghl_location_id)
-            : trim((string) config('ghl.location_id'));
+        if (! function_exists('mail') || ! is_callable('mail')) {
+            $result = [
+                'success' => false,
+                'error' => 'PHP mail() is not available on this server.',
+            ];
 
-        $tokenOverride = filled($user->ghl_api_key)
-            ? trim((string) $user->ghl_api_key)
-            : null;
-
-        $token = $this->ghl->tokenForLocation($locationId ?: null, $tokenOverride);
-
-        if ($locationId === '' || ! $token) {
-            $result = ['success' => false, 'error' => 'Missing GHL location or access token.'];
             $this->logFailure($user, $recipient, $subject, $purpose, $result);
+
             return $result;
         }
 
-        $contactId = trim((string) ($user->ghl_contact_id ?? ''));
+        $recipient = $this->sanitizeEmail($recipient);
+        $fromEmail = $this->sanitizeEmail(PlyrcardMailSender::email());
+        $fromName = PlyrcardMailSender::name();
+        $subject = $this->sanitizeHeaderValue($subject);
 
-        if ($contactId === '') {
+        if ($recipient === null || $fromEmail === null || $subject === '') {
+            $result = [
+                'success' => false,
+                'error' => 'The recipient, sender, or subject is invalid.',
+            ];
+
+            $this->logFailure($user, $recipient ?? '', $subject, $purpose, $result);
+
+            return $result;
+        }
+
+        $plainText = $this->plainTextFromHtml($html);
+        $boundary = 'plyrcard_' . bin2hex(random_bytes(16));
+
+        $headers = [
+            'MIME-Version: 1.0',
+            'From: ' . $fromName . ' <' . $fromEmail . '>',
+            'Reply-To: ' . $fromEmail,
+            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+            'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
+        ];
+
+        $message = '--' . $boundary . "\r\n"
+            . "Content-Type: text/plain; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $plainText . "\r\n"
+            . '--' . $boundary . "\r\n"
+            . "Content-Type: text/html; charset=UTF-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+            . $html . "\r\n"
+            . '--' . $boundary . '--';
+
+        $headerString = implode("\r\n", $headers);
+        $envelopeParameter = '-f' . $fromEmail;
+
+        $sentWithEnvelope = false;
+        $sentWithoutEnvelope = false;
+        $firstError = null;
+        $fallbackError = null;
+
+        try {
+            $sentWithEnvelope = @mail(
+                $recipient,
+                $subject,
+                $message,
+                $headerString,
+                $envelopeParameter,
+            );
+
+            $firstError = error_get_last();
+        } catch (\Throwable $exception) {
+            $firstError = ['message' => $exception->getMessage()];
+        }
+
+        if (! $sentWithEnvelope) {
             try {
-                $contactId = (string) ($this->ghl->upsertContact([
-                    'firstName' => $user->first_name,
-                    'lastName' => $user->last_name,
-                    'name' => trim((string) $user->first_name . ' ' . (string) $user->last_name),
-                    'email' => $recipient,
-                    'phone' => $user->phone,
-                    'tags' => ['plyrcard-system-email'],
-                ], $locationId, $tokenOverride) ?? '');
+                $sentWithoutEnvelope = @mail(
+                    $recipient,
+                    $subject,
+                    $message,
+                    $headerString,
+                );
+
+                $fallbackError = error_get_last();
             } catch (\Throwable $exception) {
-                $result = ['success' => false, 'error' => 'Could not create or resolve the GHL contact: ' . $exception->getMessage()];
-                $this->logFailure($user, $recipient, $subject, $purpose, $result);
-                return $result;
-            }
-
-            if ($contactId !== '') {
-                $user->forceFill([
-                    'ghl_contact_id' => $contactId,
-                    'ghl_location_id' => $locationId,
-                ])->saveQuietly();
+                $fallbackError = ['message' => $exception->getMessage()];
             }
         }
 
-        if ($contactId === '') {
-            $result = ['success' => false, 'error' => 'GHL contact could not be resolved for the recipient.'];
-            $this->logFailure($user, $recipient, $subject, $purpose, $result);
-            return $result;
-        }
+        $sent = $sentWithEnvelope || $sentWithoutEnvelope;
 
-        $fromEmail = PlyrcardMailSender::email();
-        $fromName = 'PLYRCARD Support';
-        $plainText = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
-        $baseUrl = rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/');
+        if ($sent) {
+            Log::info('PLYRCARD system email handed to native PHP mail().', [
+                'purpose' => $purpose,
+                'user_id' => $user->getKey(),
+                'recipient' => $recipient,
+                'from_email' => $fromEmail,
+                'subject' => $subject,
+                'host' => PlyrcardMailSender::currentHost(),
+                'used_envelope_sender' => $sentWithEnvelope,
+            ]);
 
-        $official = [
-            'type' => 'Email',
-            'contactId' => $contactId,
-            'subject' => $subject,
-            'html' => $html,
-            'message' => $plainText,
-            'emailTo' => $recipient,
-            'emailFrom' => $fromEmail,
-            'fromName' => $fromName,
-            'status' => 'delivered',
-        ];
-
-        $legacy = [
-            'locationId' => $locationId,
-            'contactId' => $contactId,
-            'subject' => $subject,
-            'html' => $html,
-            'body' => $html,
-            'message' => $html,
-            'text' => $plainText,
-            'emailTo' => $recipient,
-            'fromEmail' => $fromEmail,
-            'emailFrom' => $fromEmail,
-            'fromName' => $fromName,
-            'senderName' => $fromName,
-            'type' => 'Email',
-        ];
-
-        $versions = array_values(array_unique(array_filter([
-            'v3',
-            trim((string) config('ghl.conversations_send_version')),
-            '2021-04-15',
-            '2023-02-21',
-        ])));
-
-        $endpoints = array_values(array_unique(array_filter([
-            config('ghl.conversations_send_endpoint'),
-            '/conversations/messages',
-        ])));
-
-        $lastStatus = null;
-        $lastError = null;
-        $lastData = null;
-
-        foreach ($versions as $version) {
-            foreach ($endpoints as $endpoint) {
-                foreach ([$official, $legacy] as $payload) {
-                    try {
-                        $response = Http::withHeaders(['Version' => $version])
-                            ->connectTimeout((int) config('ghl.connect_timeout', 5))
-                            ->timeout((int) config('ghl.timeout', 20))
-                            ->withToken($token)
-                            ->acceptJson()
-                            ->asJson()
-                            ->post($baseUrl . $endpoint, $payload);
-                    } catch (\Throwable $exception) {
-                        $lastError = $exception->getMessage();
-                        continue;
-                    }
-
-                    $data = $response->json();
-                    $data = is_array($data) ? $data : ['raw' => $response->body()];
-
-                    if ($response->successful()) {
-                        Log::info('PLYRCARD system email sent through GHL.', [
-                            'purpose' => $purpose,
-                            'user_id' => $user->getKey(),
-                            'contact_id' => $contactId,
-                            'recipient' => $recipient,
-                            'from_email' => $fromEmail,
-                            'subject' => $subject,
-                            'endpoint' => $endpoint,
-                            'version' => $version,
-                            'message_id' => $data['messageId'] ?? $data['id'] ?? data_get($data, 'message.id'),
-                        ]);
-
-                        return [
-                            'success' => true,
-                            'contact_id' => $contactId,
-                            'status' => $response->status(),
-                            'message_id' => $data['messageId'] ?? $data['id'] ?? data_get($data, 'message.id'),
-                            'raw' => $data,
-                        ];
-                    }
-
-                    $lastStatus = $response->status();
-                    $lastData = $data;
-                    $lastError = $data['message'] ?? $data['error'] ?? $data['msg'] ?? $response->body();
-                }
-            }
+            return [
+                'success' => true,
+                'transport' => 'php_mail',
+                'recipient' => $recipient,
+                'from_email' => $fromEmail,
+                'used_envelope_sender' => $sentWithEnvelope,
+            ];
         }
 
         $result = [
             'success' => false,
-            'status' => $lastStatus,
-            'error' => is_string($lastError) && trim($lastError) !== ''
-                ? Str::limit(strip_tags($lastError), 300)
-                : 'GHL did not accept the email send request.',
-            'raw' => $lastData,
+            'transport' => 'php_mail',
+            'error' => $this->mailErrorMessage($firstError, $fallbackError),
         ];
 
         $this->logFailure($user, $recipient, $subject, $purpose, $result);
@@ -259,8 +216,9 @@ class PlyrcardSystemEmailService
     protected function recipientFor(User $user): ?string
     {
         foreach ([$user->email, $user->personal_email] as $candidate) {
-            $candidate = strtolower(trim((string) $candidate));
-            if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
+            $candidate = $this->sanitizeEmail((string) $candidate);
+
+            if ($candidate !== null) {
                 return $candidate;
             }
         }
@@ -268,19 +226,50 @@ class PlyrcardSystemEmailService
         return null;
     }
 
+    protected function sanitizeEmail(string $email): ?string
+    {
+        $email = strtolower(trim(str_replace(["\r", "\n"], '', $email)));
+
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+    }
+
+    protected function sanitizeHeaderValue(string $value): string
+    {
+        return trim(str_replace(["\r", "\n"], ' ', $value));
+    }
+
+    protected function plainTextFromHtml(string $html): string
+    {
+        $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t]+/', ' ', $text) ?? $text;
+        $text = preg_replace('/\n\s*\n\s*\n+/', "\n\n", $text) ?? $text;
+
+        return trim($text);
+    }
+
+    protected function mailErrorMessage(?array $firstError, ?array $fallbackError): string
+    {
+        foreach ([$fallbackError, $firstError] as $error) {
+            $message = trim((string) ($error['message'] ?? ''));
+
+            if ($message !== '') {
+                return $message;
+            }
+        }
+
+        return 'PHP mail() returned false. The hosting server did not accept the message.';
+    }
+
     protected function logFailure(User $user, string $recipient, string $subject, string $purpose, array $result): void
     {
-        Log::error('PLYRCARD system email send failed.', [
+        Log::error('PLYRCARD native system email send failed.', [
             'purpose' => $purpose,
             'user_id' => $user->getKey(),
-            'ghl_contact_id' => $user->ghl_contact_id,
-            'ghl_location_id' => $user->ghl_location_id ?: config('ghl.location_id'),
             'recipient' => $recipient,
             'from_email' => PlyrcardMailSender::email(),
             'subject' => $subject,
-            'status' => $result['status'] ?? null,
+            'host' => PlyrcardMailSender::currentHost(),
             'error' => $result['error'] ?? null,
-            'raw' => $result['raw'] ?? null,
         ]);
     }
 }

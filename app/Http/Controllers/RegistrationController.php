@@ -546,7 +546,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'error' => $exception->getMessage(),
             ];
 
-            Log::error('Registration verification email could not be sent through GHL.', [
+            Log::error('Registration welcome email could not be sent through native PHP mail().', [
                 'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);

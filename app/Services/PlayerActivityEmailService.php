@@ -52,11 +52,11 @@ class PlayerActivityEmailService
 
         if (! ($result['success'] ?? false)) {
             Cache::forget($key);
-            Log::warning('PLYRCARD player activity email failed through GHL.', [
+
+            Log::warning('PLYRCARD player activity email failed through native PHP mail().', [
                 'user_id' => $player->id,
                 'activity_type' => $type,
                 'platform' => $platform,
-                'status' => $result['status'] ?? null,
                 'error' => $result['error'] ?? 'Unknown email error.',
             ]);
         }
