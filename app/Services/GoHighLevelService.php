@@ -7211,6 +7211,50 @@ class GoHighLevelService
         ];
     }
 
+    /**
+     * Return the marketing/campaign email activity for the same recruiting
+     * connection used by Inbox. The Dashboard uses this alongside the
+     * personal outbound conversation count so campaign recipients are not
+     * omitted from Emails Sent.
+     */
+    public function getEmailCampaignActivityForUser(User $user): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $locationId = trim((string) ($credentials['location_id'] ?? ''));
+        $token = $this->tokenForLocation($locationId, $credentials['token_override'] ?? null);
+
+        if ($locationId === '' || ! $token) {
+            return [
+                'success' => false,
+                'campaigns_sent' => 0,
+                'emails_sent' => 0,
+                'error' => 'Missing recruiting data connection.',
+            ];
+        }
+
+        try {
+            return array_merge([
+                'success' => true,
+                'campaigns_sent' => 0,
+                'emails_sent' => 0,
+                'error' => null,
+            ], $this->getEmailCampaignActivityForLocation($locationId, $token));
+        } catch (\Throwable $exception) {
+            Log::warning('Recruiting campaign email activity lookup failed.', [
+                'user_id' => $user->getKey(),
+                'location_id' => $locationId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'campaigns_sent' => 0,
+                'emails_sent' => 0,
+                'error' => $exception->getMessage(),
+            ];
+        }
+    }
+
     protected function getEmailCampaignActivityForLocation(string $locationId, string $token): array
     {
         $attempts = [

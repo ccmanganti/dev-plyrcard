@@ -614,7 +614,19 @@ trait InteractsWithCoachDatabase
                 }
             }
 
-            $count = $outbound;
+            // Conversation rows represent the player's direct/personal outbound email
+            // activity. Marketing campaigns are a separate HighLevel email source and
+            // must be added as recipient-level sends, not merely as one count per campaign.
+            $campaignResult = app(GoHighLevelService::class)->getEmailCampaignActivityForUser($user);
+            $campaignEmailsSent = ($campaignResult['success'] ?? false)
+                ? max(0, (int) ($campaignResult['emails_sent'] ?? 0))
+                : 0;
+            $campaignsSent = ($campaignResult['success'] ?? false)
+                ? max(0, (int) ($campaignResult['campaigns_sent'] ?? 0))
+                : 0;
+
+            $personalOutboundEmails = $outbound;
+            $count = $personalOutboundEmails + $campaignEmailsSent;
 
             $user->forceFill(['total_emails_sent' => $count])->save();
             $user->refresh();
@@ -635,7 +647,12 @@ trait InteractsWithCoachDatabase
                 'pagination_mode' => $result['pagination_mode'] ?? null,
                 'pagination_stopped_on_duplicate_page' => $result['pagination_stopped_on_duplicate_page'] ?? false,
                 'pagination_truncated' => $result['pagination_truncated'] ?? false,
-                'outbound_email_conversations' => $outbound,
+                'personal_outbound_email_conversations' => $personalOutboundEmails,
+                'campaign_emails_sent' => $campaignEmailsSent,
+                'campaigns_sent' => $campaignsSent,
+                'combined_emails_sent' => $count,
+                'campaign_lookup_success' => (bool) ($campaignResult['success'] ?? false),
+                'campaign_lookup_error' => $campaignResult['error'] ?? null,
                 'inbound_email_conversations' => $inbound,
                 'unknown_direction_email_conversations' => $unknownDirection,
                 'non_email_conversations' => $nonEmail,
