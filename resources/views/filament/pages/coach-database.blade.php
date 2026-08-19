@@ -6695,7 +6695,11 @@
                 $engagementUniqueCoaches = (int) ($dashboardMetrics['engagement_unique_coaches'] ?? $dashboardMetrics['unique_link_click_contacts'] ?? 0);
                 $engagementUniqueSchools = (int) ($dashboardMetrics['engagement_unique_schools'] ?? $dashboardMetrics['schools_with_clicks'] ?? 0);
 
-                $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
+                $savedEmailSentCount = max(0, (int) (auth()->user()?->total_emails_sent ?? 0));
+                $emailSentCount = $savedEmailSentCount > 0
+                    ? $savedEmailSentCount
+                    : max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
+                $hasSavedEmailSentCount = $savedEmailSentCount > 0;
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $socialClickCount = (int) ($dashboardMetrics['instagram_click_count'] ?? 0)
@@ -7244,11 +7248,17 @@
                             <div class="rc-home-stat-copy-v2">
                                 <div class="rc-home-stat-label-v2">{{ $stat['label'] }}</div>
                                 @if($stat['label'] === 'Emails Sent')
-                                    <div class="rc-home-stat-value-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">{{ $stat['value'] }}</div>
-                                    <div class="rc-home-stat-value-v2 rc-email-live-fetch-value-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
-                                        <span class="rc-spinner-mini" aria-hidden="true"></span>
-                                        <span>Fetching…</span>
-                                    </div>
+                                    @if($hasSavedEmailSentCount)
+                                        {{-- v148: keep the last persisted total visible while the fresh total is fetched. --}}
+                                        <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
+                                    @else
+                                        {{-- No persisted total yet: preserve the existing visible first-load fetch state. --}}
+                                        <div class="rc-home-stat-value-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">{{ $stat['value'] }}</div>
+                                        <div class="rc-home-stat-value-v2 rc-email-live-fetch-value-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
+                                            <span class="rc-spinner-mini" aria-hidden="true"></span>
+                                            <span>Fetching…</span>
+                                        </div>
+                                    @endif
                                 @else
                                     <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
                                 @endif
@@ -7261,22 +7271,63 @@
                             @endif
 
                             @if($stat['label'] === 'Emails Sent')
-                                <div class="rc-home-stat-sub-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">
-                                    @if(filled($dashboardEmailFetchError ?? null))
-                                        <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
-                                    @else
-                                        <span>{{ $dashboardEmailFetchStatus ?: 'Email activity' }}</span>
-                                    @endif
-                                </div>
-                                <div class="rc-home-stat-sub-v2 rc-email-live-fetch-status-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
-                                    Updating sent email count…
-                                </div>
+                                @if($hasSavedEmailSentCount)
+                                    <div class="rc-home-stat-sub-v2 rc-email-saved-refresh-v148">
+                                        <span wire:loading.remove wire:target="fetchDashboardEmailSentCount">
+                                            @if(filled($dashboardEmailFetchError ?? null))
+                                                <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
+                                            @else
+                                                {{ $dashboardEmailFetchStatus ?: 'Email activity' }}
+                                            @endif
+                                        </span>
+                                        <span class="rc-email-saved-refresh-indicator-v148" wire:loading.inline-flex wire:target="fetchDashboardEmailSentCount" aria-live="polite">
+                                            <span class="rc-email-saved-refresh-dot-v148" aria-hidden="true"></span>
+                                            <span>Updating latest</span>
+                                        </span>
+                                    </div>
+                                @else
+                                    <div class="rc-home-stat-sub-v2" wire:loading.remove wire:target="fetchDashboardEmailSentCount">
+                                        @if(filled($dashboardEmailFetchError ?? null))
+                                            <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
+                                        @else
+                                            <span>{{ $dashboardEmailFetchStatus ?: 'Email activity' }}</span>
+                                        @endif
+                                    </div>
+                                    <div class="rc-home-stat-sub-v2 rc-email-live-fetch-status-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
+                                        Updating sent email count…
+                                    </div>
+                                @endif
                             @else
                                 <div class="rc-home-stat-sub-v2">{{ $stat['sub'] }}</div>
                             @endif
                         </button>
                     @endforeach
                 </div>
+
+                <style>
+                    .rc-email-saved-refresh-v148 { min-height: 1.05rem; }
+                    .rc-email-saved-refresh-indicator-v148 {
+                        align-items: center;
+                        gap: .32rem;
+                        font-size: .68rem;
+                        line-height: 1;
+                        opacity: .68;
+                    }
+                    .rc-email-saved-refresh-dot-v148 {
+                        width: .32rem;
+                        height: .32rem;
+                        border-radius: 999px;
+                        background: currentColor;
+                        animation: rcEmailSavedRefreshPulseV148 1.05s ease-in-out infinite;
+                    }
+                    @keyframes rcEmailSavedRefreshPulseV148 {
+                        0%, 100% { opacity: .28; transform: scale(.82); }
+                        50% { opacity: 1; transform: scale(1); }
+                    }
+                    @media (prefers-reduced-motion: reduce) {
+                        .rc-email-saved-refresh-dot-v148 { animation: none; opacity: .72; }
+                    }
+                </style>
 
                 <div class="rc-home-grid-v2">
                     <section class="rc-home-panel-v2 rc-home-progress-panel-v2">
