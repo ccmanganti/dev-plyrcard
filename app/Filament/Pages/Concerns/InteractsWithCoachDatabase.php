@@ -542,8 +542,8 @@ trait InteractsWithCoachDatabase
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
                 'fetch_all' => true,
                 'limit' => 100,
-                'max_rows' => 10000,
-                'max_pages' => 100,
+                'max_rows' => 25000,
+                'max_pages' => 250,
                 'status' => 'all',
                 'search' => '',
                 'sortBy' => 'last_message_date',
@@ -632,6 +632,7 @@ trait InteractsWithCoachDatabase
                 'conversations_loaded' => $conversations->count(),
                 'api_total' => $result['total'] ?? $conversations->count(),
                 'pages_fetched' => $result['pages_fetched'] ?? null,
+                'pagination_mode' => $result['pagination_mode'] ?? null,
                 'pagination_stopped_on_duplicate_page' => $result['pagination_stopped_on_duplicate_page'] ?? false,
                 'pagination_truncated' => $result['pagination_truncated'] ?? false,
                 'outbound_email_conversations' => $outbound,

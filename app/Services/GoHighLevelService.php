@@ -3218,8 +3218,8 @@ class GoHighLevelService
 
         $requestedLimit = min(max((int) ($query['limit'] ?? 100), 1), 100);
         $fetchAll = (bool) ($query['fetch_all'] ?? false);
-        $maxRows = min(max((int) ($query['max_rows'] ?? 500), $requestedLimit), 10000);
-        $maxPages = min(max((int) ($query['max_pages'] ?? 10), 1), 100);
+        $maxRows = min(max((int) ($query['max_rows'] ?? 10000), $requestedLimit), 25000);
+        $maxPages = min(max((int) ($query['max_pages'] ?? 250), 1), 250);
 
         $baseParams = array_filter([
             'locationId' => $locationId,
@@ -3242,18 +3242,33 @@ class GoHighLevelService
 
         foreach ($versions as $version) {
             $allItems = [];
-            $skip = 0;
             $page = 0;
             $pageSuccess = false;
             $total = 0;
+            $offset = 0;
+            $cursorDate = null;
+            $cursorId = null;
+            $paginationMode = 'first_page';
             $stoppedOnDuplicatePage = false;
             $paginationTruncated = false;
+            $pageDiagnostics = [];
 
-            do {
+            while (true) {
                 $params = array_merge($baseParams, ['limit' => $requestedLimit]);
 
-                if ($skip > 0) {
-                    $params['skip'] = $skip;
+                // HighLevel's conversation search is cursor-friendly. After page one,
+                // use the last conversation's date + id so we move past that exact row.
+                // Keep skip as a compatibility fallback for accounts/API versions that
+                // still honor offset pagination.
+                if ($page > 0) {
+                    if (filled($cursorDate) && filled($cursorId)) {
+                        $params['startAfterDate'] = $cursorDate;
+                        $params['startAfterId'] = $cursorId;
+                        $paginationMode = 'cursor';
+                    } else {
+                        $params['skip'] = $offset;
+                        $paginationMode = 'skip';
+                    }
                 }
 
                 $response = Http::withHeaders(['Version' => $version])
@@ -3266,12 +3281,37 @@ class GoHighLevelService
                 $lastRaw = $data;
 
                 if ($response->failed()) {
+                    // If a version rejects cursor parameters, retry the same page once
+                    // with skip. This preserves compatibility without silently returning
+                    // only page one.
+                    if ($page > 0 && isset($params['startAfterDate'], $params['startAfterId'])) {
+                        $fallbackParams = array_merge($baseParams, [
+                            'limit' => $requestedLimit,
+                            'skip' => $offset,
+                        ]);
+
+                        $response = Http::withHeaders(['Version' => $version])
+                            ->timeout((int) config('ghl.timeout', 20))
+                            ->withToken($token)
+                            ->acceptJson()
+                            ->get("{$this->baseUrl}/conversations/search", $fallbackParams);
+
+                        $data = $response->json() ?? [];
+                        $lastRaw = $data;
+                        $params = $fallbackParams;
+                        $paginationMode = 'skip_fallback';
+                    }
+                }
+
+                if ($response->failed()) {
                     $lastStatus = $response->status();
                     $lastError = $response->body();
 
                     Log::error('Recruiting conversations request failed.', [
                         'status' => $response->status(),
                         'version' => $version,
+                        'page' => $page + 1,
+                        'pagination_mode' => $paginationMode,
                         'params' => $params,
                         'body' => $response->body(),
                     ]);
@@ -3281,6 +3321,7 @@ class GoHighLevelService
 
                 $pageSuccess = true;
                 $items = $this->extractConversationsFromResponse($data);
+                $count = count($items);
                 $before = count($allItems);
 
                 foreach ($items as $item) {
@@ -3288,30 +3329,87 @@ class GoHighLevelService
                         continue;
                     }
 
-                    $id = (string) ($item['id'] ?? $item['_id'] ?? $item['conversationId'] ?? md5(json_encode($item) ?: uniqid('', true)));
+                    $id = trim((string) ($item['id'] ?? $item['_id'] ?? $item['conversationId'] ?? ''));
+                    if ($id === '') {
+                        $id = md5(json_encode($item) ?: uniqid('', true));
+                    }
                     $allItems[$id] = $item;
                 }
 
                 $newUnique = count($allItems) - $before;
-                $total = max($total, (int) ($data['total'] ?? $data['meta']['total'] ?? data_get($data, 'conversations.total') ?? 0));
-                $count = count($items);
                 $page++;
+                $offset += $count;
+                $reportedTotal = (int) (
+                    $data['total']
+                    ?? $data['totalCount']
+                    ?? data_get($data, 'meta.total')
+                    ?? data_get($data, 'pagination.total')
+                    ?? data_get($data, 'conversations.total')
+                    ?? 0
+                );
+                $total = max($total, $reportedTotal);
 
-                // HighLevel accounts have been observed returning a page-sized `total`
-                // even when more pages exist. Never use total as the stop condition.
-                $stoppedOnDuplicatePage = $fetchAll && $count >= $requestedLimit && $newUnique === 0;
-                $skip += $count > 0 ? $count : $requestedLimit;
-
-                $hasMore = $fetchAll
-                    && $count >= $requestedLimit
-                    && $newUnique > 0
-                    && count($allItems) < $maxRows
-                    && $page < $maxPages;
-
-                if (! $hasMore && $fetchAll && $count >= $requestedLimit && ! $stoppedOnDuplicatePage) {
-                    $paginationTruncated = count($allItems) >= $maxRows || $page >= $maxPages;
+                $lastItem = null;
+                for ($i = count($items) - 1; $i >= 0; $i--) {
+                    if (is_array($items[$i])) {
+                        $lastItem = $items[$i];
+                        break;
+                    }
                 }
-            } while ($hasMore);
+
+                if (is_array($lastItem)) {
+                    $cursorId = trim((string) (
+                        $lastItem['id']
+                        ?? $lastItem['_id']
+                        ?? $lastItem['conversationId']
+                        ?? ''
+                    ));
+                    $cursorDate = $lastItem['lastMessageDate']
+                        ?? $lastItem['lastMessageAt']
+                        ?? $lastItem['last_message_date']
+                        ?? $lastItem['updatedAt']
+                        ?? $lastItem['dateUpdated']
+                        ?? null;
+                }
+
+                $pageDiagnostics[] = [
+                    'page' => $page,
+                    'mode' => $paginationMode,
+                    'rows' => $count,
+                    'new_unique' => $newUnique,
+                    'unique_total' => count($allItems),
+                    'reported_total' => $reportedTotal,
+                    'has_cursor' => filled($cursorDate) && filled($cursorId),
+                ];
+
+                Log::info('Recruiting conversations page loaded.', end([
+                    'user_id' => $user->getKey(),
+                    'version' => $version,
+                ]) + $pageDiagnostics[array_key_last($pageDiagnostics)]);
+
+                if (! $fetchAll) {
+                    break;
+                }
+
+                // A short page is the only normal end-of-data signal we trust. Do not
+                // stop merely because the API's `total` equals 100 or equals this page.
+                if ($count < $requestedLimit) {
+                    break;
+                }
+
+                // If the API returned a full page but none of it was new, cursor/skip
+                // was ignored and continuing would loop forever. Mark this explicitly.
+                if ($newUnique === 0) {
+                    $stoppedOnDuplicatePage = true;
+                    $paginationTruncated = true;
+                    break;
+                }
+
+                if (count($allItems) >= $maxRows || $page >= $maxPages) {
+                    $paginationTruncated = true;
+                    break;
+                }
+            }
 
             if ($pageSuccess) {
                 $conversations = collect(array_values($allItems))
@@ -3326,8 +3424,10 @@ class GoHighLevelService
                     'conversations' => $conversations,
                     'total' => max($total, count($conversations)),
                     'pages_fetched' => $page,
+                    'pagination_mode' => $paginationMode,
                     'pagination_stopped_on_duplicate_page' => $stoppedOnDuplicatePage,
                     'pagination_truncated' => $paginationTruncated,
+                    'page_diagnostics' => $pageDiagnostics,
                     'error' => null,
                 ];
             }
