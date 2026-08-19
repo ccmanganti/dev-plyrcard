@@ -4,6 +4,7 @@ namespace App\Mail;
 
 use App\Models\User;
 use App\Models\Website;
+use App\Support\PlyrcardMailSender;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -28,7 +29,13 @@ class PlayerActivityMail extends Mailable
             ? 'Someone viewed your PLYRCARD'
             : 'Someone clicked your ' . ucfirst($this->platform) . ' link';
 
-        return new Envelope(subject: $subject);
+        $support = PlyrcardMailSender::address();
+
+        return new Envelope(
+            from: $support,
+            replyTo: [$support],
+            subject: $subject,
+        );
     }
 
     public function content(): Content

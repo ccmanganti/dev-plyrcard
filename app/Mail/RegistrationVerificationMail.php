@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\User;
+use App\Support\PlyrcardMailSender;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -17,7 +18,13 @@ class RegistrationVerificationMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Confirm your PLYRCARD account');
+        $support = PlyrcardMailSender::address();
+
+        return new Envelope(
+            from: $support,
+            replyTo: [$support],
+            subject: 'Confirm your PLYRCARD account',
+        );
     }
 
     public function content(): Content
