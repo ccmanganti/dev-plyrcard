@@ -191,7 +191,7 @@ class MyJourney extends Page
             [
                 'key' => 'amplify',
                 'name' => 'AMPLIFY',
-                'price' => '$550',
+                'price' => '$500',
                 'suffix' => 'One time',
                 // 'setup' => '$500 one-time setup fee · Covers graphics, production, and done-for-you setup',
                 'tagline' => 'Paired with My Journey ($49/mo). Perfect right before your seasons',
