@@ -992,7 +992,7 @@
         <div class="plan-tagline">Your complete recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.</div>
       </div>
       <div class="plan-price-wrap" aria-label="$49 per month plus a one-time $500 setup fee">
-        <span class="plan-price-currency">$</span><span class="plan-price">$500</span>
+        <span class="plan-price-currency">$</span><span class="plan-price">500</span>
         <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span></span>
       </div>
       <p class="plan-setup"><strong>$49/month</strong> &nbsp;· Covers graphics, production, and done-for-you setup</p>
