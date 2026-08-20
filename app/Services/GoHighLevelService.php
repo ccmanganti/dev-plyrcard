@@ -20,6 +20,54 @@ class GoHighLevelService
         $this->baseUrl = rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/');
     }
 
+    /**
+     * Resolve a canonical local coach inside the current player's GHL subaccount
+     * by exact email. Local/global coach IDs are never trusted across locations.
+     */
+    public function resolveCoachContactByEmailForUser(User $user, string $email): array
+    {
+        $credentials = $this->credentialsForUser($user);
+        $email = strtolower(trim($email));
+
+        if ($email === '') {
+            return [
+                'success' => false,
+                'contact_id' => null,
+                'contact' => null,
+                'error' => 'Missing coach email.',
+            ];
+        }
+
+        $contactId = $this->findContactIdByEmail(
+            $email,
+            $credentials['location_id'],
+            $credentials['token_override'],
+        );
+
+        if (! $contactId) {
+            return [
+                'success' => false,
+                'contact_id' => null,
+                'contact' => null,
+                'error' => 'Coach was not found in GHL by email.',
+            ];
+        }
+
+        $contact = $this->fetchContactForDashboard(
+            $contactId,
+            $credentials['location_id'],
+            $credentials['token_override'],
+            true,
+        );
+
+        return [
+            'success' => true,
+            'contact_id' => $contactId,
+            'contact' => $contact,
+            'email' => $email,
+        ];
+    }
+
     public function enabled(): bool
     {
         return filled(config('ghl.token')) && filled(config('ghl.location_id'));
