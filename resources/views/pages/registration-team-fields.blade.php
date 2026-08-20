@@ -3,9 +3,10 @@
 
     <div class="f">
         <label for="league">League</label>
-        <select name="league_id" id="league" required disabled>
+        <select id="league" required disabled>
             <option value="">Choose gender and sport first</option>
         </select>
+        <input type="hidden" name="league_id" id="leagueId" value="">
         <div class="msg">Select a league.</div>
     </div>
 
