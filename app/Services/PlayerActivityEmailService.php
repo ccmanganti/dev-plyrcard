@@ -21,7 +21,13 @@ class PlayerActivityEmailService
 
     public function socialClicked(User $player, Website $website, string $platform, Request $request): void
     {
-        $this->send($player, $website, 'social_click', strtolower($platform), $request);
+        $platform = strtolower(trim($platform));
+
+        // On the player card, YouTube is the highlight destination. Keep a
+        // dedicated activity type so the athlete gets a clear highlight alert.
+        $type = $platform === 'youtube' ? 'highlight_click' : 'social_click';
+
+        $this->send($player, $website, $type, $platform, $request);
     }
 
     protected function send(User $player, Website $website, string $type, string $platform, Request $request): void
@@ -31,13 +37,20 @@ class PlayerActivityEmailService
             return;
         }
 
-        $visitor = hash_hmac('sha256', implode('|', [
+        // Avoid emailing the athlete for their own authenticated profile visits.
+        if (auth()->check() && (int) auth()->id() === (int) $player->getKey()) {
+            return;
+        }
+
+        $viewer = hash_hmac('sha256', implode('|', [
             (string) $request->ip(),
             (string) $request->userAgent(),
             strtolower((string) $request->query('rc_email', '')),
         ]), (string) config('app.key'));
 
-        $key = "plyrcard:activity-mail:{$player->id}:{$type}:{$platform}:{$visitor}";
+        // One notification per visitor/activity in a 15-minute window. Tracking
+        // itself remains untouched; this only prevents notification floods.
+        $key = "plyrcard:activity-mail:{$player->id}:{$type}:{$platform}:{$viewer}";
         if (! Cache::add($key, true, now()->addMinutes(15))) {
             return;
         }

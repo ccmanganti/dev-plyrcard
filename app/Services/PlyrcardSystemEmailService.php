@@ -44,9 +44,11 @@ class PlyrcardSystemEmailService
             return ['success' => false, 'error' => 'The player does not have a valid email address.'];
         }
 
-        $subject = $activityType === 'profile_view'
-            ? 'Someone viewed your PLYRCARD'
-            : 'Someone clicked your ' . ucfirst($platform) . ' link';
+        $subject = match ($activityType) {
+            'profile_view' => 'Someone viewed your PLYRCARD',
+            'highlight_click' => 'Someone clicked your highlight',
+            default => 'Someone clicked your ' . ucfirst($platform) . ' link',
+        };
 
         $html = $this->renderActivityEmail(
             player: $player,
@@ -61,9 +63,11 @@ class PlyrcardSystemEmailService
             recipient: $recipient,
             subject: $subject,
             html: $html,
-            purpose: $activityType === 'profile_view'
-                ? 'profile_view_notification'
-                : 'social_click_notification',
+            purpose: match ($activityType) {
+                'profile_view' => 'profile_view_notification',
+                'highlight_click' => 'highlight_click_notification',
+                default => 'social_click_notification',
+            },
         );
     }
 
@@ -162,13 +166,14 @@ class PlyrcardSystemEmailService
         ]);
 
         $isProfile = $activityType === 'profile_view';
-        $label = $isProfile ? 'PROFILE VIEW' : strtoupper($platform) . ' CLICK';
+        $isHighlight = $activityType === 'highlight_click';
+        $label = $isProfile ? 'PROFILE VIEW' : ($isHighlight ? 'HIGHLIGHT CLICK' : strtoupper($platform) . ' CLICK');
         $title = $isProfile
             ? 'Someone viewed your PLYRCARD.'
-            : 'Someone clicked your ' . ucfirst($platform) . ' link.';
+            : ($isHighlight ? 'Someone clicked your highlight.' : 'Someone clicked your ' . ucfirst($platform) . ' link.');
         $description = $isProfile
             ? 'Your profile got another visit.'
-            : 'A visitor moved from your PLYRCARD to your ' . $platform . ' destination.';
+            : ($isHighlight ? 'A visitor clicked through to your YouTube highlight destination.' : 'A visitor moved from your PLYRCARD to your ' . $platform . ' destination.');
         $viewer = $viewerEmail ? 'Visitor: ' . $viewerEmail : 'Visitor: anonymous / direct';
         $profileUrl = $this->playerUrl($website);
 
