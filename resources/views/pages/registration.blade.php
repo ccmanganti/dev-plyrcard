@@ -5,7 +5,7 @@
     $planLabel = $plan['label'] ?? 'Free';
     $recurringDollars = number_format(((int) ($plan['recurring_amount_cents'] ?? 0)) / 100, 2);
     $setupDollars = number_format(((int) ($plan['setup_fee_cents'] ?? 0)) / 100, 2);
-    $chargeFirstMonthUpfront = (bool) ($plan['charge_first_month_upfront'] ?? true);
+    $chargeFirstMonthUpfront = $isAmplify ? true : (bool) ($plan['charge_first_month_upfront'] ?? true);
     $initialCents = ((int) ($plan['setup_fee_cents'] ?? 0)) + ($chargeFirstMonthUpfront ? ((int) ($plan['recurring_amount_cents'] ?? 0)) : 0);
     $initialDollars = number_format($initialCents / 100, 2);
 @endphp
@@ -139,8 +139,8 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
   <div class="order"><div class="order-h">{{ $planLabel }}</div><ul>
     <li><span><span id="ord-dom">yourname.com</span> domain request</span><b>Included</b></li>
     <li><span>PLYRSITE profile and recruiting tools</span><b>Included</b></li>
-    @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
-  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month starting next billing cycle @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
+    @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li><li><span>First month</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b></li>@endif
+  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)$500 setup + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
   <div class="fields" style="margin-top:24px">
     <div class="divider" id="billingInfoStart"><span>Billing information</span></div>
     <div class="f"><label>Billing name</label><input name="billing_name" id="billingName" type="text" autocomplete="name" placeholder="Name on billing account"><div class="msg">Enter billing name.</div></div>
