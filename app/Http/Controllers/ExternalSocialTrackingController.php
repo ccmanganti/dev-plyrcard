@@ -7,6 +7,7 @@ use App\Models\CoachDatabaseSchool;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\LocalRecruitingTrackingService;
+use App\Services\PlayerActivityEmailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -18,6 +19,7 @@ class ExternalSocialTrackingController extends Controller
 {
     public function __construct(
         protected LocalRecruitingTrackingService $tracking,
+        protected PlayerActivityEmailService $activityEmails,
     ) {
     }
 
@@ -66,9 +68,6 @@ class ExternalSocialTrackingController extends Controller
         $host = $this->normalizeHost($request->getHost());
         $requestedWebsiteId = $this->requestedWebsiteId($request);
 
-        // Generated campaign links carry rc_website_id. Resolve that exact Website first
-        // and verify that the incoming custom domain belongs to it. This prevents a newer
-        // stale/duplicate Website row on the same domain from being selected accidentally.
         $website = $requestedWebsiteId
             ? Website::query()
                 ->whereKey($requestedWebsiteId)
@@ -81,7 +80,6 @@ class ExternalSocialTrackingController extends Controller
             $website = null;
         }
 
-        // Backwards compatibility for links generated before rc_website_id existed.
         if (! $website) {
             $website = Website::query()
                 ->where('is_active', true)
@@ -120,57 +118,70 @@ class ExternalSocialTrackingController extends Controller
 
         $identity = $this->resolveCoachIdentity($player, $request);
 
-        // PLYRCard acts only as the middleman:
-        // 1. save the social click;
-        // 2. redirect to the player's real social URL.
         try {
             $this->tracking->record([
-            'athlete_id' => $player->getKey(),
-            'athlete_user_id' => $player->getKey(),
-            'athlete_email' => $player->email ?: $player->personal_email,
-            'athlete_ghl_contact_id' => $player->ghl_contact_id,
-            'athlete_ghl_location_id' => $player->ghl_location_id,
-            'ghl_location_id' => $player->ghl_location_id,
+                'athlete_id' => $player->getKey(),
+                'athlete_user_id' => $player->getKey(),
+                'athlete_email' => $player->email ?: $player->personal_email,
+                'athlete_ghl_contact_id' => $player->ghl_contact_id,
+                'athlete_ghl_location_id' => $player->ghl_location_id,
+                'ghl_location_id' => $player->ghl_location_id,
 
-            'coach_contact_id' => $identity['coach_contact_id'],
-            'contact_id' => $identity['coach_contact_id'],
-            'coach_email' => $identity['coach_email'],
-            'coach_name' => $identity['coach_name'],
-            'coach_title' => $identity['coach_title'],
-            'school_business_id' => $identity['school_business_id'],
-            'school_name' => $identity['school_name'],
-            'school_logo_url' => $identity['school_logo_url'],
-
-            'event_type' => 'link_click',
-            'platform' => $platform,
-            'source' => $this->trackingSource($request),
-            'destination_url' => $destination,
-            'website_id' => $website->getKey(),
-            'website_name' => $website->name,
-
-            // Existing Coach Engagement queries require a non-empty message UUID.
-            'message_uuid' => $this->externalMessageUuid(
-                $request,
-                $player->getKey(),
-                $platform,
-                $identity['coach_contact_id'],
-                $identity['coach_email'],
-            ),
-
-            'metadata' => [
-                'tracking_mode' => 'social_middleman_redirect',
-                'coach_name' => $identity['coach_name'],
+                'coach_contact_id' => $identity['coach_contact_id'],
+                'contact_id' => $identity['coach_contact_id'],
                 'coach_email' => $identity['coach_email'],
+                'coach_name' => $identity['coach_name'],
                 'coach_title' => $identity['coach_title'],
+                'school_business_id' => $identity['school_business_id'],
                 'school_name' => $identity['school_name'],
                 'school_logo_url' => $identity['school_logo_url'],
-                'match_source' => $identity['match_source'],
-                'utm_source' => $request->query('utm_source'),
-                'utm_medium' => $request->query('utm_medium'),
-                'utm_campaign' => $request->query('utm_campaign'),
-                'rc_destination' => $platform,
-            ],
+
+                'event_type' => 'link_click',
+                'platform' => $platform,
+                'source' => $this->trackingSource($request),
+                'destination_url' => $destination,
+                'website_id' => $website->getKey(),
+                'website_name' => $website->name,
+
+                'message_uuid' => $this->externalMessageUuid(
+                    $request,
+                    $player->getKey(),
+                    $platform,
+                    $identity['coach_contact_id'],
+                    $identity['coach_email'],
+                ),
+
+                'metadata' => [
+                    'tracking_mode' => 'social_middleman_redirect',
+                    'coach_name' => $identity['coach_name'],
+                    'coach_email' => $identity['coach_email'],
+                    'coach_title' => $identity['coach_title'],
+                    'school_name' => $identity['school_name'],
+                    'school_logo_url' => $identity['school_logo_url'],
+                    'match_source' => $identity['match_source'],
+                    'utm_source' => $request->query('utm_source'),
+                    'utm_medium' => $request->query('utm_medium'),
+                    'utm_campaign' => $request->query('utm_campaign'),
+                    'rc_destination' => $platform,
+                ],
             ], $request, 'link_click');
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+
+        /*
+         * v10.18: send the notification from the social redirect itself.
+         * This is deliberately not deferred to route middleware. At this point
+         * we still have the exact Website, player and platform that were clicked.
+         * CoachViewerIdentityService can also inherit a verified coach from the
+         * recent profile view if the social URL no longer contains rc_* params.
+         */
+        try {
+            // Defense-in-depth: if an older cached route still has the activity
+            // middleware attached, tell it this click was already handled here.
+            $request->attributes->set('plyrcard_activity_email_sent', true);
+
+            $this->activityEmails->socialClicked($player, $website, $platform, $request);
         } catch (\Throwable $exception) {
             report($exception);
         }
@@ -178,12 +189,6 @@ class ExternalSocialTrackingController extends Controller
         return redirect()->away($destination, 302);
     }
 
-    /**
-     * The User model has exactly these social fields:
-     * - ig_handle
-     * - yt_url
-     * - x_handle
-     */
     protected function socialDestination(User $player, string $platform): string
     {
         $value = match ($platform) {
@@ -203,14 +208,10 @@ class ExternalSocialTrackingController extends Controller
             return '';
         }
 
-        // Full URLs are accepted as-is after validation.
         if (Str::startsWith(strtolower($value), ['http://', 'https://'])) {
             return filter_var($value, FILTER_VALIDATE_URL) ? $value : '';
         }
 
-        // Accept scheme-less URLs only when they clearly point to the expected
-        // social platform. Do NOT treat every value containing a dot as a URL:
-        // Instagram handles such as "layla.harris_29" legitimately contain dots.
         $lower = strtolower(ltrim($value, '/'));
         $looksLikePlatformUrl = match ($platform) {
             'instagram' => Str::startsWith($lower, ['instagram.com/', 'www.instagram.com/']),
@@ -254,7 +255,6 @@ class ExternalSocialTrackingController extends Controller
             'match_source' => $suppliedContactId !== '' ? 'supplied_contact_id' : 'unmatched',
         ];
 
-        // Fastest lookup: the already-hydrated Coach Database cache.
         $cacheKey = 'coach-database:v10:' . $player->getKey() . ':'
             . Str::slug($locationId !== '' ? $locationId : 'default');
         $snapshot = Cache::get($cacheKey, []);

@@ -30,10 +30,22 @@ class CoachViewerIdentityService
 
         // Tracked email/profile redirect links may record the coach on the
         // tracking request and then redirect to a clean player URL. In that
-        // case the public page no longer carries rc_* identity parameters, so
-        // use the coach-attributed event that was just persisted for the same
-        // visitor/IP as a safe fallback.
-        return $this->resolveFromRecentTrackingEvent($player, $request, $eventType, $platform);
+        // case the public page no longer carries rc_* identity parameters.
+        $recent = $this->resolveFromRecentTrackingEvent($player, $request, $eventType, $platform);
+
+        if ($recent['matched']) {
+            return $recent;
+        }
+
+        // v10.18: social links are often clicked AFTER the coach lands on the
+        // clean profile URL. The social redirect may therefore have no rc_*
+        // query parameters of its own. For link clicks only, inherit identity
+        // from a recent verified profile view by the same visitor/IP.
+        if ($eventType !== 'profile_view') {
+            return $this->resolveFromRecentCoachProfileView($player, $request);
+        }
+
+        return $this->unmatched();
     }
 
     protected function resolveFromRequest(User $player, Request $request): array
@@ -181,6 +193,42 @@ class CoachViewerIdentityService
             'name' => $metadata['coach_name'] ?? $metadata['recipient_name'] ?? null,
             'school' => $metadata['school_name'] ?? null,
             'source' => 'recent_coach_tracking_event',
+        ]);
+    }
+
+
+    protected function resolveFromRecentCoachProfileView(User $player, Request $request): array
+    {
+        if (! Schema::hasTable('coach_database_tracking_events')) {
+            return $this->unmatched();
+        }
+
+        $ipHash = hash_hmac('sha256', (string) $request->ip(), (string) config('app.key'));
+
+        $event = CoachDatabaseTrackingEvent::query()
+            ->where('athlete_user_id', $player->getKey())
+            ->where('event_type', 'profile_view')
+            ->where('platform', 'website')
+            ->whereNotNull('coach_contact_id')
+            ->where('coach_contact_id', '<>', '')
+            ->where('ip_hash', $ipHash)
+            ->where('occurred_at', '>=', now()->subMinutes(30))
+            ->whereNotIn('source', ['direct_website_visit', 'anonymous', 'direct'])
+            ->latest('id')
+            ->first();
+
+        if (! $event) {
+            return $this->unmatched();
+        }
+
+        $metadata = is_array($event->metadata) ? $event->metadata : [];
+
+        return $this->matched([
+            'contact_id' => $event->coach_contact_id,
+            'email' => $metadata['coach_email'] ?? $metadata['recipient_email'] ?? null,
+            'name' => $metadata['coach_name'] ?? $metadata['recipient_name'] ?? null,
+            'school' => $metadata['school_name'] ?? null,
+            'source' => 'recent_verified_profile_view',
         ]);
     }
 

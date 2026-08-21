@@ -772,12 +772,13 @@
         #site-header.plyrcard-site-header .menu-btn { display: none !important; }
         #mobile-nav.plyrcard-mobile-nav { display: none !important; }
 
-        /* Desktop uses the normal header/admin navigation. The Locker Room pull-up
-           navigation remains available on phones/tablets only. */
-        #plyrcard-action-drawer,
-        .plyrcard-action-drawer {
-          display: none !important;
-        }
+        /* Keep Locker Room available on desktop everywhere except /admin and /admin/*. */
+        @if($plyrOnAdmin)
+          #plyrcard-action-drawer,
+          .plyrcard-action-drawer {
+            display: none !important;
+          }
+        @endif
       }
 
       @media (max-width: 767px) {

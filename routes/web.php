@@ -32,13 +32,11 @@ Route::middleware('auth')->group(function (): void {
 /* Platform-hosted player: /Sample/out/instagram */
 Route::get('/{slug}/out/{platform}', [ExternalSocialTrackingController::class, 'platform'])
     ->where('platform', 'instagram|youtube|x')
-    ->middleware(SendPlayerActivityEmail::class)
     ->name('external.social.platform');
 
 /* Parked/custom domain player: /out/instagram */
 Route::get('/out/{platform}', [ExternalSocialTrackingController::class, 'customDomain'])
     ->where('platform', 'instagram|youtube|x')
-    ->middleware(SendPlayerActivityEmail::class)
     ->name('external.social.custom-domain');
 
 Route::get('/track/click/{token}', [TrackingController::class, 'click'])->where('token', '[^/]+')->name('tracking.click');

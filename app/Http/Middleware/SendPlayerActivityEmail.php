@@ -20,6 +20,14 @@ class SendPlayerActivityEmail
             return $response;
         }
 
+        // Social redirects in v10.18 send the email inside
+        // ExternalSocialTrackingController while the exact click context is
+        // still available. This flag prevents a duplicate notification if an
+        // old cached route definition still includes this middleware.
+        if ($request->attributes->get('plyrcard_activity_email_sent') === true) {
+            return $response;
+        }
+
         try {
             $website = $this->resolveWebsite($request);
             if (! $website?->user || (auth()->check() && (int) auth()->id() === (int) $website->user_id)) {
