@@ -12,6 +12,7 @@ class PlayerActivityEmailService
 {
     public function __construct(
         protected PlyrcardSystemEmailService $systemEmail,
+        protected CoachViewerIdentityService $coachIdentity,
     ) {}
 
     public function profileViewed(User $player, Website $website, Request $request): void
@@ -22,9 +23,6 @@ class PlayerActivityEmailService
     public function socialClicked(User $player, Website $website, string $platform, Request $request): void
     {
         $platform = strtolower(trim($platform));
-
-        // On the player card, YouTube is the highlight destination. Keep a
-        // dedicated activity type so the athlete gets a clear highlight alert.
         $type = $platform === 'youtube' ? 'highlight_click' : 'social_click';
 
         $this->send($player, $website, $type, $platform, $request);
@@ -37,20 +35,47 @@ class PlayerActivityEmailService
             return;
         }
 
-        // Avoid emailing the athlete for their own authenticated profile visits.
         if (auth()->check() && (int) auth()->id() === (int) $player->getKey()) {
             return;
         }
 
-        $viewer = hash_hmac('sha256', implode('|', [
-            (string) $request->ip(),
-            (string) $request->userAgent(),
-            strtolower((string) $request->query('rc_email', '')),
-        ]), (string) config('app.key'));
+        // IMPORTANT: anonymous/direct visitors must never trigger an athlete
+        // notification. Only a visitor matched to the player's Coach Database,
+        // sent-message recipient records, school records, or an immediately
+        // preceding coach-attributed tracking event is allowed through.
+        $coach = $this->coachIdentity->resolve(
+            player: $player,
+            request: $request,
+            eventType: $type === 'profile_view' ? 'profile_view' : 'link_click',
+            platform: $platform,
+        );
 
-        // One notification per visitor/activity in a 15-minute window. Tracking
-        // itself remains untouched; this only prevents notification floods.
-        $key = "plyrcard:activity-mail:{$player->id}:{$type}:{$platform}:{$viewer}";
+        if (! ($coach['matched'] ?? false)) {
+            Log::debug('PLYRCARD activity email skipped for anonymous/unmatched visitor.', [
+                'user_id' => $player->id,
+                'activity_type' => $type,
+                'platform' => $platform,
+            ]);
+
+            return;
+        }
+
+        $viewerIdentity = strtolower(trim((string) (
+            $coach['contact_id']
+                ?? $coach['email']
+                ?? $coach['name']
+                ?? 'coach'
+        )));
+
+        // One email per known coach/activity in a 15-minute window. Anonymous
+        // traffic never reaches this point and therefore never consumes a key.
+        $key = 'plyrcard:activity-mail:' . implode(':', [
+            $player->id,
+            $type,
+            $platform,
+            hash('sha256', $viewerIdentity),
+        ]);
+
         if (! Cache::add($key, true, now()->addMinutes(15))) {
             return;
         }
@@ -60,16 +85,20 @@ class PlayerActivityEmailService
             website: $website,
             activityType: $type,
             platform: $platform,
-            viewerEmail: filter_var($request->query('rc_email'), FILTER_VALIDATE_EMAIL) ?: null,
+            viewerEmail: $coach['email'] ?? null,
+            viewerName: $coach['name'] ?? null,
+            viewerSchool: $coach['school'] ?? null,
         );
 
         if (! ($result['success'] ?? false)) {
             Cache::forget($key);
 
-            Log::warning('PLYRCARD player activity email failed through native PHP mail().', [
+            Log::warning('PLYRCARD coach activity email failed through native PHP mail().', [
                 'user_id' => $player->id,
                 'activity_type' => $type,
                 'platform' => $platform,
+                'coach_contact_id' => $coach['contact_id'] ?? null,
+                'coach_match_source' => $coach['source'] ?? null,
                 'error' => $result['error'] ?? 'Unknown email error.',
             ]);
         }

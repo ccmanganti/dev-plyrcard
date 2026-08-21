@@ -37,6 +37,8 @@ class PlyrcardSystemEmailService
         string $activityType,
         string $platform = 'website',
         ?string $viewerEmail = null,
+        ?string $viewerName = null,
+        ?string $viewerSchool = null,
     ): array {
         $recipient = $this->recipientFor($player);
 
@@ -45,9 +47,9 @@ class PlyrcardSystemEmailService
         }
 
         $subject = match ($activityType) {
-            'profile_view' => 'Someone viewed your PLYRCARD',
-            'highlight_click' => 'Someone clicked your highlight',
-            default => 'Someone clicked your ' . ucfirst($platform) . ' link',
+            'profile_view' => 'A coach viewed your PLYRCARD',
+            'highlight_click' => 'A coach clicked your highlight',
+            default => 'A coach clicked your ' . ucfirst($platform) . ' link',
         };
 
         $html = $this->renderActivityEmail(
@@ -56,6 +58,8 @@ class PlyrcardSystemEmailService
             activityType: $activityType,
             platform: $platform,
             viewerEmail: $viewerEmail,
+            viewerName: $viewerName,
+            viewerSchool: $viewerSchool,
         );
 
         return $this->sendHtml(
@@ -146,6 +150,8 @@ class PlyrcardSystemEmailService
         string $activityType,
         string $platform,
         ?string $viewerEmail,
+        ?string $viewerName,
+        ?string $viewerSchool,
     ): string {
         $viewName = 'emails.plyrcard-player-activity';
 
@@ -156,6 +162,8 @@ class PlyrcardSystemEmailService
                 'activityType' => $activityType,
                 'platform' => $platform,
                 'viewerEmail' => $viewerEmail,
+                'viewerName' => $viewerName,
+                'viewerSchool' => $viewerSchool,
             ])->render();
         }
 
@@ -169,12 +177,13 @@ class PlyrcardSystemEmailService
         $isHighlight = $activityType === 'highlight_click';
         $label = $isProfile ? 'PROFILE VIEW' : ($isHighlight ? 'HIGHLIGHT CLICK' : strtoupper($platform) . ' CLICK');
         $title = $isProfile
-            ? 'Someone viewed your PLYRCARD.'
-            : ($isHighlight ? 'Someone clicked your highlight.' : 'Someone clicked your ' . ucfirst($platform) . ' link.');
+            ? 'A coach viewed your PLYRCARD.'
+            : ($isHighlight ? 'A coach clicked your highlight.' : 'A coach clicked your ' . ucfirst($platform) . ' link.');
         $description = $isProfile
-            ? 'Your profile got another visit.'
-            : ($isHighlight ? 'A visitor clicked through to your YouTube highlight destination.' : 'A visitor moved from your PLYRCARD to your ' . $platform . ' destination.');
-        $viewer = $viewerEmail ? 'Visitor: ' . $viewerEmail : 'Visitor: anonymous / direct';
+            ? 'A coach opened your player profile.'
+            : ($isHighlight ? 'A coach clicked through to your YouTube highlight destination.' : 'A coach moved from your PLYRCARD to your ' . $platform . ' destination.');
+        $coachBits = array_values(array_filter([$viewerName, $viewerSchool, $viewerEmail]));
+        $viewer = 'Coach: ' . (empty($coachBits) ? 'Identified coach' : implode(' · ', $coachBits));
         $profileUrl = $this->playerUrl($website);
 
         return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
