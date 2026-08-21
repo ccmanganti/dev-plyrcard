@@ -11,6 +11,7 @@ use App\Services\PlayerActivityEmailService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -118,6 +119,20 @@ class ExternalSocialTrackingController extends Controller
 
         $identity = $this->resolveCoachIdentity($player, $request);
 
+        Log::info('PLYRCARD social tracking URL received.', [
+            'user_id' => $player->getKey(),
+            'website_id' => $website->getKey(),
+            'platform' => $platform,
+            'has_rc_contact_id' => $this->mergeValue($request->query('rc_contact_id')) !== '',
+            'has_rc_email' => $this->emailValue($request->query('rc_email')) !== '',
+            'rc_notify' => $request->boolean('rc_notify'),
+            'coach_match_source' => $identity['match_source'] ?? null,
+            'coach_contact_id' => $identity['coach_contact_id'] ?? null,
+            'coach_email' => $identity['coach_email'] ?? null,
+            'coach_name' => $identity['coach_name'] ?? null,
+            'school_name' => $identity['school_name'] ?? null,
+        ]);
+
         try {
             $this->tracking->record([
                 'athlete_id' => $player->getKey(),
@@ -181,7 +196,13 @@ class ExternalSocialTrackingController extends Controller
             // middleware attached, tell it this click was already handled here.
             $request->attributes->set('plyrcard_activity_email_sent', true);
 
-            $this->activityEmails->socialClicked($player, $website, $platform, $request);
+            $this->activityEmails->socialClickedFromTrackingIdentity(
+                player: $player,
+                website: $website,
+                platform: $platform,
+                identity: $identity,
+                request: $request,
+            );
         } catch (\Throwable $exception) {
             report($exception);
         }
@@ -258,8 +279,12 @@ class ExternalSocialTrackingController extends Controller
         $cacheKey = 'coach-database:v10:' . $player->getKey() . ':'
             . Str::slug($locationId !== '' ? $locationId : 'default');
         $snapshot = Cache::get($cacheKey, []);
-        $coaches = is_array($snapshot) && is_array($snapshot['coaches'] ?? null)
-            ? $snapshot['coaches']
+        $coaches = is_array($snapshot)
+            ? collect($snapshot['coaches'] ?? [])
+                ->merge($snapshot['contacts'] ?? [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->values()
+                ->all()
             : [];
 
         $cachedCoach = collect($coaches)
@@ -306,11 +331,23 @@ class ExternalSocialTrackingController extends Controller
                 ->first();
 
             if ($message) {
+                $school = null;
+                if ($message->school_business_id && Schema::hasTable('coach_database_schools')) {
+                    $school = CoachDatabaseSchool::query()
+                        ->where('user_id', $player->getKey())
+                        ->when($locationId !== '', fn ($query) => $query->where('ghl_location_id', $locationId))
+                        ->where('business_id', $message->school_business_id)
+                        ->first();
+                }
+
                 return array_merge($default, [
                     'coach_contact_id' => $message->coach_contact_id ?: ($suppliedContactId ?: null),
                     'coach_email' => strtolower(trim((string) ($message->recipient_email ?: $email))) ?: null,
-                    'coach_name' => trim((string) $message->recipient_name) ?: null,
+                    'coach_name' => trim((string) ($message->recipient_name ?: $school?->head_coach_name)) ?: null,
+                    'coach_title' => trim((string) ($school?->head_coach_title ?? '')) ?: null,
                     'school_business_id' => $message->school_business_id ?: null,
+                    'school_name' => trim((string) ($message->school_name ?? $school?->name ?? '')) ?: null,
+                    'school_logo_url' => trim((string) ($school?->logo_url ?? '')) ?: null,
                     'match_source' => 'coach_database_email_messages',
                 ]);
             }

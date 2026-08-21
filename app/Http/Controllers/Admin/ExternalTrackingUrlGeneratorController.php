@@ -77,19 +77,20 @@ class ExternalTrackingUrlGeneratorController extends Controller
             ->where('is_active', true)
             ->firstOrFail();
 
+        /*
+         * v10.19: generated campaign URLs are the attribution source for social
+         * clicks. Always include both GHL recipient merge values so the redirect
+         * can verify the actual coach and build the notification email.
+         */
         $generated = $generator->generate($player, $website, [
             'campaign' => $validated['campaign'],
             'source' => $validated['source'],
             'medium' => $validated['medium'],
-            'include_contact_id' => $request->boolean('include_contact_id'),
-            'include_email' => $request->boolean('include_email'),
+            'include_contact_id' => true,
+            'include_email' => true,
         ]);
 
-        // v139: bind every generated public/tracking URL to the exact Website selected
-        // in the generator. The social redirect controller verifies this ID against the
-        // incoming host before using it, while old links without the parameter continue
-        // to work through the domain fallback.
-        $generated = $this->appendWebsiteIdentityToGenerated(
+        $generated = $this->appendTrackingIdentityToGenerated(
             $generated,
             (int) $website->getKey(),
         );
@@ -99,11 +100,11 @@ class ExternalTrackingUrlGeneratorController extends Controller
             ->with('generated', $generated);
     }
 
-    protected function appendWebsiteIdentityToGenerated(mixed $value, int $websiteId): mixed
+    protected function appendTrackingIdentityToGenerated(mixed $value, int $websiteId): mixed
     {
         if (is_array($value)) {
             foreach ($value as $key => $item) {
-                $value[$key] = $this->appendWebsiteIdentityToGenerated($item, $websiteId);
+                $value[$key] = $this->appendTrackingIdentityToGenerated($item, $websiteId);
             }
 
             return $value;
@@ -113,13 +114,14 @@ class ExternalTrackingUrlGeneratorController extends Controller
             return $value;
         }
 
-        return $this->appendQueryParameter($value, 'rc_website_id', (string) $websiteId);
+        $value = $this->appendQueryParameter($value, 'rc_website_id', (string) $websiteId);
+
+        return $this->appendQueryParameter($value, 'rc_notify', '1');
     }
 
     protected function appendQueryParameter(string $url, string $key, string $value): string
     {
-        // Preserve merge tags such as {{contact.id}} exactly as generated. Rebuilding
-        // the URL with parse_str/http_build_query would URL-encode those placeholders.
+        // Preserve GHL merge tags such as {{contact.id}} and {{contact.email}}.
         if (preg_match('/(?:^|[?&])' . preg_quote($key, '/') . '=/', $url)) {
             return $url;
         }
