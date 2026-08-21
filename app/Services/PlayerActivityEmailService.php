@@ -89,11 +89,8 @@ class PlayerActivityEmailService
 
     protected function send(User $player, Website $website, string $type, string $platform, Request $request): void
     {
-        $recipient = $player->email ?: $player->personal_email;
-
-        if (! $recipient || ! filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
-            return;
-        }
+        // Recipient validation is handled by PlyrcardSystemEmailService because
+        // activity alerts may go to the athlete plus parent/guardian emails.
 
         // Never notify the player about their own authenticated activity.
         if (auth()->check() && (int) auth()->id() === (int) $player->getKey()) {
@@ -165,6 +162,8 @@ class PlayerActivityEmailService
             'coach_name' => $coach['name'] ?? null,
             'coach_school' => $coach['school'] ?? null,
             'coach_match_source' => $coach['source'] ?? null,
+            'sent_recipients' => $result['sent_recipients'] ?? [],
+            'failed_recipients' => $result['failed_recipients'] ?? [],
         ]);
     }
 

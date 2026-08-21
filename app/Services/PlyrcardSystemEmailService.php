@@ -40,10 +40,12 @@ class PlyrcardSystemEmailService
         ?string $viewerName = null,
         ?string $viewerSchool = null,
     ): array {
-        $recipient = $this->recipientFor($player);
+        // Activity alerts go to the athlete AND any valid parent/guardian emails
+        // stored on the player. Registration/welcome mail remains player-only.
+        $recipients = $this->activityRecipientsFor($player);
 
-        if (! $recipient) {
-            return ['success' => false, 'error' => 'The player does not have a valid email address.'];
+        if ($recipients === []) {
+            return ['success' => false, 'error' => 'The player does not have a valid player or parent email address.'];
         }
 
         $coachLastName = $this->coachLastName($viewerName);
@@ -67,17 +69,47 @@ class PlyrcardSystemEmailService
             viewerSchool: $viewerSchool,
         );
 
-        return $this->sendHtml(
-            user: $player,
-            recipient: $recipient,
-            subject: $subject,
-            html: $html,
-            purpose: match ($activityType) {
-                'profile_view' => 'profile_view_notification',
-                'highlight_click' => 'highlight_click_notification',
-                default => 'social_click_notification',
-            },
-        );
+        $purpose = match ($activityType) {
+            'profile_view' => 'profile_view_notification',
+            'highlight_click' => 'highlight_click_notification',
+            default => 'social_click_notification',
+        };
+
+        $results = [];
+        $sentRecipients = [];
+        $failedRecipients = [];
+
+        foreach ($recipients as $role => $recipient) {
+            $result = $this->sendHtml(
+                user: $player,
+                recipient: $recipient,
+                subject: $subject,
+                html: $html,
+                purpose: $purpose . ':' . $role,
+            );
+
+            $results[$role] = $result;
+
+            if ($result['success'] ?? false) {
+                $sentRecipients[$role] = $recipient;
+            } else {
+                $failedRecipients[$role] = [
+                    'email' => $recipient,
+                    'error' => $result['error'] ?? 'Unknown email error.',
+                ];
+            }
+        }
+
+        return [
+            'success' => $sentRecipients !== [],
+            'all_sent' => $failedRecipients === [],
+            'sent_recipients' => $sentRecipients,
+            'failed_recipients' => $failedRecipients,
+            'results' => $results,
+            'error' => $sentRecipients === []
+                ? 'The activity notification could not be sent to the player or parent email addresses.'
+                : null,
+        ];
     }
 
     public function sendTest(User $user): array
@@ -387,6 +419,41 @@ class PlyrcardSystemEmailService
         $this->logFailure($user, $recipient, $subject, $purpose, $result);
 
         return $result;
+    }
+
+    /**
+     * Valid recipients for coach-activity alerts. Keep each address only once
+     * so a parent using the player's email does not receive duplicates.
+     */
+    protected function activityRecipientsFor(User $user): array
+    {
+        $candidates = [
+            'player' => $user->email ?: $user->personal_email,
+            'primary_parent' => $user->parent_email
+                ?? $user->primary_parent_email
+                ?? $user->guardian_email
+                ?? null,
+            'secondary_parent' => $user->sec_parent_email
+                ?? $user->secondary_parent_email
+                ?? $user->guardian_email_2
+                ?? null,
+        ];
+
+        $recipients = [];
+        $seen = [];
+
+        foreach ($candidates as $role => $candidate) {
+            $email = $this->sanitizeEmail((string) $candidate);
+
+            if ($email === null || isset($seen[$email])) {
+                continue;
+            }
+
+            $seen[$email] = true;
+            $recipients[$role] = $email;
+        }
+
+        return $recipients;
     }
 
     protected function recipientFor(User $user): ?string

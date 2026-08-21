@@ -8185,55 +8185,211 @@ protected function campaignRecipientCoaches(): Collection
     }
 
     protected function forceSocialLinksThroughRecruitingTracking(string $html, array $trackingContext, array $coach = []): string
-{
-    if (trim($html) === '') {
+    {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        $coachForTracking = array_merge($coach, [
+            'id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? $coach['id'] ?? null,
+            'contact_id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? $coach['contact_id'] ?? null,
+            'ghl_contact_id' => $trackingContext['ghl_contact_id'] ?? $coach['ghl_contact_id'] ?? null,
+            'email' => $trackingContext['coach_email'] ?? $coach['email'] ?? null,
+            'business_id' => $trackingContext['business_id'] ?? $trackingContext['ghl_business_id'] ?? $coach['business_id'] ?? null,
+            'ghl_business_id' => $trackingContext['ghl_business_id'] ?? $trackingContext['business_id'] ?? $coach['ghl_business_id'] ?? null,
+            'school' => $trackingContext['school'] ?? $trackingContext['school_name'] ?? $coach['school'] ?? $coach['company_name'] ?? null,
+            'school_name' => $trackingContext['school_name'] ?? $trackingContext['school'] ?? $coach['school_name'] ?? null,
+        ]);
+
+        $platforms = [
+            'instagram' => ['InstagramLink'],
+            'x' => ['XLink', 'TwitterLink'],
+            'youtube' => ['YoutubeLink', 'YouTubeLink'],
+        ];
+
+        foreach ($platforms as $platform => $tokens) {
+            $destination = $this->userSocialUrl($platform, '');
+
+            if (trim($destination) === '') {
+                continue;
+            }
+
+            // IMPORTANT: the email signature must never point directly to the
+            // social network with rc_* parameters. If it does, Instagram/X/YouTube
+            // receive the request and PLYRCARD never sees the click.
+            //
+            // Route the click through the player's own PLYRCARD profile first:
+            //   hosted profile:  https://host/player-slug/out/instagram
+            //   custom domain:   https://playerdomain.com/out/instagram
+            // ExternalSocialTrackingController records/notifies, then redirects.
+            $tracked = $this->recruitingSocialMiddlemanUrl(
+                destination: $destination,
+                platform: $platform,
+                trackingContext: $trackingContext,
+                coach: $coachForTracking,
+            );
+
+            foreach ($tokens as $token) {
+                $html = str_replace('{{' . $token . '}}', $tracked, $html);
+            }
+
+            // The canonical signature has data-plyrcard-link markers. Rewrite
+            // those anchors directly so this still works after merge tokens have
+            // already been replaced by LocalTemplateMergeValueService.
+            $html = $this->replacePlyrcardSocialAnchorHref($html, $platform, $tracked);
+
+            // Also replace the exact social destination for older templates that
+            // do not have the data-plyrcard-link attribute.
+            $html = $this->replaceExactProfileDestinationInEmail(
+                $html,
+                $destination,
+                $tracked,
+            );
+        }
+
         return $html;
     }
 
-    $coachForTracking = array_merge($coach, [
-        'id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? $coach['id'] ?? null,
-        'contact_id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? $coach['contact_id'] ?? null,
-        'ghl_contact_id' => $trackingContext['ghl_contact_id'] ?? $coach['ghl_contact_id'] ?? null,
-        'business_id' => $trackingContext['business_id'] ?? $trackingContext['ghl_business_id'] ?? $coach['business_id'] ?? null,
-        'ghl_business_id' => $trackingContext['ghl_business_id'] ?? $trackingContext['business_id'] ?? $coach['ghl_business_id'] ?? null,
-        'school' => $trackingContext['school'] ?? $trackingContext['school_name'] ?? $coach['school'] ?? $coach['company_name'] ?? null,
-        'school_name' => $trackingContext['school_name'] ?? $trackingContext['school'] ?? $coach['school_name'] ?? null,
-    ]);
+    /**
+     * Build the PLYRCARD middleman URL used by social links in recruiting emails.
+     * The player's public profile URL is the safest base because it works for
+     * local/dev/prod hosted profiles and custom domains without hardcoding a host.
+     */
+    protected function recruitingSocialMiddlemanUrl(
+        string $destination,
+        string $platform,
+        array $trackingContext,
+        array $coach = [],
+    ): string {
+        $platform = strtolower(trim($platform));
+        $platform = $platform === 'twitter' ? 'x' : $platform;
 
-    $platforms = [
-        'instagram' => ['InstagramLink', 'instagram'],
-        'x' => ['XLink', 'x'],
-        'youtube' => ['YoutubeLink', 'youtube'],
-        'youtube_alt' => ['YouTubeLink', 'youtube'],
-    ];
-
-    foreach ($platforms as [$token, $platform]) {
-        $destination = $this->userSocialUrl($platform, '');
-
-        if (trim($destination) === '') {
-            continue;
+        if (! in_array($platform, ['instagram', 'youtube', 'x'], true)) {
+            return $destination;
         }
 
-        $tracked = $this->appendRecruitingTrackingQuery(
-            $destination,
-            $platform,
-            'profile_view',
-            $coachForTracking,
-            $platform
-        );
+        $profileUrl = trim((string) ($trackingContext['profile_url'] ?? $this->userProfileUrl('')));
+        $profileUrl = html_entity_decode($profileUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $html = str_replace('{{' . $token . '}}', $tracked, $html);
+        if ($profileUrl === '' || ! Str::startsWith(strtolower($profileUrl), ['http://', 'https://'])) {
+            Log::warning('PLYRCARD social signature could not build middleman URL because profile URL is missing.', [
+                'platform' => $platform,
+                'coach_contact_id' => $trackingContext['coach_contact_id'] ?? $trackingContext['contact_id'] ?? null,
+            ]);
 
-        // This existing helper safely replaces exact href destinations inside anchors.
-        $html = $this->replaceExactProfileDestinationInEmail(
-            $html,
-            $destination,
-            $tracked
-        );
+            return $destination;
+        }
+
+        // Query strings/fragments belong to the profile destination, not the
+        // /out/{platform} route itself.
+        $profileUrl = preg_replace('/[?#].*$/', '', $profileUrl) ?: $profileUrl;
+        $middleman = rtrim($profileUrl, '/') . '/out/' . rawurlencode($platform);
+
+        $contactId = trim((string) ($trackingContext['coach_contact_id']
+            ?? $trackingContext['contact_id']
+            ?? $coach['contact_id']
+            ?? $coach['id']
+            ?? $coach['ghl_contact_id']
+            ?? ''));
+        $coachEmail = strtolower(trim((string) ($trackingContext['coach_email'] ?? $coach['email'] ?? '')));
+        $businessId = trim((string) ($trackingContext['business_id']
+            ?? $trackingContext['ghl_business_id']
+            ?? $coach['business_id']
+            ?? $coach['ghl_business_id']
+            ?? ''));
+        $schoolName = trim((string) ($trackingContext['school_name']
+            ?? $trackingContext['school']
+            ?? $coach['school']
+            ?? $coach['school_name']
+            ?? $coach['company_name']
+            ?? ''));
+
+        $params = array_filter([
+            'utm_source' => 'plyrcard_recruiting',
+            'utm_medium' => 'email',
+            'utm_campaign' => 'coach_database',
+            'utm_content' => $platform,
+            'rc_event' => 'link_click',
+            'rc_platform' => $platform,
+            'rc_contact_id' => $contactId,
+            'rc_ghl_contact_id' => $contactId,
+            'rc_email' => filter_var($coachEmail, FILTER_VALIDATE_EMAIL) ? $coachEmail : null,
+            'rc_business_id' => $businessId,
+            'rc_school' => $schoolName,
+            'rc_message_uuid' => $trackingContext['message_uuid'] ?? null,
+            'rc_notify' => 1,
+            'rc_destination' => $platform,
+        ], static fn ($value): bool => ! is_null($value) && trim((string) $value) !== '');
+
+        $separator = str_contains($middleman, '?') ? '&' : '?';
+
+        return $middleman
+            . ($params !== [] ? $separator . http_build_query($params, '', '&', PHP_QUERY_RFC3986) : '');
     }
 
-    return $html;
-}
+    /**
+     * Replace the href on canonical PLYRCARD signature anchors. This is more
+     * reliable than token replacement because merge values are normally resolved
+     * before the send-time tracking pass runs.
+     */
+    protected function replacePlyrcardSocialAnchorHref(string $html, string $platform, string $replacement): string
+    {
+        $platform = strtolower(trim($platform));
+        $aliases = $platform === 'x' ? '(?:x|twitter)' : preg_quote($platform, '/');
+        $encodedReplacement = htmlspecialchars($replacement, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        return preg_replace_callback(
+            '/<a\b(?=[^>]*\bdata-plyrcard-link\s*=\s*(["\'])' . $aliases . '\1)[^>]*>/is',
+            static function (array $matches) use ($encodedReplacement): string {
+                $anchor = (string) ($matches[0] ?? '');
+
+                if (preg_match('/\bhref\s*=\s*(["\']).*?\1/is', $anchor) === 1) {
+                    return preg_replace(
+                        '/\bhref\s*=\s*(["\']).*?\1/is',
+                        'href="' . $encodedReplacement . '"',
+                        $anchor,
+                        1,
+                    ) ?: $anchor;
+                }
+
+                return preg_replace('/\s*>$/', ' href="' . $encodedReplacement . '">', $anchor, 1) ?: $anchor;
+            },
+            $html,
+        ) ?: $html;
+    }
+
+    /**
+     * Replace an exact href destination inside an email. The old send path
+     * called this helper but the method was missing, which caused the rewrite
+     * exception to be caught and the untracked original body to be sent.
+     */
+    protected function replaceExactProfileDestinationInEmail(
+        string $html,
+        string $destination,
+        string $replacement,
+    ): string {
+        $destination = html_entity_decode(trim($destination), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        if ($destination === '' || trim($replacement) === '') {
+            return $html;
+        }
+
+        $encodedReplacement = htmlspecialchars($replacement, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        return preg_replace_callback(
+            '/\bhref\s*=\s*(["\'])(.*?)\1/isu',
+            static function (array $matches) use ($destination, $encodedReplacement): string {
+                $current = html_entity_decode(trim((string) ($matches[2] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                if (! hash_equals($destination, $current)) {
+                    return (string) ($matches[0] ?? '');
+                }
+
+                return 'href="' . $encodedReplacement . '"';
+            },
+            $html,
+        ) ?: $html;
+    }
 
     /**
      * Return one canonical tracking row per coach/contact. The dataset can contain
