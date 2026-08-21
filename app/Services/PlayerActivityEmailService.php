@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class PlayerActivityEmailService
@@ -22,7 +21,19 @@ class PlayerActivityEmailService
 
     public function socialClicked(User $player, Website $website, string $platform, Request $request): void
     {
-        $platform = strtolower(trim($platform));
+        $platform = $this->normalizePlatform($platform);
+
+        if (! in_array($platform, ['instagram', 'youtube', 'x'], true)) {
+            Log::debug('PLYRCARD social activity email skipped for unsupported platform.', [
+                'user_id' => $player->id,
+                'platform' => $platform,
+            ]);
+
+            return;
+        }
+
+        // YouTube is treated as the player's highlight/video destination.
+        // Instagram and X are normal social-link clicks.
         $type = $platform === 'youtube' ? 'highlight_click' : 'social_click';
 
         $this->send($player, $website, $type, $platform, $request);
@@ -31,18 +42,19 @@ class PlayerActivityEmailService
     protected function send(User $player, Website $website, string $type, string $platform, Request $request): void
     {
         $recipient = $player->email ?: $player->personal_email;
+
         if (! $recipient || ! filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 
+        // Never notify the player about their own authenticated activity.
         if (auth()->check() && (int) auth()->id() === (int) $player->getKey()) {
             return;
         }
 
-        // IMPORTANT: anonymous/direct visitors must never trigger an athlete
-        // notification. Only a visitor matched to the player's Coach Database,
-        // sent-message recipient records, school records, or an immediately
-        // preceding coach-attributed tracking event is allowed through.
+        // Anonymous/direct visitors remain trackable by the analytics layer,
+        // but they must never trigger an athlete email. Only a visitor matched
+        // to an actual coach is allowed to generate a notification.
         $coach = $this->coachIdentity->resolve(
             player: $player,
             request: $request,
@@ -60,26 +72,14 @@ class PlayerActivityEmailService
             return;
         }
 
-        $viewerIdentity = strtolower(trim((string) (
-            $coach['contact_id']
-                ?? $coach['email']
-                ?? $coach['name']
-                ?? 'coach'
-        )));
-
-        // One email per known coach/activity in a 15-minute window. Anonymous
-        // traffic never reaches this point and therefore never consumes a key.
-        $key = 'plyrcard:activity-mail:' . implode(':', [
-            $player->id,
-            $type,
-            $platform,
-            hash('sha256', $viewerIdentity),
-        ]);
-
-        if (! Cache::add($key, true, now()->addMinutes(15))) {
-            return;
-        }
-
+        /*
+         * v10.16 IMPORTANT:
+         * There is intentionally NO cache/throttle/deduplication here.
+         * Every verified coach interaction is a separate event and should
+         * generate its own email. If the same coach clicks YouTube twice,
+         * Instagram twice, X twice, or reloads the profile twice, the player
+         * can receive two separate notifications.
+         */
         $result = $this->systemEmail->sendPlayerActivity(
             player: $player,
             website: $website,
@@ -91,8 +91,6 @@ class PlayerActivityEmailService
         );
 
         if (! ($result['success'] ?? false)) {
-            Cache::forget($key);
-
             Log::warning('PLYRCARD coach activity email failed through native PHP mail().', [
                 'user_id' => $player->id,
                 'activity_type' => $type,
@@ -101,6 +99,29 @@ class PlayerActivityEmailService
                 'coach_match_source' => $coach['source'] ?? null,
                 'error' => $result['error'] ?? 'Unknown email error.',
             ]);
+
+            return;
         }
+
+        Log::info('PLYRCARD coach activity notification sent.', [
+            'user_id' => $player->id,
+            'activity_type' => $type,
+            'platform' => $platform,
+            'coach_contact_id' => $coach['contact_id'] ?? null,
+            'coach_email' => $coach['email'] ?? null,
+            'coach_match_source' => $coach['source'] ?? null,
+        ]);
+    }
+
+    protected function normalizePlatform(string $platform): string
+    {
+        $platform = strtolower(trim($platform));
+
+        return match ($platform) {
+            'ig', 'instagram' => 'instagram',
+            'yt', 'youtube' => 'youtube',
+            'twitter', 'x', 'x.com' => 'x',
+            default => $platform,
+        };
     }
 }
