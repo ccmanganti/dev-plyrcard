@@ -79,8 +79,8 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
       <li><span class="dot">4</span><span class="lb">Billing &amp; payment</span></li>
     @else
       <li class="on"><span class="dot">1</span><span class="lb">Your account</span></li>
-      <li><span class="dot">2</span><span class="lb">Athlete basics</span></li>
-      <li><span class="dot">3</span><span class="lb">Team &amp; club</span></li>
+      <li><span class="dot">2</span><span class="lb">Athlete details</span></li>
+      <li><span class="dot">3</span><span class="lb">Sport &amp; team</span></li>
       <li><span class="dot">4</span><span class="lb">Claim your link</span></li>
     @endif
   </ol>
@@ -120,7 +120,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
   <div class="fields">
     <div class="row"><div class="f"><label>First name</label><input name="first_name" id="fn" type="text" autocomplete="given-name" placeholder="First name"><div class="msg">Enter your first name.</div></div><div class="f"><label>Last name</label><input name="last_name" id="ln" type="text" autocomplete="family-name" placeholder="Last name"><div class="msg">Enter your last name.</div></div></div>
     <div class="f"><label>Email</label><input name="email" id="em" type="email" autocomplete="email" placeholder="you@email.com"><div class="msg">Enter a valid email.</div><div class="hint">Receipts, payment notices, and account alerts go here.</div></div>
-    <div class="f"><label>Mobile</label><input name="phone" id="ph" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+1 (555) 555-5555" data-phone-mask><div class="msg">Enter a mobile number.</div></div>
+    <div class="f"><label>Mobile</label><input name="phone" id="ph" type="tel" autocomplete="tel" inputmode="tel" maxlength="12" placeholder="555-555-5555" data-phone-mask><div class="msg">Enter a mobile number.</div></div>
     <div class="f"><label>Password</label><div class="pw-wrap"><input name="password" id="pw" type="password" autocomplete="new-password" placeholder="8+ chars, 1 capital, 1 number"><button type="button" class="peek" id="peek">Show</button></div><input name="password_confirmation" id="pwc" type="hidden"><ul class="rules"><li data-r="len"><i></i>8+ characters</li><li data-r="up"><i></i>1 capital letter</li><li data-r="num"><i></i>1 number</li></ul><div class="msg">Password doesn't meet the requirements.</div></div>
     <div class="f"><label class="check"><input type="checkbox" name="is_minor" id="minor" value="1"><span>The athlete is under 18</span></label><div class="reveal" id="guardian"><p class="why">A parent or guardian is added as the primary account contact for a minor.</p><div class="row"><div class="f"><label>Guardian name</label><input name="guardian_name" id="gn" type="text" placeholder="Parent or guardian name" autocomplete="name"><div class="msg">Enter guardian name.</div></div><div class="f"><label>Guardian email</label><input name="guardian_email" id="ge" type="email" placeholder="guardian@email.com" autocomplete="email"><div class="msg">Enter guardian email.</div></div></div></div></div>
   </div>
@@ -129,6 +129,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 
 <section class="panel" data-step="3">
   <div class="eyebrow">Step 03 of 04</div><h1>Athlete profile</h1><p class="sub">Enough to build the foundation of your card before onboarding.</p>
+  @include('pages.registration-team-fields', ['paid' => true])
   @include('pages.registration-athlete-fields', ['paid' => true])
   <div class="nav step-nav"><button type="button" class="btn gho" data-go="2">Back</button><button type="button" class="btn pri" data-go="4">Continue</button></div>
 </section>
@@ -143,7 +144,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
   <div class="fields" style="margin-top:24px">
     <div class="divider" id="billingInfoStart"><span>Billing information</span></div>
     <div class="f"><label>Billing name</label><input name="billing_name" id="billingName" type="text" autocomplete="name" placeholder="Name on billing account"><div class="msg">Enter billing name.</div></div>
-    <div class="row"><div class="f"><label>Billing email</label><input name="billing_email" id="billingEmail" type="email" autocomplete="email" placeholder="billing@email.com"><div class="msg">Enter billing email.</div></div><div class="f"><label>Billing phone</label><input name="billing_phone" id="billingPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+1 (555) 555-5555" data-phone-mask><div class="msg">Enter billing phone.</div></div></div>
+    <div class="row"><div class="f"><label>Billing email</label><input name="billing_email" id="billingEmail" type="email" autocomplete="email" placeholder="billing@email.com"><div class="msg">Enter billing email.</div></div><div class="f"><label>Billing phone</label><input name="billing_phone" id="billingPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="12" placeholder="555-555-5555" data-phone-mask><div class="msg">Enter billing phone.</div></div></div>
     <div class="f"><label>Address</label><input name="billing_address_1" id="ba1" type="text" autocomplete="address-line1" placeholder="123 Main Street"><div class="msg">Enter billing address.</div></div>
     <div class="row3"><div class="f"><label>City</label><input name="billing_city" id="bcity" type="text" autocomplete="address-level2" placeholder="City"><div class="msg">Enter city.</div></div><div class="f"><label>State</label><input name="billing_state" id="bstate" type="text" autocomplete="address-level1" maxlength="40" placeholder="State / Province"><div class="msg">Enter state.</div></div><div class="f"><label>ZIP</label><input name="billing_postal_code" id="bzip" class="mono" type="text" autocomplete="postal-code" inputmode="text" maxlength="10" placeholder="22079" data-postal-mask><div class="msg">Enter ZIP.</div></div></div>
     <div class="f"><label>Country</label><select name="billing_country" id="bcountry" data-suggest-placeholder="Type or choose a country"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="AU">Australia</option><option value="PH">Philippines</option></select></div>
@@ -171,13 +172,13 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
   <div class="fields">
     <div class="row"><div class="f"><label>First name</label><input name="first_name" id="fn" type="text" autocomplete="given-name" placeholder="First name"><div class="msg">Enter first name.</div></div><div class="f"><label>Last name</label><input name="last_name" id="ln" type="text" autocomplete="family-name" placeholder="Last name"><div class="msg">Enter last name.</div></div></div>
     <div class="f"><label>Email</label><input name="email" id="em" type="email" autocomplete="email" placeholder="you@email.com"><div class="msg">Enter a valid email.</div></div>
-    <div class="f"><label>Mobile <span class="opt">— optional</span></label><input name="phone" id="ph" type="tel" autocomplete="tel" inputmode="tel" maxlength="20" placeholder="+1 (555) 555-5555" data-phone-mask></div>
+    <div class="f"><label>Mobile <span class="opt">— optional</span></label><input name="phone" id="ph" type="tel" autocomplete="tel" inputmode="tel" maxlength="12" placeholder="555-555-5555" data-phone-mask></div>
     <div class="f"><label>Password</label><div class="pw-wrap"><input name="password" id="pw" type="password" autocomplete="new-password" placeholder="8+ chars, 1 capital, 1 number"><button type="button" class="peek" id="peek">Show</button></div><input name="password_confirmation" id="pwc" type="hidden"><ul class="rules"><li data-r="len"><i></i>8+ characters</li><li data-r="up"><i></i>1 capital letter</li><li data-r="num"><i></i>1 number</li></ul><div class="msg">Password doesn't meet the requirements.</div></div>
     <div class="f"><label class="check"><input type="checkbox" name="is_minor" id="minor" value="1"><span>I'm under 18</span></label><div class="reveal" id="guardian"><p class="why">Athletes under 18 need a parent or guardian on the account.</p><div class="row"><div class="f"><label>Guardian name</label><input name="guardian_name" id="gn" type="text" placeholder="Parent or guardian name" autocomplete="name"><div class="msg">Enter guardian name.</div></div><div class="f"><label>Guardian email</label><input name="guardian_email" id="ge" type="email" placeholder="guardian@email.com" autocomplete="email"><div class="msg">Enter guardian email.</div></div></div></div></div>
   </div><div class="nav step-nav"><button type="button" class="btn pri" data-go="2">Continue</button></div><p class="tiny">Already have a PLYRCARD? <a href="/login">Log in instead</a></p>
 </section>
-<section class="panel" data-step="2"><div class="eyebrow">Step 02 of 04</div><h1>Athlete basics</h1><p class="sub">The fields coaches filter on first.</p>@include('pages.registration-athlete-fields', ['paid' => false, 'athleteOnly' => true])<div class="nav step-nav"><button type="button" class="btn gho" data-go="1">Back</button><button type="button" class="btn pri" data-go="3">Continue</button></div></section>
-<section class="panel" data-step="3"><div class="eyebrow">Step 03 of 04</div><h1>Team &amp; club</h1><p class="sub">Add the team context coaches use to verify your profile.</p>@include('pages.registration-team-fields', ['paid' => false])<div class="nav step-nav"><button type="button" class="btn gho" data-go="2">Back</button><button type="button" class="btn pri" data-go="4">Continue</button></div></section>
+<section class="panel" data-step="2"><div class="eyebrow">Step 02 of 04</div><h1>Athlete details</h1><p class="sub">Add the core profile details coaches use when reviewing your card.</p>@include('pages.registration-athlete-fields', ['paid' => false])<div class="nav step-nav"><button type="button" class="btn gho" data-go="1">Back</button><button type="button" class="btn pri" data-go="3">Continue</button></div></section>
+<section class="panel" data-step="3"><div class="eyebrow">Step 03 of 04</div><h1>Sport, league &amp; club</h1><p class="sub">Choose gender first, then sport, league, club, and team.</p>@include('pages.registration-team-fields', ['paid' => false])<div class="nav step-nav"><button type="button" class="btn gho" data-go="2">Back</button><button type="button" class="btn pri" data-go="4">Continue</button></div></section>
 <section class="panel" data-step="4">
   <div class="eyebrow">Step 04 of 04</div><h1>Claim your link</h1><p class="sub">One simple PLYRCARD link for your profile.</p>
   <div class="claim live" id="claim"><div class="k">Your automatic PLYRSITE</div><div class="url"><span class="d">plyrcard.com/</span><span class="h" id="preview">first-last-name</span></div><div class="status ok"><span class="pip"></span><span>Your link is created automatically from your name. If that link is already in use, PLYRCARD adds a number automatically.</span></div></div>
@@ -195,7 +196,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 const PAID=@json($isPaid), PLAN=@json($planKey), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status'));
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const form=$('#registrationForm'), alertBox=$('#formAlert'), loader=$('#pageLoader'), maxStep=4, successStep=5;
-const CACHE_KEY='plyrcard:registration:'+window.location.pathname+':'+PLAN+':v10.11';
+const CACHE_KEY='plyrcard:registration:'+window.location.pathname+':'+PLAN+':v10.12';
 let cur=1, division='', pickedPositions=[], chosenDomain='', statusPoll=null, registrationSubmitted=false, paymentFormUrl='', paymentConfirmed=false, cacheTimer=null;
 const suggestStates=new Map();
 
@@ -214,29 +215,18 @@ function collectCache(){
     if(el.type==='hidden'||el.name==='_token')return;
     fields[el.id]=el.type==='checkbox'?!!el.checked:el.value;
   });
-  return {version:11,plan:PLAN,step:cur,division,pickedPositions:[...pickedPositions],chosenDomain,leagueChoice:$('#league')?.value||'',clubChoice:$('#club')?.value||'',teamChoice:$('#team')?.value||'',fields};
+  return {version:12,plan:PLAN,step:cur,division,pickedPositions:[...pickedPositions],chosenDomain,leagueChoice:$('#league')?.value||'',clubChoice:$('#club')?.value||'',teamChoice:$('#team')?.value||'',fields};
 }
 function saveFormCache(){if(!cacheSafe()||registrationSubmitted)return;clearTimeout(cacheTimer);cacheTimer=setTimeout(()=>{try{sessionStorage.setItem(CACHE_KEY,JSON.stringify(collectCache()))}catch(e){}},120)}
 function loadFormCache(){if(!cacheSafe())return null;try{const raw=sessionStorage.getItem(CACHE_KEY);return raw?JSON.parse(raw):null}catch(e){return null}}
 function clearFormCache(){if(!cacheSafe())return;try{sessionStorage.removeItem(CACHE_KEY)}catch(e){}}
 
-function maskPhoneValue(value){
-  const raw=String(value||'').trim();
-  let digits=raw.replace(/\D/g,'').slice(0,15);
-  if(!digits)return '';
-  if(raw.startsWith('+')&&digits[0]!=='1'){
-    const cc=digits.length>10?digits.slice(0,digits.length-10):digits.slice(0,2);
-    const rest=digits.slice(cc.length);
-    return '+'+cc+(rest?' '+rest.replace(/(\d{3})(?=\d)/g,'$1 ').trim():'');
-  }
-  if(digits[0]==='1'&&digits.length>10)digits=digits.slice(1);
-  digits=digits.slice(0,10);
-  let out='+1';
-  if(digits.length)out+=' ('+digits.slice(0,3);
-  if(digits.length>=3)out+=')';
-  if(digits.length>3)out+=' '+digits.slice(3,6);
-  if(digits.length>6)out+='-'+digits.slice(6,10);
-  return out;
+function phoneDigits(value){let digits=String(value||'').replace(/\D/g,'').slice(0,11);if(digits.length===11&&digits.startsWith('1'))digits=digits.slice(1);return digits.slice(0,10)}
+function formatPhoneValue(value){
+  const digits=phoneDigits(value);
+  if(digits.length<=3)return digits;
+  if(digits.length<=6)return digits.slice(0,3)+'-'+digits.slice(3);
+  return digits.slice(0,3)+'-'+digits.slice(3,6)+'-'+digits.slice(6,10);
 }
 function maskPostalValue(value,country){
   let v=String(value||'').toUpperCase();
@@ -251,7 +241,11 @@ function maskPostalValue(value,country){
   return v.replace(/[^A-Z0-9\- ]/g,'').slice(0,10);
 }
 function bindMasks(){
-  $$('[data-phone-mask]').forEach(el=>el.addEventListener('input',()=>{const next=maskPhoneValue(el.value);if(el.value!==next)el.value=next;saveFormCache()}));
+  $$('[data-phone-mask]').forEach(el=>{
+    el.addEventListener('focus',()=>{const digits=phoneDigits(el.value);if(el.value!==digits)el.value=digits});
+    el.addEventListener('input',()=>{const digits=phoneDigits(el.value);if(el.value!==digits)el.value=digits;saveFormCache()});
+    el.addEventListener('blur',()=>{el.value=formatPhoneValue(el.value);saveFormCache()});
+  });
   $('#gpa')?.addEventListener('input',function(){let v=this.value.replace(/[^0-9.]/g,'');const first=v.indexOf('.');if(first>=0)v=v.slice(0,first+1)+v.slice(first+1).replace(/\./g,'');let [whole='',dec='']=v.split('.');whole=whole.slice(0,1);if(+whole>4)whole='4';dec=dec.slice(0,2);if(whole==='4'&&dec)dec=dec.replace(/[^0]/g,'0');this.value=first>=0?whole+'.'+dec:whole;saveFormCache()});
   $('#jersey')?.addEventListener('input',function(){this.value=this.value.replace(/\D/g,'').slice(0,2);saveFormCache()});
   const postal=$('#bzip');if(postal)postal.addEventListener('input',()=>{postal.value=maskPostalValue(postal.value,$('#bcountry')?.value||'US');saveFormCache()});
@@ -300,14 +294,14 @@ if($('#minor'))$('#minor').addEventListener('change',function(){$('#guardian')?.
 
 function goto(n,persist=true){$$('.panel').forEach(p=>p.classList.toggle('active',+p.dataset.step===n));$$('#steps li').forEach((li,i)=>{li.classList.toggle('on',i+1===n);li.classList.toggle('done',i+1<n);const d=li.querySelector('.dot');if(d)d.textContent=i+1<n?'✓':i+1});if($('#mbar'))$('#mbar').style.width=(Math.min(n,maxStep)/maxStep*100)+'%';cur=n;if(persist)saveFormCache();window.scrollTo({top:0,behavior:'smooth'})}
 function validateAccount(){let e=[];e.push(bad($('#fn'),!$('#fn')?.value.trim()));e.push(bad($('#ln'),!$('#ln')?.value.trim()));e.push(bad($('#em'),!mail($('#em')?.value||'')));if(PAID)e.push(bad($('#ph'),($('#ph')?.value||'').replace(/\D/g,'').length<7));e.push(bad($('#pw'),!pwState()));if($('#minor')?.checked){e.push(bad($('#gn'),!$('#gn')?.value.trim()));e.push(bad($('#ge'),!mail($('#ge')?.value||'')))}return !e.includes(true)}
-function validateAthleteBasics(){let e=[];const dm=$('#divisionWrap .msg');if(dm)dm.classList.toggle('show',!division);e.push(!division);e.push(bad($('#sport'),!$('#sport')?.value));e.push(bad($('#grad'),!$('#grad')?.value));const pm=$('#positionWrap .msg');if(pm)pm.classList.toggle('show',pickedPositions.length===0);e.push(pickedPositions.length===0);e.push(bad($('#st'),!$('#st')?.value));return !e.includes(true)}
-function validateTeam(){let e=[];e.push(bad($('#league'),!$('#league')?.value));e.push(bad($('#club'),!$('#club')?.value));if($('#club')?.value==='__other__')e.push(bad($('#clubOther'),!$('#clubOther')?.value.trim()));e.push(bad($('#team'),!$('#team')?.value));if($('#ce')?.value)e.push(bad($('#ce'),!mail($('#ce').value)));return !e.includes(true)}
+function validateAthleteDetails(){let e=[];e.push(bad($('#grad'),!$('#grad')?.value));e.push(bad($('#st'),!$('#st')?.value));return !e.includes(true)}
+function validateSportTeam(){let e=[];const dm=$('#divisionWrap .msg');if(dm)dm.classList.toggle('show',!division);e.push(!division);e.push(bad($('#sport'),!$('#sport')?.value));const pm=$('#positionWrap .msg');if(pm)pm.classList.toggle('show',pickedPositions.length===0);e.push(pickedPositions.length===0);e.push(bad($('#league'),!$('#league')?.value));e.push(bad($('#club'),!$('#club')?.value));if($('#club')?.value==='__other__')e.push(bad($('#clubOther'),!$('#clubOther')?.value.trim()));e.push(bad($('#team'),!$('#team')?.value));if($('#ce')?.value)e.push(bad($('#ce'),!mail($('#ce').value)));return !e.includes(true)}
 function validateBilling(){let e=[];['billingName','billingEmail','billingPhone','ba1','bcity','bstate','bzip'].forEach(id=>{const el=$('#'+id);let invalid=!el?.value.trim();if(id==='billingEmail')invalid=!mail(el?.value||'');if(id==='billingPhone')invalid=(el?.value||'').replace(/\D/g,'').length<7;e.push(bad(el,invalid))});const terms=$('#terms');const m=terms?.closest('.f')?.querySelector('.msg');if(m)m.classList.toggle('show',!terms?.checked);e.push(!terms?.checked);return !e.includes(true)}
 function validateFreeTerms(){const terms=$('#terms'),m=terms?.closest('.f')?.querySelector('.msg');if(m)m.classList.toggle('show',!terms?.checked);return !!terms?.checked}
-function validate(step){if(PAID){if(step===1){const no=!chosenDomain;$('#dmsg')?.classList.toggle('show',no);return !no}if(step===2)return validateAccount();if(step===3)return validateAthleteBasics()&&validateTeam();if(step===4)return validateBilling()}else{if(step===1)return validateAccount();if(step===2)return validateAthleteBasics();if(step===3)return validateTeam();if(step===4)return validateFreeTerms()}return true}
-function validateAllBeforeSubmit(){const checks=PAID?[[1,()=>{const no=!chosenDomain;$('#dmsg')?.classList.toggle('show',no);return !no}],[2,validateAccount],[3,()=>validateAthleteBasics()&&validateTeam()],[4,validateBilling]]:[[1,validateAccount],[2,validateAthleteBasics],[3,validateTeam],[4,validateFreeTerms]];for(const [step,fn] of checks){if(!fn()){goto(step);showAlert(step===(PAID?2:1)&&!$('#pw')?.value?'Your form was restored. Re-enter your password to finish registration.':'Please complete the highlighted fields before continuing.');return false}}return true}
+function validate(step){if(PAID){if(step===1){const no=!chosenDomain;$('#dmsg')?.classList.toggle('show',no);return !no}if(step===2)return validateAccount();if(step===3)return validateSportTeam()&&validateAthleteDetails();if(step===4)return validateBilling()}else{if(step===1)return validateAccount();if(step===2)return validateAthleteDetails();if(step===3)return validateSportTeam();if(step===4)return validateFreeTerms()}return true}
+function validateAllBeforeSubmit(){const checks=PAID?[[1,()=>{const no=!chosenDomain;$('#dmsg')?.classList.toggle('show',no);return !no}],[2,validateAccount],[3,()=>validateSportTeam()&&validateAthleteDetails()],[4,validateBilling]]:[[1,validateAccount],[2,validateAthleteDetails],[3,validateSportTeam],[4,validateFreeTerms]];for(const [step,fn] of checks){if(!fn()){goto(step);showAlert(step===(PAID?2:1)&&!$('#pw')?.value?'Your form was restored. Re-enter your password to finish registration.':'Please complete the highlighted fields before continuing.');return false}}return true}
 
-$$('[data-go]').forEach(b=>b.addEventListener('click',()=>{const n=+b.dataset.go;if(n>cur&&!validate(cur))return;clearAlert();if(PAID&&n===4){if($('#billingName')&&!$('#billingName').value)$('#billingName').value=($('#fn').value+' '+$('#ln').value).trim();if($('#billingEmail')&&!$('#billingEmail').value)$('#billingEmail').value=$('#em').value;if($('#billingPhone')&&!$('#billingPhone').value)$('#billingPhone').value=maskPhoneValue($('#ph').value);if($('#bstate')&&!$('#bstate').value)$('#bstate').value=$('#st')?.value||'';saveFormCache()}goto(n)}));
+$$('[data-go]').forEach(b=>b.addEventListener('click',()=>{const n=+b.dataset.go;if(n>cur&&!validate(cur))return;clearAlert();if(PAID&&n===4){if($('#billingName')&&!$('#billingName').value)$('#billingName').value=($('#fn').value+' '+$('#ln').value).trim();if($('#billingEmail')&&!$('#billingEmail').value)$('#billingEmail').value=$('#em').value;if($('#billingPhone')&&!$('#billingPhone').value)$('#billingPhone').value=formatPhoneValue($('#ph').value);if($('#bstate')&&!$('#bstate').value)$('#bstate').value=$('#st')?.value||'';saveFormCache()}goto(n)}));
 $$('input,select,textarea').forEach(el=>{el.addEventListener('input',()=>{el.classList.remove('err');el.closest('.f')?.querySelector('.msg')?.classList.remove('show');suggestStates.get(el)?.shell.classList.remove('invalid');saveFormCache()});el.addEventListener('change',saveFormCache)});
 
 // Gender -> Sport -> League -> Club -> Team cascading selection.
