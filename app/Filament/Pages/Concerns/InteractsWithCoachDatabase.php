@@ -180,7 +180,14 @@ trait InteractsWithCoachDatabase
     public string $scheduleLocation = '';
     public string $scheduleVenue = '';
     public array $notificationSettings = [
+        // Coach activity email alerts. Keep these independent so a player can
+        // choose exactly which PLYRCARD interactions should generate mail.
         'profile_views' => true,
+        'instagram_clicks' => true,
+        'youtube_clicks' => true,
+        'x_clicks' => true,
+
+        // Existing Recruiting Center notification preferences.
         'email_opens' => true,
         'coach_replies' => true,
         'weekly_digest' => false,

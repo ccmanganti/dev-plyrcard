@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class PlayerActivityEmailService
@@ -128,8 +129,29 @@ class PlayerActivityEmailService
         array $coach,
     ): void {
         /*
-         * There is intentionally NO cache/throttle/deduplication here. Every
-         * verified coach interaction is a separate notification.
+         * Notification preferences are checked only after coach identity has
+         * been verified. Analytics can continue recording the interaction even
+         * when the player has disabled the corresponding email alert.
+         */
+        $settingKey = $this->notificationSettingKey($type, $platform);
+
+        if ($settingKey !== null && ! $this->notificationSettingEnabled($player, $settingKey)) {
+            Log::info('PLYRCARD coach activity email skipped by player notification preference.', [
+                'user_id' => $player->id,
+                'activity_type' => $type,
+                'platform' => $platform,
+                'notification_setting' => $settingKey,
+                'coach_contact_id' => $coach['contact_id'] ?? null,
+                'coach_match_source' => $coach['source'] ?? null,
+            ]);
+
+            return;
+        }
+
+        /*
+         * There is intentionally NO throttle/deduplication here. Every verified
+         * coach interaction that is enabled by the player's preferences is a
+         * separate notification.
          */
         $result = $this->systemEmail->sendPlayerActivity(
             player: $player,
@@ -165,6 +187,36 @@ class PlayerActivityEmailService
             'sent_recipients' => $result['sent_recipients'] ?? [],
             'failed_recipients' => $result['failed_recipients'] ?? [],
         ]);
+    }
+
+    protected function notificationSettingKey(string $type, string $platform): ?string
+    {
+        $platform = $this->normalizePlatform($platform);
+
+        if ($type === 'profile_view') {
+            return 'profile_views';
+        }
+
+        return match ($platform) {
+            'instagram' => 'instagram_clicks',
+            'youtube' => 'youtube_clicks',
+            'x' => 'x_clicks',
+            default => null,
+        };
+    }
+
+    protected function notificationSettingEnabled(User $player, string $settingKey): bool
+    {
+        $stored = Cache::get('coach-database:notification-settings:' . $player->getKey(), []);
+
+        if (! is_array($stored) || ! array_key_exists($settingKey, $stored)) {
+            // Existing accounts and old cache payloads predate the individual
+            // social switches. Default them ON so this revision is backwards
+            // compatible and does not silently disable existing alerts.
+            return true;
+        }
+
+        return (bool) $stored[$settingKey];
     }
 
     protected function normalizePlatform(string $platform): string

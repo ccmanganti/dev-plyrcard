@@ -10942,10 +10942,43 @@ CSS;
             ])
             <div class="rc-settings-page-v72">
                 <div class="rc-schedule-titlebar-v72"><div><h1>Settings</h1><p class="rc-schedule-sub-v72">Control your recruiting notifications and account shortcuts.</p></div></div>
+
                 <div class="rc-settings-card-v72">
-                    <div class="rc-settings-head-v72"><div class="rc-settings-icon-v72">🔔</div><div><h2 style="margin:0;">Notifications</h2><p style="margin:.2rem 0 0;color:var(--rc-muted);">Choose what you get notified about</p></div></div>
+                    <div class="rc-settings-head-v72">
+                        <div class="rc-settings-icon-v72">🔔</div>
+                        <div>
+                            <h2 style="margin:0;">Coach Activity Notifications</h2>
+                            <p style="margin:.2rem 0 0;color:var(--rc-muted);">Choose exactly which verified coach interactions should send an email to you and your parent/guardian recipients.</p>
+                        </div>
+                    </div>
                     @foreach([
-                        'profile_views' => ['Profile views', 'When a coach views your PLYR profile'],
+                        'profile_views' => ['Profile views', 'When a verified coach views your PLYRCARD profile'],
+                        'instagram_clicks' => ['Instagram clicks', 'When a verified coach clicks your Instagram link'],
+                        'youtube_clicks' => ['YouTube / Highlight clicks', 'When a verified coach clicks your YouTube or highlight link'],
+                        'x_clicks' => ['X clicks', 'When a verified coach clicks your X link'],
+                    ] as $settingKey => $settingCopy)
+                        <div class="rc-setting-row-v72">
+                            <div><h3>{{ $settingCopy[0] }}</h3><p>{{ $settingCopy[1] }}</p></div>
+                            <button
+                                type="button"
+                                class="rc-toggle-v72 {{ ($notificationSettings[$settingKey] ?? true) ? 'is-on' : '' }}"
+                                wire:click="toggleNotificationSetting('{{ $settingKey }}')"
+                                aria-pressed="{{ ($notificationSettings[$settingKey] ?? true) ? 'true' : 'false' }}"
+                                aria-label="Toggle {{ $settingCopy[0] }}"
+                            ><span></span></button>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="rc-settings-card-v72">
+                    <div class="rc-settings-head-v72">
+                        <div class="rc-settings-icon-v72">⚙️</div>
+                        <div>
+                            <h2 style="margin:0;">Other Notifications</h2>
+                            <p style="margin:.2rem 0 0;color:var(--rc-muted);">Keep your existing Recruiting Center notification preferences.</p>
+                        </div>
+                    </div>
+                    @foreach([
                         'email_opens' => ['Email opens', 'When a coach opens one of your emails'],
                         'coach_replies' => ['Coach replies', 'When a coach replies to your outreach'],
                         'weekly_digest' => ['Weekly digest', 'A Monday summary of your recruiting activity'],
@@ -10953,7 +10986,13 @@ CSS;
                     ] as $settingKey => $settingCopy)
                         <div class="rc-setting-row-v72">
                             <div><h3>{{ $settingCopy[0] }}</h3><p>{{ $settingCopy[1] }}</p></div>
-                            <button type="button" class="rc-toggle-v72 {{ ($notificationSettings[$settingKey] ?? false) ? 'is-on' : '' }}" wire:click="toggleNotificationSetting('{{ $settingKey }}')" aria-label="Toggle {{ $settingCopy[0] }}"><span></span></button>
+                            <button
+                                type="button"
+                                class="rc-toggle-v72 {{ ($notificationSettings[$settingKey] ?? false) ? 'is-on' : '' }}"
+                                wire:click="toggleNotificationSetting('{{ $settingKey }}')"
+                                aria-pressed="{{ ($notificationSettings[$settingKey] ?? false) ? 'true' : 'false' }}"
+                                aria-label="Toggle {{ $settingCopy[0] }}"
+                            ><span></span></button>
                         </div>
                     @endforeach
                 </div>
