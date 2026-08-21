@@ -46,10 +46,13 @@ class PlyrcardSystemEmailService
             return ['success' => false, 'error' => 'The player does not have a valid email address.'];
         }
 
+        $coachLastName = $this->coachLastName($viewerName);
+        $coachLabel = $coachLastName !== '' ? 'Coach ' . $coachLastName : 'A coach';
+
         $subject = match ($activityType) {
-            'profile_view' => 'A coach viewed your PLYRCARD',
-            'highlight_click' => 'A coach clicked your highlight',
-            default => 'A coach clicked your ' . ucfirst($platform) . ' link',
+            'profile_view' => $coachLabel . ' viewed your PLYRCARD',
+            'highlight_click' => $coachLabel . ' clicked your PLYRCARD highlight',
+            default => $coachLabel . ' clicked your ' . ucfirst($platform) . ' link',
         };
 
         $html = $this->renderActivityEmail(
@@ -164,6 +167,7 @@ class PlyrcardSystemEmailService
                 'viewerEmail' => $viewerEmail,
                 'viewerName' => $viewerName,
                 'viewerSchool' => $viewerSchool,
+                'coachLastName' => $this->coachLastName($viewerName),
             ])->render();
         }
 
@@ -175,16 +179,19 @@ class PlyrcardSystemEmailService
 
         $isProfile = $activityType === 'profile_view';
         $isHighlight = $activityType === 'highlight_click';
+        $coachLastName = $this->coachLastName($viewerName);
+        $coachLabel = $coachLastName !== '' ? 'Coach ' . $coachLastName : 'A coach';
         $label = $isProfile ? 'PROFILE VIEW' : ($isHighlight ? 'HIGHLIGHT CLICK' : strtoupper($platform) . ' CLICK');
         $title = $isProfile
-            ? 'A coach viewed your PLYRCARD.'
-            : ($isHighlight ? 'A coach clicked your highlight.' : 'A coach clicked your ' . ucfirst($platform) . ' link.');
+            ? $coachLabel . ' viewed your PLYRCARD'
+            : ($isHighlight ? $coachLabel . ' clicked your PLYRCARD highlight' : $coachLabel . ' clicked your ' . ucfirst($platform) . ' link');
         $description = $isProfile
-            ? 'A coach opened your player profile.'
-            : ($isHighlight ? 'A coach clicked through to your YouTube highlight destination.' : 'A coach moved from your PLYRCARD to your ' . $platform . ' destination.');
-        $coachBits = array_values(array_filter([$viewerName, $viewerSchool, $viewerEmail]));
-        $viewer = 'Coach: ' . (empty($coachBits) ? 'Identified coach' : implode(' · ', $coachBits));
+            ? 'A verified coach opened your player profile.'
+            : ($isHighlight ? 'A verified coach clicked through to your YouTube highlight.' : 'A verified coach moved from your PLYRCARD to your ' . $platform . ' destination.');
         $profileUrl = $this->playerUrl($website);
+        $coachName = $viewerName ?: 'Identified coach';
+        $coachSchool = $viewerSchool ?: 'Not available';
+        $coachEmail = $viewerEmail ?: 'Not available';
 
         return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<title>PLYRCARD activity</title></head>'
@@ -196,7 +203,11 @@ class PlyrcardSystemEmailService
             . '<tr><td style="padding:38px 34px 0"><div style="font-family:Courier New,monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#FF5A3C">' . $this->escape($label) . '</div>'
             . '<h1 style="margin:12px 0 0;font-size:32px;line-height:1.1;color:#F2F0ED">' . $this->escape($title) . '</h1>'
             . '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#868E99">' . $this->escape($description) . '</p></td></tr>'
-            . '<tr><td style="padding:26px 34px 0"><table role="presentation" width="100%" bgcolor="#1A1E23" style="background:#1A1E23;border:1px solid #262C33;border-radius:12px"><tr><td style="padding:22px"><div style="font-family:Courier New,monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#868E99">Activity</div><div style="margin-top:10px;font-size:15px;color:#F2F0ED">' . $this->escape($viewer) . '</div><div style="margin-top:8px;font-size:13px;color:#868E99">' . $this->escape(now()->format('M j, Y g:i A T')) . '</div></td></tr></table></td></tr>'
+            . '<tr><td style="padding:26px 34px 0"><table role="presentation" width="100%" bgcolor="#1A1E23" style="background:#1A1E23;border:1px solid #262C33;border-radius:12px"><tr><td style="padding:22px"><div style="font-family:Courier New,monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#868E99">Coach details</div>'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr><td style="padding:9px 0;color:#868E99;font-size:13px;width:110px">Coach Name</td><td style="padding:9px 0;color:#F2F0ED;font-size:14px;font-weight:700">' . $this->escape($coachName) . '</td></tr>'
+            . '<tr><td style="padding:9px 0;border-top:1px solid #262C33;color:#868E99;font-size:13px">School</td><td style="padding:9px 0;border-top:1px solid #262C33;color:#F2F0ED;font-size:14px">' . $this->escape($coachSchool) . '</td></tr>'
+            . '<tr><td style="padding:9px 0;border-top:1px solid #262C33;color:#868E99;font-size:13px">Email</td><td style="padding:9px 0;border-top:1px solid #262C33;color:#F2F0ED;font-size:14px;word-break:break-all">' . $this->escape($coachEmail) . '</td></tr></table>'
+            . '<div style="margin-top:12px;font-size:12px;color:#5E6670">' . $this->escape(now()->format('M j, Y g:i A T')) . '</div></td></tr></table></td></tr>'
             . ($profileUrl !== ''
                 ? '<tr><td style="padding:26px 34px 0"><a href="' . $this->escape($profileUrl) . '" style="display:inline-block;padding:15px 34px;background:#FF5A3C;border-radius:10px;color:#0C0E11;text-decoration:none;font-weight:700">View my PLYRCARD</a></td></tr>'
                 : '')
@@ -204,6 +215,31 @@ class PlyrcardSystemEmailService
             . '</table></td></tr>'
             . '<tr><td align="center" style="padding:24px 34px 0;font-size:11.5px;line-height:1.7;color:#5E6670">PLYRCARD profile activity notification<br>&copy; 2026 PLYRCARD.</td></tr>'
             . '</table></td></tr></table></body></html>';
+    }
+
+    protected function coachLastName(?string $name): string
+    {
+        $name = trim((string) $name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        $name = preg_replace('/^coach\s+/i', '', $name) ?: $name;
+        $parts = preg_split('/\s+/', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if ($parts === []) {
+            return '';
+        }
+
+        $suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
+        $last = end($parts);
+
+        if (count($parts) > 1 && in_array(strtolower((string) $last), $suffixes, true)) {
+            $last = $parts[count($parts) - 2];
+        }
+
+        return trim((string) $last, " \t\n\r\0\x0B,.;:");
     }
 
     protected function sendHtml(User $user, string $recipient, string $subject, string $html, string $purpose): array
