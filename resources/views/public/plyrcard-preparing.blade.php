@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow">
-    <title>We’re preparing your PLYRCARD</title>
+    <title>We are preparing your PLYRCARD</title>
     <style>
         :root { color-scheme:dark; --accent:#ff6338; --bg:#090d12; --muted:#98a2b3; }
         * { box-sizing:border-box; }
@@ -31,16 +31,16 @@
     <main class="shell">
         <div class="brand"><span class="mark">P</span><span>PLYRCARD</span></div>
         <section class="card">
-            <span class="status"><span class="dot"></span> Preparing for publication</span>
-            <h1>We’re preparing this PLYRCARD.</h1>
-            <p><span class="name">{{ $website->name ?: 'This athlete' }}</span> has started building a PLYRCARD. The page is reserved, but it is not publicly published yet.</p>
+            <span class="status"><span class="dot"></span> Your PLYRCARD is being prepared</span>
+            <h1>We are preparing your PLYRCARD.</h1>
+            <p>Your PLYRCARD link is reserved and our team is getting your page ready. Complete your profile to help us verify and publish your PLYRCARD.</p>
             <div class="steps">
-                <div class="step"><span class="num">01</span><span>Complete the athlete profile with the information coaches need to see.</span></div>
-                <div class="step"><span class="num">02</span><span>Our team reviews the profile so the PLYRCARD can be verified and prepared for publication.</span></div>
-                <div class="step"><span class="num">03</span><span>Once published, this same link will open the athlete’s live PLYRCARD.</span></div>
+                <div class="step"><span class="num">01</span><span>Complete your profile with the information, photos, highlights, and details you want coaches to see.</span></div>
+                <div class="step"><span class="num">02</span><span>Our team will review your profile and prepare your PLYRCARD for publication.</span></div>
+                <div class="step"><span class="num">03</span><span>Once your PLYRCARD is published, this same link will open your live player profile.</span></div>
             </div>
             <div class="actions"><a class="primary" href="{{ $completeProfileUrl }}">Complete My Profile</a></div>
-            <div class="note">Already finished your profile? No action is needed here. This page will automatically be replaced by the published PLYRCARD once preparation is complete.</div>
+            <div class="note">Already completed your profile? You’re all set. We’ll finish reviewing and preparing your PLYRCARD, and this page will automatically be replaced once your PLYRCARD is published.</div>
         </section>
     </main>
 </body>

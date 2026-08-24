@@ -6621,8 +6621,8 @@
                     <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M3 12h3M18 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
                 </div>
                 <div class="rc-plyrcard-preparing-copy-v129">
-                    <strong>We’re preparing your PLYRCARD</strong>
-                    <span>Your My Journey workspace is active. You can keep completing your profile and using the available tools while we finish preparing your account and public PLYRCARD.</span>
+                    <strong>We are preparing your PLYRCARD</strong>
+                    <span>Your PLYRCARD is being prepared for publication. Complete your profile while our team reviews your information and gets your public PLYRCARD ready.</span>
                 </div>
                 <a class="rc-plyrcard-preparing-action-v129" href="{{ url('/admin/my-profile') }}">Complete My Profile</a>
             </div>
