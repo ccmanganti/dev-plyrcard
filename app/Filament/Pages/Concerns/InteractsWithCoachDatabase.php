@@ -62,6 +62,10 @@ trait InteractsWithCoachDatabase
     public bool $allowed = false;
     public bool $locked = false;
     public bool $isRecruitingAccountReady = false;
+    public bool $isFreePlanAccount = false;
+    public bool $showFreePlanGate = false;
+    public string $freePlanGateSection = 'dashboard';
+    public bool $showAccountPreparationNotice = false;
     public ?string $reason = null;
     public ?string $error = null;
 
@@ -259,6 +263,15 @@ trait InteractsWithCoachDatabase
 
         $this->refreshRecruitingAccountReadiness(refreshUser: true);
 
+        $user = Auth::user();
+        $this->showAccountPreparationNotice = (bool) ($user
+            && $this->userHasRoleName($user, 'My Journey')
+            && ! $this->isRecruitingAccountReady);
+
+        if (! $this->showAccountPreparationNotice && $this->reason === 'account_preparation') {
+            $this->reason = null;
+        }
+
         if (! $wasReady && $this->isRecruitingAccountReady) {
             $this->dispatch('rc-recruiting-account-ready');
         }
@@ -272,26 +285,50 @@ trait InteractsWithCoachDatabase
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
 
-        // v127: Do not re-query the authenticated user on every tab navigation.
+        // v10.29: Resolve plan restrictions before provisioning readiness. Free users do
+        // not need recruiting-service credentials because only Edit Profile + Settings are
+        // available to them. My Journey stays navigable while provisioning finishes.
         $this->refreshRecruitingAccountReadiness($user);
 
         if (! $user) {
             return;
         }
 
-        if (! $this->isRecruitingAccountReady) {
-            $this->allowed = false;
-            $this->locked = true;
-            $this->reason = 'account_preparation';
+        $this->isFreePlanAccount = $this->isFreeRoleRestrictedUser($user);
+        $hasMyJourney = $this->userHasRoleName($user, 'My Journey');
+        $this->showAccountPreparationNotice = $hasMyJourney && ! $this->isRecruitingAccountReady;
+
+        if ($this->isFreePlanAccount) {
+            $this->allowed = true;
+            $this->locked = false;
+            $this->reason = null;
             $this->error = null;
+
+            if ($this->section === 'profile') {
+                $this->redirect($this->freeRoleDefaultProfileUrl());
+                return;
+            }
+
+            if (! $this->canFreeRoleAccessCoachDatabaseSection($this->section)) {
+                $this->showFreePlanGate = true;
+                $this->freePlanGateSection = $this->section;
+                // Never hydrate a locked Free-plan section behind the upgrade slider.
+                $this->section = 'settings';
+            }
+
+            if ($this->section === 'settings') {
+                $this->loadNotificationSettings();
+            }
 
             return;
         }
 
-        if ($this->isFreeRoleRestrictedUser($user) && ! $this->canFreeRoleAccessCoachDatabaseSection($this->section)) {
-            $this->redirect($this->freeRoleDefaultProfileUrl());
-
-            return;
+        if ($this->showAccountPreparationNotice) {
+            // My Journey remains usable while account provisioning is still underway.
+            $this->allowed = true;
+            $this->locked = false;
+            $this->reason = 'account_preparation';
+            $this->error = null;
         }
 
         // getInitialState() is local/permission-only. Keep it for access gating, but do not
@@ -301,6 +338,15 @@ trait InteractsWithCoachDatabase
         $this->locked = (bool) ($state['locked'] ?? false);
         $this->reason = $state['reason'] ?? null;
         $this->error = $state['error'] ?? null;
+
+        if ($this->showAccountPreparationNotice) {
+            // Provisioning is not an access lock for My Journey. Keep local pages open and
+            // let API-backed sections fill in automatically once setup completes.
+            $this->allowed = true;
+            $this->locked = false;
+            $this->reason = 'account_preparation';
+            $this->error = null;
+        }
 
         if (! $this->allowed || $this->locked) {
             return;
@@ -411,7 +457,7 @@ trait InteractsWithCoachDatabase
         }
 
         if ($this->isFreeRoleRestrictedUser($user) && ! $this->canFreeRoleAccessCoachDatabaseSection($section)) {
-            $this->redirect($this->freeRoleDefaultProfileUrl(), navigate: true);
+            $this->openFreePlanGate($section);
             return;
         }
 
@@ -530,6 +576,13 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        if (! $this->isRecruitingAccountReady) {
+            $this->dashboardEmailFetchError = null;
+            $this->dashboardEmailFetchStatus = 'Preparing your recruiting workspace';
+            $this->isFetchingDashboardEmailsSent = false;
+            return;
+        }
+
         if (! Schema::hasColumn('users', 'total_emails_sent')) {
             $this->dashboardEmailFetchError = 'The total_emails_sent column is unavailable.';
             $this->dashboardEmailFetchStatus = 'Unable to store sent-email count.';
@@ -633,6 +686,33 @@ trait InteractsWithCoachDatabase
     protected function canFreeRoleAccessCoachDatabaseSection(string $section): bool
     {
         return in_array($section, ['profile', 'settings'], true);
+    }
+
+    public function openFreePlanGate(string $section = 'dashboard'): void
+    {
+        $user = Auth::user();
+        if (! $user || ! $this->isFreeRoleRestrictedUser($user)) {
+            return;
+        }
+
+        $allowedSections = [
+            'dashboard', 'schools', 'coaches', 'favorites', 'lists',
+            'conversations', 'campaigns', 'compose', 'support', 'schedule',
+        ];
+
+        $section = strtolower(trim($section));
+        $this->freePlanGateSection = in_array($section, $allowedSections, true) ? $section : 'dashboard';
+        $this->showFreePlanGate = true;
+    }
+
+    public function closeFreePlanGate(): void
+    {
+        $this->showFreePlanGate = false;
+    }
+
+    public function freeRoleManagePlanUrl(): string
+    {
+        return $this->freeRoleDefaultProfileUrl() . '?section=upgrade';
     }
 
     protected function userHasRoleName($user, string $roleName): bool
@@ -781,7 +861,7 @@ trait InteractsWithCoachDatabase
     public function pollDeferredUiData(): void
     {
         $user = Auth::user();
-        if (! $user || ! $this->allowed || $this->locked) {
+        if (! $user || ! $this->allowed || $this->locked || ! $this->isRecruitingAccountReady) {
             return;
         }
 
@@ -1004,7 +1084,7 @@ trait InteractsWithCoachDatabase
 
     public function startBackgroundLoad(bool $force = false): void
     {
-        if (! $this->allowed || $this->locked) {
+        if (! $this->allowed || $this->locked || ! $this->isRecruitingAccountReady) {
             return;
         }
 
@@ -1053,7 +1133,7 @@ trait InteractsWithCoachDatabase
 
     public function pollRealtime(): void
     {
-        if (! $this->allowed || $this->locked) {
+        if (! $this->allowed || $this->locked || ! $this->isRecruitingAccountReady) {
             return;
         }
 

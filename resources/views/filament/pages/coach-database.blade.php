@@ -1,8 +1,11 @@
 <x-filament-panels::page>
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
+        data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
         x-data
         x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
+        x-on:rc-free-plan-gate.window="$wire.openFreePlanGate($event.detail?.section || 'dashboard')"
+        x-on:rc-recruiting-account-ready.window="$nextTick(() => $wire.bootDeferredUiData())"
         x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
     <style>
         :root {
@@ -6583,6 +6586,19 @@
     >
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>
+        @endif
+
+        @if($showAccountPreparationNotice ?? false)
+            <div class="rc-plyrcard-preparing-banner-v129" role="status" wire:poll.10s="checkRecruitingAccountReadiness">
+                <div class="rc-plyrcard-preparing-icon-v129" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M3 12h3M18 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                </div>
+                <div class="rc-plyrcard-preparing-copy-v129">
+                    <strong>We’re preparing your PLYRCARD</strong>
+                    <span>Your My Journey workspace is active. You can keep completing your profile and using the available tools while we finish preparing your account and public PLYRCARD.</span>
+                </div>
+                <a class="rc-plyrcard-preparing-action-v129" href="{{ url('/admin/my-profile') }}">Complete My Profile</a>
+            </div>
         @endif
 
         @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings'], true) || $isStatDrawerOpen))
@@ -14484,6 +14500,94 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 
 
 
+<style id="rc-plan-access-v129">
+.rc-plyrcard-preparing-banner-v129 {
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr) auto;
+    align-items:center;
+    gap:.85rem;
+    margin:0 0 1rem;
+    padding:.9rem 1rem;
+    border:1px solid rgba(255,99,56,.24);
+    border-radius:1rem;
+    background:linear-gradient(135deg,rgba(255,99,56,.11),rgba(15,23,42,.04));
+    box-shadow:0 10px 28px rgba(15,23,42,.05);
+}
+.rc-plyrcard-preparing-icon-v129 {
+    width:2.35rem;height:2.35rem;border-radius:.78rem;display:grid;place-items:center;
+    background:rgba(255,99,56,.13);color:#ff6338;flex:0 0 auto;
+}
+.rc-plyrcard-preparing-icon-v129 svg { width:1.15rem;height:1.15rem;animation:rcPrepareSpinV129 5s linear infinite; }
+.rc-plyrcard-preparing-copy-v129 { min-width:0;display:grid;gap:.18rem; }
+.rc-plyrcard-preparing-copy-v129 strong { color:var(--rc-text);font-size:.88rem;font-weight:850; }
+.rc-plyrcard-preparing-copy-v129 span { color:var(--rc-muted);font-size:.76rem;line-height:1.45; }
+.rc-plyrcard-preparing-action-v129 {
+    display:inline-flex;align-items:center;justify-content:center;min-height:2.2rem;padding:.45rem .75rem;
+    border:1px solid rgba(255,99,56,.42);border-radius:.7rem;background:#ff6338;color:#fff!important;
+    font-size:.74rem;font-weight:800;text-decoration:none!important;white-space:nowrap;
+}
+@keyframes rcPrepareSpinV129 { to { transform:rotate(360deg); } }
+
+.rc-free-plan-gate-v129 {
+    position:fixed;inset:0;z-index:2147483000;display:flex;justify-content:flex-end;
+    background:rgba(2,6,23,.72);backdrop-filter:blur(9px);padding:1rem;
+}
+.rc-free-plan-gate-panel-v129 {
+    width:min(38rem,100%);height:100%;overflow:auto;border-radius:1.35rem;background:#fff;color:#111827;
+    box-shadow:-28px 0 80px rgba(0,0,0,.36);display:flex;flex-direction:column;
+}
+.rc-free-plan-gate-head-v129 {
+    position:relative;padding:2rem 2.1rem 1.7rem;background:linear-gradient(135deg,#ff6338,#ff4f3e);color:#fff;
+}
+.rc-free-plan-gate-badge-v129 { display:inline-flex;align-items:center;gap:.35rem;padding:.32rem .65rem;border:1px solid rgba(255,255,255,.58);border-radius:999px;font-size:.7rem;font-weight:900;letter-spacing:.04em;text-transform:uppercase; }
+.rc-free-plan-gate-head-v129 h2 { margin:1.2rem 0 .45rem;font-size:1.35rem;line-height:1.15;font-weight:900;letter-spacing:-.03em; }
+.rc-free-plan-gate-head-v129 p { margin:0;max-width:30rem;font-size:.86rem;line-height:1.5;color:rgba(255,255,255,.94); }
+.rc-free-plan-gate-close-v129 { position:absolute;top:1rem;right:1rem;width:2.45rem;height:2.45rem;border:0;border-radius:.75rem;background:rgba(255,255,255,.16);color:#fff;font-size:1.35rem;cursor:pointer; }
+.rc-free-plan-gate-body-v129 { padding:1.6rem 2rem;display:grid;gap:1rem; }
+.rc-free-plan-gate-point-v129 { display:grid;grid-template-columns:1.5rem minmax(0,1fr);gap:.65rem;color:#5b6472;font-size:.86rem;line-height:1.45; }
+.rc-free-plan-gate-check-v129 { width:1.5rem;height:1.5rem;border-radius:999px;display:grid;place-items:center;background:#dcfce7;color:#10b981;font-weight:900; }
+.rc-free-plan-gate-footer-v129 { margin-top:auto;padding:1rem 2rem 1.35rem;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:.65rem; }
+.rc-free-plan-gate-secondary-v129,.rc-free-plan-gate-primary-v129 { min-height:2.75rem;padding:.65rem 1.1rem;border-radius:.8rem;font-size:.8rem;font-weight:850;text-decoration:none!important;display:inline-flex;align-items:center;justify-content:center; }
+.rc-free-plan-gate-secondary-v129 { border:1px solid #d9dee7;background:#fff;color:#1f2937;cursor:pointer; }
+.rc-free-plan-gate-primary-v129 { border:1px solid #ff6338;background:#ff6338;color:#fff!important; }
+@media(max-width:700px){
+    .rc-plyrcard-preparing-banner-v129{grid-template-columns:auto minmax(0,1fr)}
+    .rc-plyrcard-preparing-action-v129{grid-column:1/-1}
+    .rc-free-plan-gate-v129{padding:0}
+    .rc-free-plan-gate-panel-v129{border-radius:0}
+}
+@media(prefers-reduced-motion:reduce){.rc-plyrcard-preparing-icon-v129 svg{animation:none}}
+</style>
+
+@if($showFreePlanGate ?? false)
+    @php
+        $freeGateNames = [
+            'dashboard' => 'Dashboard', 'schools' => 'Discover Schools', 'coaches' => 'Coach Database',
+            'favorites' => 'Favorites', 'lists' => 'Lists', 'conversations' => 'Inbox',
+            'campaigns' => 'Campaigns', 'compose' => 'Compose Email', 'support' => 'Support', 'schedule' => 'Schedule',
+        ];
+        $freeGateName = $freeGateNames[$freePlanGateSection ?? 'dashboard'] ?? 'This feature';
+    @endphp
+    <div class="rc-free-plan-gate-v129" role="presentation" wire:key="free-plan-gate-v129-{{ $freePlanGateSection }}">
+        <section class="rc-free-plan-gate-panel-v129" role="dialog" aria-modal="true" aria-labelledby="rc-free-plan-gate-title-v129">
+            <header class="rc-free-plan-gate-head-v129">
+                <button type="button" class="rc-free-plan-gate-close-v129" wire:click="closeFreePlanGate" aria-label="Close">×</button>
+                <span class="rc-free-plan-gate-badge-v129">My Journey</span>
+                <h2 id="rc-free-plan-gate-title-v129">{{ $freeGateName }} is a My Journey feature</h2>
+                <p>Your Free plan includes Edit Profile and Settings. Upgrade to My Journey to unlock the recruiting workspace and outreach tools.</p>
+            </header>
+            <div class="rc-free-plan-gate-body-v129">
+                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>Discover Schools, Favorites, Lists, Compose Email, Inbox, Schedule, outreach, and analytics are available with My Journey.</span></div>
+                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>You can keep editing your athlete profile and account settings on Free at any time.</span></div>
+            </div>
+            <footer class="rc-free-plan-gate-footer-v129">
+                <button type="button" class="rc-free-plan-gate-secondary-v129" wire:click="closeFreePlanGate">Not now</button>
+                <a class="rc-free-plan-gate-primary-v129" href="{{ $this->freeRoleManagePlanUrl() }}">Manage Plan</a>
+            </footer>
+        </section>
+    </div>
+@endif
+
 <script data-navigate-once>
 (() => {
     if (window.__plyrRcPersistentNavInstalled) return;
@@ -14517,6 +14621,14 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     };
 
     const currentRoot = () => document.querySelector('.rc-livewire-root');
+    const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule']);
+    const isFreePlan = () => currentRoot()?.dataset?.rcFreePlan === '1';
+
+    const openFreePlanGate = (section) => {
+        if (!isFreePlan() || !freePlanLockedSections.has(section)) return false;
+        window.dispatchEvent(new CustomEvent('rc-free-plan-gate', { detail: { section } }));
+        return true;
+    };
 
     const setSidebarActive = (section) => {
         document.querySelectorAll('.fi-sidebar a[href]').forEach((anchor) => {
@@ -14557,12 +14669,19 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 
         event.preventDefault();
         event.stopPropagation();
+
+        // Free plan: do not mutate history and do not ask Livewire to switch to a
+        // restricted section. Open the upgrade slider in place instead.
+        if (openFreePlanGate(section)) return;
+
         switchSection(section, anchor.href, false);
     }, true);
 
     window.addEventListener('popstate', () => {
         const section = pathToSection(window.location.pathname);
-        if (section && currentRoot()) switchSection(section, null, true);
+        if (!section || !currentRoot()) return;
+        if (openFreePlanGate(section)) return;
+        switchSection(section, null, true);
     });
 
     document.addEventListener('livewire:init', () => {

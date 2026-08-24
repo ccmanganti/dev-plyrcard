@@ -65,6 +65,21 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
         return true;
     }
 
+    /**
+     * PLYRCARD registration does not use Laravel's verification notification.
+     * The custom RegistrationController sends the branded registration welcome
+     * email with a /admin dashboard CTA. Keeping this override prevents a
+     * legacy Registered listener / Filament verification hook from also sending
+     * the old "Confirm email" notification.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        \Illuminate\Support\Facades\Log::debug('PLYRCARD suppressed Laravel verification notification.', [
+            'user_id' => $this->getKey(),
+            'email' => $this->email,
+        ]);
+    }
+
     public function getFilamentName(): string { return trim($this->first_name . ' ' . $this->last_name); }
     public function nationalTeam(): BelongsTo { return $this->belongsTo(NationalTeam::class); }
     public function school(): BelongsTo { return $this->belongsTo(School::class); }
