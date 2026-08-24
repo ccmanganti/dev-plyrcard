@@ -2,17 +2,24 @@
 
 namespace App\Filament\Pages\Auth\PasswordReset;
 
-use Filament\Auth\Pages\PasswordReset\ResetPassword as BaseResetPassword;
+if (class_exists(\Filament\Auth\Pages\PasswordReset\ResetPassword::class)) {
+    class_alias(
+        \Filament\Auth\Pages\PasswordReset\ResetPassword::class,
+        __NAMESPACE__ . '\\PlyrcardFilamentResetPasswordBase',
+    );
+} elseif (class_exists(\Filament\Pages\Auth\PasswordReset\ResetPassword::class)) {
+    class_alias(
+        \Filament\Pages\Auth\PasswordReset\ResetPassword::class,
+        __NAMESPACE__ . '\\PlyrcardFilamentResetPasswordBase',
+    );
+} else {
+    throw new \RuntimeException('Unable to locate the Filament reset password page class.');
+}
 
-class ResetPassword extends BaseResetPassword
+/**
+ * Keep PLYRCARD's configured class name while delegating token validation,
+ * password rules, password update, and post-reset behavior to Filament.
+ */
+class ResetPassword extends PlyrcardFilamentResetPasswordBase
 {
-    public function getHeading(): string
-    {
-        return 'Create a new password';
-    }
-
-    public function getSubheading(): ?string
-    {
-        return 'Choose a strong password for your account.';
-    }
 }

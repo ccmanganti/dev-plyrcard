@@ -48,6 +48,32 @@ class PlyrcardSystemEmailService
         return $this->sendRegistrationWelcome($user);
     }
 
+    public function sendPasswordReset(User $user, string $token): array
+    {
+        $recipient = $this->recipientFor($user);
+
+        if (! $recipient) {
+            return ['success' => false, 'error' => 'The player does not have a valid email address.'];
+        }
+
+        $resetUrl = $this->filamentPasswordResetUrl($user, $token);
+
+        if ($resetUrl === '') {
+            return ['success' => false, 'error' => 'PLYRCARD could not generate the password reset URL.'];
+        }
+
+        $expiresInMinutes = max(1, (int) config('auth.passwords.users.expire', 60));
+        $html = $this->renderPasswordResetEmail($user, $resetUrl, $expiresInMinutes);
+
+        return $this->sendHtml(
+            user: $user,
+            recipient: $recipient,
+            subject: 'Reset your PLYRCARD password',
+            html: $html,
+            purpose: 'password_reset',
+        );
+    }
+
     public function sendPlayerActivity(
         User $player,
         Website $website,
@@ -151,6 +177,42 @@ class PlyrcardSystemEmailService
             html: $html,
             purpose: 'native_mail_test',
         );
+    }
+
+    protected function renderPasswordResetEmail(User $user, string $resetUrl, int $expiresInMinutes): string
+    {
+        $viewName = 'emails.plyrcard-password-reset';
+
+        if (View::exists($viewName)) {
+            return view($viewName, [
+                'user' => $user,
+                'resetUrl' => $resetUrl,
+                'expiresInMinutes' => $expiresInMinutes,
+            ])->render();
+        }
+
+        Log::warning('PLYRCARD password reset Blade view is missing; using built-in fallback template.', [
+            'view' => $viewName,
+            'expected_path' => resource_path('views/emails/plyrcard-password-reset.blade.php'),
+            'user_id' => $user->getKey(),
+        ]);
+
+        $firstName = $this->escape((string) ($user->first_name ?: 'Player'));
+        $url = $this->escape($resetUrl);
+
+        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reset your PLYRCARD password</title></head>'
+            . '<body style="margin:0;padding:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,Helvetica,sans-serif">'
+            . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0C0E11"><tr><td align="center" style="padding:32px 12px">'
+            . '<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px">'
+            . '<tr><td style="padding:0 34px 22px;font-size:19px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></td></tr>'
+            . '<tr><td bgcolor="#131619" style="background:#131619;border:1px solid #1E242A;border-radius:14px"><table role="presentation" width="100%">'
+            . '<tr><td style="padding:38px 34px 0"><div style="font-family:Courier New,monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#FF5A3C">Password reset</div>'
+            . '<h1 style="margin:12px 0 0;font-size:32px;line-height:1.1;color:#F2F0ED">Reset your PLYRCARD password</h1>'
+            . '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#868E99">Hi ' . $firstName . ', we received a request to reset your PLYRCARD password.</p></td></tr>'
+            . '<tr><td style="padding:26px 34px 0"><a href="' . $url . '" style="display:inline-block;padding:14px 28px;background:#FF5A3C;border-radius:10px;color:#0C0E11;text-decoration:none;font-weight:700">Reset Password</a></td></tr>'
+            . '<tr><td style="padding:24px 34px 34px;font-size:13px;line-height:1.6;color:#868E99">This link expires in ' . $expiresInMinutes . ' minutes. If you did not request it, you can ignore this email.</td></tr>'
+            . '</table></td></tr><tr><td align="center" style="padding:24px 34px 0;font-size:11.5px;color:#5E6670">PLYRCARD account security<br>&copy; 2026 PLYRCARD.</td></tr>'
+            . '</table></td></tr></table></body></html>';
     }
 
     protected function renderRegistrationEmail(
@@ -275,6 +337,69 @@ class PlyrcardSystemEmailService
             . '</table></td></tr>'
             . '<tr><td align="center" style="padding:24px 34px 0;font-size:11.5px;line-height:1.7;color:#5E6670">PLYRCARD profile activity notification<br>&copy; 2026 PLYRCARD.</td></tr>'
             . '</table></td></tr></table></body></html>';
+    }
+
+    protected function filamentPasswordResetUrl(User $user, string $token): string
+    {
+        try {
+            $panel = \Filament\Facades\Filament::getPanel('admin');
+
+            if (! $panel) {
+                return '';
+            }
+
+            $authBaseUrl = $this->authBaseUrl();
+            $urlGenerator = app('url');
+
+            if ($authBaseUrl !== '') {
+                $urlGenerator->forceRootUrl($authBaseUrl);
+            }
+
+            try {
+                // Filament generates the signed reset URL expected by its reset page.
+                return (string) $panel->getResetPasswordUrl($token, $user);
+            } finally {
+                if ($authBaseUrl !== '') {
+                    // Return URL generation to the current request host after the email URL is built.
+                    $urlGenerator->forceRootUrl(null);
+                }
+            }
+        } catch (\Throwable $exception) {
+            Log::error('PLYRCARD could not generate Filament password reset URL.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            return '';
+        }
+    }
+
+    protected function authBaseUrl(): string
+    {
+        $configured = rtrim((string) config('app.url', ''), '/');
+
+        try {
+            if (app()->bound('request')) {
+                $request = request();
+                $host = strtolower(trim((string) $request->getHost()));
+                $host = preg_replace('/:\\d+$/', '', $host) ?: $host;
+                $host = preg_replace('/^www\\./', '', $host) ?: $host;
+
+                // Main PLYRCARD hosts can safely keep the exact request scheme/port.
+                if ($host === 'localhost'
+                    || $host === '127.0.0.1'
+                    || $host === '::1'
+                    || $host === 'dev.plyrcard.com'
+                    || str_ends_with($host, '.dev.plyrcard.com')
+                    || $host === 'plyrcard.com') {
+                    return rtrim($request->getSchemeAndHttpHost(), '/');
+                }
+            }
+        } catch (\Throwable) {
+            // Use APP_URL for CLI jobs and player-owned custom domains.
+        }
+
+        return $configured !== '' ? $configured : 'http://localhost';
     }
 
     protected function dashboardUrl(): string

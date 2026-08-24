@@ -397,6 +397,9 @@
       $plyrDrawerLoginAction = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
           ? route('plyrcard.drawer-login')
           : url('/admin/login');
+      $plyrPasswordResetRequestAction = \Illuminate\Support\Facades\Route::has('locker-room.password-reset.request')
+          ? route('locker-room.password-reset.request')
+          : url('/admin/password-reset/request');
 
       $plyrEditableProfileFields = [
           'first_name', 'last_name', 'phone', 'street', 'city', 'state', 'country',
@@ -3497,7 +3500,7 @@
             </form>
           </div>
           <div class="plyrcard-drawer-view" data-plyrcard-view="forgot-password" data-title="Reset Password">
-            <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ url('/admin/password-reset/request') }}" data-plyrcard-loading-form novalidate>
+            <form class="plyrcard-form-card plyrcard-form-stack" method="POST" action="{{ $plyrPasswordResetRequestAction }}" data-plyrcard-ajax-form novalidate data-success-message="If a PLYRCARD account exists for that email, a password reset link has been sent.">
               @csrf
               <p class="plyrcard-mini-copy">Enter your email and we’ll send password reset instructions.</p>
               <label class="plyrcard-input-label">Email<span class="plyrcard-input-wrap"><i class="fa-solid fa-envelope"></i><input class="plyrcard-drawer-input" type="email" name="email" placeholder="you@example.com" required></span></label>

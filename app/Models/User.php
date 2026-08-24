@@ -80,6 +80,25 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
         ]);
     }
 
+    /**
+     * Route every Laravel password-reset notification through the same native
+     * PLYRCARD mail transport used by the registration/activity emails.
+     * Filament's custom request page also calls this service directly.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $result = app(\App\Services\PlyrcardSystemEmailService::class)
+            ->sendPasswordReset($this, (string) $token);
+
+        if (! ($result['success'] ?? false)) {
+            \Illuminate\Support\Facades\Log::error('PLYRCARD password reset notification failed.', [
+                'user_id' => $this->getKey(),
+                'email' => $this->email,
+                'error' => $result['error'] ?? 'Unknown password reset email error.',
+            ]);
+        }
+    }
+
     public function getFilamentName(): string { return trim($this->first_name . ' ' . $this->last_name); }
     public function nationalTeam(): BelongsTo { return $this->belongsTo(NationalTeam::class); }
     public function school(): BelongsTo { return $this->belongsTo(School::class); }

@@ -14,6 +14,7 @@ use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\RecruitingProfileViewTrackingController;
 use App\Http\Controllers\Admin\ExternalTrackingUrlGeneratorController;
 use App\Http\Controllers\ExternalSocialTrackingController;
+use App\Http\Controllers\LockerRoomPasswordResetController;
 use App\Http\Middleware\SendPlayerActivityEmail;
 
 /*
@@ -287,6 +288,10 @@ Route::get('/csrf-token', function () {
         'csrf_token' => csrf_token(),
     ]);
 })->name('csrf-token');
+
+Route::post('/locker-room/password-reset/request', [LockerRoomPasswordResetController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('locker-room.password-reset.request');
 
 Route::post('/locker-room/login', function (Request $request) {
     $expectsJson = $request->expectsJson() || $request->ajax();
