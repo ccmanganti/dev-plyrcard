@@ -703,11 +703,25 @@ trait InteractsWithCoachDatabase
         $section = strtolower(trim($section));
         $this->freePlanGateSection = in_array($section, $allowedSections, true) ? $section : 'dashboard';
         $this->showFreePlanGate = true;
+
+        // v10.30: the upgrade slider is client-owned. If a legacy/direct Livewire
+        // caller reaches this method, tell Alpine to open the existing slider and
+        // skip the giant Coach Database morph that previously caused flicker/repaint.
+        $this->dispatch('rc-free-plan-gate', section: $this->freePlanGateSection);
+
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
     }
 
     public function closeFreePlanGate(): void
     {
         $this->showFreePlanGate = false;
+        $this->dispatch('rc-free-plan-gate-close');
+
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
     }
 
     public function freeRoleManagePlanUrl(): string

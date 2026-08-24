@@ -2,9 +2,36 @@
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
         data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
-        x-data
+        x-data="{
+            freeGateOpen: @js((bool) ($showFreePlanGate ?? false)),
+            freeGateSection: @js((string) ($freePlanGateSection ?? 'dashboard')),
+            freeGateNames: {
+                dashboard: 'Dashboard',
+                schools: 'Discover Schools',
+                coaches: 'Coach Database',
+                favorites: 'Favorites',
+                lists: 'Lists',
+                conversations: 'Inbox',
+                campaigns: 'Campaigns',
+                compose: 'Compose Email',
+                support: 'Support',
+                schedule: 'Schedule'
+            },
+            openFreeGate(section) {
+                const normalized = String(section || 'dashboard').toLowerCase();
+                this.freeGateSection = Object.prototype.hasOwnProperty.call(this.freeGateNames, normalized)
+                    ? normalized
+                    : 'dashboard';
+                this.freeGateOpen = true;
+            },
+            closeFreeGate() {
+                this.freeGateOpen = false;
+            }
+        }"
         x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
-        x-on:rc-free-plan-gate.window="$wire.openFreePlanGate($event.detail?.section || 'dashboard')"
+        x-on:rc-free-plan-gate.window="openFreeGate($event.detail?.section || 'dashboard')"
+        x-on:rc-free-plan-gate-close.window="closeFreeGate()"
+        x-on:keydown.escape.window="if (freeGateOpen) closeFreeGate()"
         x-on:rc-recruiting-account-ready.window="$nextTick(() => $wire.bootDeferredUiData())"
         x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
     <style>
@@ -14531,7 +14558,9 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 .rc-free-plan-gate-v129 {
     position:fixed;inset:0;z-index:2147483000;display:flex;justify-content:flex-end;
     background:rgba(2,6,23,.72);backdrop-filter:blur(9px);padding:1rem;
+    contain:layout paint;isolation:isolate;
 }
+.rc-free-plan-gate-v129[x-cloak] { display:none !important; }
 .rc-free-plan-gate-panel-v129 {
     width:min(38rem,100%);height:100%;overflow:auto;border-radius:1.35rem;background:#fff;color:#111827;
     box-shadow:-28px 0 80px rgba(0,0,0,.36);display:flex;flex-direction:column;
@@ -14559,21 +14588,42 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 @media(prefers-reduced-motion:reduce){.rc-plyrcard-preparing-icon-v129 svg{animation:none}}
 </style>
 
-@if($showFreePlanGate ?? false)
-    @php
-        $freeGateNames = [
-            'dashboard' => 'Dashboard', 'schools' => 'Discover Schools', 'coaches' => 'Coach Database',
-            'favorites' => 'Favorites', 'lists' => 'Lists', 'conversations' => 'Inbox',
-            'campaigns' => 'Campaigns', 'compose' => 'Compose Email', 'support' => 'Support', 'schedule' => 'Schedule',
-        ];
-        $freeGateName = $freeGateNames[$freePlanGateSection ?? 'dashboard'] ?? 'This feature';
-    @endphp
-    <div class="rc-free-plan-gate-v129" role="presentation" wire:key="free-plan-gate-v129-{{ $freePlanGateSection }}">
-        <section class="rc-free-plan-gate-panel-v129" role="dialog" aria-modal="true" aria-labelledby="rc-free-plan-gate-title-v129">
+@if($isFreePlanAccount ?? false)
+    {{-- v10.30: This gate is deliberately client-only. It is always present for a
+         Free account and Alpine only toggles visibility. Do not use wire:click or
+         conditionally mount/unmount it; either behavior causes a Livewire morph of
+         the very large Recruiting Center component and makes the slider flicker. --}}
+    <div
+        class="rc-free-plan-gate-v129"
+        role="presentation"
+        x-cloak
+        x-show="freeGateOpen"
+        x-transition:enter="transition ease-out duration-150"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
+        x-on:click.self="closeFreeGate()"
+        wire:ignore
+    >
+        <section
+            class="rc-free-plan-gate-panel-v129"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rc-free-plan-gate-title-v130"
+            x-on:click.stop
+            x-transition:enter="transition ease-out duration-180"
+            x-transition:enter-start="translate-x-6 opacity-0"
+            x-transition:enter-end="translate-x-0 opacity-100"
+            x-transition:leave="transition ease-in duration-120"
+            x-transition:leave-start="translate-x-0 opacity-100"
+            x-transition:leave-end="translate-x-6 opacity-0"
+        >
             <header class="rc-free-plan-gate-head-v129">
-                <button type="button" class="rc-free-plan-gate-close-v129" wire:click="closeFreePlanGate" aria-label="Close">×</button>
+                <button type="button" class="rc-free-plan-gate-close-v129" x-on:click="closeFreeGate()" aria-label="Close">×</button>
                 <span class="rc-free-plan-gate-badge-v129">My Journey</span>
-                <h2 id="rc-free-plan-gate-title-v129">{{ $freeGateName }} is a My Journey feature</h2>
+                <h2 id="rc-free-plan-gate-title-v130"><span x-text="freeGateNames[freeGateSection] || 'This feature'"></span> is a My Journey feature</h2>
                 <p>Your Free plan includes Edit Profile and Settings. Upgrade to My Journey to unlock the recruiting workspace and outreach tools.</p>
             </header>
             <div class="rc-free-plan-gate-body-v129">
@@ -14581,7 +14631,7 @@ body.rc-account-preparing .rc-account-impersonation-bar {
                 <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>You can keep editing your athlete profile and account settings on Free at any time.</span></div>
             </div>
             <footer class="rc-free-plan-gate-footer-v129">
-                <button type="button" class="rc-free-plan-gate-secondary-v129" wire:click="closeFreePlanGate">Not now</button>
+                <button type="button" class="rc-free-plan-gate-secondary-v129" x-on:click="closeFreeGate()">Not now</button>
                 <a class="rc-free-plan-gate-primary-v129" href="{{ $this->freeRoleManagePlanUrl() }}">Manage Plan</a>
             </footer>
         </section>
