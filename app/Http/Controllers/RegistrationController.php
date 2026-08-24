@@ -17,7 +17,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -570,23 +569,15 @@ class RegistrationController extends PublicPlayerIntakeController
         $request->session()->regenerate();
         $request->session()->regenerateToken();
 
-        $verificationEmailResult = ['success' => false, 'error' => 'Verification email was not attempted.'];
+        $welcomeEmailResult = ['success' => false, 'error' => 'Welcome email was not attempted.'];
 
         try {
-            $verificationUrl = URL::temporarySignedRoute(
-                'registration.verify-email',
-                now()->addHours(72),
-                ['user' => $user->getKey(), 'hash' => sha1($user->getEmailForVerification())],
-            );
+            $dashboardUrl = rtrim($request->getSchemeAndHttpHost(), '/') . '/admin';
 
-            $verificationEmailResult = app(PlyrcardSystemEmailService::class)
-                ->sendRegistrationVerification($user, $verificationUrl);
-
-            if (($verificationEmailResult['success'] ?? false) && Schema::hasColumn('users', 'email_verification_sent_at')) {
-                $user->forceFill(['email_verification_sent_at' => now()])->saveQuietly();
-            }
+            $welcomeEmailResult = app(PlyrcardSystemEmailService::class)
+                ->sendRegistrationWelcome($user, $dashboardUrl, $planKey);
         } catch (\Throwable $exception) {
-            $verificationEmailResult = [
+            $welcomeEmailResult = [
                 'success' => false,
                 'error' => $exception->getMessage(),
             ];
@@ -609,7 +600,9 @@ class RegistrationController extends PublicPlayerIntakeController
             'payment_form_url' => $paymentFormUrl,
             // Keep payment_url for compatibility with older registration JavaScript.
             'payment_url' => $paymentFormUrl,
-            'verification_email_sent' => (bool) ($verificationEmailResult['success'] ?? false),
+            'welcome_email_sent' => (bool) ($welcomeEmailResult['success'] ?? false),
+            // Backwards-compatible response key for older frontends. This is a welcome email, not a verification email.
+            'verification_email_sent' => (bool) ($welcomeEmailResult['success'] ?? false),
             'redirect_url' => url('/admin/my-profile'),
             'message' => $isPaid
                 ? ($paymentFormUrl

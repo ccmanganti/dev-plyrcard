@@ -10,8 +10,11 @@ use Illuminate\Support\Facades\View;
 
 class PlyrcardSystemEmailService
 {
-    public function sendRegistrationVerification(User $user, string $verificationUrl): array
-    {
+    public function sendRegistrationWelcome(
+        User $user,
+        ?string $dashboardUrl = null,
+        ?string $planKey = null,
+    ): array {
         $recipient = $this->recipientFor($user);
 
         if (! $recipient) {
@@ -20,7 +23,11 @@ class PlyrcardSystemEmailService
 
         $user->loadMissing('activeWebsite');
 
-        $html = $this->renderRegistrationEmail($user, $verificationUrl);
+        $dashboardUrl = trim((string) $dashboardUrl) !== ''
+            ? trim((string) $dashboardUrl)
+            : $this->dashboardUrl();
+
+        $html = $this->renderRegistrationEmail($user, $dashboardUrl, $planKey);
 
         return $this->sendHtml(
             user: $user,
@@ -29,6 +36,16 @@ class PlyrcardSystemEmailService
             html: $html,
             purpose: 'registration_welcome',
         );
+    }
+
+    /**
+     * Backwards-compatible alias for older callers. Registration email
+     * verification is no longer part of the signup experience; even if an old
+     * caller supplies a verification URL, the email points to /admin instead.
+     */
+    public function sendRegistrationVerification(User $user, string $ignoredVerificationUrl = ''): array
+    {
+        return $this->sendRegistrationWelcome($user);
     }
 
     public function sendPlayerActivity(
@@ -136,27 +153,37 @@ class PlyrcardSystemEmailService
         );
     }
 
-    protected function renderRegistrationEmail(User $user, string $verificationUrl): string
-    {
-        $viewName = 'emails.plyrcard-registration-verification';
+    protected function renderRegistrationEmail(
+        User $user,
+        string $dashboardUrl,
+        ?string $planKey = null,
+    ): string {
+        $viewName = 'emails.plyrcard-registration-welcome';
+        $isMyJourney = strtolower(trim((string) $planKey)) === 'my-journey';
 
         if (View::exists($viewName)) {
             return view($viewName, [
                 'user' => $user,
-                'verificationUrl' => $verificationUrl,
+                'dashboardUrl' => $dashboardUrl,
+                'planKey' => $planKey,
+                'isMyJourney' => $isMyJourney,
             ])->render();
         }
 
-        Log::warning('PLYRCARD registration email Blade view is missing; using built-in fallback template.', [
+        Log::warning('PLYRCARD registration welcome email Blade view is missing; using built-in fallback template.', [
             'view' => $viewName,
-            'expected_path' => resource_path('views/emails/plyrcard-registration-verification.blade.php'),
+            'expected_path' => resource_path('views/emails/plyrcard-registration-welcome.blade.php'),
             'user_id' => $user->getKey(),
         ]);
 
         $firstName = $this->escape((string) ($user->first_name ?: 'Player'));
         $profileUrl = $this->playerUrl($user->activeWebsite);
         $profileUrlEscaped = $this->escape($profileUrl);
-        $verificationUrlEscaped = $this->escape($verificationUrl);
+        $dashboardUrlEscaped = $this->escape($dashboardUrl);
+        $domainLabel = $isMyJourney ? 'Requested PLYRSITE domain' : 'Your PLYRSITE';
+        $domainReview = $isMyJourney
+            ? '<div style="margin-top:12px;padding:11px 13px;border:1px solid #3A3324;border-radius:9px;background:#1B1812;color:#D7B56D;font-size:12.5px;line-height:1.5"><strong style="color:#F2F0ED">Pending team review.</strong> Your domain will not be publicly visible until the PLYRCARD team reviews and approves it.</div>'
+            : '';
 
         return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             . '<title>Welcome to PLYRCARD</title></head>'
@@ -168,13 +195,11 @@ class PlyrcardSystemEmailService
             . '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
             . '<tr><td style="padding:38px 34px 0"><div style="font-family:Courier New,monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#FF5A3C">Account created</div>'
             . '<h1 style="margin:12px 0 0;font-size:32px;line-height:1.1;color:#F2F0ED">Welcome to PLYRCARD, ' . $firstName . '.</h1>'
-            . '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#868E99">Your account is ready. You can start building and sharing your player profile now.</p></td></tr>'
+            . '<p style="margin:14px 0 0;font-size:15px;line-height:1.6;color:#868E99">Your account is ready. Head to your dashboard to continue building your player profile.</p></td></tr>'
             . ($profileUrl !== ''
-                ? '<tr><td style="padding:28px 34px 0"><table role="presentation" width="100%" bgcolor="#1A1E23" style="background:#1A1E23;border:1px solid #262C33;border-radius:12px"><tr><td style="padding:22px"><div style="font-family:Courier New,monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#868E99">Your PLYRSITE</div><div style="margin-top:11px;font-size:20px;font-weight:800;color:#F2F0ED;word-break:break-all">' . $profileUrlEscaped . '</div></td></tr></table></td></tr>'
+                ? '<tr><td style="padding:28px 34px 0"><table role="presentation" width="100%" bgcolor="#1A1E23" style="background:#1A1E23;border:1px solid #262C33;border-radius:12px"><tr><td style="padding:22px"><div style="font-family:Courier New,monospace;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#868E99">' . $this->escape($domainLabel) . '</div><div style="margin-top:11px;font-size:20px;font-weight:800;color:#F2F0ED;word-break:break-all">' . $profileUrlEscaped . '</div>' . $domainReview . '</td></tr></table></td></tr>'
                 : '')
-            . ($verificationUrl !== ''
-                ? '<tr><td style="padding:26px 34px 0"><a href="' . $verificationUrlEscaped . '" style="display:inline-block;padding:14px 28px;background:#FF5A3C;border-radius:10px;color:#0C0E11;text-decoration:none;font-weight:700">Verify email (optional)</a><p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:#5E6670">Verification is optional and does not block access to your account.</p></td></tr>'
-                : '')
+            . '<tr><td style="padding:26px 34px 0"><a href="' . $dashboardUrlEscaped . '" style="display:inline-block;padding:14px 28px;background:#FF5A3C;border-radius:10px;color:#0C0E11;text-decoration:none;font-weight:700">Go to Dashboard</a></td></tr>'
             . '<tr><td style="padding:28px 34px 34px;font-size:14px;line-height:1.6;color:#868E99">Questions? Reply to this email.<div style="margin-top:16px;font-weight:600;color:#F2F0ED">This is your journey. It has to come from you.<br><span style="color:#FF5A3C">Authenticity is Key.</span></div></td></tr>'
             . '</table></td></tr>'
             . '<tr><td align="center" style="padding:24px 34px 0;font-size:11.5px;line-height:1.7;color:#5E6670">You are receiving this because a PLYRCARD account was created with this address.<br>&copy; 2026 PLYRCARD.</td></tr>'
