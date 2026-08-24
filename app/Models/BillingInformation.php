@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BillingInformation extends Model
 {
@@ -27,6 +28,8 @@ class BillingInformation extends Model
         'payment_type',
         'payment_brand',
         'payment_provider',
+        'payment_mode',
+        'payment_live_mode',
 
         // Native registration / commercial context.
         'plan_key',
@@ -35,6 +38,8 @@ class BillingInformation extends Model
         'recurring_amount_cents',
         'setup_fee_cents',
         'initial_amount_cents',
+        'amount_paid_cents',
+        'amount_refunded_cents',
         'payment_status',
         'subscription_status',
         'requested_domain',
@@ -46,6 +51,7 @@ class BillingInformation extends Model
         'ghl_location_id',
         'ghl_invoice_id',
         'ghl_invoice_schedule_id',
+        'ghl_order_id',
         'ghl_subscription_id',
         'ghl_transaction_id',
         'ghl_payment_method_id',
@@ -56,21 +62,31 @@ class BillingInformation extends Model
         'ghl_synced_at',
         'ghl_payment_completed_at',
         'ghl_last_event_at',
+        'payment_synced_at',
     ];
 
     protected $casts = [
         'recurring_amount_cents' => 'integer',
         'setup_fee_cents' => 'integer',
         'initial_amount_cents' => 'integer',
+        'amount_paid_cents' => 'integer',
+        'amount_refunded_cents' => 'integer',
+        'payment_live_mode' => 'boolean',
         'registration_meta' => 'array',
         'ghl_sync_response' => 'array',
         'ghl_synced_at' => 'datetime',
         'ghl_payment_completed_at' => 'datetime',
         'ghl_last_event_at' => 'datetime',
+        'payment_synced_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function paymentTransactions(): HasMany
+    {
+        return $this->hasMany(PaymentTransaction::class);
     }
 }

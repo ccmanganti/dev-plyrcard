@@ -397,6 +397,33 @@ class RegistrationPaymentVerificationService
             ]),
         ])->save();
 
+        // v10.25: payment verification is the synchronization point. Persist
+        // masked/safe payment details and idempotent transaction rows before
+        // granting the paid role. A sync/enrichment failure must not reverse a
+        // payment that HighLevel already proved successful.
+        $paymentSync = null;
+        try {
+            $paymentSync = app(RegistrationPaymentSyncService::class)->sync(
+                $user,
+                $billing,
+                $rows,
+                $source,
+            );
+            $billing->refresh();
+        } catch (\Throwable $exception) {
+            Log::warning('Registration payment was verified, but payment details could not be synchronized locally.', [
+                'user_id' => $user->getKey(),
+                'billing_id' => $billing->getKey(),
+                'source' => $source,
+                'error' => $exception->getMessage(),
+            ]);
+
+            $paymentSync = [
+                'synced' => false,
+                'error' => $exception->getMessage(),
+            ];
+        }
+
         $role = config('plyrcard-registration.plans.' . $billing->plan_key . '.role_after_payment');
         if (filled($role) && method_exists($user, 'syncRoles')) {
             $user->syncRoles([(string) $role]);
@@ -452,6 +479,7 @@ class RegistrationPaymentVerificationService
             'expected_amount_cents' => $expectedCents,
             'matched_amount_cents' => $matchedCents,
             'record_ids' => $ids,
+            'payment_sync' => $paymentSync,
         ];
     }
 
