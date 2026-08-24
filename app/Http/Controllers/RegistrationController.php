@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Services\GoHighLevelService;
 use App\Services\PlyrcardSystemEmailService;
+use App\Services\RegistrationPaymentVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -265,7 +266,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'position' => ['required', 'array', 'min:1', 'max:3'],
             'position.*' => ['required', 'string', 'max:100'],
             'high_school' => ['nullable', 'string', 'max:255'],
-            'state' => ['required', 'string', 'max:100'],
+            'state' => ['nullable', 'string', 'max:100'],
             'league_id' => ['required', 'integer', 'exists:leagues,id'],
             'club_id' => ['required', 'string', 'max:50'],
             'club_other' => ['nullable', 'string', 'max:255'],
@@ -367,7 +368,7 @@ class RegistrationController extends PublicPlayerIntakeController
             $positions,
             $domainLookup,
         ) {
-            $school = $this->resolveRegistrationSchool($validated['high_school'] ?? null, $validated['state']);
+            $school = $this->resolveRegistrationSchool($validated['high_school'] ?? null, $validated['state'] ?? null);
             [$league, $club, $clubLeague, $teamName] = $this->resolveRegistrationProgram(
                 (int) $validated['league_id'],
                 $validated['club_id'],
@@ -390,7 +391,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'year' => (string) $validated['year'],
                 'gpa' => $validated['gpa'] ?? null,
                 'jersey_number' => isset($validated['jersey_number']) ? (string) $validated['jersey_number'] : null,
-                'state' => $validated['state'],
+                'state' => $validated['state'] ?? null,
                 'country' => 'USA',
                 'school_id' => $school?->id,
                 'league_id' => $league?->id,
@@ -626,10 +627,40 @@ class RegistrationController extends PublicPlayerIntakeController
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $billing = BillingInformation::query()->where('user_id', $user->id)->first();
+        $billing = BillingInformation::query()
+            ->where('user_id', $user->id)
+            ->latest('id')
+            ->first();
 
         if (! $billing) {
             return response()->json(['message' => 'Billing record not found.'], 404);
+        }
+
+        $verification = null;
+
+        // The HighLevel survey owns secure card collection. While the browser is
+        // sitting on the payment step, this endpoint verifies the resulting GHL
+        // transaction/order server-side. The parent registration page never reads
+        // or submits card fields from the cross-origin iframe.
+        if ($billing->plan_key !== 'free' && $billing->payment_status !== 'paid') {
+            try {
+                $verification = app(RegistrationPaymentVerificationService::class)
+                    ->verify($user, $billing);
+
+                $billing->refresh();
+            } catch (\Throwable $exception) {
+                Log::warning('Registration payment status check could not verify HighLevel payment yet.', [
+                    'user_id' => $user->getKey(),
+                    'billing_id' => $billing->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $verification = [
+                    'verified' => false,
+                    'source' => 'ghl_payments_api',
+                    'reason' => 'verification_exception',
+                ];
+            }
         }
 
         return response()->json([
@@ -638,6 +669,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'payment_status' => $billing->payment_status,
             'subscription_status' => $billing->subscription_status,
             'paid' => $billing->payment_status === 'paid',
+            'verification' => $verification,
             'redirect_url' => url('/admin/my-profile'),
         ]);
     }
@@ -688,7 +720,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'label' => 'Amplify',
                 'recurring_amount_cents' => 4900,
                 'setup_fee_cents' => 50000,
-                'charge_first_month_upfront' => false,
+                'charge_first_month_upfront' => true,
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'My Journey',
                 'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
@@ -758,9 +790,22 @@ class RegistrationController extends PublicPlayerIntakeController
             'app_url' => url('/admin/my-profile'),
         ], fn ($value) => filled($value));
 
-        $separator = str_contains($baseUrl, '?') ? '&' : '?';
+        // Merge with the survey's existing query string instead of blindly
+        // appending another copy (for example, notrack=true&notrack=true).
+        $parts = parse_url($baseUrl);
+        $existingQuery = [];
+        parse_str((string) ($parts['query'] ?? ''), $existingQuery);
+        $query = array_merge($existingQuery, $params);
 
-        return $baseUrl . $separator . http_build_query($params);
+        $scheme = (string) ($parts['scheme'] ?? 'https');
+        $host = (string) ($parts['host'] ?? '');
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $path = (string) ($parts['path'] ?? '');
+        $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+
+        return $scheme . '://' . $host . $port . $path
+            . ($query !== [] ? '?' . http_build_query($query) : '')
+            . $fragment;
     }
 
     protected function normalizeRegistrationGender(string $gender): string

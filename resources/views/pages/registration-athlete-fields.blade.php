@@ -21,12 +21,11 @@
     <div class="row">
         <div class="f"><label for="hs">High school <span class="opt">— optional</span></label><input name="high_school" id="hs" type="text" placeholder="Briar Woods High School" autocomplete="organization"></div>
         <div class="f">
-            <label for="st">State</label>
-            <select name="state" id="st" required data-suggest-placeholder="Type or choose a state">
+            <label for="st">State <span class="opt">— optional</span></label>
+            <select name="state" id="st" data-suggest-placeholder="Type or choose a state">
                 <option value="">Select state</option>
                 @foreach(($states ?? []) as $code => $stateName)<option value="{{ $code }}">{{ $stateName }}</option>@endforeach
             </select>
-            <div class="msg">Select a state.</div>
         </div>
     </div>
 </div>

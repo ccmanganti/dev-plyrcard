@@ -71,6 +71,17 @@ return [
         'schedule_version' => env('GHL_INVOICE_SCHEDULE_VERSION', '2023-02-21'),
         'connect_timeout' => (int) env('GHL_BILLING_CONNECT_TIMEOUT', 5),
         'timeout' => (int) env('GHL_BILLING_TIMEOUT', 20),
+
+        // v10.22: after the secure GHL survey processes the card, PLYRCARD
+        // checks HighLevel's Payments API and advances automatically. Raw card
+        // data never leaves the HighLevel iframe.
+        'payment_verification' => [
+            'enabled' => env('GHL_REGISTRATION_PAYMENT_VERIFICATION', true),
+            'api_version' => env('GHL_PAYMENTS_API_VERSION', 'v3'),
+            'timeout' => (int) env('GHL_PAYMENT_VERIFY_TIMEOUT', 8),
+            'limit' => (int) env('GHL_PAYMENT_VERIFY_LIMIT', 50),
+            'window_minutes' => (int) env('GHL_PAYMENT_VERIFY_WINDOW_MINUTES', 90),
+        ],
     ],
 
     /*
