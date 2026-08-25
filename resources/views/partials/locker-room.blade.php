@@ -41,6 +41,10 @@
         : null;
     $lrMustChangePassword = $lrLoggedIn && $lrUser && (bool) (($lrUser->must_change_password ?? false) || session('plyrcard_show_password_overlay'));
     $lrLogoutUrl = url('/admin/logout');
+    $lrSupportEmail = 'support@plyrcard.com';
+    $lrSupportPhone = '+15718880852';
+    $lrFacebookUrl = 'https://www.facebook.com/plyrcard';
+    $lrMainShareUrl = rtrim((string) config('app.url', url('/')), '/');
 @endphp
 
 @if($plyrShouldRenderPullup ?? true)
@@ -170,6 +174,58 @@
         .lr-stat-grid { grid-template-columns:1fr 1fr; }
         .lr-plan { display:none; }
     }
+
+    /* Logged-out Get Started keeps the original desktop bottom-sheet behavior.
+       Authenticated Locker Room stays the 50% right-side workspace. */
+    @media (min-width: 901px) {
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-panel {
+            top: auto !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: min(82dvh, 620px) !important;
+            border-left: 0 !important;
+            border-top: 1px solid rgba(255,255,255,.06) !important;
+            border-radius: 16px 16px 0 0 !important;
+            box-shadow: 0 -18px 46px rgba(0,0,0,.42) !important;
+            transform: translateY(102%) !important;
+            overflow: hidden !important;
+        }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"].is-open .lr-panel { transform: translateY(0) !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-head { min-height: 48px !important; padding: 10px 12px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-head h2 { font-size: 18px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-head p { display: none !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-body { background: #050505 !important; padding: 8px 9px 62px !important; max-height: calc(min(82dvh, 620px) - 48px) !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"].is-open + .lr-drawer-tab { right: 0 !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-shell { gap: 8px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-group { gap: 4px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-group-title { color: rgba(255,255,255,.60) !important; font-size: 10px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-grid { grid-template-columns: repeat(4,minmax(0,1fr)) !important; gap: 7px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-card { min-height: 58px !important; border: 0 !important; border-radius: 7px !important; padding: 7px 5px 6px !important; gap: 5px !important; box-shadow: 0 4px 10px rgba(0,0,0,.24) !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-icon { width: auto !important; height: auto !important; border-radius: 0 !important; background: transparent !important; color: currentColor !important; font-size: 13px !important; }
+        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-card strong { font-size: 10px !important; }
+    }
+
+    /* v10.37 Get Started launcher: restore the original 8-action structure. */
+    .lr-guest-shell { display: grid; gap: 20px; width: 100%; }
+    .lr-guest-group { display: grid; gap: 9px; }
+    .lr-guest-group-title { color: #667085; font-size: 10px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+    .lr-guest-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+    .lr-guest-card { min-width: 0; min-height: 92px; border: 1px solid #e2e6ec; border-radius: 14px; background: #fff; color: #101828; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 13px 9px; text-decoration: none; text-align: center; cursor: pointer; box-shadow: 0 5px 16px rgba(15,23,42,.035); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+    .lr-guest-card:hover { transform: translateY(-1px); border-color: #ffb29b; box-shadow: 0 10px 22px rgba(15,23,42,.065); }
+    .lr-guest-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f5f7fa; color: #101828; font-size: 14px; }
+    .lr-guest-card strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; color: inherit; font-size: 11px; font-weight: 850; line-height: 1.2; }
+    .lr-guest-card.is-accent { background: #ff5c35; border-color: #ff5c35; color: #fff; }
+    .lr-guest-card.is-accent .lr-guest-icon { background: rgba(255,255,255,.16); color: #fff; }
+    .lr-guest-card.is-accent:hover { background: #ed4e28; border-color: #ed4e28; }
+    .lr-login-remember { display: flex; align-items: center; gap: 8px; color: #475467; font-size: 11px; font-weight: 700; }
+    .lr-login-remember input { accent-color: #ff5c35; }
+    @media (max-width: 1100px) { .lr-guest-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+    @media (max-width: 900px) { .lr-guest-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; } .lr-guest-card { min-height: 84px; } }
+    @media (max-width: 350px) { .lr-guest-grid { grid-template-columns: 1fr; } }
 
     /* v10.35 conditional visibility + native Locker Room form controls. */
     #plyrcard-action-drawer.lr-drawer [hidden] { display: none !important; }
@@ -429,6 +485,7 @@
      data-login-url="{{ $lrLoginUrl }}"
      data-password-reset-url="{{ $lrPasswordResetUrl }}"
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
+     data-main-share-url="{{ $lrMainShareUrl }}"
      data-force-password="{{ $lrMustChangePassword ? '1' : '0' }}"
      data-authenticated="{{ $lrLoggedIn ? '1' : '0' }}">
     <button type="button" class="lr-scrim" data-lr-close aria-label="Close Locker Room"></button>
@@ -438,7 +495,7 @@
                 <button type="button" class="lr-back" data-lr-back hidden aria-label="Back"><i class="fa-solid fa-chevron-left"></i></button>
                 <div>
                     <h2 data-lr-title>{{ $lrLoggedIn ? 'Locker Room' : 'Get Started' }}</h2>
-                    <p data-lr-subtitle>{{ $lrLoggedIn ? 'Your player workspace' : 'Sign in to your PLYRCARD' }}</p>
+                    <p data-lr-subtitle>{{ $lrLoggedIn ? 'Your player workspace' : 'Everything you need to get started' }}</p>
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:9px;">
@@ -666,9 +723,55 @@
 
                 <section class="lr-view" data-lr-view="gate"><div class="lr-card lr-gate"><div class="lr-gate-icon"><i class="fa-solid fa-lock"></i></div><h3 class="lr-card-title" data-lr-gate-title>Available with My Journey</h3><p class="lr-card-copy">Your Free plan keeps Profile and Settings available. Upgrade to unlock recruiting stats, Schedule, and the full recruiting workspace.</p><div class="lr-actions" style="justify-content:center;"><button class="lr-btn" type="button" data-lr-back>Not now</button><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="upgrade">See Plans</button></div></div></section>
             @else
-                <section class="lr-view is-active" data-lr-view="login"><form class="lr-form" data-lr-login-form><div class="lr-form-section"><h4>Sign In</h4><div class="lr-form-grid"><div class="lr-field is-full"><label>Email</label><input class="lr-input" type="email" name="email" required></div><div class="lr-field is-full"><label>Password</label><input class="lr-input" type="password" name="password" required></div></div><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit">Sign In</button><button class="lr-btn" type="button" data-lr-nav="forgot-password">Forgot Password?</button><a class="lr-btn" href="/registration?utm_plan=free">Start Free</a><button class="lr-btn" type="button" data-lr-nav="book-call">Book a Call</button></div></div></form></section>
+                <section class="lr-view is-active" data-lr-view="guest-home">
+                    <div class="lr-guest-shell">
+                        <div class="lr-guest-group">
+                            <div class="lr-guest-group-title">Contact</div>
+                            <div class="lr-guest-grid">
+                                <a class="lr-guest-card" href="mailto:{{ $lrSupportEmail }}"><span class="lr-guest-icon"><i class="fa-solid fa-envelope"></i></span><strong>Email Us</strong></a>
+                                <a class="lr-guest-card" href="sms:{{ $lrSupportPhone }}"><span class="lr-guest-icon"><i class="fa-solid fa-comment-dots"></i></span><strong>Text Us</strong></a>
+                                <a class="lr-guest-card" href="tel:{{ $lrSupportPhone }}"><span class="lr-guest-icon"><i class="fa-solid fa-phone"></i></span><strong>Call Us</strong></a>
+                                <a class="lr-guest-card" href="{{ $lrFacebookUrl }}" target="_blank" rel="noopener"><span class="lr-guest-icon"><i class="fa-brands fa-facebook-messenger"></i></span><strong>Chat Us</strong></a>
+                            </div>
+                        </div>
+
+                        <div class="lr-guest-group">
+                            <div class="lr-guest-group-title">Start</div>
+                            <div class="lr-guest-grid">
+                                <button class="lr-guest-card" type="button" data-lr-nav="share-site"><span class="lr-guest-icon"><i class="fa-solid fa-share-nodes"></i></span><strong>Share</strong></button>
+                                <button class="lr-guest-card" type="button" data-lr-nav="book-call"><span class="lr-guest-icon"><i class="fa-solid fa-calendar-check"></i></span><strong>Book Demo</strong></button>
+                                <a class="lr-guest-card" href="/pricing"><span class="lr-guest-icon"><i class="fa-solid fa-user-plus"></i></span><strong>Register Now</strong></a>
+                                <button class="lr-guest-card is-accent" type="button" data-lr-nav="login"><span class="lr-guest-icon"><i class="fa-solid fa-right-to-bracket"></i></span><strong>Login</strong></button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="lr-view" data-lr-view="share-site">
+                    <div class="lr-form-section">
+                        <h4>Share PLYRCARD</h4>
+                        <p class="lr-card-copy">Share PLYRCARD with another athlete, parent, or coach.</p>
+                        <div class="lr-field" style="margin-top:12px;"><label>PLYRCARD URL</label><input class="lr-input" value="{{ $lrMainShareUrl }}" readonly data-lr-guest-share-input></div>
+                        <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-guest-share>Share</button><button class="lr-btn" type="button" data-lr-guest-copy>Copy Link</button></div>
+                    </div>
+                </section>
+
+                <section class="lr-view" data-lr-view="login">
+                    <form class="lr-form" data-lr-login-form>
+                        <div class="lr-form-section">
+                            <h4>Sign In</h4>
+                            <p class="lr-card-copy">Sign in to open your Locker Room.</p>
+                            <div class="lr-form-grid" style="margin-top:12px;">
+                                <div class="lr-field is-full"><label>Email</label><input class="lr-input" type="email" name="email" autocomplete="email" required></div>
+                                <div class="lr-field is-full"><label>Password</label><input class="lr-input" type="password" name="password" autocomplete="current-password" required></div>
+                                <label class="lr-login-remember is-full"><input type="checkbox" name="remember" value="1"><span>Remember me</span></label>
+                            </div>
+                            <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit">Sign In</button><button class="lr-btn" type="button" data-lr-nav="forgot-password">Forgot Password?</button></div>
+                        </div>
+                    </form>
+                </section>
                 <section class="lr-view" data-lr-view="forgot-password"><form class="lr-form" data-lr-password-reset-form><div class="lr-form-section"><h4>Reset Password</h4><p class="lr-card-copy">Enter your email and we’ll send password reset instructions.</p><div class="lr-field" style="margin-top:12px;"><label>Email</label><input class="lr-input" type="email" name="email" required></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Reset Link</button></form></section>
-                <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book a Call</h3></div><div data-lr-book-embed></div></div></section>
+                <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book Demo</h3><p class="lr-card-copy">Choose a time to see how PLYRCARD works.</p></div><div data-lr-book-embed></div></div></section>
             @endauth
         </div>
         <div class="lr-toast" data-lr-toast></div>
@@ -691,7 +794,7 @@
     try {
         state = JSON.parse(document.getElementById('plyrcard-locker-room-initial')?.textContent || '{}') || {};
     } catch (_) { state = {}; }
-    let currentView = authenticated ? (forcePassword ? 'password' : 'home') : 'login';
+    let currentView = authenticated ? (forcePassword ? 'password' : 'home') : 'guest-home';
     let history = [];
     let toastTimer = null;
     let profilePositionSelection = new Set();
@@ -707,8 +810,8 @@
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 
-    const titles = {home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call':'Book a Call',billing:'Billing',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
-    const subtitles = {home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',services:'Request extra support',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call':'Schedule time with our team',billing:'Plan and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
+    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
+    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',services:'Request extra support',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Plan and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
 
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
@@ -740,13 +843,13 @@
         qa('[data-lr-view]').forEach(el => el.classList.toggle('is-active', el.dataset.lrView === view));
         q('[data-lr-title]').textContent = titles[view] || 'Locker Room';
         q('[data-lr-subtitle]').textContent = subtitles[view] || '';
-        const back = q('[data-lr-back].lr-back'); if (back) back.hidden = forcePassword || view === (authenticated ? 'home' : 'login');
+        const back = q('[data-lr-back].lr-back'); if (back) back.hidden = forcePassword || view === (authenticated ? 'home' : 'guest-home');
         q('.lr-body')?.scrollTo({top:0, behavior:'auto'});
         if (view === 'support') ensureSupportEmbed();
         if (view === 'book-call') ensureBookEmbed();
         render();
     }
-    function goBack() { const target = history.pop() || (authenticated ? 'home' : 'login'); setView(target, false); }
+    function goBack() { const target = history.pop() || (authenticated ? 'home' : 'guest-home'); setView(target, false); }
 
     async function request(url, options = {}) {
         const headers = Object.assign({'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrf()}, options.headers || {});
@@ -1080,6 +1183,8 @@
         const visit = event.target.closest('[data-lr-visit-plyrcard]'); if (visit) { event.preventDefault(); const url=state.website?.url; if(url){ window.open(url,'_blank','noopener'); } else { setView('share'); } return; }
         const copyLink = event.target.closest('[data-lr-copy-link]'); if (copyLink) { const url=state.website?.url || ''; if(url) navigator.clipboard?.writeText(url).then(()=>showToast('PLYRCARD link copied.')).catch(()=>showToast('Copy the link from the field above.')); return; }
         const nativeShare = event.target.closest('[data-lr-native-share]'); if(nativeShare){ const url=state.website?.url || ''; if(url && navigator.share){ navigator.share({title:'My PLYRCARD',url}).catch(()=>{}); } else if(url){ navigator.clipboard?.writeText(url); showToast('PLYRCARD link copied.'); } return; }
+        const guestCopy = event.target.closest('[data-lr-guest-copy]'); if (guestCopy) { const url=drawer.dataset.mainShareUrl || ''; if(url) navigator.clipboard?.writeText(url).then(()=>showToast('PLYRCARD link copied.')).catch(()=>showToast('Copy the link from the field above.')); return; }
+        const guestShare = event.target.closest('[data-lr-guest-share]'); if (guestShare) { const url=drawer.dataset.mainShareUrl || ''; if(url && navigator.share){ navigator.share({title:'PLYRCARD',url}).catch(()=>{}); } else if(url){ navigator.clipboard?.writeText(url); showToast('PLYRCARD link copied.'); } return; }
         const newSchedule = event.target.closest('[data-lr-new-schedule]'); if (newSchedule) { const form=q('[data-lr-schedule-form]'); form.reset(); form.querySelector('[name="schedule_id"]').value=''; q('[data-lr-schedule-form-title]').textContent='New Schedule'; form.hidden=false; form.scrollIntoView({behavior:'auto',block:'start'}); return; }
         const cancelSchedule = event.target.closest('[data-lr-cancel-schedule]'); if (cancelSchedule) { q('[data-lr-schedule-form]').hidden=true; return; }
         const edit = event.target.closest('[data-lr-edit-schedule]'); if (edit) { const item=(state.schedule?.items||[]).find(x=>String(x.id)===String(edit.dataset.lrEditSchedule)); if(!item)return; const form=q('[data-lr-schedule-form]'); fillForm(form,item); form.querySelector('[name="schedule_id"]').value=item.id; form.querySelector('[name="is_home"]').value=item.is_home?'1':'0'; q('[data-lr-schedule-form-title]').textContent='Edit Schedule'; form.hidden=false; form.scrollIntoView({behavior:'auto',block:'start'}); return; }
