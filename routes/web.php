@@ -385,20 +385,51 @@ Route::middleware(['web'])
 */
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/locker-room/data', [LockerRoomController::class, 'data'])
+        ->name('locker-room.data');
+
+    Route::get('/locker-room/profile/options', [LockerRoomController::class, 'profileOptions'])
+        ->name('locker-room.profile.options');
+
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
         ->name('locker-room.profile.update');
 
     Route::post('/locker-room/schedule', [LockerRoomController::class, 'storeSchedule'])
         ->name('locker-room.schedule.store');
 
+    Route::put('/locker-room/schedule/{schedule}', [LockerRoomController::class, 'updateSchedule'])
+        ->whereNumber('schedule')
+        ->name('locker-room.schedule.update');
+
+    Route::delete('/locker-room/schedule/{schedule}', [LockerRoomController::class, 'deleteSchedule'])
+        ->whereNumber('schedule')
+        ->name('locker-room.schedule.delete');
+
     Route::post('/locker-room/settings', [LockerRoomController::class, 'updateSettings'])
         ->name('locker-room.settings.update');
+
+    // Compatibility aliases for the former separate Website Settings UI.
+    // The v10.33 Locker Room now exposes these controls inside Settings.
+    Route::post('/locker-room/website-settings', [LockerRoomController::class, 'updateWebsiteSettings'])
+        ->name('locker-room.website-settings.update');
+
+    Route::post('/locker-room/website-settings/calendar/refresh', [LockerRoomController::class, 'refreshWebsiteCalendar'])
+        ->name('locker-room.website-settings.calendar.refresh');
+
+    Route::post('/locker-room/billing', [LockerRoomController::class, 'updateBilling'])
+        ->name('locker-room.billing.update');
 
     Route::post('/locker-room/support', [LockerRoomController::class, 'storeSupport'])
         ->name('locker-room.support.store');
 
     Route::post('/locker-room/referral', [LockerRoomController::class, 'storeReferral'])
         ->name('locker-room.referral.store');
+
+    Route::post('/locker-room/additional-service', [LockerRoomController::class, 'storeAdditionalService'])
+        ->name('locker-room.additional-service.store');
+
+    Route::post('/locker-room/password', [LockerRoomController::class, 'updatePasswordFromOverlay'])
+        ->name('locker-room.password.update');
 });
 
 /*

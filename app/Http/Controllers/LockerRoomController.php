@@ -4,22 +4,145 @@ namespace App\Http\Controllers;
 
 use App\Models\AdditionalServiceRequest;
 use App\Models\BillingInformation;
+use App\Models\Club;
+use App\Models\ClubLeague;
+use App\Models\League;
 use App\Models\LockerRoomReferral;
 use App\Models\LockerRoomSupportRequest;
+use App\Models\NationalTeam;
 use App\Models\Schedule;
+use App\Models\School;
 use App\Models\Website;
 use App\Services\GoHighLevelService;
+use App\Services\LockerRoomDataService;
+use App\Services\LockerRoomReferralEmailService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class LockerRoomController extends Controller
 {
-    public function updateProfile(Request $request): RedirectResponse|JsonResponse
+    public function data(Request $request, LockerRoomDataService $dataService): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        return response()->json([
+            'success' => true,
+            'data' => $dataService->snapshot($user),
+        ]);
+    }
+
+    public function profileOptions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        $user->loadMissing(['school', 'league', 'club', 'nationalTeam']);
+
+        $filters = $request->validate([
+            'type' => ['required', Rule::in(['school', 'league', 'club', 'national_team', 'age_group'])],
+            'sport' => ['nullable', 'string', 'max:255'],
+            'gender' => ['nullable', Rule::in(['male', 'female'])],
+            'league_id' => ['nullable', 'integer'],
+            'search' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $type = (string) $filters['type'];
+        $search = trim((string) ($filters['search'] ?? ''));
+        $sport = trim((string) ($filters['sport'] ?? $user->sport ?? ''));
+        $gender = $this->normalizeGender($filters['gender'] ?? $user->gender ?? null);
+        $leagueId = $filters['league_id'] ?? $user->league_id;
+        $rows = collect();
+
+        if ($type === 'school') {
+            $rows = School::query()
+                ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', '%' . $search . '%'))
+                ->orderBy('name')
+                ->limit(120)
+                ->get(['id', 'name'])
+                ->map(fn (School $school): array => ['value' => (string) $school->id, 'label' => (string) $school->name]);
+
+            if ($user->school && ! $rows->contains('value', (string) $user->school->id)) {
+                $rows->prepend(['value' => (string) $user->school->id, 'label' => (string) $user->school->name]);
+            }
+        } elseif ($type === 'national_team') {
+            $rows = NationalTeam::query()
+                ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', '%' . $search . '%'))
+                ->orderBy('name')
+                ->limit(120)
+                ->get(['id', 'name'])
+                ->map(fn (NationalTeam $team): array => ['value' => (string) $team->id, 'label' => (string) $team->name]);
+
+            if ($user->nationalTeam && ! $rows->contains('value', (string) $user->nationalTeam->id)) {
+                $rows->prepend(['value' => (string) $user->nationalTeam->id, 'label' => (string) $user->nationalTeam->name]);
+            }
+        } elseif ($type === 'league') {
+            if ($sport !== '' && $gender !== null) {
+                $rows = League::query()
+                    ->where(function (Builder $query) use ($gender): Builder {
+                        return $query
+                            ->whereJsonContains('genders', $gender)
+                            ->orWhere('gender', $gender)
+                            ->orWhere('gender', ucfirst($gender))
+                            ->orWhere('gender', $gender === 'female' ? 'Girls' : 'Boys')
+                            ->orWhere('gender', $gender === 'female' ? 'Female' : 'Male');
+                    })
+                    ->where(function (Builder $query) use ($sport): Builder {
+                        return $query->whereNull('sport')->orWhere('sport', $sport);
+                    })
+                    ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', '%' . $search . '%'))
+                    ->orderBy('name')
+                    ->limit(100)
+                    ->get(['id', 'name'])
+                    ->map(fn (League $league): array => ['value' => (string) $league->id, 'label' => (string) $league->name]);
+            }
+
+            if ($user->league && ! $rows->contains('value', (string) $user->league->id)) {
+                $rows->prepend(['value' => (string) $user->league->id, 'label' => (string) $user->league->name]);
+            }
+        } elseif ($type === 'club') {
+            if ($leagueId) {
+                $rows = Club::query()
+                    ->whereHas('clubLeagues', function (Builder $query) use ($leagueId, $gender, $sport): Builder {
+                        return $query
+                            ->where('league_id', $leagueId)
+                            ->where('is_active', true)
+                            ->when($gender !== null, fn (Builder $query): Builder => $query->whereJsonContains('genders', $gender))
+                            ->when($sport !== '', fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                                return $query->whereNull('sport')->orWhere('sport', $sport);
+                            }));
+                    })
+                    ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'like', '%' . $search . '%'))
+                    ->orderBy('name')
+                    ->limit(100)
+                    ->get(['id', 'name'])
+                    ->map(fn (Club $club): array => ['value' => (string) $club->id, 'label' => (string) $club->name]);
+            }
+
+            if ($user->club && ! $rows->contains('value', (string) $user->club->id)) {
+                $rows->prepend(['value' => (string) $user->club->id, 'label' => (string) $user->club->name]);
+            }
+        } else {
+            $rows = collect(config('plyrcard.age_groups', [
+                'u13' => 'U13', 'u14' => 'U14', 'u15' => 'U15', 'u16' => 'U16',
+                'u17' => 'U17', 'u18' => 'U18', 'u19' => 'U19',
+            ]))->values()->map(fn ($label): array => ['value' => (string) $label, 'label' => (string) $label]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'options' => $rows->unique('value')->values()->all(),
+        ]);
+    }
+
+    public function updateProfile(Request $request, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
@@ -27,6 +150,7 @@ class LockerRoomController extends Controller
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
+            'personal_email' => ['nullable', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
             'street' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
@@ -44,112 +168,191 @@ class LockerRoomController extends Controller
             'height' => ['nullable', 'string', 'max:255'],
             'weight' => ['nullable', 'string', 'max:255'],
             'dominant_foot' => ['nullable', Rule::in(['left', 'right', 'both'])],
-
-            'school_id' => ['nullable', 'integer'],
-            'national_team_id' => ['nullable', 'integer'],
-            'national_team_period' => ['nullable', 'string', 'max:255'],
+            'ncaa_field_id' => ['nullable', 'string', 'max:255'],
+            'max_speed' => ['nullable', 'numeric', 'min:0'],
+            'school_id' => ['nullable', 'integer', Rule::exists('schools', 'id')],
+            'league_id' => ['nullable', 'integer', Rule::exists('leagues', 'id')],
+            'club_id' => ['nullable', 'integer', Rule::exists('clubs', 'id')],
             'team_name' => ['nullable', 'string', 'max:255'],
+            'national_team_id' => ['nullable', 'integer', Rule::exists('national_teams', 'id')],
+            'national_team_period' => ['nullable', 'string', 'max:255'],
+            'pro_club_name' => ['nullable', 'string', 'max:255'],
+            'pro_club_logo' => ['nullable', 'image', 'max:5120'],
 
-            'player_bio' => ['nullable', 'string'],
-            'academic_accolades' => ['nullable', 'string'],
-            'sports_accolades' => ['nullable', 'string'],
+            'player_bio' => ['nullable', 'string', 'max:10000'],
+            'academic_accolades' => ['nullable', 'string', 'max:10000'],
+            'sports_accolades' => ['nullable', 'string', 'max:10000'],
 
             'ig_handle' => ['nullable', 'string', 'max:255'],
             'x_handle' => ['nullable', 'string', 'max:255'],
             'yt_url' => ['nullable', 'url', 'max:2048'],
             'featured_video_url' => ['nullable', 'url', 'max:2048'],
-            'featured_video_urls' => ['nullable', 'string'],
-            'press' => ['nullable', 'string'],
+            'featured_video_urls' => ['nullable', 'string', 'max:10000'],
 
             'parent' => ['nullable', 'string', 'max:255'],
+            'parent_email' => ['nullable', 'email', 'max:255'],
             'parent_phone' => ['nullable', 'string', 'max:255'],
             'sec_parent' => ['nullable', 'string', 'max:255'],
+            'sec_parent_email' => ['nullable', 'email', 'max:255'],
             'sec_parent_phone' => ['nullable', 'string', 'max:255'],
             'club_coach' => ['nullable', 'string', 'max:255'],
+            'club_coach_email' => ['nullable', 'email', 'max:255'],
             'club_coach_phone' => ['nullable', 'string', 'max:255'],
             'natl_coach' => ['nullable', 'string', 'max:255'],
+            'natl_coach_email' => ['nullable', 'email', 'max:255'],
             'natl_coach_phone' => ['nullable', 'string', 'max:255'],
             'tech_trainer' => ['nullable', 'string', 'max:255'],
+            'tech_trainer_email' => ['nullable', 'email', 'max:255'],
             'tech_trainer_phone' => ['nullable', 'string', 'max:255'],
             'snc_trainer' => ['nullable', 'string', 'max:255'],
+            'snc_trainer_email' => ['nullable', 'email', 'max:255'],
             'snc_trainer_phone' => ['nullable', 'string', 'max:255'],
 
-            'plyrcard_image' => ['nullable', 'image', 'max:10240'],
-            'player_image' => ['nullable', 'image', 'max:10240'],
-            'action_image' => ['nullable', 'image', 'max:10240'],
-            'mobile_hero_image' => ['nullable', 'image', 'max:10240'],
-            'youtube_thumbnail' => ['nullable', 'image', 'max:10240'],
-            'national_team_image' => ['nullable', 'image', 'max:10240'],
+            'raw_player_images_existing' => ['nullable', 'array', 'max:20'],
+            'raw_player_images_existing.*' => ['nullable', 'string', 'max:2048'],
+            'raw_player_images_new' => ['nullable', 'array', 'max:20'],
+            'raw_player_images_new.*' => ['image', 'max:5120'],
         ]);
 
-        unset(
-            $data['email'],
-            $data['personal_email'],
-            $data['parent_email'],
-            $data['sec_parent_email'],
-            $data['club_coach_email'],
-            $data['natl_coach_email'],
-            $data['tech_trainer_email'],
-            $data['snc_trainer_email'],
-            $data['password'],
-            $data['roles']
+        $data['position'] = collect($data['position'] ?? [])
+            ->map(fn ($position) => trim((string) $position))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $data['club_league_id'] = $this->resolveClubLeagueId(
+            $data['club_id'] ?? null,
+            $data['league_id'] ?? null,
+            $data['gender'] ?? null,
+            $data['sport'] ?? null,
         );
 
-        if (array_key_exists('position', $data)) {
-            $data['position'] = collect($data['position'] ?? [])
-                ->map(fn ($position) => trim((string) $position))
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
+        if (filled($data['club_id'] ?? null) && filled($data['league_id'] ?? null) && ! $data['club_league_id']) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'club_id' => ['The selected club does not match the selected league, sport, and sex.'],
+            ]);
         }
 
-        foreach (['plyrcard_image', 'player_image', 'action_image', 'mobile_hero_image', 'youtube_thumbnail', 'national_team_image'] as $imageField) {
-            if ($request->hasFile($imageField)) {
-                $data[$imageField] = $request->file($imageField)->store('user-player-images', 'public');
-            } else {
-                unset($data[$imageField]);
+        if (filled($data['team_name'] ?? null)) {
+            $data['team_name'] = strtoupper(trim((string) $data['team_name']));
+        } elseif (blank($data['club_id'] ?? null)) {
+            $data['team_name'] = null;
+        }
+
+        if ($request->hasFile('pro_club_logo')) {
+            $data['pro_club_logo'] = $request->file('pro_club_logo')->store('pro-club-logos', 'public');
+        } else {
+            unset($data['pro_club_logo']);
+        }
+
+        $currentRawImages = collect(is_array($user->raw_player_images) ? $user->raw_player_images : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $keptRawImages = $request->has('raw_player_images_existing')
+            ? collect($data['raw_player_images_existing'] ?? [])
+                ->map(fn ($path): string => trim((string) $path))
+                ->filter(fn (string $path): bool => $currentRawImages->contains($path))
+                ->unique()
+                ->values()
+            : $currentRawImages->values();
+
+        $newRawFiles = collect($request->file('raw_player_images_new', []))->filter();
+        if (($keptRawImages->count() + $newRawFiles->count()) > 20) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'raw_player_images_new' => ['You can keep up to 20 raw player images.'],
+            ]);
+        }
+
+        $removedRawImages = $currentRawImages->diff($keptRawImages);
+        foreach ($removedRawImages as $removedPath) {
+            if (str_starts_with($removedPath, 'user-player-images/raw/')) {
+                Storage::disk('public')->delete($removedPath);
             }
         }
 
-        $user->forceFill($data)->save();
+        foreach ($newRawFiles as $file) {
+            $keptRawImages->push($file->store('user-player-images/raw', 'public'));
+        }
 
-        return $this->success($request, 'Profile saved successfully.', ['user' => $user->fresh()]);
+        $data['raw_player_images'] = $keptRawImages->unique()->values()->all();
+        unset($data['raw_player_images_existing'], $data['raw_player_images_new']);
+
+        if (! $this->hasPremiumAccess($user)) {
+            unset(
+                $data['ig_handle'],
+                $data['x_handle'],
+                $data['yt_url'],
+                $data['featured_video_url'],
+                $data['featured_video_urls']
+            );
+        }
+
+        $user->forceFill($data)->save();
+        $user->refresh();
+
+        return $this->success($request, 'Profile saved.', [
+            'data' => $dataService->snapshot($user),
+        ]);
     }
 
-    public function storeSchedule(Request $request): RedirectResponse|JsonResponse
+    public function storeSchedule(Request $request, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
+        $this->ensureScheduleAccess($user);
 
-        $data = $request->validate([
-            'title' => ['nullable', 'string', 'max:255'],
-            'opponent' => ['required', 'string', 'max:255'],
-            'status' => ['nullable', Rule::in(['upcoming', 'completed', 'cancelled', 'postponed'])],
-            'game_date' => ['required', 'date'],
-            'game_time' => ['nullable'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'venue' => ['nullable', 'string', 'max:255'],
-            'result' => ['nullable', 'string', 'max:255'],
-            'score' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
-            'is_home' => ['nullable', 'boolean'],
-        ]);
-
+        $data = $this->validatedScheduleData($request);
         $data['created_by_user_id'] = $user->id;
-        $data['status'] = $data['status'] ?? 'upcoming';
-        $data['is_home'] = $request->boolean('is_home');
 
         $schedule = Schedule::create($data);
+        $schedule->users()->syncWithoutDetaching([$user->id]);
 
-        if (method_exists($schedule, 'users')) {
-            $schedule->users()->syncWithoutDetaching([$user->id]);
-        }
-
-        return $this->success($request, 'Schedule saved successfully.', ['schedule' => $schedule]);
+        return $this->success($request, 'Schedule added.', [
+            'schedule' => $schedule->fresh(),
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
     }
 
-    public function updateBilling(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
+    public function updateSchedule(Request $request, Schedule $schedule, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+        $this->ensureScheduleAccess($user);
+
+        if ((int) $schedule->created_by_user_id !== (int) $user->id) {
+            return $this->failure($request, 'You can view this team schedule, but only its creator can edit it.', 403);
+        }
+
+        $schedule->fill($this->validatedScheduleData($request))->save();
+
+        return $this->success($request, 'Schedule updated.', [
+            'schedule' => $schedule->fresh(),
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
+    }
+
+    public function deleteSchedule(Request $request, Schedule $schedule, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+        $this->ensureScheduleAccess($user);
+
+        if ((int) $schedule->created_by_user_id !== (int) $user->id) {
+            return $this->failure($request, 'You can view this team schedule, but only its creator can remove it.', 403);
+        }
+
+        $schedule->delete();
+
+        return $this->success($request, 'Schedule removed.', [
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
+    }
+
+    public function updateBilling(Request $request, GoHighLevelService $ghl, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
@@ -165,142 +368,144 @@ class LockerRoomController extends Controller
             'billing_state' => ['required', 'string', 'max:255'],
             'billing_postal_code' => ['required', 'string', 'max:40'],
             'billing_country' => ['required', 'string', 'max:255'],
-            'cardholder_name' => ['nullable', 'string', 'max:255'],
-            'card_last_four' => ['nullable', 'digits:4'],
-            'card_expiration' => ['nullable', 'string', 'max:12'],
-            'payment_type' => ['nullable', Rule::in(['card', 'bank', 'other'])],
         ]);
 
-        $billing = BillingInformation::updateOrCreate(
-            ['user_id' => $user->id],
-            $data
-        );
+        // Card/provider metadata is deliberately not accepted from the browser.
+        // It stays owned by the payment synchronization flow.
+        $billing = BillingInformation::updateOrCreate(['user_id' => $user->id], $data);
 
-        $sync = $ghl->upsertContact($user, [
-            'name' => $data['billing_name'],
-            'email' => $data['billing_email'],
-            'phone' => $data['billing_phone'] ?? $user->phone,
-            'address1' => trim($data['billing_address_1'] . ' ' . ($data['billing_address_2'] ?? '')),
-            'city' => $data['billing_city'],
-            'state' => $data['billing_state'],
-            'postalCode' => $data['billing_postal_code'],
-            'country' => $data['billing_country'],
-            'companyName' => $data['billing_company'] ?? null,
-        ], [], 'PlyrCard Billing Information');
+        try {
+            $sync = $ghl->upsertContact($user, [
+                'name' => $data['billing_name'],
+                'email' => $data['billing_email'],
+                'phone' => $data['billing_phone'] ?? $user->phone,
+                'address1' => trim($data['billing_address_1'] . ' ' . ($data['billing_address_2'] ?? '')),
+                'city' => $data['billing_city'],
+                'state' => $data['billing_state'],
+                'postalCode' => $data['billing_postal_code'],
+                'country' => $data['billing_country'],
+                'companyName' => $data['billing_company'] ?? null,
+            ], [], 'PlyrCard Billing Information');
 
-        $billing->forceFill([
-            'ghl_contact_id' => $sync['contact_id'] ?? $billing->ghl_contact_id,
-            'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
-            'ghl_sync_response' => $sync,
-            'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : $billing->ghl_synced_at,
-        ])->save();
+            $billing->forceFill([
+                'ghl_contact_id' => $sync['contact_id'] ?? $billing->ghl_contact_id,
+                'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
+                'ghl_sync_response' => $sync,
+                'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : $billing->ghl_synced_at,
+            ])->save();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
-        return $this->success($request, 'Billing information saved and synced.', ['billing' => $billing->fresh()]);
+        return $this->success($request, 'Billing information saved.', [
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
     }
 
-    public function updateSettings(Request $request): RedirectResponse|JsonResponse
-    {
-        return $this->success($request, 'Settings are coming soon.');
-    }
-
-    public function updateWebsiteSettings(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
+    public function updateSettings(Request $request, GoHighLevelService $ghl, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
 
-        if (! method_exists($user, 'hasRole') || ! $user->hasRole('My Journey')) {
-            return $this->failure($request, 'Website Settings are only available on the My Journey plan.', 403);
-        }
+        $defaults = [
+            'profile_views' => true,
+            'instagram_clicks' => true,
+            'youtube_clicks' => true,
+            'x_clicks' => true,
+            'email_opens' => true,
+            'coach_replies' => true,
+            'weekly_digest' => false,
+            'product_news' => false,
+        ];
 
         $data = $request->validate([
-            'article_section_type' => ['required', Rule::in(['follow_me', 'calendar'])],
+            'notifications' => ['nullable', 'array'],
+            'notifications.profile_views' => ['nullable', 'boolean'],
+            'notifications.instagram_clicks' => ['nullable', 'boolean'],
+            'notifications.youtube_clicks' => ['nullable', 'boolean'],
+            'notifications.x_clicks' => ['nullable', 'boolean'],
+            'notifications.email_opens' => ['nullable', 'boolean'],
+            'notifications.coach_replies' => ['nullable', 'boolean'],
+            'notifications.weekly_digest' => ['nullable', 'boolean'],
+            'notifications.product_news' => ['nullable', 'boolean'],
+            'article_section_type' => ['nullable', Rule::in(['follow_me', 'calendar'])],
         ]);
 
-        $website = Website::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->latest('updated_at')
-            ->first();
+        $stored = Cache::get('coach-database:notification-settings:' . $user->id, []);
+        $settings = array_merge($defaults, is_array($stored) ? $stored : []);
 
-        if (! $website) {
-            return $this->failure($request, 'No active published website was found yet.', 422);
+        foreach (($data['notifications'] ?? []) as $key => $value) {
+            if (array_key_exists($key, $settings)) {
+                $settings[$key] = (bool) $value;
+            }
         }
 
-        if ($data['article_section_type'] === 'follow_me') {
-            $website->forceFill([
-                'article_section_type' => 'follow_me',
-                'ghl_calendar_id' => null,
-                'ghl_calendar_name' => null,
-                'ghl_calendar_embed_url' => null,
-            ])->save();
+        if (filled($data['article_section_type'] ?? null)) {
+            if (! $this->hasPremiumAccess($user)) {
+                return $this->failure($request, 'Website display controls are available with My Journey.', 403);
+            }
 
-            return $this->success($request, 'Website settings saved. Follow Me form will be shown.', [
-                'website' => $website->fresh(),
-            ]);
+            $website = Website::query()
+                ->where('user_id', $user->id)
+                ->where('is_active', true)
+                ->latest('updated_at')
+                ->first();
+
+            if (! $website) {
+                return $this->failure($request, 'Your PLYRCARD website is still being prepared.', 422);
+            }
+
+            if ($data['article_section_type'] === 'follow_me') {
+                $website->forceFill([
+                    'article_section_type' => 'follow_me',
+                    'ghl_calendar_id' => null,
+                    'ghl_calendar_name' => null,
+                    'ghl_calendar_embed_url' => null,
+                ])->save();
+            } else {
+                $calendarAlreadyReady = $website->article_section_type === 'calendar'
+                    && (filled($website->ghl_calendar_id) || filled($website->ghl_calendar_embed_url));
+
+                if (! $calendarAlreadyReady) {
+                    if (! $this->workspaceReady($user)) {
+                        return $this->failure($request, 'We are still preparing your PLYRCARD. Calendar controls will become available when setup is complete.', 422);
+                    }
+
+                    try {
+                        $sync = $ghl->syncFirstActivePersonalCalendarForWebsite($website);
+                    } catch (\Throwable $exception) {
+                        report($exception);
+                        $sync = ['ok' => false];
+                    }
+
+                    if (! ($sync['ok'] ?? false)) {
+                        return $this->failure($request, 'Your booking calendar is not ready yet. Please try again after your PLYRCARD setup is complete.', 422);
+                    }
+                }
+
+                $website->forceFill(['article_section_type' => 'calendar'])->save();
+            }
         }
 
-        $locationId = $website->ghl_location_id ?: config('services.ghl.location_id');
-        $manualToken = $website->ghl_api_token ?: null;
+        // Commit notification preferences only after any requested PLYRCARD-display
+        // update succeeds, so the response is never a partial save.
+        Cache::put('coach-database:notification-settings:' . $user->id, $settings, now()->addYear());
 
-        if (blank($locationId)) {
-            return $this->failure($request, 'Ask an admin to add the GHL Location ID for this website first.', 422);
-        }
-
-        if (blank($manualToken) && blank(config('services.ghl.token'))) {
-            return $this->failure($request, 'Ask an admin to add the GHL Private Integration Token for this website first.', 422);
-        }
-
-        $sync = $ghl->syncFirstActivePersonalCalendarForWebsite($website);
-
-        if (! ($sync['ok'] ?? false)) {
-            return $this->failure($request, $sync['message'] ?? 'No active personal calendar was found.', 422);
-        }
-
-        $website->forceFill([
-            'article_section_type' => 'calendar',
-        ])->save();
-
-        return $this->success($request, 'Website settings saved. The first active personal calendar was pulled from GHL.', [
-            'website' => $website->fresh(),
-            'calendar' => $sync['calendar'] ?? null,
+        return $this->success($request, 'Settings saved.', [
+            'data' => $dataService->snapshot($user->fresh()),
         ]);
     }
 
-    public function refreshWebsiteCalendar(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
+    /** Backwards-compatible route for older Locker Room forms. */
+    public function updateWebsiteSettings(Request $request, GoHighLevelService $ghl, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
-        $user = Auth::user();
-        abort_unless($user, 403);
+        return $this->updateSettings($request, $ghl, $dataService);
+    }
 
-        if (! method_exists($user, 'hasRole') || ! $user->hasRole('My Journey')) {
-            return $this->failure($request, 'Website Calendar is only available on the My Journey plan.', 403);
-        }
-
-        $website = Website::query()
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->latest('updated_at')
-            ->first();
-
-        if (! $website) {
-            return $this->failure($request, 'No active published website was found yet.', 422);
-        }
-
-        $sync = $ghl->syncFirstActivePersonalCalendarForWebsite($website);
-
-        if (! ($sync['ok'] ?? false)) {
-            return $this->failure($request, $sync['message'] ?? 'No active personal calendar was found.', 422);
-        }
-
-        $website->forceFill([
-            'article_section_type' => 'calendar',
-        ])->save();
-
-        return $this->success($request, 'Calendar refreshed from GHL.', [
-            'website' => $website->fresh(),
-            'calendar' => $sync['calendar'] ?? null,
-        ]);
+    public function refreshWebsiteCalendar(Request $request, GoHighLevelService $ghl, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $request->merge(['article_section_type' => 'calendar']);
+        return $this->updateSettings($request, $ghl, $dataService);
     }
 
     public function updatePasswordFromOverlay(Request $request): RedirectResponse|JsonResponse
@@ -314,8 +519,7 @@ class LockerRoomController extends Controller
 
         $user->forceFill([
             'password' => Hash::make($data['password']),
-            'password_change_required' => false,
-            'password_changed_at' => now(),
+            'must_change_password' => false,
         ])->save();
 
         $request->session()->forget('plyrcard_show_password_overlay');
@@ -340,15 +544,19 @@ class LockerRoomController extends Controller
             'status' => 'open',
         ]);
 
-        $sync = $ghl->upsertContact($user, [], [], 'PlyrCard Support Request');
-        $note = $ghl->addContactNote($sync['contact_id'] ?? null, "Support request: {$data['concern']}\n\n{$data['details']}");
+        try {
+            $sync = $ghl->upsertContact($user, [], [], 'PlyrCard Support Request');
+            $note = $ghl->addContactNote($sync['contact_id'] ?? null, "Support request: {$data['concern']}\n\n{$data['details']}");
 
-        $support->forceFill([
-            'ghl_contact_id' => $sync['contact_id'] ?? null,
-            'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
-            'ghl_sync_response' => ['contact' => $sync, 'note' => $note],
-            'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : null,
-        ])->save();
+            $support->forceFill([
+                'ghl_contact_id' => $sync['contact_id'] ?? null,
+                'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
+                'ghl_sync_response' => ['contact' => $sync, 'note' => $note],
+                'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : null,
+            ])->save();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
         $this->mailSupportCopy(
             $user,
@@ -359,52 +567,76 @@ class LockerRoomController extends Controller
         return $this->success($request, 'Support request submitted.', ['support_request' => $support->fresh()]);
     }
 
-    public function storeReferral(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
-    {
+    public function storeReferral(
+        Request $request,
+        GoHighLevelService $ghl,
+        LockerRoomReferralEmailService $referralEmail,
+    ): RedirectResponse|JsonResponse {
         $user = Auth::user();
         abort_unless($user, 403);
 
         $data = $request->validate([
             'friend_name' => ['required', 'string', 'max:255'],
-            'friend_email' => ['nullable', 'email', 'max:255', 'required_without:friend_phone'],
-            'friend_phone' => ['nullable', 'string', 'max:255', 'required_without:friend_email'],
+            'friend_email' => ['required', 'email', 'max:255'],
             'message' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $referral = LockerRoomReferral::create([
             'user_id' => $user->id,
             'friend_name' => $data['friend_name'],
-            'friend_email' => $data['friend_email'] ?? null,
-            'friend_phone' => $data['friend_phone'] ?? null,
+            'friend_email' => $data['friend_email'],
+            'friend_phone' => null,
             'message' => $data['message'] ?? null,
             'status' => 'new',
         ]);
 
-        $nameParts = preg_split('/\s+/', trim($data['friend_name']), 2);
-        $sync = $ghl->upsertContact($user, [
-            'firstName' => $nameParts[0] ?? $data['friend_name'],
-            'lastName' => $nameParts[1] ?? null,
-            'name' => $data['friend_name'],
-            'email' => $data['friend_email'] ?? null,
-            'phone' => $data['friend_phone'] ?? null,
-        ], [], 'PlyrCard Referral');
+        try {
+            $nameParts = preg_split('/\s+/', trim($data['friend_name']), 2);
+            $sync = $ghl->upsertContact($user, [
+                'firstName' => $nameParts[0] ?? $data['friend_name'],
+                'lastName' => $nameParts[1] ?? null,
+                'name' => $data['friend_name'],
+                'email' => $data['friend_email'],
+            ], [], 'PlyrCard Referral');
 
-        $note = $ghl->addContactNote($sync['contact_id'] ?? null, "Referred by {$user->first_name} {$user->last_name} ({$user->email}).\n\nMessage: " . ($data['message'] ?? '-'));
+            $note = $ghl->addContactNote($sync['contact_id'] ?? null, "Referred by {$user->first_name} {$user->last_name} ({$user->email}).\n\nMessage: " . ($data['message'] ?? '-'));
 
-        $referral->forceFill([
-            'ghl_contact_id' => $sync['contact_id'] ?? null,
-            'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
-            'ghl_sync_response' => ['contact' => $sync, 'note' => $note],
-            'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : null,
-        ])->save();
+            $referral->forceFill([
+                'ghl_contact_id' => $sync['contact_id'] ?? null,
+                'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
+                'ghl_sync_response' => ['contact' => $sync, 'note' => $note],
+                'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : null,
+            ])->save();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
-        $this->mailSupportCopy(
+        $emailResult = $referralEmail->send(
             $user,
-            'New Locker Room referral',
-            "Referral from {$user->first_name} {$user->last_name} ({$user->email})\n\nFriend: {$data['friend_name']}\nEmail: " . ($data['friend_email'] ?? '-') . "\nPhone: " . ($data['friend_phone'] ?? '-') . "\n\nMessage:\n" . ($data['message'] ?? '')
+            (string) $data['friend_name'],
+            (string) $data['friend_email'],
+            $data['message'] ?? null,
         );
 
-        return $this->success($request, 'Referral submitted.', ['referral' => $referral->fresh()]);
+        if (! ($emailResult['success'] ?? false)) {
+            return $this->failure(
+                $request,
+                'The referral was saved, but the invitation email could not be sent. Please try again.',
+                502,
+                [
+                    'referral_saved' => true,
+                    'email_sent' => false,
+                    'email_error' => $emailResult['error'] ?? null,
+                    'referral' => $referral->fresh(),
+                ],
+            );
+        }
+
+        return $this->success($request, 'Invitation email sent to ' . $data['friend_email'] . '.', [
+            'email_sent' => true,
+            'recipient' => $emailResult['recipient'] ?? $data['friend_email'],
+            'referral' => $referral->fresh(),
+        ]);
     }
 
     public function storeAdditionalService(Request $request, GoHighLevelService $ghl): RedirectResponse|JsonResponse
@@ -428,7 +660,6 @@ class LockerRoomController extends Controller
         ]);
 
         $serviceName = $data['service_name'] ?: $services[$data['service_key']];
-
         $serviceRequest = AdditionalServiceRequest::create([
             'user_id' => $user->id,
             'service_key' => $data['service_key'],
@@ -438,23 +669,108 @@ class LockerRoomController extends Controller
             'status' => 'new',
         ]);
 
-        $sync = $ghl->upsertContact($user, [], [], 'PlyrCard Additional Service');
-        $note = $ghl->addContactNote($sync['contact_id'] ?? null, "Additional service request: {$serviceName}\nListed price: " . ($data['listed_price'] ?? '-') . "\n\nNotes: " . ($data['notes'] ?? '-'));
+        try {
+            $sync = $ghl->upsertContact($user, [], [], 'PlyrCard Additional Service');
+            $note = $ghl->addContactNote($sync['contact_id'] ?? null, "Additional service request: {$serviceName}\nListed price: " . ($data['listed_price'] ?? '-') . "\n\nNotes: " . ($data['notes'] ?? '-'));
+            $serviceRequest->forceFill([
+                'ghl_contact_id' => $sync['contact_id'] ?? null,
+                'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
+                'ghl_sync_response' => ['contact' => $sync, 'note' => $note],
+                'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : null,
+            ])->save();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
 
-        $serviceRequest->forceFill([
-            'ghl_contact_id' => $sync['contact_id'] ?? null,
-            'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
-            'ghl_sync_response' => ['contact' => $sync, 'note' => $note],
-            'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : null,
-        ])->save();
+        return $this->success($request, 'Request submitted.', ['additional_service_request' => $serviceRequest->fresh()]);
+    }
 
-        $this->mailSupportCopy(
-            $user,
-            'New Additional Service request',
-            "Additional service request from {$user->first_name} {$user->last_name} ({$user->email})\n\nService: {$serviceName}\nPrice: " . ($data['listed_price'] ?? '-') . "\n\nNotes:\n" . ($data['notes'] ?? '')
-        );
+    protected function normalizeGender(?string $gender): ?string
+    {
+        $gender = strtolower(trim((string) $gender));
 
-        return $this->success($request, 'Additional service request submitted.', ['additional_service_request' => $serviceRequest->fresh()]);
+        return match (true) {
+            str_contains($gender, 'female'), str_contains($gender, 'girl'), str_contains($gender, 'women') => 'female',
+            str_contains($gender, 'male'), str_contains($gender, 'boy'), str_contains($gender, 'men') => 'male',
+            default => filled($gender) ? $gender : null,
+        };
+    }
+
+    protected function resolveClubLeagueId(?int $clubId, ?int $leagueId, ?string $gender, ?string $sport = null): ?int
+    {
+        if (! $clubId || ! $leagueId) {
+            return null;
+        }
+
+        $gender = $this->normalizeGender($gender);
+
+        return ClubLeague::query()
+            ->where('club_id', $clubId)
+            ->where('league_id', $leagueId)
+            ->where('is_active', true)
+            ->when($gender !== null, fn (Builder $query): Builder => $query->whereJsonContains('genders', $gender))
+            ->when(filled($sport), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($sport): Builder {
+                return $query->whereNull('sport')->orWhere('sport', $sport);
+            }))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->value('id');
+    }
+
+    protected function validatedScheduleData(Request $request): array
+    {
+        $data = $request->validate([
+            'title' => ['nullable', 'string', 'max:255'],
+            'opponent' => ['required', 'string', 'max:255'],
+            'status' => ['nullable', Rule::in(['upcoming', 'completed', 'cancelled', 'postponed'])],
+            'game_date' => ['required', 'date'],
+            'game_time' => ['nullable', 'date_format:H:i'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'venue' => ['nullable', 'string', 'max:255'],
+            'result' => ['nullable', 'string', 'max:255'],
+            'score' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'is_home' => ['nullable', 'boolean'],
+        ]);
+
+        $data['status'] = $data['status'] ?? 'upcoming';
+        $data['is_home'] = $request->boolean('is_home');
+
+        return $data;
+    }
+
+    protected function ensureScheduleAccess($user): void
+    {
+        if (! $this->hasPremiumAccess($user)) {
+            abort(403, 'Schedule is available with My Journey.');
+        }
+    }
+
+    protected function hasPremiumAccess($user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        try {
+            if (method_exists($user, 'hasRole') && ($user->hasRole('My Journey') || $user->hasRole('Amplify'))) {
+                return true;
+            }
+        } catch (\Throwable) {
+        }
+
+        $plan = strtolower(trim((string) optional($user->billingInformation)->plan_key));
+        return in_array($plan, ['my-journey', 'my_journey', 'amplify'], true);
+    }
+
+    protected function workspaceReady($user): bool
+    {
+        $apiKey = trim((string) ($user->getRawOriginal('ghl_api_key') ?? ''));
+        $locationId = trim((string) ($user->getRawOriginal('ghl_location_id') ?? ''));
+        $missing = ['', 'null', 'none', 'pending', 'not set', 'n/a'];
+
+        return ! in_array(strtolower($apiKey), $missing, true)
+            && ! in_array(strtolower($locationId), $missing, true);
     }
 
     private function mailSupportCopy($user, string $subject, string $body): void
