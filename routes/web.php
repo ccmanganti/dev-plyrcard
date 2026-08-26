@@ -394,6 +394,12 @@ Route::middleware(['web'])
 |--------------------------------------------------------------------------
 */
 
+Route::middleware(['auth', 'signed'])
+    ->get('/billing/payment-method/return', function () {
+        return redirect('/admin/billing?payment_method=updated');
+    })
+    ->name('billing.payment-method.return');
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/locker-room/data', [LockerRoomController::class, 'data'])
         ->name('locker-room.data');

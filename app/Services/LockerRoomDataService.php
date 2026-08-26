@@ -902,6 +902,8 @@ class LockerRoomDataService
             'last_transaction_amount_cents' => (int) ($transaction?->amount_cents ?? 0),
             'last_transaction_paid_at' => optional($transaction?->paid_at ?: $transaction?->ghl_created_at)->toIso8601String(),
             'payment_synced_at' => optional($billing?->payment_synced_at ?: $transaction?->synced_at)->toIso8601String(),
+            'payment_method_update_url' => app(BillingProfileService::class)->paymentMethodUpdateUrl($user, $billing),
+            'admin_billing_url' => url('/admin/billing'),
         ];
     }
 

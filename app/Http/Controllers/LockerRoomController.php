@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdditionalServiceRequest;
-use App\Models\BillingInformation;
 use App\Models\Club;
 use App\Models\ClubLeague;
 use App\Models\League;
@@ -13,6 +12,7 @@ use App\Models\NationalTeam;
 use App\Models\Schedule;
 use App\Models\School;
 use App\Models\Website;
+use App\Services\BillingProfileService;
 use App\Services\GoHighLevelService;
 use App\Services\LockerRoomDataService;
 use App\Services\LockerRoomReferralEmailService;
@@ -388,52 +388,16 @@ class LockerRoomController extends Controller
         ]);
     }
 
-    public function updateBilling(Request $request, GoHighLevelService $ghl, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    public function updateBilling(Request $request, BillingProfileService $billingService, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
 
-        $data = $request->validate([
-            'billing_name' => ['required', 'string', 'max:255'],
-            'billing_email' => ['required', 'email', 'max:255'],
-            'billing_phone' => ['nullable', 'string', 'max:255'],
-            'billing_company' => ['nullable', 'string', 'max:255'],
-            'billing_address_1' => ['required', 'string', 'max:255'],
-            'billing_address_2' => ['nullable', 'string', 'max:255'],
-            'billing_city' => ['required', 'string', 'max:255'],
-            'billing_state' => ['required', 'string', 'max:255'],
-            'billing_postal_code' => ['required', 'string', 'max:40'],
-            'billing_country' => ['required', 'string', 'max:255'],
-        ]);
+        // Admin Billing and Locker Room both use BillingProfileService so there is
+        // one authoritative validation, persistence, and external sync path.
+        $billingService->update($user, $request->all());
 
-        // Card/provider metadata is deliberately not accepted from the browser.
-        // It stays owned by the payment synchronization flow.
-        $billing = BillingInformation::updateOrCreate(['user_id' => $user->id], $data);
-
-        try {
-            $sync = $ghl->upsertContact($user, [
-                'name' => $data['billing_name'],
-                'email' => $data['billing_email'],
-                'phone' => $data['billing_phone'] ?? $user->phone,
-                'address1' => trim($data['billing_address_1'] . ' ' . ($data['billing_address_2'] ?? '')),
-                'city' => $data['billing_city'],
-                'state' => $data['billing_state'],
-                'postalCode' => $data['billing_postal_code'],
-                'country' => $data['billing_country'],
-                'companyName' => $data['billing_company'] ?? null,
-            ], [], 'PlyrCard Billing Information');
-
-            $billing->forceFill([
-                'ghl_contact_id' => $sync['contact_id'] ?? $billing->ghl_contact_id,
-                'ghl_sync_status' => ($sync['ok'] ?? false) ? 'synced' : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
-                'ghl_sync_response' => $sync,
-                'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : $billing->ghl_synced_at,
-            ])->save();
-        } catch (\Throwable $exception) {
-            report($exception);
-        }
-
-        return $this->success($request, 'Billing information saved.', [
+        return $this->success($request, 'Billing information updated.', [
             'data' => $dataService->snapshot($user->fresh()),
         ]);
     }
