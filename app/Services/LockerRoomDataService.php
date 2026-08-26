@@ -277,6 +277,14 @@ class LockerRoomDataService
             $remoteStats['social_clicks'] ?? 0
         );
 
+        // Match the Coach Database dashboard's Favorites card.
+        // This is a local PLYRCARD relationship, so no external request is needed.
+        try {
+            $favorites = (int) $user->favoriteSchoolRecords()->count();
+        } catch (\Throwable) {
+            $favorites = 0;
+        }
+
         $schoolsEngaged = $number(
             $tracking['schools_with_clicks'] ?? 0,
             $tracking['schools_with_profile_views'] ?? 0,
@@ -300,6 +308,7 @@ class LockerRoomDataService
             'profile_completion' => $this->profileCompletion($user),
             'stats' => [
                 'profile_views' => $profileViews,
+                'favorites' => $favorites,
                 'emails_sent' => $emailsSent,
                 'email_clicks' => $number(
                     $tracking['email_click_count'] ?? 0,
