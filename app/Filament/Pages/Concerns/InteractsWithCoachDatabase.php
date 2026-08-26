@@ -4419,6 +4419,30 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     }
 
 
+    public function favoriteSelectedConversationSchool(): void
+    {
+        $coach = $this->selectedConversationCoachRow();
+        $conversation = $this->selectedConversationRow();
+        $schoolId = trim((string) ($coach['school_id'] ?? $coach['business_id'] ?? $coach['ghl_business_id'] ?? $conversation['business_id'] ?? $conversation['company_id'] ?? ''));
+        $schoolName = trim((string) ($coach['school'] ?? $coach['company_name'] ?? $conversation['school'] ?? $conversation['company_name'] ?? ''));
+
+        if ($schoolId === '' && $schoolName !== '') {
+            $school = collect($this->allSchools())->first(function (array $row) use ($schoolName): bool {
+                return strcasecmp(trim((string) ($row['name'] ?? '')), $schoolName) === 0;
+            });
+            $schoolId = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['name'] ?? ''));
+        }
+
+        if ($schoolId === '') {
+            Notification::make()->title('Recruiting Center')->body('No matched school found to add to favorites.')->warning()->send();
+            return;
+        }
+
+        $this->favoriteSchoolById($schoolId);
+        Notification::make()->title('Recruiting Center')->body('School added to Favorites.')->success()->send();
+    }
+
+
 
     public function schoolCommunicationHistoryForClient(string $schoolId): array
     {

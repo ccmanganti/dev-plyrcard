@@ -2146,8 +2146,8 @@ discoverSelectedIds: [],
         .rc-contact-lines-v56 { display:grid; gap:.55rem; margin:1.05rem 0; }
         .rc-contact-line-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.5rem; align-items:center; color:var(--rc-text); font-size:.78rem; }
         .rc-contact-line-v56 svg { color:var(--rc-muted); width:1rem; height:1rem; }
-        .rc-profile-actions-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.55rem; margin:1rem 0; }
-        .rc-profile-action-v56 { min-height:3.55rem; border:1px solid var(--rc-border); border-radius:.8rem; background:var(--rc-surface); color:var(--rc-text); display:grid; place-items:center; gap:.25rem; font-size:.78rem; font-weight:700; cursor:pointer; }
+        .rc-profile-actions-v56 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin:1rem 0; }
+        .rc-profile-action-v56 { min-height:3.25rem; border:1px solid var(--rc-border); border-radius:.8rem; background:var(--rc-surface); color:var(--rc-text); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.22rem; padding:.45rem .25rem; font-size:.7rem; line-height:1.1; font-weight:700; cursor:pointer; min-width:0; text-align:center; }
         .rc-profile-action-v56:hover { border-color:#ff6338; color:#ff6338; }
         .rc-about-grid-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
         .rc-about-item-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.45rem; color:var(--rc-muted); font-size:.72rem; }
@@ -10845,10 +10845,20 @@ CSS;
                                     <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div> -->
                                 </div>
 
-                                <!-- <div class="rc-profile-actions-v56">
-                                    <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>View School</span></button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Add to List</span></button>
-                                </div> -->
+                                <div class="rc-profile-actions-v56">
+                                    <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool" wire:loading.attr="disabled" wire:target="viewSelectedConversationSchool" title="View school">
+                                        <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                        <span>View School</span>
+                                    </button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList" wire:loading.attr="disabled" wire:target="addSelectedConversationSchoolToList" title="Add school to list">
+                                        <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                        <span>Add to List</span>
+                                    </button>
+                                    <button type="button" class="rc-profile-action-v56" wire:click="favoriteSelectedConversationSchool" wire:loading.attr="disabled" wire:target="favoriteSelectedConversationSchool" title="Add school to favorites">
+                                        <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                        <span>Favorite</span>
+                                    </button>
+                                </div>
 
                                 <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>
                                 <div class="rc-about-grid-v56">
