@@ -405,7 +405,7 @@ Route::middleware(['auth', 'signed'])
             }
         }
 
-        return redirect('/admin/billing?payment_method=updated');
+        return redirect('/admin/coach-database/settings?payment_method=updated#billing-payments');
     })
     ->name('billing.payment-method.return');
 

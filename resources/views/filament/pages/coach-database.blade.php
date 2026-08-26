@@ -11039,6 +11039,74 @@ CSS;
                         </div>
                     @endforeach
                 </div>
+
+                @php
+                    $settingsBillingService = app(\App\Services\BillingProfileService::class);
+                    $settingsBilling = $settingsBillingService->get(auth()->user());
+                    $settingsPaymentUpdateUrl = $settingsBillingService->paymentMethodUpdateUrl(auth()->user(), $settingsBilling);
+                    $settingsBillingConnected = filled($settingsBilling->ghl_contact_id);
+                    $settingsBrand = strtoupper((string) ($settingsBilling->payment_brand ?: 'CARD'));
+                @endphp
+
+                <div class="rc-settings-card-v72" id="billing-payments">
+                    <div class="rc-settings-head-v72">
+                        <div class="rc-settings-icon-v72">💳</div>
+                        <div>
+                            <h2 style="margin:0;">Billing &amp; Payments</h2>
+                            <p style="margin:.2rem 0 0;color:var(--rc-muted);">Manage the billing contact, address, subscription, and saved payment method used for your PLYRCARD account.</p>
+                        </div>
+                    </div>
+
+                    @if(session('success'))
+                        <div style="margin:0 0 1rem;padding:.7rem .8rem;border:1px solid rgba(16,185,129,.3);border-radius:.7rem;background:rgba(16,185,129,.08);color:#047857;font-size:.82rem;font-weight:650;">{{ session('success') }}</div>
+                    @endif
+                    @if($errors->has('locker_room'))
+                        <div style="margin:0 0 1rem;padding:.7rem .8rem;border:1px solid rgba(239,68,68,.3);border-radius:.7rem;background:rgba(239,68,68,.08);color:#b91c1c;font-size:.82rem;font-weight:650;">{{ $errors->first('locker_room') }}</div>
+                    @endif
+
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem;margin-bottom:1rem;">
+                        <div class="rc-card is-flat"><div class="rc-subtle">Billing account</div><strong>{{ $settingsBillingConnected ? 'Connected' : 'Not connected yet' }}</strong></div>
+                        <div class="rc-card is-flat"><div class="rc-subtle">Plan</div><strong>{{ str($settingsBilling->plan_key ?: 'free')->replace('-', ' ')->title() }}</strong></div>
+                        <div class="rc-card is-flat"><div class="rc-subtle">Subscription</div><strong>{{ str($settingsBilling->subscription_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
+                        <div class="rc-card is-flat"><div class="rc-subtle">Payment</div><strong>{{ str($settingsBilling->payment_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
+                    </div>
+
+                    <div class="rc-row" style="align-items:flex-start;">
+                        <div>
+                            <div class="rc-row-title">Payment Method</div>
+                            @if($settingsBilling->card_last_four)
+                                <p class="rc-subtle" style="margin:.25rem 0 0;">{{ $settingsBrand }} ending in {{ $settingsBilling->card_last_four }}{{ $settingsBilling->card_expiration ? ' · Expires '.$settingsBilling->card_expiration : '' }}</p>
+                            @else
+                                <p class="rc-subtle" style="margin:.25rem 0 0;">No saved payment method is available yet.</p>
+                            @endif
+                        </div>
+                        @if($settingsPaymentUpdateUrl)
+                            <a class="rc-btn rc-btn-primary" href="{{ $settingsPaymentUpdateUrl }}">{{ $settingsBilling->card_last_four ? 'Update Card' : 'Add Payment Method' }}</a>
+                        @endif
+                    </div>
+
+                    <form method="POST" action="{{ route('locker-room.billing.update') }}" style="margin-top:1rem;">
+                        @csrf
+                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;">
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Name<input class="rc-input" style="width:100%;" name="billing_name" value="{{ old('billing_name', $settingsBilling->billing_name) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Email<input class="rc-input" style="width:100%;" type="email" name="billing_email" value="{{ old('billing_email', $settingsBilling->billing_email) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Phone<input class="rc-input" style="width:100%;" name="billing_phone" value="{{ old('billing_phone', $settingsBilling->billing_phone) }}"></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Company / Organization<input class="rc-input" style="width:100%;" name="billing_company" value="{{ old('billing_company', $settingsBilling->billing_company) }}"></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 1<input class="rc-input" style="width:100%;" name="billing_address_1" value="{{ old('billing_address_1', $settingsBilling->billing_address_1) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 2<input class="rc-input" style="width:100%;" name="billing_address_2" value="{{ old('billing_address_2', $settingsBilling->billing_address_2) }}"></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">City<input class="rc-input" style="width:100%;" name="billing_city" value="{{ old('billing_city', $settingsBilling->billing_city) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">State / Province<input class="rc-input" style="width:100%;" name="billing_state" value="{{ old('billing_state', $settingsBilling->billing_state) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Postal Code<input class="rc-input" style="width:100%;" name="billing_postal_code" value="{{ old('billing_postal_code', $settingsBilling->billing_postal_code) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Country<input class="rc-input" style="width:100%;" name="billing_country" value="{{ old('billing_country', $settingsBilling->billing_country ?: 'US') }}" required></label>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-top:1rem;">
+                            <button class="rc-btn rc-btn-primary" type="submit">Save Billing Information</button>
+                            @if(!$settingsBillingConnected)
+                                <span class="rc-subtle">Saving will automatically connect this billing profile to your PLYRCARD billing account.</span>
+                            @endif
+                        </div>
+                    </form>
+                </div>
             </div>
         @endif
 

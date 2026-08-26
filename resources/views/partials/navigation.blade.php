@@ -1,3 +1,11 @@
+@php
+    // v10.43: the public website navigation/Locker Room UI must never render
+    // inside Filament/admin. This guard wraps the entire partial, including its
+    // assets, styles, header markup, pull-up control, and scripts.
+    $plyrSuppressPublicNavigation = request()->is('admin') || request()->is('admin/*');
+@endphp
+
+@if (! $plyrSuppressPublicNavigation)
   @once
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2715,3 +2723,5 @@
 
 
   @include("partials.locker-room")
+
+@endif

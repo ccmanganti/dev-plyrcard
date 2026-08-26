@@ -21,6 +21,10 @@ class Billing extends Page
     protected static string|UnitEnum|null $navigationGroup = 'Account';
     protected static ?int $navigationSort = 95;
 
+    // Billing lives inside Recruiting Center > Settings. Keep this page only as
+    // a backwards-compatible internal route; do not register a second Settings item.
+    protected static bool $shouldRegisterNavigation = false;
+
     public ?string $billing_name = null;
     public ?string $billing_email = null;
     public ?string $billing_phone = null;
