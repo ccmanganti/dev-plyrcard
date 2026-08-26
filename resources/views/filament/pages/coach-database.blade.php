@@ -1,3 +1,10 @@
+@php
+    // v10.55: compute the canonical drawer catalog before Alpine serializes it.
+    $globalSchoolDrawerCatalog = in_array($section, ['dashboard', 'schools', 'favorites', 'lists'], true)
+        ? $this->discoverClientSchools
+        : [];
+@endphp
+
 <x-filament-panels::page>
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
@@ -26,6 +33,255 @@
             },
             closeFreeGate() {
                 this.freeGateOpen = false;
+            },
+discoverSelectedIds: [],
+            discoverSearch: '',
+            discoverDivision: '',
+            discoverConference: '',
+            discoverAvailableConferences: [],
+            discoverViewMode: 'grid',
+            discoverClientCount: 0,
+            discoverClientShown: 24,
+            discoverListsOpen: false,
+            discoverDrawerTab: 'coaches',
+            discoverSchoolComms: [],
+            discoverSchoolCommsLoading: false,
+            discoverSchoolCommsLoadedFor: '',
+            dashboardDetail: @js(in_array($section, ['profile-views', 'coach-engagement'], true) ? $section : ''),
+            discoverLists: @js(collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values()->all()),
+            discoverBulkNotice: '',
+            discoverBulkNoticeTimer: null,
+            discoverNewBulkListName: '',
+            discoverNewDrawerListName: '',
+            discoverCreatingList: false,
+            optimisticSchool: window.__plyrSchoolDrawerOptimistic || null,
+            globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
+            normalizeGlobalSchoolName(value) {
+                return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            },
+            applyGlobalSchoolState(detail) {
+                if (!detail) return;
+                const id = String(detail.id ?? '').trim();
+                const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : []).find(item => String(item?.id ?? '').trim() === id);
+                if (row) {
+                    if (Object.prototype.hasOwnProperty.call(detail, 'is_favorite')) row.is_favorite = !!detail.is_favorite;
+                    if (Array.isArray(detail.list_keys)) row.list_keys = [...detail.list_keys];
+                }
+            },
+            openGlobalSchool(reference) {
+                const source = (reference && typeof reference === 'object') ? reference : { id: reference };
+                const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
+                const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
+                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+                const local = rows.find(row => {
+                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
+                        .map(value => String(value ?? '').trim())
+                        .filter(Boolean);
+                    if (sourceId && ids.includes(sourceId)) return true;
+                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
+                    return !!sourceName && rowName === sourceName;
+                }) || null;
+
+                if (!local && (!source || typeof source !== 'object')) return;
+
+                const merged = { ...(local || {}), ...(source || {}) };
+                if (local) {
+                    // Canonical local values must win for all interactive identity/state.
+                    merged.id = local.id;
+                    merged.school_id = local.school_id ?? local.id;
+                    merged.name = local.name ?? merged.name;
+                    merged.logo_url = local.logo_url || merged.logo_url || '';
+                    merged.city = local.city ?? merged.city;
+                    merged.state = local.state ?? merged.state;
+                    merged.division = local.division ?? merged.division;
+                    merged.conference = local.conference ?? merged.conference;
+                    merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
+                    merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coach_count ?? merged.coaches.length ?? 0);
+                    merged.is_favorite = !!local.is_favorite;
+                    merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+                }
+
+                window.__plyrSchoolDrawerOptimistic = merged;
+                this.optimisticSchool = merged;
+                this.discoverDrawerTab = 'coaches';
+                this.discoverSchoolComms = [];
+                this.discoverSchoolCommsLoading = false;
+                this.discoverSchoolCommsLoadedFor = '';
+                this.discoverListsOpen = false;
+                this.discoverNewDrawerListName = '';
+            },
+            async loadDiscoverCommunications(force = false) {
+                const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                if (!id || this.discoverSchoolCommsLoading) return;
+                if (!force && this.discoverSchoolCommsLoadedFor === id && this.discoverSchoolComms.length > 0) return;
+
+                this.discoverSchoolCommsLoading = true;
+                try {
+                    const rows = await this.$wire.call('schoolCommunicationHistoryForClient', id);
+                    // Ignore a late response if the user already opened a different school.
+                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (currentId !== id) return;
+                    this.discoverSchoolComms = Array.isArray(rows) ? rows : [];
+                    this.discoverSchoolCommsLoadedFor = id;
+                } catch (error) {
+                    console.error('Unable to load school communication history.', error);
+                    this.discoverSchoolComms = [];
+                } finally {
+                    this.discoverSchoolCommsLoading = false;
+                }
+            },
+            discoverListKey(list) {
+                return String(list?.key || list?.slug || list?.id || '').trim();
+            },
+            discoverListLabel(list) {
+                return String(list?.label || list?.name || this.discoverListKey(list) || 'List');
+            },
+            discoverListColor(list) {
+                return String(list?.color || '#ff6338');
+            },
+            discoverListCount(list) {
+                return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0);
+            },
+            setDiscoverListCount(key, count) {
+                key = String(key || '').toLowerCase();
+                const item = this.discoverLists.find(list => this.discoverListKey(list).toLowerCase() === key);
+                if (item) item.schools_count = Math.max(0, Number(count || 0));
+            },
+            showDiscoverBulkNotice(message) {
+                this.discoverBulkNotice = String(message || '');
+                if (this.discoverBulkNoticeTimer) window.clearTimeout(this.discoverBulkNoticeTimer);
+                this.discoverBulkNoticeTimer = window.setTimeout(() => { this.discoverBulkNotice = ''; }, 3200);
+            },
+            async addSelectedSchoolsToDiscoverList(list) {
+                const ids = [...this.discoverSelectedIds].map(String).filter(Boolean);
+                const key = this.discoverListKey(list);
+                if (!ids.length || !key) return;
+                const label = this.discoverListLabel(list);
+                const previousCount = this.discoverListCount(list);
+                this.setDiscoverListCount(key, previousCount + ids.length);
+                this.showDiscoverBulkNotice(`Adding ${ids.length} school${ids.length === 1 ? '' : 's'} to ${label}...`);
+                try {
+                    const result = await this.$wire.call('queueSchoolIdsToList', ids, key);
+                    if (!result || result.success === false) {
+                        this.setDiscoverListCount(key, previousCount);
+                        this.showDiscoverBulkNotice(result?.error || `Unable to add schools to ${label}.`);
+                        return;
+                    }
+                    const added = Number(result.updated_schools ?? result.school_count ?? ids.length);
+                    const listCount = Number(result.list_count ?? (previousCount + added));
+                    this.setDiscoverListCount(key, listCount);
+                    this.showDiscoverBulkNotice(added > 0
+                        ? `Added ${added} school${added === 1 ? '' : 's'} to ${label}.`
+                        : `Selected school${ids.length === 1 ? ' is' : 's are'} already in ${label}.`);
+                    this.discoverSelectedIds = [];
+                    window.dispatchEvent(new CustomEvent('rc-discover-clear-selection'));
+                } catch (error) {
+                    this.setDiscoverListCount(key, previousCount);
+                    this.showDiscoverBulkNotice(`Unable to add schools to ${label}.`);
+                }
+            },
+            async createDiscoverBulkList() {
+                const name = String(this.discoverNewBulkListName || '').trim();
+                if (!name || this.discoverCreatingList) return;
+                this.discoverCreatingList = true;
+                try {
+                    const result = await this.$wire.call('createCustomListQuick', name, '#ff6338');
+                    if (!result || result.success === false || !result.list) {
+                        this.showDiscoverBulkNotice(result?.error || 'Unable to create the list.');
+                        return;
+                    }
+                    const list = result.list;
+                    const key = this.discoverListKey(list);
+                    if (key && !this.discoverLists.some(item => this.discoverListKey(item).toLowerCase() === key.toLowerCase())) {
+                        this.discoverLists.push(list);
+                    }
+                    this.discoverNewBulkListName = '';
+                    await this.addSelectedSchoolsToDiscoverList(list);
+                } finally {
+                    this.discoverCreatingList = false;
+                }
+            },
+            async createDiscoverDrawerList() {
+                const name = String(this.discoverNewDrawerListName || '').trim();
+                if (!name || !this.optimisticSchool || this.discoverCreatingList) return;
+                this.discoverCreatingList = true;
+                try {
+                    const result = await this.$wire.call('createCustomListQuick', name, '#ff6338');
+                    if (!result || result.success === false || !result.list) return;
+                    const list = result.list;
+                    const key = this.discoverListKey(list);
+                    if (key && !this.discoverLists.some(item => this.discoverListKey(item).toLowerCase() === key.toLowerCase())) {
+                        this.discoverLists.push(list);
+                    }
+                    this.discoverNewDrawerListName = '';
+                    if (key && !this.discoverInList(key)) this.toggleDiscoverList(key);
+                } finally {
+                    this.discoverCreatingList = false;
+                }
+            },
+            closeDiscoverSchool() {
+                window.__plyrSchoolDrawerOptimistic = null;
+                this.discoverListsOpen = false;
+                this.discoverDrawerTab = 'coaches';
+                this.optimisticSchool = null;
+                // v110: explicit close event is also consumed by any nested Discover
+                // controller, so a stale Alpine subtree cannot immediately repaint it.
+                window.dispatchEvent(new CustomEvent('rc-discover-drawer-closed'));
+            },
+            favoriteDiscoverSchool() {
+                if (!this.optimisticSchool) return;
+                const previous = !!this.optimisticSchool.is_favorite;
+                const next = !previous;
+                this.optimisticSchool.is_favorite = next;
+                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [] } }));
+                Promise.resolve(this.$wire.call('queueSchoolFavoriteState', String(this.optimisticSchool.id), next))
+                    .then(result => {
+                        if (!result || result.success === false) {
+                            if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
+                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
+                        }
+                    })
+                    .catch(() => {
+                        if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
+                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                    });
+            },
+            toggleDiscoverList(key) {
+                if (!this.optimisticSchool || !key) return;
+                key = String(key).toLowerCase();
+                const previous = Array.isArray(this.optimisticSchool.list_keys) ? [...this.optimisticSchool.list_keys] : [];
+                const has = previous.map(v => String(v).toLowerCase()).includes(key);
+                const list = this.discoverLists.find(item => this.discoverListKey(item).toLowerCase() === key);
+                const previousCount = list ? this.discoverListCount(list) : 0;
+                this.optimisticSchool.list_keys = has
+                    ? previous.filter(v => String(v).toLowerCase() !== key)
+                    : [...previous, key];
+                if (list) this.setDiscoverListCount(key, previousCount + (has ? -1 : 1));
+                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: this.optimisticSchool.list_keys || [] } }));
+                Promise.resolve(this.$wire.call('queueSchoolListMemberships', String(this.optimisticSchool.id), { [key]: !has }))
+                    .then(result => {
+                        if (!result || result.success === false) {
+                            if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
+                            if (list) this.setDiscoverListCount(key, previousCount);
+                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
+                            return;
+                        }
+                        const serverCount = Number(result?.list_counts?.[key]);
+                        if (list && Number.isFinite(serverCount)) this.setDiscoverListCount(key, serverCount);
+                    })
+                    .catch(() => {
+                        if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
+                        if (list) this.setDiscoverListCount(key, previousCount);
+                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
+                    });
+            },
+            discoverInList(key) {
+                const keys = Array.isArray(this.optimisticSchool?.list_keys) ? this.optimisticSchool.list_keys : [];
+                return keys.map(v => String(v).toLowerCase()).includes(String(key || '').toLowerCase());
             }
         }"
         x-on:rc-fast-section.window="$wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
@@ -6337,268 +6593,8 @@
         };
     </script>
 
-    @php
-        // v113: one canonical local school catalog powers the same drawer from
-        // Dashboard, Discover Schools, Favorites, and My Lists. GHL remains a
-        // stats overlay only; drawer identity/roster/membership are local.
-        $globalSchoolDrawerCatalog = in_array($section, ['dashboard', 'schools', 'favorites', 'lists'], true)
-            ? $this->discoverClientSchools
-            : [];
-    @endphp
-
     <div
         class="rc-wrap"
-        x-data="{
-            discoverSelectedIds: [],
-            discoverSearch: '',
-            discoverDivision: '',
-            discoverConference: '',
-            discoverAvailableConferences: [],
-            discoverViewMode: 'grid',
-            discoverClientCount: 0,
-            discoverClientShown: 24,
-            discoverListsOpen: false,
-            discoverDrawerTab: 'coaches',
-            discoverSchoolComms: [],
-            discoverSchoolCommsLoading: false,
-            discoverSchoolCommsLoadedFor: '',
-            dashboardDetail: @js(in_array($section, ['profile-views', 'coach-engagement'], true) ? $section : ''),
-            discoverLists: @js(collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values()->all()),
-            discoverBulkNotice: '',
-            discoverBulkNoticeTimer: null,
-            discoverNewBulkListName: '',
-            discoverNewDrawerListName: '',
-            discoverCreatingList: false,
-            optimisticSchool: window.__plyrSchoolDrawerOptimistic || null,
-            globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
-            normalizeGlobalSchoolName(value) {
-                return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-            },
-            applyGlobalSchoolState(detail) {
-                if (!detail) return;
-                const id = String(detail.id ?? '').trim();
-                const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : []).find(item => String(item?.id ?? '').trim() === id);
-                if (row) {
-                    if (Object.prototype.hasOwnProperty.call(detail, 'is_favorite')) row.is_favorite = !!detail.is_favorite;
-                    if (Array.isArray(detail.list_keys)) row.list_keys = [...detail.list_keys];
-                }
-            },
-            openGlobalSchool(reference) {
-                const source = (reference && typeof reference === 'object') ? reference : { id: reference };
-                const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
-                const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
-                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
-                const local = rows.find(row => {
-                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
-                        .map(value => String(value ?? '').trim())
-                        .filter(Boolean);
-                    if (sourceId && ids.includes(sourceId)) return true;
-                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
-                    return !!sourceName && rowName === sourceName;
-                }) || null;
-
-                if (!local && (!source || typeof source !== 'object')) return;
-
-                const merged = { ...(local || {}), ...(source || {}) };
-                if (local) {
-                    // Canonical local values must win for all interactive identity/state.
-                    merged.id = local.id;
-                    merged.school_id = local.school_id ?? local.id;
-                    merged.name = local.name ?? merged.name;
-                    merged.logo_url = local.logo_url || merged.logo_url || '';
-                    merged.city = local.city ?? merged.city;
-                    merged.state = local.state ?? merged.state;
-                    merged.division = local.division ?? merged.division;
-                    merged.conference = local.conference ?? merged.conference;
-                    merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
-                    merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coach_count ?? merged.coaches.length ?? 0);
-                    merged.is_favorite = !!local.is_favorite;
-                    merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
-                }
-
-                window.__plyrSchoolDrawerOptimistic = merged;
-                this.optimisticSchool = merged;
-                this.discoverDrawerTab = 'coaches';
-                this.discoverSchoolComms = [];
-                this.discoverSchoolCommsLoading = false;
-                this.discoverSchoolCommsLoadedFor = '';
-                this.discoverListsOpen = false;
-                this.discoverNewDrawerListName = '';
-            },
-            async loadDiscoverCommunications() {
-                const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                if (!id || this.discoverSchoolCommsLoading) return;
-                if (this.discoverSchoolCommsLoadedFor === id) return;
-
-                this.discoverSchoolCommsLoading = true;
-                try {
-                    const rows = await this.$wire.call('schoolCommunicationHistoryForClient', id);
-                    // Ignore a late response if the user already opened a different school.
-                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                    if (currentId !== id) return;
-                    this.discoverSchoolComms = Array.isArray(rows) ? rows : [];
-                    this.discoverSchoolCommsLoadedFor = id;
-                } catch (error) {
-                    console.error('Unable to load school communication history.', error);
-                    this.discoverSchoolComms = [];
-                } finally {
-                    this.discoverSchoolCommsLoading = false;
-                }
-            },
-            discoverListKey(list) {
-                return String(list?.key || list?.slug || list?.id || '').trim();
-            },
-            discoverListLabel(list) {
-                return String(list?.label || list?.name || this.discoverListKey(list) || 'List');
-            },
-            discoverListColor(list) {
-                return String(list?.color || '#ff6338');
-            },
-            discoverListCount(list) {
-                return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0);
-            },
-            setDiscoverListCount(key, count) {
-                key = String(key || '').toLowerCase();
-                const item = this.discoverLists.find(list => this.discoverListKey(list).toLowerCase() === key);
-                if (item) item.schools_count = Math.max(0, Number(count || 0));
-            },
-            showDiscoverBulkNotice(message) {
-                this.discoverBulkNotice = String(message || '');
-                if (this.discoverBulkNoticeTimer) window.clearTimeout(this.discoverBulkNoticeTimer);
-                this.discoverBulkNoticeTimer = window.setTimeout(() => { this.discoverBulkNotice = ''; }, 3200);
-            },
-            async addSelectedSchoolsToDiscoverList(list) {
-                const ids = [...this.discoverSelectedIds].map(String).filter(Boolean);
-                const key = this.discoverListKey(list);
-                if (!ids.length || !key) return;
-                const label = this.discoverListLabel(list);
-                const previousCount = this.discoverListCount(list);
-                this.setDiscoverListCount(key, previousCount + ids.length);
-                this.showDiscoverBulkNotice(`Adding ${ids.length} school${ids.length === 1 ? '' : 's'} to ${label}...`);
-                try {
-                    const result = await this.$wire.call('queueSchoolIdsToList', ids, key);
-                    if (!result || result.success === false) {
-                        this.setDiscoverListCount(key, previousCount);
-                        this.showDiscoverBulkNotice(result?.error || `Unable to add schools to ${label}.`);
-                        return;
-                    }
-                    const added = Number(result.updated_schools ?? result.school_count ?? ids.length);
-                    const listCount = Number(result.list_count ?? (previousCount + added));
-                    this.setDiscoverListCount(key, listCount);
-                    this.showDiscoverBulkNotice(added > 0
-                        ? `Added ${added} school${added === 1 ? '' : 's'} to ${label}.`
-                        : `Selected school${ids.length === 1 ? ' is' : 's are'} already in ${label}.`);
-                    this.discoverSelectedIds = [];
-                    window.dispatchEvent(new CustomEvent('rc-discover-clear-selection'));
-                } catch (error) {
-                    this.setDiscoverListCount(key, previousCount);
-                    this.showDiscoverBulkNotice(`Unable to add schools to ${label}.`);
-                }
-            },
-            async createDiscoverBulkList() {
-                const name = String(this.discoverNewBulkListName || '').trim();
-                if (!name || this.discoverCreatingList) return;
-                this.discoverCreatingList = true;
-                try {
-                    const result = await this.$wire.call('createCustomListQuick', name, '#ff6338');
-                    if (!result || result.success === false || !result.list) {
-                        this.showDiscoverBulkNotice(result?.error || 'Unable to create the list.');
-                        return;
-                    }
-                    const list = result.list;
-                    const key = this.discoverListKey(list);
-                    if (key && !this.discoverLists.some(item => this.discoverListKey(item).toLowerCase() === key.toLowerCase())) {
-                        this.discoverLists.push(list);
-                    }
-                    this.discoverNewBulkListName = '';
-                    await this.addSelectedSchoolsToDiscoverList(list);
-                } finally {
-                    this.discoverCreatingList = false;
-                }
-            },
-            async createDiscoverDrawerList() {
-                const name = String(this.discoverNewDrawerListName || '').trim();
-                if (!name || !this.optimisticSchool || this.discoverCreatingList) return;
-                this.discoverCreatingList = true;
-                try {
-                    const result = await this.$wire.call('createCustomListQuick', name, '#ff6338');
-                    if (!result || result.success === false || !result.list) return;
-                    const list = result.list;
-                    const key = this.discoverListKey(list);
-                    if (key && !this.discoverLists.some(item => this.discoverListKey(item).toLowerCase() === key.toLowerCase())) {
-                        this.discoverLists.push(list);
-                    }
-                    this.discoverNewDrawerListName = '';
-                    if (key && !this.discoverInList(key)) this.toggleDiscoverList(key);
-                } finally {
-                    this.discoverCreatingList = false;
-                }
-            },
-            closeDiscoverSchool() {
-                window.__plyrSchoolDrawerOptimistic = null;
-                this.discoverListsOpen = false;
-                this.discoverDrawerTab = 'coaches';
-                this.optimisticSchool = null;
-                // v110: explicit close event is also consumed by any nested Discover
-                // controller, so a stale Alpine subtree cannot immediately repaint it.
-                window.dispatchEvent(new CustomEvent('rc-discover-drawer-closed'));
-            },
-            favoriteDiscoverSchool() {
-                if (!this.optimisticSchool) return;
-                const previous = !!this.optimisticSchool.is_favorite;
-                const next = !previous;
-                this.optimisticSchool.is_favorite = next;
-                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [] } }));
-                Promise.resolve(this.$wire.call('queueSchoolFavoriteState', String(this.optimisticSchool.id), next))
-                    .then(result => {
-                        if (!result || result.success === false) {
-                            if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
-                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
-                        }
-                    })
-                    .catch(() => {
-                        if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
-                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                    });
-            },
-            toggleDiscoverList(key) {
-                if (!this.optimisticSchool || !key) return;
-                key = String(key).toLowerCase();
-                const previous = Array.isArray(this.optimisticSchool.list_keys) ? [...this.optimisticSchool.list_keys] : [];
-                const has = previous.map(v => String(v).toLowerCase()).includes(key);
-                const list = this.discoverLists.find(item => this.discoverListKey(item).toLowerCase() === key);
-                const previousCount = list ? this.discoverListCount(list) : 0;
-                this.optimisticSchool.list_keys = has
-                    ? previous.filter(v => String(v).toLowerCase() !== key)
-                    : [...previous, key];
-                if (list) this.setDiscoverListCount(key, previousCount + (has ? -1 : 1));
-                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: this.optimisticSchool.list_keys || [] } }));
-                Promise.resolve(this.$wire.call('queueSchoolListMemberships', String(this.optimisticSchool.id), { [key]: !has }))
-                    .then(result => {
-                        if (!result || result.success === false) {
-                            if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
-                            if (list) this.setDiscoverListCount(key, previousCount);
-                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
-                            return;
-                        }
-                        const serverCount = Number(result?.list_counts?.[key]);
-                        if (list && Number.isFinite(serverCount)) this.setDiscoverListCount(key, serverCount);
-                    })
-                    .catch(() => {
-                        if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
-                        if (list) this.setDiscoverListCount(key, previousCount);
-                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                    });
-            },
-            discoverInList(key) {
-                const keys = Array.isArray(this.optimisticSchool?.list_keys) ? this.optimisticSchool.list_keys : [];
-                return keys.map(v => String(v).toLowerCase()).includes(String(key || '').toLowerCase());
-            }
-        }"
         x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
         x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
@@ -12184,7 +12180,7 @@ CSS;
                 <div class="rc-school-tabbar-v72 rc-discover-tabbar-v111" role="tablist" aria-label="School detail tabs">
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'coaches' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='coaches'">Coaching Staff</button>
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'roster' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='roster'">Roster &amp; Stats</button>
-                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications()">Communications</button>
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications(true)">Communications</button>
                 </div>
 
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
