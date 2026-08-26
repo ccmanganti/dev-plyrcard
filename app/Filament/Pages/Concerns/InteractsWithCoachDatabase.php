@@ -4511,9 +4511,35 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 ->values();
         }
 
-        $coachIds = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['id'] ?? $coach['contact_id'] ?? ''))))->filter()->unique()->values();
+        // v10.53: a local Coach model can have both its numeric Laravel ID and a
+        // completely different GHL contact ID. Conversations are keyed by the GHL
+        // contact ID, so never collapse the coach down to only the first available ID.
+        // Keep every known identifier and allow any of them to match.
+        $coachIds = $coaches
+            ->flatMap(fn (array $coach): array => [
+                $coach['ghl_contact_id'] ?? null,
+                $coach['contact_id'] ?? null,
+                $coach['contactId'] ?? null,
+                $coach['id'] ?? null,
+            ])
+            ->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->values();
         $coachEmails = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? $coach['contact_email'] ?? ''))))->filter()->unique()->values();
         $coachNames = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? ''))))))->filter()->unique()->values();
+
+        $schoolIds = collect([
+            $school['id'] ?? null,
+            $school['school_id'] ?? null,
+            $school['business_id'] ?? null,
+            $school['company_id'] ?? null,
+            $school['ghl_business_id'] ?? null,
+            $schoolBusinessId,
+        ])->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->values();
 
         try {
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
@@ -4538,18 +4564,45 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
             $schoolNameKey = strtolower(trim($schoolName));
             $matchedConversations = collect($this->conversations)
-                ->filter(function (array $conversation) use ($schoolNameKey, $coachIds, $coachEmails, $coachNames): bool {
-                    $contactId = strtolower(trim((string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? '')));
+                ->filter(function (array $conversation) use ($schoolNameKey, $schoolIds, $coachIds, $coachEmails, $coachNames): bool {
+                    $conversationContactIds = collect([
+                        $conversation['contact_id'] ?? null,
+                        $conversation['contactId'] ?? null,
+                        $conversation['coach_id'] ?? null,
+                        $conversation['coach_contact_id'] ?? null,
+                    ])->map(fn ($value): string => strtolower(trim((string) $value)))
+                        ->filter()
+                        ->unique();
+
+                    $conversationSchoolIds = collect([
+                        $conversation['school_id'] ?? null,
+                        $conversation['school_business_id'] ?? null,
+                        $conversation['business_id'] ?? null,
+                        $conversation['company_id'] ?? null,
+                        $conversation['ghl_business_id'] ?? null,
+                    ])->map(fn ($value): string => strtolower(trim((string) $value)))
+                        ->filter()
+                        ->unique();
+
                     $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
-                    $conversationSchool = strtolower(trim((string) ($conversation['school'] ?? $conversation['company_name'] ?? '')));
+                    $conversationSchool = strtolower(trim((string) (
+                        $conversation['school']
+                        ?? $conversation['school_name']
+                        ?? $conversation['company_name']
+                        ?? $conversation['company']
+                        ?? ''
+                    )));
                     $name = strtolower(trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? '')));
 
-                    return ($contactId !== '' && $coachIds->contains($contactId))
+                    return ($conversationContactIds->isNotEmpty() && $coachIds->intersect($conversationContactIds)->isNotEmpty())
                         || ($email !== '' && $coachEmails->contains($email))
+                        || ($conversationSchoolIds->isNotEmpty() && $schoolIds->intersect($conversationSchoolIds)->isNotEmpty())
                         || ($schoolNameKey !== '' && $conversationSchool === $schoolNameKey)
                         || ($name !== '' && $coachNames->contains($name));
                 })
-                ->take(12)
+                // A school can have several coaches and years of threads. Keep a
+                // wider set here; the final normalized history is still capped below.
+                ->take(50)
                 ->values();
 
             $historyRows = [];
@@ -4564,7 +4617,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                     $user,
                     $conversationId,
                     null,
-                    12
+                    25
                 );
 
                 if (! ($messageResult['success'] ?? false)) {
