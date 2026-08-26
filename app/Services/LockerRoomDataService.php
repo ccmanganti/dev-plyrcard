@@ -300,30 +300,17 @@ class LockerRoomDataService
             $user->total_emails_sent ?? 0
         );
 
-        // Coach Database defines Coach Engagement as Instagram + YouTube + X only.
-        // Do not use the generic social_clicks aggregate here because it may include
-        // legacy/duplicate click buckets and can substantially overstate the card.
-        $instagramClicks = $number(
-            $tracking['instagram_click_count'] ?? 0,
-            $tracking['instagram_clicks'] ?? 0,
-            $remoteStats['instagram_click_count'] ?? 0,
-            $remoteStats['instagram_clicks'] ?? 0
-        );
-        $youtubeClicks = $number(
-            $tracking['youtube_click_count'] ?? 0,
-            $tracking['youtube_clicks'] ?? 0,
-            $remoteStats['youtube_click_count'] ?? 0,
-            $remoteStats['youtube_clicks'] ?? 0
-        );
-        $xClicks = $number(
-            $tracking['x_click_count'] ?? 0,
-            $tracking['x_clicks'] ?? 0,
-            $tracking['twitter_clicks'] ?? 0,
-            $remoteStats['x_click_count'] ?? 0,
-            $remoteStats['x_clicks'] ?? 0,
-            $remoteStats['twitter_clicks'] ?? 0
-        );
-        $socialClicks = $instagramClicks + $youtubeClicks + $xClicks;
+        // v10.51: use the exact same source-of-truth rule as Coach Database.
+        // When LocalRecruitingTrackingService has attributed engagement rows, those
+        // rows are authoritative for BOTH the dashboard card and its drill-down.
+        // Never max them against cached/legacy counters; doing so is what caused
+        // Locker Room to show inflated totals while Coach Database showed the
+        // correct smaller number.
+        $engagement = $this->localCoachEngagementSnapshot($user, $tracking);
+        $instagramClicks = (int) ($engagement['platform_counts']['instagram'] ?? 0);
+        $youtubeClicks = (int) ($engagement['platform_counts']['youtube'] ?? 0);
+        $xClicks = (int) ($engagement['platform_counts']['x'] ?? 0);
+        $socialClicks = (int) ($engagement['total'] ?? ($instagramClicks + $youtubeClicks + $xClicks));
 
         $profileUniqueContacts = $number(
             $tracking['profile_view_unique_contact_count'] ?? 0,
@@ -406,6 +393,206 @@ class LockerRoomDataService
     }
 
     /**
+     * Return Coach Engagement using the exact LocalRecruitingTrackingService rows
+     * used by Coach Database. This mirrors InteractsWithCoachDatabase:
+     * - coachEngagementRows() wins when rows exist;
+     * - Instagram/YouTube/X are normalized per row;
+     * - each row's aggregate count is summed exactly once;
+     * - legacy cached counters are used only when there are no authoritative rows.
+     */
+    protected function localCoachEngagementSnapshot(User $user, array $dashboardStats = []): array
+    {
+        $rawRows = [];
+
+        try {
+            $rawRows = app(LocalRecruitingTrackingService::class)->coachEngagementRows($user);
+        } catch (\Throwable) {
+            $rawRows = [];
+        }
+
+        $rows = collect(is_array($rawRows) ? $rawRows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+
+        if ($rows->isNotEmpty()) {
+            $platformCounts = [
+                'instagram' => $this->dashboardSocialClickTotal($rows, 'instagram'),
+                'youtube' => $this->dashboardSocialClickTotal($rows, 'youtube'),
+                'x' => $this->dashboardSocialClickTotal($rows, 'x'),
+            ];
+
+            return [
+                'total' => array_sum($platformCounts),
+                'platform_counts' => $platformCounts,
+                'unique_coaches' => $rows->pluck('coach_id')->filter()->unique()->count(),
+                'unique_schools' => $rows->map(function (array $row): string {
+                    return trim((string) ($row['school_key'] ?? $row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? $row['school'] ?? ''));
+                })->filter()->unique()->count(),
+                'rows' => $this->formatCoachEngagementRows($rows),
+                'authoritative_rows' => true,
+            ];
+        }
+
+        // Same fallback concept as Coach Database when no local rows exist. Keep it
+        // local-only here; remote snapshot counters are deliberately not maxed in.
+        $instagram = max(
+            (int) ($dashboardStats['instagram_click_count'] ?? 0),
+            (int) ($dashboardStats['instagram_clicks'] ?? 0),
+        );
+        $youtube = max(
+            (int) ($dashboardStats['youtube_click_count'] ?? 0),
+            (int) ($dashboardStats['youtube_clicks'] ?? 0),
+        );
+        $x = max(
+            (int) ($dashboardStats['x_click_count'] ?? 0),
+            (int) ($dashboardStats['twitter_click_count'] ?? 0),
+            (int) ($dashboardStats['x_clicks'] ?? 0),
+            (int) ($dashboardStats['twitter_clicks'] ?? 0),
+        );
+
+        return [
+            'total' => $instagram + $youtube + $x,
+            'platform_counts' => ['instagram' => $instagram, 'youtube' => $youtube, 'x' => $x],
+            'unique_coaches' => (int) ($dashboardStats['engagement_unique_coaches'] ?? $dashboardStats['unique_link_click_contacts'] ?? 0),
+            'unique_schools' => (int) ($dashboardStats['engagement_unique_schools'] ?? $dashboardStats['schools_with_clicks'] ?? 0),
+            'rows' => [],
+            'authoritative_rows' => false,
+        ];
+    }
+
+    protected function normalizeDashboardSocialPlatform(mixed $platform = null, array $row = []): string
+    {
+        $raw = strtolower(trim((string) $platform));
+        $haystack = strtolower(trim(implode(' ', array_filter(array_map(
+            fn ($value): string => is_scalar($value) ? (string) $value : '',
+            [
+                $raw,
+                $row['platform_key'] ?? null,
+                $row['platform'] ?? null,
+                $row['rc_platform'] ?? null,
+                $row['utm_content'] ?? null,
+                $row['source'] ?? null,
+                $row['type'] ?? null,
+                $row['event_type'] ?? null,
+                $row['url'] ?? null,
+                $row['destination_url'] ?? null,
+                $row['href'] ?? null,
+                $row['link'] ?? null,
+                $row['last_clicked_url'] ?? null,
+            ]
+        )))));
+
+        return match (true) {
+            str_contains($haystack, 'instagram'),
+            preg_match('/(^|[^a-z0-9])ig([^a-z0-9]|$)/', $haystack) === 1 => 'instagram',
+            str_contains($haystack, 'youtube'),
+            str_contains($haystack, 'youtu.be'),
+            preg_match('/(^|[^a-z0-9])yt([^a-z0-9]|$)/', $haystack) === 1 => 'youtube',
+            str_contains($haystack, 'twitter'),
+            str_contains($haystack, 'x.com'),
+            $raw === 'x' => 'x',
+            default => $raw === 'twitter' ? 'x' : $raw,
+        };
+    }
+
+    protected function dashboardTrackingRowClickCount(array $row): int
+    {
+        foreach (['clicks', 'click_count', 'clicks_count', 'total', 'count', 'events_count', 'value'] as $key) {
+            if (isset($row[$key]) && is_numeric($row[$key])) {
+                return max(0, (int) $row[$key]);
+            }
+        }
+
+        return 1;
+    }
+
+    protected function dashboardSocialClickTotal(\Illuminate\Support\Collection $rows, string $platform): int
+    {
+        $platform = $platform === 'twitter' ? 'x' : strtolower(trim($platform));
+
+        return $rows
+            ->filter(fn ($row): bool => is_array($row))
+            ->filter(function (array $row) use ($platform): bool {
+                return $this->normalizeDashboardSocialPlatform(
+                    $row['platform_key'] ?? $row['platform'] ?? $row['rc_platform'] ?? $row['utm_content'] ?? null,
+                    $row,
+                ) === $platform;
+            })
+            ->sum(fn (array $row): int => $this->dashboardTrackingRowClickCount($row));
+    }
+
+    protected function formatCoachEngagementRows(\Illuminate\Support\Collection $rows): array
+    {
+        return $rows
+            ->map(function (array $row): ?array {
+                $platform = $this->normalizeDashboardSocialPlatform(
+                    $row['platform_key'] ?? $row['platform'] ?? $row['rc_platform'] ?? $row['utm_content'] ?? null,
+                    $row,
+                );
+
+                if (! in_array($platform, ['instagram', 'youtube', 'x'], true)) {
+                    return null;
+                }
+
+                $clicks = $this->dashboardTrackingRowClickCount($row);
+                $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
+                $coachName = trim((string) ($row['coach_name'] ?? $row['name'] ?? $row['title'] ?? 'Known coach contact')) ?: 'Known coach contact';
+                $schoolRef = trim((string) ($row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? $row['school_key'] ?? ''));
+                $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? $row['company_name'] ?? ''));
+                $school = ($schoolRef !== '' || $schoolName !== '')
+                    ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
+                    : null;
+                $identity = $contactId !== ''
+                    ? 'coach:' . $contactId
+                    : 'viewer:' . strtolower($schoolRef . '|' . $coachName . '|' . ($row['coach_email'] ?? $row['email'] ?? ''));
+
+                return [
+                    'identity_key' => $identity,
+                    'contact_id' => $contactId ?: null,
+                    'coach_name' => $coachName,
+                    'coach_email' => $row['coach_email'] ?? $row['email'] ?? null,
+                    'coach_title' => $row['coach_title'] ?? $row['title_name'] ?? null,
+                    'school' => $school ? $this->schoolPayload($school) : [
+                        'id' => null,
+                        'reference' => $schoolRef !== '' ? $schoolRef : ($schoolName !== '' ? 'school:' . $schoolName : null),
+                        'name' => $schoolName,
+                        'logo_url' => $row['school_logo_url'] ?? $row['business_logo_url'] ?? $row['logo_url'] ?? null,
+                        'conference' => $row['conference'] ?? null,
+                        'division' => $row['division'] ?? null,
+                        'city' => $row['city'] ?? null,
+                        'state' => $row['state'] ?? null,
+                    ],
+                    'count' => $clicks,
+                    'platform_counts' => [
+                        'instagram' => $platform === 'instagram' ? $clicks : 0,
+                        'youtube' => $platform === 'youtube' ? $clicks : 0,
+                        'x' => $platform === 'x' ? $clicks : 0,
+                    ],
+                    'last_at' => $row['last_at'] ?? $row['occurred_at'] ?? $row['time'] ?? $row['created_at'] ?? null,
+                    'last_at_label' => $this->activityTimeLabel($row['last_at'] ?? $row['occurred_at'] ?? $row['time'] ?? $row['created_at'] ?? null),
+                    'last_subject' => $row['last_subject'] ?? $row['subject'] ?? null,
+                ];
+            })
+            ->filter()
+            ->groupBy('identity_key')
+            ->map(function ($group): array {
+                $group = collect($group);
+                $base = (array) $group->sortByDesc(fn ($row) => strtotime((string) ($row['last_at'] ?? '')) ?: 0)->first();
+                $base['platform_counts'] = [
+                    'instagram' => (int) $group->sum(fn ($row) => (int) data_get($row, 'platform_counts.instagram', 0)),
+                    'youtube' => (int) $group->sum(fn ($row) => (int) data_get($row, 'platform_counts.youtube', 0)),
+                    'x' => (int) $group->sum(fn ($row) => (int) data_get($row, 'platform_counts.x', 0)),
+                ];
+                $base['count'] = array_sum($base['platform_counts']);
+                return $base;
+            })
+            ->sortByDesc(fn ($row) => (int) ($row['count'] ?? 0))
+            ->take(100)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Locker Room dashboard drill-down using the same local tracking source that
      * powers the Admin Dashboard. Only coach-attributed rows are returned in the
      * coach list; aggregate/direct visits remain represented in the stat total.
@@ -460,20 +647,24 @@ class LockerRoomDataService
         }
 
         if ($metric === 'social_clicks') {
-            $cachedRows = $this->cachedCoachEngagementRows($user);
-            if ($cachedRows !== []) {
+            $tracking = [];
+            try {
+                $tracking = app(LocalRecruitingTrackingService::class)->dashboardStats($user);
+            } catch (\Throwable) {
+                $tracking = [];
+            }
+
+            $engagement = $this->localCoachEngagementSnapshot($user, $tracking);
+            if (! empty($engagement['rows']) || (bool) ($engagement['authoritative_rows'] ?? false)) {
                 return [
                     'metric' => $metric,
                     'label' => $definitions[$metric]['label'],
                     'icon' => $definitions[$metric]['icon'],
-                    'total' => $total,
-                    'identified_count' => count($cachedRows),
-                    'platform_counts' => [
-                        'x' => (int) data_get($dashboard, 'stats.x_clicks', 0),
-                        'instagram' => (int) data_get($dashboard, 'stats.instagram_clicks', 0),
-                        'youtube' => (int) data_get($dashboard, 'stats.youtube_clicks', 0),
-                    ],
-                    'rows' => $cachedRows,
+                    'total' => (int) ($engagement['total'] ?? 0),
+                    'identified_count' => (int) ($engagement['unique_coaches'] ?? count($engagement['rows'] ?? [])),
+                    'schools_reached' => (int) ($engagement['unique_schools'] ?? 0),
+                    'platform_counts' => $engagement['platform_counts'] ?? ['x' => 0, 'instagram' => 0, 'youtube' => 0],
+                    'rows' => $engagement['rows'] ?? [],
                 ];
             }
         }
