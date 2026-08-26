@@ -15,9 +15,9 @@ class Billing extends Page
     protected string $view = 'filament.pages.billing';
 
     protected static ?string $slug = 'billing';
-    protected static ?string $navigationLabel = 'Billing';
-    protected static ?string $title = 'Billing';
-    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
+    protected static ?string $navigationLabel = 'Settings';
+    protected static ?string $title = 'Settings';
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
     protected static string|UnitEnum|null $navigationGroup = 'Account';
     protected static ?int $navigationSort = 95;
 
@@ -42,6 +42,7 @@ class Billing extends Page
         $user = auth()->user();
         abort_unless($user, 403);
 
+        $billingService->refreshPaymentIdentity($user);
         $this->fill($billingService->formData($user));
     }
 
@@ -55,6 +56,20 @@ class Billing extends Page
         Notification::make()
             ->title('Billing information updated')
             ->body('Your billing contact and address have been saved.')
+            ->success()
+            ->send();
+    }
+
+    public function refreshPaymentMethod(BillingProfileService $billingService): void
+    {
+        $user = auth()->user();
+        abort_unless($user, 403);
+
+        $billingService->refreshPaymentIdentity($user);
+
+        Notification::make()
+            ->title('Payment information refreshed')
+            ->body('Your current subscription and saved payment references were refreshed.')
             ->success()
             ->send();
     }

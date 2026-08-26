@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Validator;
 class BillingProfileService
 {
     public function __construct(
-        protected GoHighLevelService $ghl,
+        protected BillingAccountService $billingAccount,
     ) {
     }
 
@@ -35,43 +35,27 @@ class BillingProfileService
     {
         $data = Validator::make($input, $this->rules())->validate();
 
-        // Never accept PAN/CVC, payment method IDs, card brand, last four, or any
-        // other provider-owned payment metadata from the browser.
         $billing = BillingInformation::query()->updateOrCreate(
             ['user_id' => $user->getKey()],
             $data,
         );
 
-        try {
-            $sync = $this->ghl->upsertContact($user, [
-                'name' => $data['billing_name'],
-                'email' => $data['billing_email'],
-                'phone' => $data['billing_phone'] ?? $user->phone,
-                'address1' => trim($data['billing_address_1'] . ' ' . ($data['billing_address_2'] ?? '')),
-                'city' => $data['billing_city'],
-                'state' => $data['billing_state'],
-                'postalCode' => $data['billing_postal_code'],
-                'country' => $data['billing_country'],
-                'companyName' => $data['billing_company'] ?? null,
-            ], [], 'PlyrCard Billing Information');
+        // Billing always synchronizes to PLYRCARD's own billing subaccount.
+        // The athlete's User::ghl_contact_id / ghl_location_id / ghl_api_key are
+        // intentionally not used or overwritten here.
+        $contactId = $this->billingAccount->ensureBillingContact($user, $billing);
 
-            $billing->forceFill([
-                'ghl_contact_id' => $sync['contact_id'] ?? $billing->ghl_contact_id,
-                'ghl_sync_status' => ($sync['ok'] ?? false)
-                    ? 'synced'
-                    : (($sync['skipped'] ?? false) ? 'skipped' : 'failed'),
-                'ghl_sync_response' => $sync,
-                'ghl_synced_at' => ($sync['ok'] ?? false) ? now() : $billing->ghl_synced_at,
-            ])->save();
-        } catch (\Throwable $exception) {
-            report($exception);
+        $billing->forceFill([
+            'ghl_location_id' => $billing->ghl_location_id ?: config('ghl.location_id'),
+            'ghl_contact_id' => $contactId ?: $billing->ghl_contact_id,
+            'ghl_sync_status' => $contactId ? 'synced' : 'failed',
+            'ghl_synced_at' => $contactId ? now() : $billing->ghl_synced_at,
+        ])->save();
 
-            $billing->forceFill([
-                'ghl_sync_status' => 'failed',
-                'ghl_sync_response' => [
-                    'message' => 'Billing profile synchronization failed.',
-                ],
-            ])->save();
+        // When a subscription already exists, refresh the authoritative payer
+        // contact/customer/payment-method references after every billing update.
+        if (filled($billing->ghl_subscription_id)) {
+            $this->billingAccount->refreshPaymentIdentity($billing);
         }
 
         return $billing->fresh();
@@ -90,15 +74,14 @@ class BillingProfileService
                 'billing_state' => $user->state,
                 'billing_country' => $user->country ?: 'US',
                 'currency' => 'USD',
+                'ghl_location_id' => config('ghl.location_id'),
             ],
         );
     }
 
     public function formData(User $user): array
     {
-        $billing = $this->get($user);
-
-        return Arr::only($billing->toArray(), [
+        return Arr::only($this->get($user)->toArray(), [
             'billing_name',
             'billing_email',
             'billing_phone',
@@ -110,6 +93,13 @@ class BillingProfileService
             'billing_postal_code',
             'billing_country',
         ]);
+    }
+
+    public function refreshPaymentIdentity(User $user): BillingInformation
+    {
+        $billing = $this->get($user);
+        $this->billingAccount->refreshPaymentIdentity($billing);
+        return $billing->fresh();
     }
 
     public function paymentMethodUpdateUrl(User $user, ?BillingInformation $billing = null): ?string
@@ -129,6 +119,8 @@ class BillingProfileService
         $replace = [
             '{contact_id}' => rawurlencode((string) ($billing->ghl_contact_id ?? '')),
             '{customer_id}' => rawurlencode((string) ($billing->ghl_customer_id ?? '')),
+            '{payment_method_id}' => rawurlencode((string) ($billing->ghl_payment_method_id ?? '')),
+            '{subscription_id}' => rawurlencode((string) ($billing->ghl_subscription_id ?? '')),
             '{email}' => rawurlencode((string) ($billing->billing_email ?: $user->email)),
             '{user_id}' => rawurlencode((string) $user->getKey()),
             '{return_url}' => rawurlencode($returnUrl),
@@ -136,11 +128,12 @@ class BillingProfileService
 
         $url = strtr($template, $replace);
 
-        // If no placeholders are used, append non-sensitive context that most
-        // hosted payment forms can ignore safely if unsupported.
         if ($url === $template) {
             $separator = str_contains($url, '?') ? '&' : '?';
             $url .= $separator . http_build_query([
+                'contact_id' => $billing->ghl_contact_id,
+                'customer_id' => $billing->ghl_customer_id,
+                'subscription_id' => $billing->ghl_subscription_id,
                 'email' => $billing->billing_email ?: $user->email,
                 'return_url' => $returnUrl,
             ]);

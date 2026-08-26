@@ -395,7 +395,16 @@ Route::middleware(['web'])
 */
 
 Route::middleware(['auth', 'signed'])
-    ->get('/billing/payment-method/return', function () {
+    ->get('/billing/payment-method/return', function (\Illuminate\Http\Request $request) {
+        if ($request->user()) {
+            try {
+                app(\App\Services\BillingProfileService::class)
+                    ->refreshPaymentIdentity($request->user());
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
         return redirect('/admin/billing?payment_method=updated');
     })
     ->name('billing.payment-method.return');
