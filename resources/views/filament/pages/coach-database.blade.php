@@ -14842,5 +14842,5 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 }
 </style>
 
+    @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>
-@include('partials.amplify-upgrade-modal')
