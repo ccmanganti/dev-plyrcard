@@ -15,10 +15,6 @@
 
 
   @php
-      use App\Models\Website;
-      use App\Models\Team;
-      use Illuminate\Support\Str;
-
       $plyrUser = auth()->user();
       $plyrLoggedIn = auth()->check();
 
@@ -31,7 +27,7 @@
 
           $plyrFirstName = $rawFirstName
               ? trim($rawFirstName)
-              : Str::of($plyrUser->name ?? 'Player')->trim()->explode(' ')->first();
+              : \Illuminate\Support\Str::of($plyrUser->name ?? 'Player')->trim()->explode(' ')->first();
       }
 
       $plyrRoleNames = collect();
@@ -120,7 +116,7 @@
           }
 
           $websiteSlug = strtolower(trim((string) $website->slug, '/'));
-          $websiteNameSlug = Str::slug((string) $website->name);
+          $websiteNameSlug = \Illuminate\Support\Str::slug((string) $website->name);
 
           return ($websiteSlug && $websiteSlug === $pathSlug)
               || ($websiteNameSlug && $websiteNameSlug === $pathSlug);
@@ -139,7 +135,7 @@
       $plyrWebsite = null;
       $plyrWebsiteUrl = null;
 
-      if ($plyrLoggedIn && $plyrUser && class_exists(Website::class)) {
+      if ($plyrLoggedIn && $plyrUser && class_exists(\App\Models\Website::class)) {
           try {
               if (method_exists($plyrUser, 'websites')) {
                   $relationshipResult = $plyrUser->websites()
@@ -171,7 +167,7 @@
           }
 
           if ($plyrOwnedWebsites->isEmpty()) {
-              $plyrOwnedWebsites = Website::query()
+              $plyrOwnedWebsites = \App\Models\Website::query()
                   ->where('user_id', $plyrUser->id)
                   ->where('is_active', true)
                   ->where('is_published', true)
@@ -189,14 +185,14 @@
               } elseif (! blank($plyrWebsite->slug)) {
                   $plyrWebsiteUrl = url('/' . ltrim($plyrWebsite->slug, '/'));
               } elseif (! blank($plyrWebsite->name)) {
-                  $plyrWebsiteUrl = url('/' . Str::slug($plyrWebsite->name));
+                  $plyrWebsiteUrl = url('/' . \Illuminate\Support\Str::slug($plyrWebsite->name));
               }
           }
       }
 
       $plyrViewedWebsite = $plyrRenderedWebsite;
 
-      if (class_exists(Website::class)) {
+      if (class_exists(\App\Models\Website::class)) {
           // First detect the logged-in player's own website from their User -> Website relationship.
           // This is the important custom-domain path for player-owned domains such as selinpehlivan.com.
           if ($plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
@@ -205,7 +201,7 @@
 
           // Custom-domain player site detection for public visits and other players' domains.
           if (! $plyrViewedWebsite && ! $plyrOnMainPlyrSite) {
-              $plyrViewedWebsite = Website::query()
+              $plyrViewedWebsite = \App\Models\Website::query()
                   ->where('is_active', true)
                   ->where('is_published', true)
                   ->whereNotNull('domain')
@@ -216,7 +212,7 @@
           // Path-based player site detection for main-domain URLs like /selin-pehlivan.
           if (! $plyrViewedWebsite && ! $plyrOnAdmin && $plyrCurrentPath !== '' && ! in_array($plyrCurrentPath, $plyrReservedPaths, true)) {
               $pathSlug = strtolower($plyrCurrentPath);
-              $plyrViewedWebsite = Website::query()
+              $plyrViewedWebsite = \App\Models\Website::query()
                   ->where('is_active', true)
                   ->where('is_published', true)
                   ->where(function ($query) use ($pathSlug) {
@@ -225,12 +221,12 @@
                   ->first();
 
               if (! $plyrViewedWebsite) {
-                  $plyrViewedWebsite = Website::query()
+                  $plyrViewedWebsite = \App\Models\Website::query()
                       ->where('is_active', true)
                       ->where('is_published', true)
                       ->get()
                       ->first(function (Website $website) use ($pathSlug) {
-                          return Str::slug($website->name) === $pathSlug;
+                          return \Illuminate\Support\Str::slug($website->name) === $pathSlug;
                       });
               }
           }
@@ -298,9 +294,9 @@
       $plyrTeamLandingUrl = null;
       $plyrTeamLandingName = 'My Team';
 
-      if ($plyrLoggedIn && $plyrUser && filled($plyrUser->team_name ?? null) && class_exists(Team::class)) {
+      if ($plyrLoggedIn && $plyrUser && filled($plyrUser->team_name ?? null) && class_exists(\App\Models\Team::class)) {
           try {
-              $plyrTeam = Team::query()
+              $plyrTeam = \App\Models\Team::query()
                   ->where('name', $plyrUser->team_name)
                   ->when($plyrUser->club_id ?? null, fn ($query) => $query->where('club_id', $plyrUser->club_id))
                   ->first();
@@ -356,7 +352,7 @@
               return null;
           }
 
-          if (Str::startsWith($value, ['http://', 'https://'])) {
+          if (\Illuminate\Support\Str::startsWith($value, ['http://', 'https://'])) {
               return $value;
           }
 
@@ -464,14 +460,14 @@
           : [];
 
       $plyrPositionLabelToValue = collect($plyrPositionOptionsBySport)
-          ->flatMap(fn ($positionOptions) => collect($positionOptions)->mapWithKeys(fn ($label, $value) => [Str::lower($label) => $value]))
+          ->flatMap(fn ($positionOptions) => collect($positionOptions)->mapWithKeys(fn ($label, $value) => [\Illuminate\Support\Str::lower($label) => $value]))
           ->all();
 
       $plyrSelectedPositions = collect($plyrSelectedPositions)
           ->map(function ($position) use ($plyrPositionLabelToValue) {
               $position = trim((string) $position);
 
-              return $plyrPositionLabelToValue[Str::lower($position)] ?? $position;
+              return $plyrPositionLabelToValue[\Illuminate\Support\Str::lower($position)] ?? $position;
           })
           ->filter()
           ->unique()
