@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\BillingInformation;
+use App\Models\PaymentTransaction;
 use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -18,22 +21,18 @@ class BillingAccountService
      * PLYRCARD billing always belongs to the PLYRCARD billing subaccount.
      * Never use the athlete's own ghl_location_id / ghl_api_key here.
      */
-    public function credentials(BillingInformation $billing): array
+    public function credentials(?BillingInformation $billing = null): array
     {
-        $locationId = trim((string) ($billing->ghl_location_id ?: config('ghl.location_id')));
-        $token = trim((string) config('ghl.token'));
-
         return [
-            'location_id' => $locationId,
-            'token' => $token,
+            'location_id' => trim((string) (($billing?->ghl_location_id) ?: config('ghl.location_id'))),
+            'token' => trim((string) config('ghl.token')),
         ];
     }
 
     /**
      * Create or update the payer/subscriber contact in PLYRCARD's billing
      * subaccount. User::ghl_subscriber_contact_id is the authoritative user-level
-     * pointer. BillingInformation::ghl_contact_id is mirrored for billing records
-     * and existing payment services.
+     * pointer. BillingInformation::ghl_contact_id is mirrored for billing records.
      */
     public function ensureBillingContact(User $user, BillingInformation $billing): ?string
     {
@@ -68,10 +67,11 @@ class BillingAccountService
                     ->acceptJson()
                     ->asJson()
                     ->timeout((int) config('ghl.timeout', 20))
-                    ->put(rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/') . '/contacts/' . rawurlencode($existingContactId), $payload);
+                    ->put($this->baseUrl() . '/contacts/' . rawurlencode($existingContactId), $payload);
 
                 if ($response->successful()) {
                     $this->persistSubscriberContact($user, $billing, $existingContactId, $locationId);
+                    $this->forgetSyncCache($user);
                     return $existingContactId;
                 }
 
@@ -86,6 +86,7 @@ class BillingAccountService
 
             if ($contactId) {
                 $this->persistSubscriberContact($user, $billing, $contactId, $locationId);
+                $this->forgetSyncCache($user);
             }
 
             return $contactId;
@@ -101,16 +102,137 @@ class BillingAccountService
     }
 
     /**
-     * Hydrate the subscriber identity and reusable payment references from the
-     * actual subscription. This is the authoritative post-payment association.
+     * Cross-reference the manually stored subscriber contact against PLYRCARD's
+     * billing subaccount. This hydrates billing contact details, checks the real
+     * subscription status, refreshes reusable payment references and aligns the
+     * displayed plan with the user's actual PLYRCARD role.
+     */
+    public function syncSubscriberAccount(User $user, ?BillingInformation $billing = null, bool $force = false): array
+    {
+        $user->loadMissing('roles');
+        $subscriberContactId = trim((string) $user->ghl_subscriber_contact_id);
+
+        if ($subscriberContactId === '') {
+            return [
+                'success' => false,
+                'reason' => 'missing_subscriber_contact_id',
+                'plan_key' => $this->rolePlanKey($user),
+            ];
+        }
+
+        $billing ??= BillingInformation::query()->firstOrCreate(
+            ['user_id' => $user->getKey()],
+            $this->defaultBillingData($user),
+        );
+
+        $credentials = $this->credentials($billing);
+        if ($credentials['location_id'] === '' || $credentials['token'] === '') {
+            return ['success' => false, 'reason' => 'missing_billing_credentials'];
+        }
+
+        $cacheKey = $this->syncCacheKey($user, $subscriberContactId);
+        if (! $force && Cache::has($cacheKey)) {
+            return (array) Cache::get($cacheKey);
+        }
+
+        $result = [
+            'success' => true,
+            'contact_id' => $subscriberContactId,
+            'contact_found' => false,
+            'subscription_found' => false,
+            'subscription_active' => false,
+            'subscription_status' => null,
+            'subscription_id' => null,
+            'plan_key' => $this->rolePlanKey($user),
+        ];
+
+        try {
+            // Keep the user-level subscriber ID and the billing record in sync.
+            $this->persistSubscriberContact($user, $billing, $subscriberContactId, $credentials['location_id']);
+
+            $contactResult = $this->fetchContact($subscriberContactId, $credentials);
+            if ($contactResult['success']) {
+                $result['contact_found'] = true;
+                $this->hydrateBillingFromContact($billing, $contactResult['contact']);
+            } else {
+                $result['success'] = false;
+                $result['contact_error'] = $contactResult['reason'];
+            }
+
+            $subscriptionsResult = $this->listSubscriptions($subscriberContactId, $credentials);
+            if ($subscriptionsResult['success']) {
+                $subscription = $this->chooseSubscription($subscriptionsResult['subscriptions']);
+                if ($subscription) {
+                    $subscriptionState = $this->hydrateBillingFromSubscription($billing, $subscription, $credentials['location_id']);
+                    $result = array_merge($result, $subscriptionState, [
+                        'subscription_found' => true,
+                    ]);
+                } else {
+                    $billing->forceFill([
+                        'subscription_status' => 'not_subscribed',
+                        'payment_synced_at' => now(),
+                    ])->save();
+                }
+            } else {
+                $result['success'] = false;
+                $result['subscription_error'] = $subscriptionsResult['reason'];
+            }
+
+            // Role is authoritative for the current PLYRCARD tier. Billing plan_key
+            // is kept aligned so Locker Room/Admin never show a stale plan.
+            $rolePlanKey = $this->rolePlanKey($user);
+            if ($rolePlanKey !== null) {
+                $billing->forceFill(['plan_key' => $rolePlanKey])->save();
+                $result['plan_key'] = $rolePlanKey;
+            }
+
+            $this->refreshLatestTransactionMetadata($user, $billing, $subscriberContactId, $credentials);
+            $billing->refresh();
+
+            $result['billing_id'] = $billing->getKey();
+            $result['subscription_status'] = $billing->subscription_status;
+            $result['payment_method_id'] = $billing->ghl_payment_method_id;
+            $result['customer_id'] = $billing->ghl_customer_id;
+            $result['card_last_four'] = $billing->card_last_four;
+
+            Cache::put($cacheKey, $result, now()->addSeconds(60));
+            return $result;
+        } catch (\Throwable $exception) {
+            Log::warning('Subscriber billing cross-reference failed.', [
+                'user_id' => $user->getKey(),
+                'contact_id' => $subscriberContactId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'reason' => 'exception',
+                'error' => $exception->getMessage(),
+                'plan_key' => $this->rolePlanKey($user),
+            ];
+        }
+    }
+
+    /**
+     * Hydrate payment identity from a known subscription ID. Kept for checkout
+     * completion / payment-method return flows. If the stored subscription ID is
+     * missing or stale, fall back to a contact-based cross-reference.
      */
     public function refreshPaymentIdentity(BillingInformation $billing): array
     {
+        $billing->loadMissing('user.roles');
+        $user = $billing->user;
         $subscriptionId = trim((string) $billing->ghl_subscription_id);
         $credentials = $this->credentials($billing);
 
-        if ($subscriptionId === '' || $credentials['location_id'] === '' || $credentials['token'] === '') {
-            return ['success' => false, 'reason' => 'missing_subscription_or_credentials'];
+        if ($credentials['location_id'] === '' || $credentials['token'] === '') {
+            return ['success' => false, 'reason' => 'missing_credentials'];
+        }
+
+        if ($subscriptionId === '') {
+            return $user
+                ? $this->syncSubscriberAccount($user, $billing, true)
+                : ['success' => false, 'reason' => 'missing_subscription'];
         }
 
         try {
@@ -118,73 +240,35 @@ class BillingAccountService
                 ->withToken($credentials['token'])
                 ->acceptJson()
                 ->timeout((int) config('ghl.timeout', 20))
-                ->get(
-                    rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/')
-                    . '/payments/subscriptions/' . rawurlencode($subscriptionId),
-                    [
-                        'altId' => $credentials['location_id'],
-                        'altType' => 'location',
-                    ],
-                );
+                ->get($this->baseUrl() . '/payments/subscriptions/' . rawurlencode($subscriptionId), [
+                    'altId' => $credentials['location_id'],
+                    'altType' => 'location',
+                ]);
 
             $body = $response->json();
             $body = is_array($body) ? $body : [];
 
             if ($response->failed()) {
-                return [
-                    'success' => false,
-                    'reason' => 'subscription_lookup_failed',
-                    'status' => $response->status(),
-                ];
+                return $user
+                    ? $this->syncSubscriberAccount($user, $billing, true)
+                    : ['success' => false, 'reason' => 'subscription_lookup_failed', 'status' => $response->status()];
             }
 
-            $contactId = trim((string) (data_get($body, 'contactId') ?? data_get($body, 'contact.id') ?? ''));
-            $customerId = trim((string) (data_get($body, 'autoPayment.customerId') ?? ''));
-            $paymentMethodId = trim((string) (data_get($body, 'autoPayment.paymentMethodId') ?? ''));
-            $provider = data_get($body, 'paymentProvider.type');
-            $status = data_get($body, 'status');
-            $liveMode = data_get($body, 'liveMode');
+            $state = $this->hydrateBillingFromSubscription($billing, $body, $credentials['location_id']);
 
-            $updates = [
-                'ghl_location_id' => $credentials['location_id'],
-                'payment_synced_at' => now(),
-            ];
-
-            if ($contactId !== '') {
-                $updates['ghl_contact_id'] = $contactId;
-            }
-            if ($customerId !== '') {
-                $updates['ghl_customer_id'] = $customerId;
-            }
-            if ($paymentMethodId !== '') {
-                $updates['ghl_payment_method_id'] = $paymentMethodId;
-            }
-            if (filled($provider)) {
-                $updates['payment_provider'] = $provider;
-            }
-            if (filled($status)) {
-                $updates['subscription_status'] = is_string($status) ? strtolower($status) : $billing->subscription_status;
-            }
-            if (! is_null($liveMode)) {
-                $updates['payment_live_mode'] = filter_var($liveMode, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? (bool) $liveMode;
-            }
-
-            $billing->forceFill($updates)->save();
-
-            if ($contactId !== '') {
-                $user = $billing->user;
-                if ($user) {
+            if ($user) {
+                $contactId = trim((string) ($state['contact_id'] ?? ''));
+                if ($contactId !== '') {
                     $user->forceFill(['ghl_subscriber_contact_id' => $contactId])->save();
                 }
+                $rolePlanKey = $this->rolePlanKey($user);
+                if ($rolePlanKey !== null) {
+                    $billing->forceFill(['plan_key' => $rolePlanKey])->save();
+                }
+                $this->forgetSyncCache($user);
             }
 
-            return [
-                'success' => true,
-                'contact_id' => $contactId ?: null,
-                'customer_id' => $customerId ?: null,
-                'payment_method_id' => $paymentMethodId ?: null,
-                'subscription_id' => $subscriptionId,
-            ];
+            return array_merge(['success' => true], $state);
         } catch (\Throwable $exception) {
             Log::warning('Billing subscription identity refresh failed.', [
                 'billing_id' => $billing->getKey(),
@@ -192,20 +276,360 @@ class BillingAccountService
                 'error' => $exception->getMessage(),
             ]);
 
-            return ['success' => false, 'reason' => 'exception'];
+            return $user
+                ? $this->syncSubscriberAccount($user, $billing, true)
+                : ['success' => false, 'reason' => 'exception'];
         }
+    }
+
+    public function rolePlanKey(User $user): ?string
+    {
+        $user->loadMissing('roles');
+        $roles = $user->getRoleNames()->map(fn ($role) => strtolower(trim((string) $role)));
+
+        if ($roles->contains('amplify')) {
+            return 'amplify';
+        }
+        if ($roles->contains('my journey') || $roles->contains('my-journey') || $roles->contains('my_journey')) {
+            return 'my-journey';
+        }
+        if ($roles->contains('free')) {
+            return 'free';
+        }
+
+        return null;
+    }
+
+    protected function fetchContact(string $contactId, array $credentials): array
+    {
+        $response = Http::withHeaders(['Version' => '2021-07-28'])
+            ->withToken($credentials['token'])
+            ->acceptJson()
+            ->timeout((int) config('ghl.timeout', 20))
+            ->get($this->baseUrl() . '/contacts/' . rawurlencode($contactId));
+
+        if ($response->failed()) {
+            return ['success' => false, 'reason' => 'contact_lookup_failed', 'status' => $response->status()];
+        }
+
+        $body = $response->json();
+        $body = is_array($body) ? $body : [];
+        $contact = data_get($body, 'contact', $body);
+
+        return ['success' => is_array($contact), 'contact' => is_array($contact) ? $contact : []];
+    }
+
+    protected function listSubscriptions(string $contactId, array $credentials): array
+    {
+        $params = [
+            'altId' => $credentials['location_id'],
+            'altType' => 'location',
+            'contactId' => $contactId,
+            'limit' => 50,
+            'offset' => 0,
+        ];
+
+        $response = Http::withHeaders(['Version' => 'v3'])
+            ->withToken($credentials['token'])
+            ->acceptJson()
+            ->timeout((int) config('ghl.timeout', 20))
+            ->get($this->baseUrl() . '/payments/subscriptions', $params);
+
+        // Some older HighLevel payment responses used `contact` as the filter
+        // name. Retry that spelling only when the current endpoint rejects the
+        // documented/current contactId query.
+        if (in_array($response->status(), [400, 422], true)) {
+            unset($params['contactId']);
+            $params['contact'] = $contactId;
+            $response = Http::withHeaders(['Version' => 'v3'])
+                ->withToken($credentials['token'])
+                ->acceptJson()
+                ->timeout((int) config('ghl.timeout', 20))
+                ->get($this->baseUrl() . '/payments/subscriptions', $params);
+        }
+
+        if ($response->failed()) {
+            return ['success' => false, 'reason' => 'subscription_list_failed', 'status' => $response->status()];
+        }
+
+        $body = $response->json();
+        $body = is_array($body) ? $body : [];
+        $rows = data_get($body, 'data', data_get($body, 'subscriptions', []));
+        $rows = is_array($rows) ? $rows : [];
+
+        // Never accept another contact's subscription when the remote endpoint
+        // returns broader results than requested.
+        $rows = collect($rows)->filter(function ($row) use ($contactId): bool {
+            if (! is_array($row)) {
+                return false;
+            }
+            $rowContact = trim((string) (data_get($row, 'contactId') ?? data_get($row, 'contact.id') ?? ''));
+            return $rowContact === '' || hash_equals($contactId, $rowContact);
+        })->values()->all();
+
+        return ['success' => true, 'subscriptions' => $rows];
+    }
+
+    protected function chooseSubscription(array $subscriptions): ?array
+    {
+        if ($subscriptions === []) {
+            return null;
+        }
+
+        return collect($subscriptions)
+            ->filter(fn ($row) => is_array($row))
+            ->sortByDesc(function (array $row): string {
+                $active = $this->isActiveSubscriptionStatus($this->subscriptionStatus($row)) ? '2' : '1';
+                $updated = (string) (data_get($row, 'updatedAt') ?? data_get($row, 'createdAt') ?? '');
+                return $active . '|' . $updated;
+            })
+            ->first();
+    }
+
+    protected function hydrateBillingFromContact(BillingInformation $billing, array $contact): void
+    {
+        $firstName = trim((string) (data_get($contact, 'firstName') ?? data_get($contact, 'first_name') ?? ''));
+        $lastName = trim((string) (data_get($contact, 'lastName') ?? data_get($contact, 'last_name') ?? ''));
+        $fullName = trim((string) (data_get($contact, 'name') ?? trim($firstName . ' ' . $lastName)));
+
+        $updates = array_filter([
+            'billing_name' => $fullName,
+            'billing_email' => data_get($contact, 'email'),
+            'billing_phone' => data_get($contact, 'phone'),
+            'billing_company' => data_get($contact, 'companyName') ?? data_get($contact, 'company_name'),
+            'billing_address_1' => data_get($contact, 'address1') ?? data_get($contact, 'address'),
+            'billing_city' => data_get($contact, 'city'),
+            'billing_state' => data_get($contact, 'state'),
+            'billing_postal_code' => data_get($contact, 'postalCode') ?? data_get($contact, 'postal_code'),
+            'billing_country' => data_get($contact, 'country'),
+        ], fn ($value) => filled($value));
+
+        if ($updates !== []) {
+            $billing->forceFill($updates)->save();
+        }
+    }
+
+    protected function hydrateBillingFromSubscription(BillingInformation $billing, array $subscription, string $locationId): array
+    {
+        $contactId = trim((string) (data_get($subscription, 'contactId') ?? data_get($subscription, 'contact.id') ?? ''));
+        $subscriptionId = trim((string) (data_get($subscription, '_id') ?? data_get($subscription, 'id') ?? data_get($subscription, 'subscriptionId') ?? ''));
+        $customerId = trim((string) (data_get($subscription, 'autoPayment.customerId') ?? ''));
+        $paymentMethodId = trim((string) (data_get($subscription, 'autoPayment.paymentMethodId') ?? ''));
+        $provider = data_get($subscription, 'paymentProvider.type') ?? data_get($subscription, 'paymentProviderType');
+        $status = $this->subscriptionStatus($subscription);
+        $liveMode = data_get($subscription, 'liveMode');
+        $currency = strtoupper(trim((string) (data_get($subscription, 'currency') ?? '')));
+        $amount = data_get($subscription, 'amount');
+
+        $updates = [
+            'ghl_location_id' => $locationId,
+            'subscription_status' => $status ?: 'unknown',
+            'payment_synced_at' => now(),
+        ];
+
+        if ($contactId !== '') {
+            $updates['ghl_contact_id'] = $contactId;
+        }
+        if ($subscriptionId !== '') {
+            $updates['ghl_subscription_id'] = $subscriptionId;
+        }
+        if ($customerId !== '') {
+            $updates['ghl_customer_id'] = $customerId;
+        }
+        if ($paymentMethodId !== '') {
+            $updates['ghl_payment_method_id'] = $paymentMethodId;
+        }
+        if (filled($provider)) {
+            $updates['payment_provider'] = is_scalar($provider) ? (string) $provider : $billing->payment_provider;
+        }
+        if ($currency !== '') {
+            $updates['currency'] = $currency;
+        }
+        if (is_numeric($amount)) {
+            $numericAmount = (float) $amount;
+            // HighLevel subscription amount can arrive as dollars in the API.
+            // Only populate recurring amount when it was previously blank/zero.
+            if ((int) $billing->recurring_amount_cents <= 0) {
+                $updates['recurring_amount_cents'] = (int) round($numericAmount * 100);
+            }
+        }
+        if (! is_null($liveMode)) {
+            $updates['payment_live_mode'] = filter_var($liveMode, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? (bool) $liveMode;
+        }
+
+        $billing->forceFill($updates)->save();
+
+        return [
+            'contact_id' => $contactId ?: null,
+            'subscription_id' => $subscriptionId ?: null,
+            'customer_id' => $customerId ?: null,
+            'payment_method_id' => $paymentMethodId ?: null,
+            'subscription_status' => $status ?: 'unknown',
+            'subscription_active' => $this->isActiveSubscriptionStatus($status),
+        ];
+    }
+
+    protected function refreshLatestTransactionMetadata(User $user, BillingInformation $billing, string $contactId, array $credentials): void
+    {
+        try {
+            $response = Http::withHeaders(['Version' => 'v3'])
+                ->withToken($credentials['token'])
+                ->acceptJson()
+                ->timeout((int) config('ghl.timeout', 20))
+                ->get($this->baseUrl() . '/payments/transactions', [
+                    'altId' => $credentials['location_id'],
+                    'altType' => 'location',
+                    'locationId' => $credentials['location_id'],
+                    'contactId' => $contactId,
+                    'limit' => 10,
+                    'offset' => 0,
+                ]);
+
+            if ($response->failed()) {
+                return;
+            }
+
+            $rows = data_get($response->json(), 'data', []);
+            if (! is_array($rows) || $rows === []) {
+                return;
+            }
+
+            $latest = collect($rows)
+                ->filter(fn ($row) => is_array($row))
+                ->sortByDesc(fn ($row) => (string) (data_get($row, 'updatedAt') ?? data_get($row, 'createdAt') ?? ''))
+                ->first();
+
+            if (! is_array($latest)) {
+                return;
+            }
+
+            $brand = data_get($latest, 'paymentMethod.card.brand')
+                ?? data_get($latest, 'paymentMethod.brand')
+                ?? data_get($latest, 'card.brand');
+            $lastFour = data_get($latest, 'paymentMethod.card.last4')
+                ?? data_get($latest, 'paymentMethod.last4')
+                ?? data_get($latest, 'card.last4');
+            $expMonth = data_get($latest, 'paymentMethod.card.expMonth') ?? data_get($latest, 'card.expMonth');
+            $expYear = data_get($latest, 'paymentMethod.card.expYear') ?? data_get($latest, 'card.expYear');
+            $transactionId = trim((string) (data_get($latest, '_id') ?? data_get($latest, 'id') ?? ''));
+            $status = trim((string) (data_get($latest, 'status') ?? ''));
+            $amount = data_get($latest, 'amount');
+            $paidAt = data_get($latest, 'createdAt') ?? data_get($latest, 'paidAt');
+
+            $billingUpdates = array_filter([
+                'payment_brand' => $brand,
+                'card_last_four' => $lastFour,
+                'card_expiration' => ($expMonth && $expYear) ? sprintf('%02d/%s', (int) $expMonth, substr((string) $expYear, -2)) : null,
+                'ghl_transaction_id' => $transactionId,
+            ], fn ($value) => filled($value));
+
+            if ($billingUpdates !== []) {
+                $billing->forceFill($billingUpdates)->save();
+            }
+
+            if (class_exists(PaymentTransaction::class) && $transactionId !== '') {
+                PaymentTransaction::query()->updateOrCreate(
+                    ['ghl_transaction_id' => $transactionId],
+                    [
+                        'user_id' => $user->getKey(),
+                        'billing_information_id' => $billing->getKey(),
+                        'plan_key' => $billing->plan_key,
+                        'ghl_location_id' => $credentials['location_id'],
+                        'ghl_contact_id' => $contactId,
+                        'ghl_subscription_id' => $billing->ghl_subscription_id,
+                        'status' => $status ?: null,
+                        'currency' => strtoupper((string) (data_get($latest, 'currency') ?? $billing->currency ?? 'USD')),
+                        'amount_cents' => is_numeric($amount) ? (int) round(((float) $amount) * 100) : 0,
+                        'payment_provider' => data_get($latest, 'paymentProviderType') ?? $billing->payment_provider,
+                        'payment_mode' => data_get($latest, 'paymentMode') ?? $billing->payment_mode,
+                        'live_mode' => (bool) (data_get($latest, 'liveMode') ?? false),
+                        'card_brand' => $brand,
+                        'card_last_four' => $lastFour,
+                        'paid_at' => $paidAt ? Carbon::parse($paidAt) : null,
+                        'synced_at' => now(),
+                        'ghl_payload' => $latest,
+                    ],
+                );
+            }
+        } catch (\Throwable $exception) {
+            Log::debug('Latest billing transaction metadata refresh skipped.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function subscriptionStatus(array $subscription): string
+    {
+        $raw = data_get($subscription, 'status');
+        if (is_string($raw) || is_numeric($raw)) {
+            return strtolower(trim((string) $raw));
+        }
+        if (is_array($raw)) {
+            foreach (['status', 'value', 'name', 'label'] as $key) {
+                if (filled($raw[$key] ?? null)) {
+                    return strtolower(trim((string) $raw[$key]));
+                }
+            }
+        }
+
+        if (filled(data_get($subscription, 'canceledAt'))) {
+            return 'cancelled';
+        }
+
+        return 'unknown';
+    }
+
+    protected function isActiveSubscriptionStatus(?string $status): bool
+    {
+        return in_array(strtolower(trim((string) $status)), [
+            'active', 'trial', 'trialing', 'current',
+        ], true);
     }
 
     protected function persistSubscriberContact(User $user, BillingInformation $billing, string $contactId, string $locationId): void
     {
-        $user->forceFill([
-            'ghl_subscriber_contact_id' => $contactId,
-        ])->save();
+        if ($user->ghl_subscriber_contact_id !== $contactId) {
+            $user->forceFill(['ghl_subscriber_contact_id' => $contactId])->saveQuietly();
+        }
 
         $billing->forceFill([
             'ghl_contact_id' => $contactId,
             'ghl_location_id' => $locationId,
         ])->save();
+    }
+
+    protected function defaultBillingData(User $user): array
+    {
+        return [
+            'billing_name' => trim((string) ($user->first_name . ' ' . $user->last_name)),
+            'billing_email' => $user->email,
+            'billing_phone' => $user->phone,
+            'billing_address_1' => $user->street,
+            'billing_city' => $user->city,
+            'billing_state' => $user->state,
+            'billing_country' => $user->country ?: 'US',
+            'currency' => 'USD',
+            'ghl_location_id' => config('ghl.location_id'),
+        ];
+    }
+
+    protected function syncCacheKey(User $user, string $contactId): string
+    {
+        return 'plyrcard:billing-sync:' . $user->getKey() . ':' . sha1($contactId);
+    }
+
+    protected function forgetSyncCache(User $user): void
+    {
+        $contactId = trim((string) $user->ghl_subscriber_contact_id);
+        if ($contactId !== '') {
+            Cache::forget($this->syncCacheKey($user, $contactId));
+        }
+    }
+
+    protected function baseUrl(): string
+    {
+        return rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/');
     }
 
     protected function firstName(?string $name): ?string

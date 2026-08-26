@@ -63,7 +63,7 @@ class BillingProfileService
 
     public function get(User $user): BillingInformation
     {
-        return BillingInformation::query()->firstOrCreate(
+        $billing = BillingInformation::query()->firstOrCreate(
             ['user_id' => $user->getKey()],
             [
                 'billing_name' => trim((string) ($user->first_name . ' ' . $user->last_name)),
@@ -77,6 +77,23 @@ class BillingProfileService
                 'ghl_location_id' => config('ghl.location_id'),
             ],
         );
+
+        // If a subscriber contact has been assigned, cross-reference it against
+        // the billing subaccount. The service internally throttles this lookup so
+        // Settings/Locker Room can stay current without hammering the API.
+        if (filled($user->ghl_subscriber_contact_id)) {
+            $this->billingAccount->syncSubscriberAccount($user, $billing);
+            $billing->refresh();
+        } else {
+            // Even without a billing contact, the displayed plan must follow the
+            // user's actual PLYRCARD tier role rather than stale billing metadata.
+            $rolePlan = $this->billingAccount->rolePlanKey($user);
+            if ($rolePlan !== null && $billing->plan_key !== $rolePlan) {
+                $billing->forceFill(['plan_key' => $rolePlan])->save();
+            }
+        }
+
+        return $billing;
     }
 
     public function formData(User $user): array

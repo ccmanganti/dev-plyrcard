@@ -17,6 +17,11 @@ use Illuminate\Support\Str;
 
 class LockerRoomDataService
 {
+    public function __construct(
+        protected BillingAccountService $billingAccount,
+    ) {
+    }
+
     public function snapshot(User $user): array
     {
         $user->loadMissing(['roles', 'school', 'club', 'league', 'nationalTeam']);
@@ -25,6 +30,26 @@ class LockerRoomDataService
             ->where('user_id', $user->id)
             ->latest('updated_at')
             ->first();
+
+        if (filled($user->ghl_subscriber_contact_id)) {
+            $billing ??= BillingInformation::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'billing_name' => trim((string) ($user->first_name . ' ' . $user->last_name)),
+                    'billing_email' => $user->email,
+                    'billing_phone' => $user->phone,
+                    'billing_address_1' => $user->street,
+                    'billing_city' => $user->city,
+                    'billing_state' => $user->state,
+                    'billing_country' => $user->country ?: 'US',
+                    'currency' => 'USD',
+                    'ghl_location_id' => config('ghl.location_id'),
+                ],
+            );
+
+            $this->billingAccount->syncSubscriberAccount($user, $billing);
+            $billing->refresh();
+        }
 
         $website = Website::query()
             ->where('user_id', $user->id)
@@ -81,21 +106,27 @@ class LockerRoomDataService
 
     protected function planKey(User $user, ?BillingInformation $billing): string
     {
-        $billingPlan = strtolower(trim((string) ($billing?->plan_key ?? '')));
-
-        if ($billingPlan === 'amplify') {
-            return 'amplify';
-        }
-
-        if (in_array($billingPlan, ['my-journey', 'my_journey'], true)) {
-            return 'my-journey';
-        }
-
+        // PLYRCARD roles are authoritative for product access/current tier.
+        // Billing subscription state is verified separately against the payer
+        // contact and must not accidentally promote/downgrade application access.
         if ($this->hasRole($user, 'Amplify')) {
             return 'amplify';
         }
 
         if ($this->hasRole($user, 'My Journey')) {
+            return 'my-journey';
+        }
+
+        if ($this->hasRole($user, 'Free')) {
+            return 'free';
+        }
+
+        // Compatibility fallback for legacy users that do not yet have a tier role.
+        $billingPlan = strtolower(trim((string) ($billing?->plan_key ?? '')));
+        if ($billingPlan === 'amplify') {
+            return 'amplify';
+        }
+        if (in_array($billingPlan, ['my-journey', 'my_journey'], true)) {
             return 'my-journey';
         }
 

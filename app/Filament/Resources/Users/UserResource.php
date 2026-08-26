@@ -2173,6 +2173,14 @@ class UserResource extends Resource
                 ->modalHeading(fn (User $record) => 'Edit ' . $record->first_name . ' ' . $record->last_name)
                 ->modalSubmitActionLabel('Save changes')
                 ->modalWidth('7xl')
+                ->after(function (User $record): void {
+                    if (filled($record->ghl_subscriber_contact_id)) {
+                        // A manually assigned subscriber ID should immediately
+                        // hydrate billing/contact/payment/subscription data.
+                        app(\App\Services\BillingAccountService::class)
+                            ->syncSubscriberAccount($record, null, true);
+                    }
+                })
                 ->slideOver(),
 
             Action::make('editAccess')
