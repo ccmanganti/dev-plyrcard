@@ -2149,6 +2149,13 @@ discoverSelectedIds: [],
         .rc-profile-actions-v56 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.5rem; margin:1rem 0; }
         .rc-profile-action-v56 { min-height:3.25rem; border:1px solid var(--rc-border); border-radius:.8rem; background:var(--rc-surface); color:var(--rc-text); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.22rem; padding:.45rem .25rem; font-size:.7rem; line-height:1.1; font-weight:700; cursor:pointer; min-width:0; text-align:center; }
         .rc-profile-action-v56:hover { border-color:#ff6338; color:#ff6338; }
+        .rc-profile-action-v56.is-active { border-color:#ff6338; background:rgba(255,99,56,.10); color:#ff6338; }
+        .rc-profile-action-v56.is-favorited { border-color:#ff6338; background:#ff6338; color:#fff; }
+        .rc-profile-action-v56.is-favorited svg { fill:currentColor; }
+        .rc-profile-action-wrap-v57 { position:relative; min-width:0; }
+        .rc-profile-action-wrap-v57 > .rc-profile-action-v56 { width:100%; height:100%; }
+        .rc-profile-list-menu-v57 { top:calc(100% + .45rem) !important; left:0 !important; right:auto !important; width:min(22rem,calc(100vw - 2rem)) !important; z-index:120 !important; }
+        .rc-profile-list-menu-v57 button { grid-template-columns:1.1rem minmax(8rem,1fr) auto !important; }
         .rc-about-grid-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
         .rc-about-item-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.45rem; color:var(--rc-muted); font-size:.72rem; }
         .rc-about-item-v56 strong { display:block; color:var(--rc-text); font-size:.86rem; margin-bottom:.12rem; }
@@ -9655,6 +9662,58 @@ discoverSelectedIds: [],
                 $selectedInitials = strtoupper(collect(explode(' ', trim($selectedName)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
                 $selectedStarred = (bool) ($selectedConversation['starred'] ?? $selectedConversation['is_starred'] ?? false);
+
+                // v10.57: resolve the Inbox conversation back to the same canonical school row
+                // used by the global school slider. This keeps View School, Favorites and
+                // list membership behavior identical to the school drawer.
+                $selectedSchoolCandidateIds = collect([
+                    data_get($selectedCoach, 'school_id'),
+                    data_get($selectedCoach, 'business_id'),
+                    data_get($selectedCoach, 'ghl_business_id'),
+                    $selectedConversation['school_id'] ?? null,
+                    $selectedConversation['business_id'] ?? null,
+                    $selectedConversation['company_id'] ?? null,
+                    $selectedConversation['ghl_business_id'] ?? null,
+                ])->map(fn ($value) => trim((string) $value))->filter()->unique()->values();
+
+                $selectedInboxSchool = collect($this->allSchools())->first(function ($row) use ($selectedSchoolCandidateIds, $selectedSchool) {
+                    if (! is_array($row)) return false;
+                    $rowIds = collect([
+                        $row['id'] ?? null,
+                        $row['school_id'] ?? null,
+                        $row['business_id'] ?? null,
+                        $row['company_id'] ?? null,
+                        $row['ghl_business_id'] ?? null,
+                    ])->map(fn ($value) => trim((string) $value))->filter();
+
+                    if ($selectedSchoolCandidateIds->intersect($rowIds)->isNotEmpty()) return true;
+
+                    $rowName = trim((string) ($row['name'] ?? $row['school'] ?? $row['company_name'] ?? ''));
+                    return $selectedSchool !== '' && $rowName !== '' && strcasecmp($rowName, $selectedSchool) === 0;
+                });
+
+                if (! is_array($selectedInboxSchool)) {
+                    $selectedInboxSchool = [
+                        'id' => (string) ($selectedSchoolCandidateIds->first() ?? ''),
+                        'school_id' => (string) ($selectedSchoolCandidateIds->first() ?? ''),
+                        'name' => $selectedSchool,
+                        'logo_url' => $selectedSchoolLogo,
+                        'conference' => data_get($selectedCoach, 'conference') ?? $selectedConversation['conference'] ?? '',
+                        'division' => data_get($selectedCoach, 'division') ?? $selectedConversation['division'] ?? '',
+                        'coaches' => $selectedCoach ? [$selectedCoach] : [],
+                        'is_favorite' => false,
+                        'list_keys' => [],
+                    ];
+                }
+
+                $selectedInboxSchoolId = trim((string) ($selectedInboxSchool['id'] ?? $selectedInboxSchool['school_id'] ?? ''));
+                $selectedInboxFavorite = (bool) ($selectedInboxSchool['is_favorite'] ?? false);
+                $selectedInboxListKeys = collect($selectedInboxSchool['list_keys'] ?? $selectedInboxSchool['lists'] ?? [])
+                    ->map(fn ($key) => strtolower(trim((string) $key)))
+                    ->filter(fn ($key) => $key !== '' && $key !== '__favorite__')
+                    ->unique()->values()->all();
+                $selectedInboxLists = collect($this->lists ?? [])->filter(fn ($row) => is_array($row))->values()->all();
+
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
                 $filterStatus = $conversationStatusFilter ?? 'all';
                 $threadInitials = function (string $name): string {
@@ -10845,18 +10904,103 @@ CSS;
                                     <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div> -->
                                 </div>
 
-                                <div class="rc-profile-actions-v56">
-                                    <button type="button" class="rc-profile-action-v56" wire:click="viewSelectedConversationSchool" wire:loading.attr="disabled" wire:target="viewSelectedConversationSchool" title="View school">
+                                <div
+                                    class="rc-profile-actions-v56"
+                                    x-data="{
+                                        school: @js($selectedInboxSchool),
+                                        schoolId: @js($selectedInboxSchoolId),
+                                        favorite: @js($selectedInboxFavorite),
+                                        favoritePending: false,
+                                        listsOpen: false,
+                                        listKeys: @js($selectedInboxListKeys),
+                                        lists: @js($selectedInboxLists),
+                                        normalizeKey(value) { return String(value || '').trim().toLowerCase(); },
+                                        listKey(list) { return String(list?.key || list?.slug || list?.id || '').trim(); },
+                                        listLabel(list) { return String(list?.label || list?.name || this.listKey(list) || 'List'); },
+                                        listColor(list) { return String(list?.color || '#ff6338'); },
+                                        listCount(list) { return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0); },
+                                        inList(key) { return this.listKeys.map(v => this.normalizeKey(v)).includes(this.normalizeKey(key)); },
+                                        openSchool() {
+                                            if (!this.schoolId && !this.school?.name) return;
+                                            const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
+                                            this.listsOpen = false;
+                                            openGlobalSchool(payload);
+                                        },
+                                        async toggleFavorite() {
+                                            if (!this.schoolId || this.favoritePending) return;
+                                            const previous = this.favorite;
+                                            this.favorite = !previous;
+                                            this.favoritePending = true;
+                                            try {
+                                                const result = await this.$wire.call('queueSchoolFavoriteState', this.schoolId, this.favorite);
+                                                if (!result || result.success === false) this.favorite = previous;
+                                            } catch (_) { this.favorite = previous; }
+                                            finally { this.favoritePending = false; }
+                                        },
+                                        async toggleList(key) {
+                                            key = this.normalizeKey(key);
+                                            if (!this.schoolId || !key) return;
+                                            const previous = [...this.listKeys];
+                                            const has = this.inList(key);
+                                            this.listKeys = has ? previous.filter(v => this.normalizeKey(v) !== key) : [...previous, key];
+                                            try {
+                                                const result = await this.$wire.call('queueSchoolListMemberships', this.schoolId, { [key]: !has });
+                                                if (!result || result.success === false) this.listKeys = previous;
+                                            } catch (_) { this.listKeys = previous; }
+                                        }
+                                    }"
+                                >
+                                    <button type="button" class="rc-profile-action-v56" x-on:click.stop="openSchool()" title="View school">
                                         <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
                                         <span>View School</span>
                                     </button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="addSelectedConversationSchoolToList" wire:loading.attr="disabled" wire:target="addSelectedConversationSchoolToList" title="Add school to list">
-                                        <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                        <span>Add to List</span>
-                                    </button>
-                                    <button type="button" class="rc-profile-action-v56" wire:click="favoriteSelectedConversationSchool" wire:loading.attr="disabled" wire:target="favoriteSelectedConversationSchool" title="Add school to favorites">
-                                        <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
-                                        <span>Favorite</span>
+
+                                    <div class="rc-profile-action-wrap-v57 rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
+                                        <button
+                                            type="button"
+                                            class="rc-profile-action-v56"
+                                            x-on:click.stop="listsOpen=!listsOpen"
+                                            x-bind:class="listKeys.length ? 'is-active' : ''"
+                                            x-bind:aria-expanded="listsOpen ? 'true' : 'false'"
+                                            aria-haspopup="menu"
+                                            title="Add school to list"
+                                        >
+                                            <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                            <span x-text="listKeys.length ? 'In Lists' : 'Add to List'"></span>
+                                        </button>
+
+                                        <div class="rc-school-list-menu-v72 rc-profile-list-menu-v57" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left x-on:click.stop role="menu">
+                                            <h4>Add to a list</h4>
+                                            <template x-for="list in lists" :key="`inbox-list-${listKey(list)}`">
+                                                <button
+                                                    type="button"
+                                                    x-bind:style="`--list-color:${listColor(list)}`"
+                                                    x-bind:class="inList(listKey(list)) ? 'is-active' : ''"
+                                                    x-on:click.stop="toggleList(listKey(list))"
+                                                    role="menuitemcheckbox"
+                                                    x-bind:aria-checked="inList(listKey(list)) ? 'true' : 'false'"
+                                                >
+                                                    <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                                    <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" x-bind:style="`--dot:${listColor(list)}`"></span><span x-text="listLabel(list)"></span></span>
+                                                    <small class="rc-list-count-v81" x-text="listCount(list)"></small>
+                                                </button>
+                                            </template>
+                                            <div class="rc-school-list-empty" x-show="lists.length === 0">No lists yet.</div>
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        class="rc-profile-action-v56"
+                                        x-on:click.stop="toggleFavorite()"
+                                        x-bind:class="favorite ? 'is-favorited' : ''"
+                                        x-bind:aria-pressed="favorite ? 'true' : 'false'"
+                                        x-bind:disabled="favoritePending"
+                                        title="Favorite school"
+                                    >
+                                        <svg x-show="!favoritePending" viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                        <span class="rc-action-spinner-v81" x-cloak x-show="favoritePending"></span>
+                                        <span x-text="favorite ? 'Favorited' : 'Favorite'"></span>
                                     </button>
                                 </div>
 
