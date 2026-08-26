@@ -14,6 +14,12 @@
     $lrProfileOptionsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.profile.options')
         ? route('locker-room.profile.options')
         : null;
+    $lrDashboardActivityUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.activity')
+        ? route('locker-room.dashboard.activity')
+        : null;
+    $lrDashboardSchoolUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.school')
+        ? route('locker-room.dashboard.school', ['school' => '__SCHOOL__'])
+        : null;
     $lrScheduleStoreUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.schedule.store')
         ? route('locker-room.schedule.store')
         : null;
@@ -45,9 +51,22 @@
     $lrSupportPhone = '+15718880852';
     $lrFacebookUrl = 'https://www.facebook.com/plyrcard';
     $lrMainShareUrl = rtrim((string) config('app.url', url('/')), '/');
+
+    // v10.38: authenticated Locker Room is public-player-site only. The navigation
+    // partial resolves ownership and passes $plyrShouldRenderPullup. Never allow a
+    // direct include to make Locker Room appear inside Filament/Admin.
+    $lrOnAdmin = request()->is('admin') || request()->is('admin/*');
+    $lrOnRegistration = request()->is('registration') || request()->is('registration/*');
+    $lrRenderAllowed = isset($plyrShouldRenderPullup)
+        ? (bool) $plyrShouldRenderPullup
+        : (! $lrLoggedIn && ! $lrOnAdmin && ! $lrOnRegistration);
+
+    if ($lrOnAdmin || $lrOnRegistration) {
+        $lrRenderAllowed = false;
+    }
 @endphp
 
-@if($plyrShouldRenderPullup ?? true)
+@if($lrRenderAllowed)
 <style>
     .lr-drawer, .lr-drawer * { box-sizing: border-box; }
     .lr-drawer { position: fixed; inset: 0; z-index: 2147483600; pointer-events: none; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #111827; }
@@ -90,6 +109,39 @@
     .lr-stat-icon { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:#fff1ec; color:#ff5c35; }
     .lr-stat-value { margin-top:14px; font-size:28px; font-weight:850; letter-spacing:-.04em; color:#111827; }
     .lr-stat-label { margin-top:2px; color:#667085; font-size:12px; }
+    button.lr-stat { width:100%; text-align:left; cursor:pointer; font:inherit; transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease; }
+    button.lr-stat:hover { transform:translateY(-1px); border-color:#ffc3b1; box-shadow:0 9px 20px rgba(15,23,42,.065); }
+    .lr-stat-open { margin-left:auto; color:#98a2b3; font-size:10px; }
+    .lr-dashboard-detail { position:absolute; inset:76px 0 0; z-index:18; display:none; grid-template-rows:auto 1fr; background:#f7f8fa; border-top:1px solid #e5e7eb; }
+    .lr-dashboard-detail.is-open { display:grid; }
+    .lr-dashboard-detail-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .lr-dashboard-detail-head-main { min-width:0; display:flex; align-items:center; gap:10px; }
+    .lr-dashboard-detail-head h3 { margin:0; color:#111827; font-size:15px; font-weight:850; }
+    .lr-dashboard-detail-head p { margin:3px 0 0; color:#667085; font-size:11px; }
+    .lr-dashboard-detail-body { overflow:auto; padding:16px 18px 26px; }
+    .lr-activity-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px 14px; margin-bottom:11px; }
+    .lr-activity-summary strong { font-size:20px; color:#111827; }
+    .lr-activity-summary span { color:#667085; font-size:11px; }
+    .lr-activity-list { display:grid; gap:9px; }
+    .lr-activity-row { width:100%; border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px; display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:10px; align-items:center; text-align:left; color:#111827; }
+    .lr-activity-row.is-clickable, button.lr-activity-row { cursor:pointer; transition:border-color .14s ease, transform .14s ease, box-shadow .14s ease; }
+    .lr-activity-row.is-clickable:hover, button.lr-activity-row:hover { border-color:#ffc3b1; transform:translateY(-1px); box-shadow:0 8px 18px rgba(15,23,42,.055); }
+    .lr-activity-avatar { width:38px; height:38px; border-radius:11px; background:#fff1ec; color:#ff5c35; display:grid; place-items:center; font-size:12px; font-weight:900; }
+    .lr-activity-copy { min-width:0; }
+    .lr-activity-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+    .lr-activity-copy small { display:block; margin-top:3px; color:#667085; font-size:10px; line-height:1.35; }
+    .lr-school-link { border:0; background:#f8fafc; color:#344054; border-radius:9px; padding:7px 9px; font-size:10px; font-weight:800; cursor:pointer; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .lr-school-link:hover { background:#fff1ec; color:#e94c28; }
+    .lr-school-hero { display:grid; grid-template-columns:54px minmax(0,1fr); gap:12px; align-items:center; border:1px solid #e5e7eb; background:#fff; border-radius:15px; padding:14px; }
+    .lr-school-logo { width:54px; height:54px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; object-fit:contain; padding:5px; }
+    .lr-school-logo-fallback { width:54px; height:54px; border-radius:12px; background:#fff1ec; color:#ff5c35; display:grid; place-items:center; font-weight:900; }
+    .lr-school-meta h4 { margin:0; font-size:16px; }
+    .lr-school-meta p { margin:4px 0 0; color:#667085; font-size:11px; }
+    .lr-school-roster { display:grid; gap:8px; margin-top:12px; }
+    .lr-school-coach { border:1px solid #e5e7eb; border-radius:12px; background:#fff; padding:10px 11px; }
+    .lr-school-coach strong { display:block; font-size:12px; }
+    .lr-school-coach span { display:block; margin-top:2px; color:#667085; font-size:10px; }
+    .lr-detail-empty { border:1px dashed #d0d5dd; border-radius:14px; padding:18px; text-align:center; color:#667085; font-size:12px; background:#fff; }
     .lr-card { border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:15px; }
     .lr-card-title { margin:0; font-size:14px; font-weight:800; color:#111827; }
     .lr-card-copy { margin:5px 0 0; color:#667085; font-size:12px; line-height:1.45; }
@@ -175,45 +227,14 @@
         .lr-plan { display:none; }
     }
 
-    /* Logged-out Get Started keeps the original desktop bottom-sheet behavior.
-       Authenticated Locker Room stays the 50% right-side workspace. */
-    @media (min-width: 901px) {
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-panel {
-            top: auto !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
-            width: 100vw !important;
-            height: auto !important;
-            min-height: 0 !important;
-            max-height: min(82dvh, 620px) !important;
-            border-left: 0 !important;
-            border-top: 1px solid rgba(255,255,255,.06) !important;
-            border-radius: 16px 16px 0 0 !important;
-            box-shadow: 0 -18px 46px rgba(0,0,0,.42) !important;
-            transform: translateY(102%) !important;
-            overflow: hidden !important;
-        }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"].is-open .lr-panel { transform: translateY(0) !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-head { min-height: 48px !important; padding: 10px 12px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-head h2 { font-size: 18px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-head p { display: none !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-body { background: #050505 !important; padding: 8px 9px 62px !important; max-height: calc(min(82dvh, 620px) - 48px) !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"].is-open + .lr-drawer-tab { right: 0 !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-shell { gap: 8px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-group { gap: 4px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-group-title { color: rgba(255,255,255,.60) !important; font-size: 10px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-grid { grid-template-columns: repeat(4,minmax(0,1fr)) !important; gap: 7px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-card { min-height: 58px !important; border: 0 !important; border-radius: 7px !important; padding: 7px 5px 6px !important; gap: 5px !important; box-shadow: 0 4px 10px rgba(0,0,0,.24) !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-icon { width: auto !important; height: auto !important; border-radius: 0 !important; background: transparent !important; color: currentColor !important; font-size: 13px !important; }
-        #plyrcard-action-drawer.lr-drawer[data-authenticated="0"] .lr-guest-card strong { font-size: 10px !important; }
-    }
+    /* v10.38: Get Started uses the same right-side 50% / full-height shell as Locker Room.
+       The default .lr-panel geometry above now applies to both authenticated and guest states. */
 
     /* v10.37 Get Started launcher: restore the original 8-action structure. */
     .lr-guest-shell { display: grid; gap: 20px; width: 100%; }
     .lr-guest-group { display: grid; gap: 9px; }
     .lr-guest-group-title { color: #667085; font-size: 10px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
-    .lr-guest-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+    .lr-guest-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
     .lr-guest-card { min-width: 0; min-height: 92px; border: 1px solid #e2e6ec; border-radius: 14px; background: #fff; color: #101828; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 13px 9px; text-decoration: none; text-align: center; cursor: pointer; box-shadow: 0 5px 16px rgba(15,23,42,.035); transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, background .15s ease; }
     .lr-guest-card:hover { transform: translateY(-1px); border-color: #ffb29b; box-shadow: 0 10px 22px rgba(15,23,42,.065); }
     .lr-guest-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: #f5f7fa; color: #101828; font-size: 14px; }
@@ -223,8 +244,7 @@
     .lr-guest-card.is-accent:hover { background: #ed4e28; border-color: #ed4e28; }
     .lr-login-remember { display: flex; align-items: center; gap: 8px; color: #475467; font-size: 11px; font-weight: 700; }
     .lr-login-remember input { accent-color: #ff5c35; }
-    @media (max-width: 1100px) { .lr-guest-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
-    @media (max-width: 900px) { .lr-guest-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; } .lr-guest-card { min-height: 84px; } }
+        @media (max-width: 900px) { .lr-guest-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; } .lr-guest-card { min-height: 84px; } }
     @media (max-width: 350px) { .lr-guest-grid { grid-template-columns: 1fr; } }
 
     /* v10.35 conditional visibility + native Locker Room form controls. */
@@ -476,6 +496,8 @@
      data-url="{{ $lrDataUrl }}"
      data-profile-url="{{ $lrProfileUrl }}"
      data-profile-options-url="{{ $lrProfileOptionsUrl }}"
+     data-dashboard-activity-url="{{ $lrDashboardActivityUrl }}"
+     data-dashboard-school-url="{{ $lrDashboardSchoolUrl }}"
      data-schedule-url="{{ $lrScheduleStoreUrl }}"
      data-schedule-base-url="{{ $lrScheduleBaseUrl }}"
      data-settings-url="{{ $lrSettingsUrl }}"
@@ -549,10 +571,13 @@
                         <div class="lr-preparing" data-lr-preparing hidden><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>We are preparing your PLYRCARD.</strong><span>Complete your profile while our team gets your public PLYRCARD and recruiting workspace ready.</span></div></div>
                         <div class="lr-card"><div style="display:flex;justify-content:space-between;gap:12px;align-items:end;"><div><h3 class="lr-card-title">Profile Completion</h3><p class="lr-card-copy">A stronger profile gives coaches more useful information.</p></div><strong data-lr-completion style="font-size:24px;">0%</strong></div><div class="lr-progress-track"><div class="lr-progress-fill" data-lr-progress></div></div><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="profile">Complete My Profile</button></div></div>
                         <div class="lr-stat-grid">
-                            <div class="lr-stat"><span class="lr-stat-icon"><i class="fa-solid fa-eye"></i></span><div class="lr-stat-value" data-lr-stat="profile_views">0</div><div class="lr-stat-label">PLYRCARD Views</div></div>
-                            <div class="lr-stat"><span class="lr-stat-icon"><i class="fa-solid fa-paper-plane"></i></span><div class="lr-stat-value" data-lr-stat="emails_sent">0</div><div class="lr-stat-label">Emails Sent</div></div>
-                            <div class="lr-stat"><span class="lr-stat-icon"><i class="fa-solid fa-arrow-pointer"></i></span><div class="lr-stat-value" data-lr-stat="social_clicks">0</div><div class="lr-stat-label">Social Clicks</div></div>
-                            <div class="lr-stat"><span class="lr-stat-icon"><i class="fa-solid fa-building-columns"></i></span><div class="lr-stat-value" data-lr-stat="schools_engaged">0</div><div class="lr-stat-label">Schools Engaged</div></div>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="profile_views"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-eye"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="profile_views">0</div><div class="lr-stat-label">PLYRCARD Views</div></button>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="email_clicks"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-arrow-pointer"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="email_clicks">0</div><div class="lr-stat-label">Email Link Clicks</div></button>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="email_opens"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-envelope-open-text"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="email_opens">0</div><div class="lr-stat-label">Email Opens</div></button>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="social_clicks"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-share-nodes"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="social_clicks">0</div><div class="lr-stat-label">Coach Engagement</div></button>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="emails_sent"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-paper-plane"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="emails_sent">0</div><div class="lr-stat-label">Emails Sent</div></button>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="coach_replies"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-reply"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="coach_replies">0</div><div class="lr-stat-label">Coach Replies</div></button>
+                            <button class="lr-stat" type="button" data-lr-dashboard-metric="schools_engaged"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-building-columns"></i></span><i class="fa-solid fa-chevron-right lr-stat-open"></i></div><div class="lr-stat-value" data-lr-stat="schools_engaged">0</div><div class="lr-stat-label">Schools Engaged</div></button>
                         </div>
                         <div class="lr-card" data-lr-next-schedule><h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div></div>
                     </div>
@@ -774,6 +799,29 @@
                 <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book Demo</h3><p class="lr-card-copy">Choose a time to see how PLYRCARD works.</p></div><div data-lr-book-embed></div></div></section>
             @endauth
         </div>
+
+        <aside class="lr-dashboard-detail" data-lr-dashboard-activity-panel aria-label="Dashboard activity detail">
+            <div class="lr-dashboard-detail-head">
+                <div class="lr-dashboard-detail-head-main">
+                    <button type="button" class="lr-back" data-lr-dashboard-detail-close aria-label="Back to dashboard"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div><h3 data-lr-dashboard-detail-title>Recruiting Activity</h3><p data-lr-dashboard-detail-subtitle>Coaches connected to this activity.</p></div>
+                </div>
+                <button type="button" class="lr-close" data-lr-dashboard-detail-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="lr-dashboard-detail-body" data-lr-dashboard-detail-body><div class="lr-detail-empty">Choose a dashboard stat to view its activity.</div></div>
+        </aside>
+
+        <aside class="lr-dashboard-detail" data-lr-dashboard-school-panel aria-label="School detail">
+            <div class="lr-dashboard-detail-head">
+                <div class="lr-dashboard-detail-head-main">
+                    <button type="button" class="lr-back" data-lr-dashboard-school-close aria-label="Back to activity"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div><h3>School Details</h3><p>Local school information and coach roster.</p></div>
+                </div>
+                <button type="button" class="lr-close" data-lr-dashboard-school-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="lr-dashboard-detail-body" data-lr-dashboard-school-body><div class="lr-detail-empty">Select a school from a coach activity row.</div></div>
+        </aside>
+
         <div class="lr-toast" data-lr-toast></div>
     </section>
 </div>
@@ -802,6 +850,10 @@
     let pendingRawPreviewUrls = [];
     let rawUploadStatusMessage = '';
     let rawUploadStatusTone = '';
+    let dashboardActivityState = null;
+    let dashboardSchoolState = null;
+    let dashboardActivityLoading = false;
+    let dashboardSchoolLoading = false;
     const profileOptionCache = new Map();
     let profileOptionsLoadVersion = 0;
     const q = (s, r = drawer) => r.querySelector(s);
@@ -827,12 +879,28 @@
         if (forcePassword) setView('password', false);
         refreshData();
     }
-    function closeDrawer() { drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
+    function closeDashboardSchool() {
+        const panel = q('[data-lr-dashboard-school-panel]');
+        if (panel) panel.classList.remove('is-open');
+        dashboardSchoolState = null;
+        dashboardSchoolLoading = false;
+    }
+
+    function closeDashboardActivity() {
+        closeDashboardSchool();
+        const panel = q('[data-lr-dashboard-activity-panel]');
+        if (panel) panel.classList.remove('is-open');
+        dashboardActivityState = null;
+        dashboardActivityLoading = false;
+    }
+
+    function closeDrawer() { closeDashboardActivity(); drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
 
     function isFree() { return state?.plan?.is_free === true; }
     function requiresPremium(view) { return ['dashboard','schedule'].includes(view); }
     function setView(view, push = true) {
         if (!view) return;
+        closeDashboardActivity();
         if (forcePassword && authenticated && view !== 'password') view = 'password';
         if (authenticated && isFree() && requiresPremium(view)) {
             q('[data-lr-gate-title]').textContent = `${titles[view] || 'This feature'} is available with My Journey`;
@@ -861,6 +929,147 @@
             throw new Error(validation || json.message || `Request failed (${response.status})`);
         }
         return json;
+    }
+
+    function lrInitials(name) {
+        const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+        return (parts.slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'PC');
+    }
+
+    function metricRowSubtitle(row) {
+        const bits = [];
+        if (row.coach_title) bits.push(row.coach_title);
+        if (row.coach_email) bits.push(row.coach_email);
+        if (row.last_subject) bits.push(`Subject: ${row.last_subject}`);
+        if (row.last_at_label) bits.push(row.last_at_label);
+        return bits.join(' · ');
+    }
+
+    function renderDashboardActivityDetail() {
+        const panel = q('[data-lr-dashboard-activity-panel]');
+        const body = q('[data-lr-dashboard-detail-body]');
+        const title = q('[data-lr-dashboard-detail-title]');
+        const subtitle = q('[data-lr-dashboard-detail-subtitle]');
+        if (!panel || !body) return;
+
+        panel.classList.add('is-open');
+        if (dashboardActivityLoading) {
+            if (title) title.textContent = 'Recruiting Activity';
+            if (subtitle) subtitle.textContent = 'Loading identified coach activity...';
+            body.innerHTML = '<div class="lr-detail-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading activity...</div>';
+            return;
+        }
+
+        const data = dashboardActivityState || {};
+        const rows = Array.isArray(data.rows) ? data.rows : [];
+        if (title) title.textContent = data.label || 'Recruiting Activity';
+        if (subtitle) subtitle.textContent = data.metric === 'schools_engaged'
+            ? 'Schools connected to tracked recruiting activity.'
+            : 'Identified coaches connected to this activity.';
+
+        const note = data.note ? `<div class="lr-preparing" style="margin-bottom:11px;border-color:#e5e7eb;background:#fff;"><i class="fa-solid fa-circle-info" style="color:#667085"></i><div><span style="margin-top:0;color:#667085;">${esc(data.note)}</span></div></div>` : '';
+        const summary = `<div class="lr-activity-summary"><div><span>Total activity</span><strong>${Number(data.total || 0).toLocaleString()}</strong></div><div style="text-align:right"><span>${data.metric === 'schools_engaged' ? 'Schools listed' : 'Identified coaches'}</span><strong>${Number(data.identified_count || rows.length || 0).toLocaleString()}</strong></div></div>`;
+
+        if (!rows.length) {
+            body.innerHTML = summary + note + '<div class="lr-detail-empty">No identified coach rows are available for this stat yet.</div>';
+            return;
+        }
+
+        if (data.metric === 'schools_engaged') {
+            const html = rows.map(row => {
+                const school = row.school || {};
+                const reference = school.reference || school.id || school.name || '';
+                const meta = [school.division, school.conference, [school.city, school.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+                return `<button type="button" class="lr-activity-row" data-lr-dashboard-school="${esc(reference)}">
+                    <span class="lr-activity-avatar"><i class="fa-solid fa-building-columns"></i></span>
+                    <span class="lr-activity-copy"><strong>${esc(school.name || 'School')}</strong><small>${esc(meta || `${Number(row.coach_count || 0)} identified coach${Number(row.coach_count || 0) === 1 ? '' : 'es'}`)}</small></span>
+                    <span style="display:grid;justify-items:end;gap:3px;"><b>${Number(row.count || 0).toLocaleString()}</b><small style="color:#98a2b3;font-size:9px;">${esc(row.last_at_label || '')}</small></span>
+                </button>`;
+            }).join('');
+            body.innerHTML = summary + note + `<div class="lr-activity-list">${html}</div>`;
+            return;
+        }
+
+        const html = rows.map(row => {
+            const school = row.school || {};
+            const reference = school.reference || school.id || school.name || '';
+            const schoolName = school.name || '';
+            const platforms = Object.entries(row.platform_counts || {}).filter(([,count]) => Number(count) > 0).map(([platform,count]) => `${platform === 'x' ? 'X' : platform.charAt(0).toUpperCase()+platform.slice(1)} ${count}`).join(' · ');
+            const subtitleText = [metricRowSubtitle(row), platforms].filter(Boolean).join(' · ');
+            const tag = reference
+                ? `<button type="button" class="lr-school-link" data-lr-dashboard-school="${esc(reference)}">${esc(schoolName || 'View School')} <i class="fa-solid fa-chevron-right"></i></button>`
+                : `<span style="color:#98a2b3;font-size:10px;">${Number(row.count || 0).toLocaleString()} event${Number(row.count || 0) === 1 ? '' : 's'}</span>`;
+            return `<div class="lr-activity-row${reference ? ' is-clickable' : ''}" ${reference ? `data-lr-dashboard-school="${esc(reference)}" role="button" tabindex="0"` : ''}>
+                <span class="lr-activity-avatar">${esc(lrInitials(row.coach_name))}</span>
+                <span class="lr-activity-copy"><strong>${esc(row.coach_name || 'Coach')}</strong><small>${esc(schoolName || 'School not matched')}${subtitleText ? `<br>${esc(subtitleText)}` : ''}<br><b>${Number(row.count || 0).toLocaleString()}</b> tracked event${Number(row.count || 0) === 1 ? '' : 's'}</small></span>
+                ${tag}
+            </div>`;
+        }).join('');
+        body.innerHTML = summary + note + `<div class="lr-activity-list">${html}</div>`;
+    }
+
+    async function openDashboardMetric(metric) {
+        if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
+        closeDashboardSchool();
+        dashboardActivityLoading = true;
+        dashboardActivityState = null;
+        renderDashboardActivityDetail();
+        try {
+            const url = new URL(drawer.dataset.dashboardActivityUrl, window.location.origin);
+            url.searchParams.set('metric', metric);
+            const json = await request(url.toString());
+            dashboardActivityState = json.data || {};
+        } catch (error) {
+            dashboardActivityState = {label:'Recruiting Activity', total:0, identified_count:0, rows:[], note:error.message};
+        } finally {
+            dashboardActivityLoading = false;
+            renderDashboardActivityDetail();
+        }
+    }
+
+    function renderDashboardSchoolDetail() {
+        const panel = q('[data-lr-dashboard-school-panel]');
+        const body = q('[data-lr-dashboard-school-body]');
+        if (!panel || !body) return;
+        panel.classList.add('is-open');
+        if (dashboardSchoolLoading) {
+            body.innerHTML = '<div class="lr-detail-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading school...</div>';
+            return;
+        }
+        const data = dashboardSchoolState || {};
+        const school = data.school || null;
+        const coaches = Array.isArray(data.coaches) ? data.coaches : [];
+        if (!school) {
+            body.innerHTML = '<div class="lr-detail-empty">School information could not be matched to the local school database.</div>';
+            return;
+        }
+        const meta = [school.division, school.conference, [school.city, school.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
+        const logo = school.logo_url
+            ? `<img class="lr-school-logo" src="${esc(school.logo_url)}" alt="${esc(school.name || 'School')} logo">`
+            : `<span class="lr-school-logo-fallback">${esc(lrInitials(school.name))}</span>`;
+        const roster = coaches.length
+            ? coaches.map(coach => `<div class="lr-school-coach"><strong>${esc(coach.name || 'Coach')}</strong><span>${esc([coach.title, coach.email, coach.phone].filter(Boolean).join(' · ') || 'Coach')}</span></div>`).join('')
+            : '<div class="lr-detail-empty">No local coach roster is currently attached to this school.</div>';
+        body.innerHTML = `<div class="lr-school-hero">${logo}<div class="lr-school-meta"><h4>${esc(school.name || 'School')}</h4><p>${esc(meta || 'School information')}</p></div></div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;"><h4 style="margin:0;font-size:13px;">Coach Roster</h4><span class="lr-chip">${coaches.length} coach${coaches.length === 1 ? '' : 'es'}</span></div><div class="lr-school-roster">${roster}</div>`;
+    }
+
+    async function openDashboardSchool(reference) {
+        reference = String(reference || '').trim();
+        if (!reference || !authenticated || isFree() || !drawer.dataset.dashboardSchoolUrl) return;
+        dashboardSchoolLoading = true;
+        dashboardSchoolState = null;
+        renderDashboardSchoolDetail();
+        try {
+            const base = drawer.dataset.dashboardSchoolUrl;
+            const url = base.replace('__SCHOOL__', encodeURIComponent(reference));
+            const json = await request(url);
+            dashboardSchoolState = json.data || {};
+        } catch (error) {
+            dashboardSchoolState = {school:null, coaches:[], error:error.message};
+        } finally {
+            dashboardSchoolLoading = false;
+            renderDashboardSchoolDetail();
+        }
     }
 
     async function refreshData() {
@@ -1173,6 +1382,10 @@
         if (event.target.closest('[data-lr-close]')) { event.preventDefault(); closeDrawer(); return; }
         const back = event.target.closest('[data-lr-back]'); if (back) { event.preventDefault(); goBack(); return; }
         const nav = event.target.closest('[data-lr-nav]'); if (nav && drawer.contains(nav)) { event.preventDefault(); setView(nav.dataset.lrNav); return; }
+        const metric = event.target.closest('[data-lr-dashboard-metric]'); if (metric && drawer.contains(metric)) { event.preventDefault(); openDashboardMetric(metric.dataset.lrDashboardMetric); return; }
+        if (event.target.closest('[data-lr-dashboard-detail-close]')) { event.preventDefault(); closeDashboardActivity(); return; }
+        if (event.target.closest('[data-lr-dashboard-school-close]')) { event.preventDefault(); closeDashboardSchool(); return; }
+        const schoolDetail = event.target.closest('[data-lr-dashboard-school]'); if (schoolDetail && drawer.contains(schoolDetail)) { event.preventDefault(); event.stopPropagation(); openDashboardSchool(schoolDetail.dataset.lrDashboardSchool); return; }
         const tab = event.target.closest('[data-pane]'); if (tab && drawer.contains(tab)) { qa('[data-pane]').forEach(x=>x.classList.toggle('is-active',x===tab)); qa('[data-lr-profile-pane]').forEach(x=>x.classList.toggle('is-active',x.dataset.lrProfilePane===tab.dataset.pane)); return; }
         const positionTrigger = event.target.closest('[data-lr-position-trigger]'); if (positionTrigger && drawer.contains(positionTrigger)) { event.preventDefault(); const menu=q('[data-lr-position-menu]'); if(menu) menu.hidden=!menu.hidden; return; }
         const positionOption = event.target.closest('[data-lr-position-option]'); if (positionOption && drawer.contains(positionOption)) { event.preventDefault(); const value=positionOption.dataset.lrPositionOption; if(profilePositionSelection.has(value)) profilePositionSelection.delete(value); else profilePositionSelection.add(value); updatePositionUi(); return; }
@@ -1259,7 +1472,12 @@
 
     document.addEventListener('click', event => { const picker=q('[data-lr-position-picker]'); const menu=q('[data-lr-position-menu]'); if(picker && menu && !picker.contains(event.target)) menu.hidden=true; });
 
-    document.addEventListener('keydown', event => { if(event.key==='Escape' && drawer.classList.contains('is-open')) closeDrawer(); });
+    document.addEventListener('keydown', event => {
+        if (event.key !== 'Escape' || !drawer.classList.contains('is-open')) return;
+        if (q('[data-lr-dashboard-school-panel]')?.classList.contains('is-open')) { closeDashboardSchool(); return; }
+        if (q('[data-lr-dashboard-activity-panel]')?.classList.contains('is-open')) { closeDashboardActivity(); return; }
+        closeDrawer();
+    });
 
     // Keep the existing public mobile navigation functional without any page-loader animation.
     const menuButton=document.getElementById('menu-btn'), mobileNav=document.getElementById('mobile-nav');

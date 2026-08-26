@@ -5,9 +5,12 @@ namespace App\Services;
 use App\Models\BillingInformation;
 use App\Models\PaymentTransaction;
 use App\Models\Schedule;
+use App\Models\School;
 use App\Models\User;
 use App\Models\Website;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -226,6 +229,7 @@ class LockerRoomDataService
     protected function dashboardPayload(User $user): array
     {
         $tracking = [];
+        $remoteStats = [];
 
         try {
             $tracking = app(LocalRecruitingTrackingService::class)->dashboardStats($user);
@@ -233,28 +237,52 @@ class LockerRoomDataService
             $tracking = [];
         }
 
+        // Match the Admin Dashboard source layering: local tracking is authoritative,
+        // while cached dashboard sync values may contribute metrics that are not stored
+        // as local redirect/open events (for example coach replies).
+        try {
+            $summary = Cache::get($this->dashboardActivitySummaryCacheKey($user), []);
+            $remoteStats = is_array($summary) && is_array($summary['stats'] ?? null)
+                ? $summary['stats']
+                : [];
+        } catch (\Throwable) {
+            $remoteStats = [];
+        }
+
         $number = static fn (...$values): int => max(array_map(static fn ($value): int => is_numeric($value) ? (int) $value : 0, $values));
 
         $profileViews = $number(
             $tracking['profile_views'] ?? 0,
             $tracking['view_profile_total'] ?? 0,
-            $tracking['profile_view_school_click_count'] ?? 0
+            $tracking['profile_view_school_click_count'] ?? 0,
+            $remoteStats['profile_views'] ?? 0,
+            $remoteStats['view_profile_total'] ?? 0
         );
 
         $emailsSent = $number(
             $tracking['emails_sent'] ?? 0,
             $tracking['email_sent_count'] ?? 0,
+            $remoteStats['emails_sent'] ?? 0,
+            $remoteStats['email_sent_count'] ?? 0,
+            $remoteStats['Sent email count'] ?? 0,
+            (int) ($remoteStats['personal_emails_sent'] ?? 0) + (int) ($remoteStats['campaigns_sent'] ?? 0),
             $user->total_emails_sent ?? 0
         );
 
-        $socialClicks = (int) ($tracking['instagram_click_count'] ?? 0)
-            + (int) ($tracking['youtube_click_count'] ?? 0)
-            + (int) ($tracking['x_click_count'] ?? 0);
+        $socialClicks = $number(
+            (int) ($tracking['instagram_click_count'] ?? 0)
+                + (int) ($tracking['youtube_click_count'] ?? 0)
+                + (int) ($tracking['x_click_count'] ?? 0),
+            $tracking['social_clicks'] ?? 0,
+            $remoteStats['social_clicks'] ?? 0
+        );
 
         $schoolsEngaged = $number(
             $tracking['schools_with_clicks'] ?? 0,
             $tracking['schools_with_profile_views'] ?? 0,
-            $tracking['profile_view_unique_school_count'] ?? 0
+            $tracking['profile_view_unique_school_count'] ?? 0,
+            $remoteStats['schools_with_clicks'] ?? 0,
+            $remoteStats['schools_with_profile_views'] ?? 0
         );
 
         $upcoming = Schedule::query()
@@ -273,16 +301,483 @@ class LockerRoomDataService
             'stats' => [
                 'profile_views' => $profileViews,
                 'emails_sent' => $emailsSent,
+                'email_clicks' => $number(
+                    $tracking['email_click_count'] ?? 0,
+                    $tracking['email_clicks'] ?? 0,
+                    $remoteStats['email_click_count'] ?? 0,
+                    $remoteStats['email_clicks'] ?? 0,
+                    $remoteStats['Click count'] ?? 0
+                ),
                 'social_clicks' => $socialClicks,
                 'schools_engaged' => $schoolsEngaged,
-                'email_opens' => $number($tracking['email_opens'] ?? 0, $tracking['email_open_count'] ?? 0),
-                'coach_replies' => $number($tracking['coach_replies'] ?? 0),
-                'instagram_clicks' => (int) ($tracking['instagram_click_count'] ?? 0),
-                'youtube_clicks' => (int) ($tracking['youtube_click_count'] ?? 0),
-                'x_clicks' => (int) ($tracking['x_click_count'] ?? 0),
+                'email_opens' => $number(
+                    $tracking['email_opens'] ?? 0,
+                    $tracking['email_open_count'] ?? 0,
+                    $remoteStats['email_opens'] ?? 0,
+                    $remoteStats['email_open_count'] ?? 0,
+                    $remoteStats['Open count'] ?? 0
+                ),
+                'coach_replies' => $number($tracking['coach_replies'] ?? 0, $remoteStats['coach_replies'] ?? 0),
+                'instagram_clicks' => $number($tracking['instagram_click_count'] ?? 0, $remoteStats['instagram_click_count'] ?? 0),
+                'youtube_clicks' => $number($tracking['youtube_click_count'] ?? 0, $remoteStats['youtube_click_count'] ?? 0),
+                'x_clicks' => $number($tracking['x_click_count'] ?? 0, $remoteStats['x_click_count'] ?? 0),
             ],
             'next_schedule' => $upcoming ? $this->scheduleRow($upcoming, $user) : null,
         ];
+    }
+
+    /**
+     * Locker Room dashboard drill-down using the same local tracking source that
+     * powers the Admin Dashboard. Only coach-attributed rows are returned in the
+     * coach list; aggregate/direct visits remain represented in the stat total.
+     */
+    public function dashboardActivity(User $user, string $metric): array
+    {
+        $metric = strtolower(trim($metric));
+        $definitions = [
+            'profile_views' => ['label' => 'PLYRCARD Views', 'icon' => 'eye'],
+            'email_clicks' => ['label' => 'Email Link Clicks', 'icon' => 'cursor'],
+            'email_opens' => ['label' => 'Email Opens', 'icon' => 'envelope-open'],
+            'social_clicks' => ['label' => 'Social Clicks', 'icon' => 'share'],
+            'emails_sent' => ['label' => 'Emails Sent', 'icon' => 'paper-plane'],
+            'coach_replies' => ['label' => 'Coach Replies', 'icon' => 'reply'],
+            'schools_engaged' => ['label' => 'Schools Engaged', 'icon' => 'school'],
+        ];
+
+        if (! isset($definitions[$metric])) {
+            return ['metric' => $metric, 'label' => 'Recruiting Activity', 'total' => 0, 'identified_count' => 0, 'rows' => []];
+        }
+
+        $dashboard = $this->dashboardPayload($user);
+        $total = (int) data_get($dashboard, 'stats.' . $metric, 0);
+
+        if ($metric === 'coach_replies') {
+            $rows = $this->cachedReplyActivityRows($user);
+            return [
+                'metric' => $metric,
+                'label' => $definitions[$metric]['label'],
+                'icon' => $definitions[$metric]['icon'],
+                'total' => $total,
+                'identified_count' => count($rows),
+                'rows' => $rows,
+                'note' => $total > count($rows) ? 'Some reply activity is available only as an aggregate count.' : null,
+            ];
+        }
+
+        if (! Schema::hasTable('coach_database_tracking_events')) {
+            return [
+                'metric' => $metric,
+                'label' => $definitions[$metric]['label'],
+                'icon' => $definitions[$metric]['icon'],
+                'total' => $total,
+                'identified_count' => 0,
+                'rows' => [],
+            ];
+        }
+
+        $query = DB::table('coach_database_tracking_events')
+            ->where('athlete_user_id', $user->getKey());
+
+        if ($metric === 'profile_views') {
+            $query->where('event_type', 'profile_view');
+        } elseif ($metric === 'email_clicks') {
+            $query->where('event_type', 'link_click')
+                ->whereNotNull('message_uuid')
+                ->where('message_uuid', '<>', '');
+        } elseif ($metric === 'email_opens') {
+            $query->where('event_type', 'email_open');
+        } elseif ($metric === 'social_clicks') {
+            $query->where('event_type', 'link_click')
+                ->whereNotNull('message_uuid')
+                ->where('message_uuid', '<>', '')
+                ->whereIn('platform', ['instagram', 'youtube', 'x']);
+        } elseif ($metric === 'emails_sent') {
+            $query->where('event_type', 'email_sent');
+        } elseif ($metric === 'schools_engaged') {
+            $query->where(function ($builder): void {
+                $builder->where('event_type', 'profile_view')
+                    ->orWhere(function ($clicks): void {
+                        $clicks->where('event_type', 'link_click')
+                            ->whereNotNull('message_uuid')
+                            ->where('message_uuid', '<>', '');
+                    });
+            })->whereNotNull('school_business_id')->where('school_business_id', '<>', '');
+        }
+
+        $events = $query
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->limit(1000)
+            ->get()
+            ->map(fn ($row): array => (array) $row)
+            ->values();
+
+        if ($metric === 'schools_engaged') {
+            $rows = $this->groupSchoolActivityRows($events->all());
+        } else {
+            $rows = $this->groupCoachActivityRows($events->all(), $metric);
+        }
+
+        return [
+            'metric' => $metric,
+            'label' => $definitions[$metric]['label'],
+            'icon' => $definitions[$metric]['icon'],
+            'total' => $total,
+            'identified_count' => count($rows),
+            'rows' => $rows,
+            'note' => $metric === 'profile_views' && $total > array_sum(array_map(fn (array $row): int => (int) ($row['count'] ?? 0), $rows))
+                ? 'Direct or anonymous visits are included in the total but are not shown as identified coaches.'
+                : null,
+        ];
+    }
+
+    public function dashboardSchool(User $user, string $reference): array
+    {
+        $reference = trim(urldecode($reference));
+        if ($reference === '') {
+            return ['school' => null, 'coaches' => []];
+        }
+
+        $school = $this->resolveSchool($reference);
+        if (! $school) {
+            return [
+                'school' => [
+                    'id' => null,
+                    'reference' => $reference,
+                    'name' => str_starts_with($reference, 'school:') ? substr($reference, 7) : $reference,
+                    'logo_url' => null,
+                    'conference' => null,
+                    'division' => null,
+                    'city' => null,
+                    'state' => null,
+                ],
+                'coaches' => [],
+            ];
+        }
+
+        $coaches = [];
+        if (Schema::hasTable('coaches')) {
+            $query = DB::table('coaches')->where('school_id', $school->getKey());
+            if (Schema::hasColumn('coaches', 'deleted_at')) {
+                $query->whereNull('deleted_at');
+            }
+
+            $coaches = $query->get()->map(function ($row): array {
+                $row = (array) $row;
+                $name = trim((string) ($row['display_name'] ?? ''))
+                    ?: trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')))
+                    ?: 'Coach';
+
+                return [
+                    'id' => $row['id'] ?? null,
+                    'contact_id' => $row['ghl_contact_id'] ?? null,
+                    'name' => $name,
+                    'email' => $row['email'] ?? null,
+                    'phone' => $row['phone'] ?? null,
+                    'title' => $row['title'] ?? null,
+                    'conference' => $row['conference'] ?? null,
+                    'division' => $row['division'] ?? null,
+                ];
+            })->sortBy(fn (array $row): string => strtolower((string) ($row['name'] ?? '')))->values()->all();
+        }
+
+        return [
+            'school' => $this->schoolPayload($school),
+            'coaches' => $coaches,
+        ];
+    }
+
+    public function hasPremiumLockerRoomAccess(User $user): bool
+    {
+        $billing = BillingInformation::query()
+            ->where('user_id', $user->id)
+            ->latest('updated_at')
+            ->first();
+
+        return in_array($this->planKey($user, $billing), ['my-journey', 'amplify'], true);
+    }
+
+    protected function groupCoachActivityRows(array $events, string $metric): array
+    {
+        $contactIds = collect($events)
+            ->map(fn (array $row): string => trim((string) ($row['coach_contact_id'] ?? '')))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $coaches = collect();
+        if ($contactIds->isNotEmpty() && Schema::hasTable('coaches') && Schema::hasColumn('coaches', 'ghl_contact_id')) {
+            $coachQuery = DB::table('coaches')->whereIn('ghl_contact_id', $contactIds->all());
+            if (Schema::hasColumn('coaches', 'deleted_at')) {
+                $coachQuery->whereNull('deleted_at');
+            }
+            $coaches = $coachQuery->get()->map(fn ($row): array => (array) $row)
+                ->keyBy(fn (array $row): string => trim((string) ($row['ghl_contact_id'] ?? '')));
+        }
+
+        $grouped = [];
+
+        foreach ($events as $event) {
+            $contactId = trim((string) ($event['coach_contact_id'] ?? ''));
+            if ($contactId === '') {
+                continue;
+            }
+
+            $metadata = $this->trackingMetadata($event['metadata'] ?? null);
+            $coach = $coaches->get($contactId, []);
+            $name = trim((string) ($coach['display_name'] ?? ''))
+                ?: trim((string) (($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? '')))
+                ?: trim((string) ($metadata['coach_name'] ?? $metadata['contact_name'] ?? ''))
+                ?: 'Known coach contact';
+            $email = trim((string) ($coach['email'] ?? $metadata['coach_email'] ?? ''));
+            $title = trim((string) ($coach['title'] ?? $metadata['coach_title'] ?? ''));
+            $schoolReference = trim((string) ($event['school_business_id'] ?? ''));
+            $schoolName = trim((string) ($metadata['school_name'] ?? $metadata['school'] ?? $metadata['business_name'] ?? ''));
+
+            $school = null;
+            $coachSchoolId = $coach['school_id'] ?? null;
+            if ($coachSchoolId) {
+                $school = School::query()->find($coachSchoolId);
+            }
+            if (! $school && ($schoolReference !== '' || $schoolName !== '')) {
+                $school = $this->resolveSchool($schoolReference !== '' ? $schoolReference : 'school:' . $schoolName);
+            }
+
+            $schoolPayload = $school ? $this->schoolPayload($school) : [
+                'id' => null,
+                'reference' => $schoolReference !== '' ? $schoolReference : ($schoolName !== '' ? 'school:' . $schoolName : null),
+                'name' => $schoolName,
+                'logo_url' => null,
+                'conference' => $coach['conference'] ?? null,
+                'division' => $coach['division'] ?? null,
+                'city' => $coach['city'] ?? null,
+                'state' => $coach['state'] ?? null,
+            ];
+
+            $key = strtolower($contactId);
+            if (! isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'coach_id' => $coach['id'] ?? null,
+                    'contact_id' => $contactId,
+                    'coach_name' => $name,
+                    'coach_email' => $email !== '' ? $email : null,
+                    'coach_title' => $title !== '' ? $title : null,
+                    'school' => $schoolPayload,
+                    'count' => 0,
+                    'platform_counts' => ['instagram' => 0, 'youtube' => 0, 'x' => 0, 'website' => 0, 'email' => 0],
+                    'last_at' => $event['occurred_at'] ?? $event['created_at'] ?? null,
+                    'last_at_label' => $this->activityTimeLabel($event['occurred_at'] ?? $event['created_at'] ?? null),
+                    'last_subject' => trim((string) ($metadata['email_subject'] ?? $metadata['subject'] ?? '')) ?: null,
+                ];
+            }
+
+            $grouped[$key]['count']++;
+            $platform = strtolower(trim((string) ($event['platform'] ?? '')));
+            if (array_key_exists($platform, $grouped[$key]['platform_counts'])) {
+                $grouped[$key]['platform_counts'][$platform]++;
+            }
+        }
+
+        return collect($grouped)
+            ->sortByDesc(fn (array $row): int => (int) ($row['count'] ?? 0))
+            ->values()
+            ->take(100)
+            ->all();
+    }
+
+    protected function groupSchoolActivityRows(array $events): array
+    {
+        $rows = [];
+
+        foreach ($events as $event) {
+            $metadata = $this->trackingMetadata($event['metadata'] ?? null);
+            $reference = trim((string) ($event['school_business_id'] ?? ''));
+            $name = trim((string) ($metadata['school_name'] ?? $metadata['school'] ?? $metadata['business_name'] ?? ''));
+            if ($reference === '' && $name === '') {
+                continue;
+            }
+
+            $school = $this->resolveSchool($reference !== '' ? $reference : 'school:' . $name);
+            $payload = $school ? $this->schoolPayload($school) : [
+                'id' => null,
+                'reference' => $reference !== '' ? $reference : 'school:' . $name,
+                'name' => $name ?: $reference,
+                'logo_url' => null,
+                'conference' => null,
+                'division' => null,
+                'city' => null,
+                'state' => null,
+            ];
+
+            $key = strtolower((string) ($payload['reference'] ?? $payload['id'] ?? $payload['name'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+
+            if (! isset($rows[$key])) {
+                $rows[$key] = [
+                    'school' => $payload,
+                    'count' => 0,
+                    'coach_contacts' => [],
+                    'last_at' => $event['occurred_at'] ?? $event['created_at'] ?? null,
+                    'last_at_label' => $this->activityTimeLabel($event['occurred_at'] ?? $event['created_at'] ?? null),
+                ];
+            }
+
+            $rows[$key]['count']++;
+            $contactId = trim((string) ($event['coach_contact_id'] ?? ''));
+            if ($contactId !== '') {
+                $rows[$key]['coach_contacts'][$contactId] = true;
+            }
+        }
+
+        return collect($rows)
+            ->map(function (array $row): array {
+                $row['coach_count'] = count($row['coach_contacts'] ?? []);
+                unset($row['coach_contacts']);
+                return $row;
+            })
+            ->sortByDesc(fn (array $row): int => (int) ($row['count'] ?? 0))
+            ->values()
+            ->take(100)
+            ->all();
+    }
+
+    protected function cachedReplyActivityRows(User $user): array
+    {
+        $rows = Cache::get($this->dashboardActivityHistoryCacheKey($user), []);
+
+        return collect(is_array($rows) ? $rows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->filter(function (array $row): bool {
+                $haystack = strtolower(implode(' ', [
+                    (string) ($row['type'] ?? ''),
+                    (string) ($row['title'] ?? ''),
+                    (string) ($row['copy'] ?? ''),
+                ]));
+                return str_contains($haystack, 'reply') || str_contains($haystack, 'replied');
+            })
+            ->map(function (array $row): array {
+                $schoolRef = trim((string) ($row['school_id'] ?? $row['business_id'] ?? ''));
+                $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? ''));
+                $school = ($schoolRef !== '' || $schoolName !== '')
+                    ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
+                    : null;
+
+                return [
+                    'coach_id' => $row['coach_id'] ?? null,
+                    'contact_id' => $row['contact_id'] ?? $row['coach_contact_id'] ?? null,
+                    'coach_name' => trim((string) ($row['coach_name'] ?? $row['title'] ?? 'Coach')) ?: 'Coach',
+                    'coach_email' => $row['coach_email'] ?? $row['email'] ?? null,
+                    'coach_title' => null,
+                    'school' => $school ? $this->schoolPayload($school) : [
+                        'id' => null,
+                        'reference' => $schoolRef !== '' ? $schoolRef : ($schoolName !== '' ? 'school:' . $schoolName : null),
+                        'name' => $schoolName,
+                        'logo_url' => null,
+                        'conference' => null,
+                        'division' => null,
+                        'city' => null,
+                        'state' => null,
+                    ],
+                    'count' => max(1, (int) ($row['count'] ?? 1)),
+                    'platform_counts' => [],
+                    'last_at' => $row['time'] ?? null,
+                    'last_at_label' => $this->activityTimeLabel($row['time'] ?? null),
+                    'last_subject' => null,
+                ];
+            })
+            ->take(100)
+            ->values()
+            ->all();
+    }
+
+    protected function dashboardActivitySummaryCacheKey(User $user): string
+    {
+        return 'coach-database:dashboard-activity:' . $user->id . ':' . md5((string) ($user->ghl_location_id ?? '') . '|' . substr((string) ($user->ghl_api_key ?? ''), -12));
+    }
+
+    protected function dashboardActivityHistoryCacheKey(User $user): string
+    {
+        return 'coach-database:dashboard-activity-history:' . $user->id . ':' . md5((string) ($user->ghl_location_id ?? ''));
+    }
+
+    protected function trackingMetadata($raw): array
+    {
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    protected function resolveSchool(string $reference): ?School
+    {
+        $reference = trim(urldecode($reference));
+        if ($reference === '') {
+            return null;
+        }
+
+        if (str_starts_with($reference, 'school:')) {
+            $name = trim(substr($reference, 7));
+            return $name !== ''
+                ? School::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->first()
+                : null;
+        }
+
+        if (ctype_digit($reference)) {
+            $school = School::query()->find((int) $reference);
+            if ($school) {
+                return $school;
+            }
+        }
+
+        if (Schema::hasColumn('schools', 'ghl_business_id')) {
+            $school = School::query()->where('ghl_business_id', $reference)->first();
+            if ($school) {
+                return $school;
+            }
+        }
+
+        return School::query()->whereRaw('LOWER(name) = ?', [strtolower($reference)])->first();
+    }
+
+    protected function schoolPayload(School $school): array
+    {
+        $logo = $school->logo_url ?? $school->logo ?? null;
+        if ($logo && ! Str::startsWith((string) $logo, ['http://', 'https://'])) {
+            $logo = $this->storageUrl((string) $logo);
+        }
+
+        return [
+            'id' => $school->getKey(),
+            'reference' => filled($school->ghl_business_id ?? null) ? (string) $school->ghl_business_id : (string) $school->getKey(),
+            'business_id' => $school->ghl_business_id ?? null,
+            'name' => $school->name ?? 'School',
+            'logo_url' => $logo,
+            'conference' => $school->conference ?? null,
+            'division' => $school->division ?? null,
+            'city' => $school->city ?? null,
+            'state' => $school->state ?? null,
+        ];
+    }
+
+    protected function activityTimeLabel($value): string
+    {
+        if (! $value) {
+            return 'Recent';
+        }
+
+        try {
+            return Carbon::parse($value)->diffForHumans();
+        } catch (\Throwable) {
+            return 'Recent';
+        }
     }
 
     protected function schedulePayload(User $user): array

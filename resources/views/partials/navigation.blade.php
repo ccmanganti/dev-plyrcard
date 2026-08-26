@@ -232,24 +232,30 @@
           || (bool) $plyrViewedWebsite
           || (bool) $plyrRenderedWebsite;
 
-      $plyrOwnsViewedWebsite = $plyrControllerSaysOwnerCanSeeLocker
-          || ($plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id));
+      // v10.38: ownership is determined from the actual Website record only.
+      // Do not let a generic controller flag make Locker Room appear on another
+      // player's public PLYRCARD.
+      $plyrOwnsViewedWebsite = ($plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id))
+          || ($plyrLoggedIn && $plyrUser && $plyrRenderedWebsite && ((int) $plyrRenderedWebsite->user_id === (int) $plyrUser->id));
 
       // Final fallback for custom-domain templates where activePage is passed but the request was not matched earlier.
       if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
           $plyrOwnsViewedWebsite = (bool) $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
       }
 
-      $plyrPullUpOnly = $plyrPullUpOnly ?? ($plyrOnAdmin || $plyrOnPlayerWebsite);
+      // Player websites use only the pull-up control; Admin must never render it.
+      $plyrPullUpOnly = $plyrPullUpOnly ?? $plyrOnPlayerWebsite;
       $plyrHideHeaderNavigation = $plyrOnPlayerWebsite;
 
       /*
-      * Visibility rules:
-      * - Main PLYRCard site: logged out shows GET STARTED, logged in shows Locker Room.
-      * - Player's own website: logged in owner shows Locker Room only.
-      * - Other player websites: show nothing.
+      * v10.39 visibility rules:
+      * - /admin and /admin/* are the only places where the pull-up is suppressed.
+      * - Main PLYRCARD pages always render the pull-up: Locker Room when signed in,
+      *   Get Started when signed out.
+      * - A player website renders Locker Room only for the authenticated owner of THAT website.
+      * - Another player's website must not expose the signed-in player's Locker Room.
       */
-      if ($plyrOnRegistrationPage) {
+      if ($plyrOnAdmin) {
           $plyrShouldRenderPullup = false;
       } elseif ($plyrOnPlayerWebsite) {
           $plyrShouldRenderPullup = $plyrLoggedIn && $plyrOwnsViewedWebsite;
@@ -2699,9 +2705,9 @@
     <a data-nav href="/pricing" class="nav-link{{ ($activePage ?? '') === 'pricing' ? ' active' : '' }}">Pricing</a>
     <a data-nav href="/podcast" class="nav-link{{ ($activePage ?? '') === 'podcast' ? ' active' : '' }}">Podcast</a>
     <a data-nav href="/book-demo" class="nav-link{{ ($activePage ?? '') === 'book-demo' ? ' active' : '' }}">Book Demo</a>
-    @unless($plyrOnRegistrationPage)
+    @if($plyrShouldRenderPullup)
       <button type="button" class="nav-link" data-plyrcard-open-drawer>{{ $plyrTabLabel }}</button>
-    @endunless
+    @endif
     @guest
       <a data-nav href="/registration?utm_plan=free" class="nav-cta-pill{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
     @endguest

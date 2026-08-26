@@ -40,6 +40,42 @@ class LockerRoomController extends Controller
         ]);
     }
 
+    public function dashboardActivity(Request $request, LockerRoomDataService $dataService): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless($dataService->hasPremiumLockerRoomAccess($user), 403);
+
+        $validated = $request->validate([
+            'metric' => ['required', Rule::in([
+                'profile_views',
+                'email_clicks',
+                'email_opens',
+                'social_clicks',
+                'emails_sent',
+                'coach_replies',
+                'schools_engaged',
+            ])],
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $dataService->dashboardActivity($user, (string) $validated['metric']),
+        ]);
+    }
+
+    public function dashboardSchool(Request $request, string $school, LockerRoomDataService $dataService): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless($dataService->hasPremiumLockerRoomAccess($user), 403);
+
+        return response()->json([
+            'success' => true,
+            'data' => $dataService->dashboardSchool($user, $school),
+        ]);
+    }
+
     public function profileOptions(Request $request): JsonResponse
     {
         $user = $request->user();

@@ -329,13 +329,23 @@ Route::post('/locker-room/login', function (Request $request) {
         ->latest('updated_at')
         ->first();
 
-    $redirectUrl = url('/');
+    // v10.38: after drawer sign-in, return the player to THEIR published PLYRCARD.
+    // If it is still preparing/unpublished, use the main PLYRCARD homepage instead.
+    // Build from APP_URL so a request originating on a custom domain never sends the
+    // user to that custom domain's root by mistake.
+    $mainAppUrl = rtrim((string) config('app.url'), '/');
+    if ($mainAppUrl === '') {
+        $mainAppUrl = rtrim($request->getSchemeAndHttpHost(), '/');
+    }
+
+    $redirectUrl = $mainAppUrl . '/';
 
     if ($website) {
         if (! blank($website->domain)) {
-            $redirectUrl = route('locker-room.website.visit', $website);
+            $ownerBridgePath = route('locker-room.website.visit', $website, false);
+            $redirectUrl = $mainAppUrl . '/' . ltrim($ownerBridgePath, '/');
         } elseif (! blank($website->slug)) {
-            $redirectUrl = url('/' . ltrim($website->slug, '/'));
+            $redirectUrl = $mainAppUrl . '/' . ltrim((string) $website->slug, '/');
         }
     }
 
@@ -390,6 +400,13 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/locker-room/profile/options', [LockerRoomController::class, 'profileOptions'])
         ->name('locker-room.profile.options');
+
+    Route::get('/locker-room/dashboard/activity', [LockerRoomController::class, 'dashboardActivity'])
+        ->name('locker-room.dashboard.activity');
+
+    Route::get('/locker-room/dashboard/school/{school}', [LockerRoomController::class, 'dashboardSchool'])
+        ->where('school', '[^/]+')
+        ->name('locker-room.dashboard.school');
 
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
         ->name('locker-room.profile.update');
