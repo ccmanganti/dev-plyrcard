@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\LockerRoomController;
+use App\Http\Controllers\AmplifyUpgradeController;
 use App\Http\Controllers\PublicClubTeamController;
 use App\Http\Controllers\PublicPlayerIntakeController;
 use App\Http\Controllers\PublicWebsiteController;
@@ -23,6 +24,11 @@ use App\Http\Middleware\SendPlayerActivityEmail;
  */
 
 Route::middleware('auth')->group(function (): void {
+    Route::post('/billing/amplify/start', [AmplifyUpgradeController::class, 'start'])
+        ->name('billing.amplify.start');
+    Route::get('/billing/amplify/status', [AmplifyUpgradeController::class, 'status'])
+        ->name('billing.amplify.status');
+
     Route::get('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'index'])
         ->name('admin.external-tracking-url-generator');
 

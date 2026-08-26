@@ -11071,6 +11071,17 @@ CSS;
                         <div class="rc-card is-flat"><div class="rc-subtle">Payment</div><strong>{{ str($settingsBilling->payment_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
                     </div>
 
+                    @php
+                        $settingsIsAmplify = auth()->user()?->getRoleNames()?->contains(fn ($role) => strcasecmp(trim((string) $role), 'Amplify') === 0) ?? false;
+                    @endphp
+
+                    @if(!$settingsIsAmplify)
+                        <div class="rc-row" style="align-items:center;margin-bottom:.8rem;border:1px solid rgba(255,99,56,.22);background:rgba(255,99,56,.055);border-radius:.85rem;padding:.85rem 1rem;">
+                            <div><div class="rc-row-title">Amplify</div><p class="rc-subtle" style="margin:.2rem 0 0;">Upgrade without leaving Settings. Payment confirmation updates your account automatically.</p></div>
+                            <button class="rc-btn rc-btn-primary" type="button" data-plyrcard-amplify-open>Upgrade to Amplify</button>
+                        </div>
+                    @endif
+
                     <div class="rc-row" style="align-items:flex-start;">
                         <div>
                             <div class="rc-row-title">Payment Method</div>
@@ -14646,7 +14657,7 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 .rc-free-plan-gate-footer-v129 { margin-top:auto;padding:1rem 2rem 1.35rem;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:.65rem; }
 .rc-free-plan-gate-secondary-v129,.rc-free-plan-gate-primary-v129 { min-height:2.75rem;padding:.65rem 1.1rem;border-radius:.8rem;font-size:.8rem;font-weight:850;text-decoration:none!important;display:inline-flex;align-items:center;justify-content:center; }
 .rc-free-plan-gate-secondary-v129 { border:1px solid #d9dee7;background:#fff;color:#1f2937;cursor:pointer; }
-.rc-free-plan-gate-primary-v129 { border:1px solid #ff6338;background:#ff6338;color:#fff!important; }
+.rc-free-plan-gate-primary-v129 { border:1px solid #ff6338;background:#ff6338;color:#fff!important;cursor:pointer;font-family:inherit; }
 @media(max-width:700px){
     .rc-plyrcard-preparing-banner-v129{grid-template-columns:auto minmax(0,1fr)}
     .rc-plyrcard-preparing-action-v129{grid-column:1/-1}
@@ -14700,7 +14711,7 @@ body.rc-account-preparing .rc-account-impersonation-bar {
             </div>
             <footer class="rc-free-plan-gate-footer-v129">
                 <button type="button" class="rc-free-plan-gate-secondary-v129" x-on:click="closeFreeGate()">Not now</button>
-                <a class="rc-free-plan-gate-primary-v129" href="{{ $this->freeRoleManagePlanUrl() }}">Manage Plan</a>
+                <button type="button" class="rc-free-plan-gate-primary-v129" data-plyrcard-amplify-open>Upgrade to Amplify</button>
             </footer>
         </section>
     </div>
@@ -14832,3 +14843,4 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 </style>
 
 </x-filament-panels::page>
+@include('partials.amplify-upgrade-modal')

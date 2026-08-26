@@ -734,7 +734,25 @@
 
                 <section class="lr-view" data-lr-view="share"><div class="lr-section"><div class="lr-card" data-lr-share-card></div></div></section>
 
-                <section class="lr-view" data-lr-view="services"><form class="lr-form" data-lr-service-form><div class="lr-form-section"><h4>Additional Services</h4><p class="lr-card-copy">Tell us what extra support you need.</p><div class="lr-form-grid" style="margin-top:12px;"><div class="lr-field"><label>Service</label><select class="lr-select" name="service_key" required><option value="upgraded_site_design">Upgraded Site Design</option><option value="starting_graphics_bundle">Starting Graphics Bundle</option><option value="individual_graphic">Individual Graphic</option><option value="domain">Domain</option><option value="custom">Custom / Other</option></select></div><div class="lr-field"><label>Service Name</label><input class="lr-input" name="service_name" placeholder="Optional custom name"></div><div class="lr-field"><label>Listed Price</label><input class="lr-input" name="listed_price" placeholder="Optional"></div><div class="lr-field is-full"><label>Notes</label><textarea class="lr-textarea" name="notes"></textarea></div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Request</button></form></section>
+                <section class="lr-view" data-lr-view="services">
+                    <div class="lr-section">
+                        <div class="lr-hero"><span class="lr-eyebrow">À La Carte</span><h3>Additional Services</h3><p class="lr-muted">Add individual recruiting support whenever you need it. Ordering is coming soon.</p></div>
+                        <div class="lr-plan-grid">
+                            @foreach([
+                                ['Rep Support', '$50', '/hour', 'One-on-one time with your dedicated rep.', 'fa-user'],
+                                ['VEO Highlight Reel', '$90', 'each', 'Pro-edited highlight reel from your game film.', 'fa-film'],
+                                ['Coach Outreach Campaign', '$80', 'each', 'Targeted email campaign to a set of coaches.', 'fa-paper-plane'],
+                                ['Custom Graphic', '$50', 'each', 'Branded graphic for socials or coach outreach.', 'fa-image'],
+                            ] as [$serviceName, $servicePrice, $serviceUnit, $serviceCopy, $serviceIcon])
+                                <article class="lr-plan-card">
+                                    <div style="display:flex;gap:11px;align-items:center;"><span class="lr-menu-icon" style="width:38px;height:38px;"><i class="fa-solid {{ $serviceIcon }}"></i></span><div><div class="lr-plan-name" style="font-size:18px;">{{ $serviceName }}</div><div class="lr-plan-price" style="font-size:25px;">{{ $servicePrice }} <small>{{ $serviceUnit }}</small></div></div></div>
+                                    <p class="lr-card-copy">{{ $serviceCopy }}</p>
+                                    <div class="lr-actions"><button class="lr-btn" type="button" disabled style="opacity:.58;cursor:not-allowed;">Coming Soon</button></div>
+                                </article>
+                            @endforeach
+                        </div>
+                    </div>
+                </section>
 
                 <section class="lr-view" data-lr-view="show"><div class="lr-section"><div class="lr-hero"><span class="lr-eyebrow">PLYRCARD Show</span><h3>Stories, Recruiting & The Game</h3><p class="lr-muted">Explore PLYRCARD conversations and athlete stories. Opening the show is an intentional external action, not Locker Room navigation.</p><div class="lr-actions"><a class="lr-btn lr-btn-primary" href="/podcast">Open PLYRCARD Show</a></div></div></div></section>
 
@@ -888,7 +906,7 @@
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 
     const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
-    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',services:'Request extra support',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
+    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
 
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
@@ -1383,7 +1401,12 @@
 
     function renderPlans() {
         const box = q('[data-lr-plans]'); if (!box) return;
-        box.innerHTML = (state.plans || []).map(plan => `<article class="lr-plan-card ${plan.current?'is-current':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${plan.current?'<span class="lr-chip">Current Plan</span>':''}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${plan.current?'':`<div class="lr-actions"><a class="lr-btn lr-btn-primary" href="${esc(plan.action_url)}">${esc(plan.action_label || 'Choose Plan')}</a></div>`}</article>`).join('');
+        box.innerHTML = (state.plans || []).map(plan => {
+            const action = plan.current ? '' : (plan.key === 'amplify'
+                ? `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-plyrcard-amplify-open>${esc(plan.action_label || 'Upgrade to Amplify')}</button></div>`
+                : `<div class="lr-actions"><a class="lr-btn lr-btn-primary" href="${esc(plan.action_url)}">${esc(plan.action_label || 'Choose Plan')}</a></div>`);
+            return `<article class="lr-plan-card ${plan.current?'is-current':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${plan.current?'<span class="lr-chip">Current Plan</span>':''}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
+        }).join('');
     }
 
     function renderBilling() {
@@ -1542,8 +1565,11 @@
     if(menuButton && mobileNav && menuButton.dataset.lrBound!=='1') { menuButton.dataset.lrBound='1'; menuButton.addEventListener('click',()=>{const open=mobileNav.classList.toggle('open');menuButton.setAttribute('aria-expanded',open?'true':'false');}); }
     const header=document.getElementById('site-header'); if(header && header.dataset.lrScrollBound!=='1'){header.dataset.lrScrollBound='1'; const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>14); onScroll(); window.addEventListener('scroll',onScroll,{passive:true});}
 
+    window.addEventListener('plyrcard:amplify-upgraded', () => { refreshData(); setView('upgrade', false); showToast('Amplify is active.'); });
     if (forcePassword) setView('password', false);
     else render();
 })();
 </script>
 @endif
+
+@include('partials.amplify-upgrade-modal')
