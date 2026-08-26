@@ -300,12 +300,48 @@ class LockerRoomDataService
             $user->total_emails_sent ?? 0
         );
 
-        $socialClicks = $number(
-            (int) ($tracking['instagram_click_count'] ?? 0)
-                + (int) ($tracking['youtube_click_count'] ?? 0)
-                + (int) ($tracking['x_click_count'] ?? 0),
-            $tracking['social_clicks'] ?? 0,
-            $remoteStats['social_clicks'] ?? 0
+        // Coach Database defines Coach Engagement as Instagram + YouTube + X only.
+        // Do not use the generic social_clicks aggregate here because it may include
+        // legacy/duplicate click buckets and can substantially overstate the card.
+        $instagramClicks = $number(
+            $tracking['instagram_click_count'] ?? 0,
+            $tracking['instagram_clicks'] ?? 0,
+            $remoteStats['instagram_click_count'] ?? 0,
+            $remoteStats['instagram_clicks'] ?? 0
+        );
+        $youtubeClicks = $number(
+            $tracking['youtube_click_count'] ?? 0,
+            $tracking['youtube_clicks'] ?? 0,
+            $remoteStats['youtube_click_count'] ?? 0,
+            $remoteStats['youtube_clicks'] ?? 0
+        );
+        $xClicks = $number(
+            $tracking['x_click_count'] ?? 0,
+            $tracking['x_clicks'] ?? 0,
+            $tracking['twitter_clicks'] ?? 0,
+            $remoteStats['x_click_count'] ?? 0,
+            $remoteStats['x_clicks'] ?? 0,
+            $remoteStats['twitter_clicks'] ?? 0
+        );
+        $socialClicks = $instagramClicks + $youtubeClicks + $xClicks;
+
+        $profileUniqueContacts = $number(
+            $tracking['profile_view_unique_contact_count'] ?? 0,
+            $tracking['unique_profile_view_contacts'] ?? 0,
+            $tracking['unique_profile_views'] ?? 0,
+            $tracking['unique_profile_view_count'] ?? 0,
+            $remoteStats['profile_view_unique_contact_count'] ?? 0,
+            $remoteStats['unique_profile_view_contacts'] ?? 0,
+            $remoteStats['unique_profile_views'] ?? 0,
+            $remoteStats['unique_profile_view_count'] ?? 0
+        );
+        $profileUniqueSchools = $number(
+            $tracking['profile_view_unique_school_count'] ?? 0,
+            $tracking['schools_with_profile_views'] ?? 0,
+            $tracking['schools_with_clicks'] ?? 0,
+            $remoteStats['profile_view_unique_school_count'] ?? 0,
+            $remoteStats['schools_with_profile_views'] ?? 0,
+            $remoteStats['schools_with_clicks'] ?? 0
         );
 
         // Match the Coach Database dashboard's Favorites card.
@@ -339,6 +375,8 @@ class LockerRoomDataService
             'profile_completion' => $this->profileCompletion($user),
             'stats' => [
                 'profile_views' => $profileViews,
+                'profile_unique_contacts' => $profileUniqueContacts,
+                'profile_unique_schools' => $profileUniqueSchools,
                 'favorites' => $favorites,
                 'emails_sent' => $emailsSent,
                 'email_clicks' => $number(
@@ -349,6 +387,10 @@ class LockerRoomDataService
                     $remoteStats['Click count'] ?? 0
                 ),
                 'social_clicks' => $socialClicks,
+                'coach_engagement' => $socialClicks,
+                'instagram_clicks' => $instagramClicks,
+                'youtube_clicks' => $youtubeClicks,
+                'x_clicks' => $xClicks,
                 'schools_engaged' => $schoolsEngaged,
                 'email_opens' => $number(
                     $tracking['email_opens'] ?? 0,
@@ -358,9 +400,6 @@ class LockerRoomDataService
                     $remoteStats['Open count'] ?? 0
                 ),
                 'coach_replies' => $number($tracking['coach_replies'] ?? 0, $remoteStats['coach_replies'] ?? 0),
-                'instagram_clicks' => $number($tracking['instagram_click_count'] ?? 0, $remoteStats['instagram_click_count'] ?? 0),
-                'youtube_clicks' => $number($tracking['youtube_click_count'] ?? 0, $remoteStats['youtube_click_count'] ?? 0),
-                'x_clicks' => $number($tracking['x_click_count'] ?? 0, $remoteStats['x_click_count'] ?? 0),
             ],
             'next_schedule' => $upcoming ? $this->scheduleRow($upcoming, $user) : null,
         ];
@@ -375,10 +414,10 @@ class LockerRoomDataService
     {
         $metric = strtolower(trim($metric));
         $definitions = [
-            'profile_views' => ['label' => 'PLYRCARD Views', 'icon' => 'eye'],
+            'profile_views' => ['label' => 'Profile Views', 'icon' => 'eye'],
             'email_clicks' => ['label' => 'Email Link Clicks', 'icon' => 'cursor'],
             'email_opens' => ['label' => 'Email Opens', 'icon' => 'envelope-open'],
-            'social_clicks' => ['label' => 'Social Clicks', 'icon' => 'share'],
+            'social_clicks' => ['label' => 'Coach Engagement', 'icon' => 'share'],
             'emails_sent' => ['label' => 'Emails Sent', 'icon' => 'paper-plane'],
             'coach_replies' => ['label' => 'Coach Replies', 'icon' => 'reply'],
             'schools_engaged' => ['label' => 'Schools Engaged', 'icon' => 'school'],
@@ -402,6 +441,41 @@ class LockerRoomDataService
                 'rows' => $rows,
                 'note' => $total > count($rows) ? 'Some reply activity is available only as an aggregate count.' : null,
             ];
+        }
+
+        if ($metric === 'profile_views') {
+            $cachedRows = $this->cachedProfileViewRows($user);
+            if ($cachedRows !== []) {
+                return [
+                    'metric' => $metric,
+                    'label' => $definitions[$metric]['label'],
+                    'icon' => $definitions[$metric]['icon'],
+                    'total' => $total,
+                    'identified_count' => (int) data_get($dashboard, 'stats.profile_unique_contacts', count($cachedRows)),
+                    'schools_reached' => (int) data_get($dashboard, 'stats.profile_unique_schools', 0),
+                    'rows' => $cachedRows,
+                    'note' => 'Direct or anonymous visits are included in the total but are not shown as identified coaches.',
+                ];
+            }
+        }
+
+        if ($metric === 'social_clicks') {
+            $cachedRows = $this->cachedCoachEngagementRows($user);
+            if ($cachedRows !== []) {
+                return [
+                    'metric' => $metric,
+                    'label' => $definitions[$metric]['label'],
+                    'icon' => $definitions[$metric]['icon'],
+                    'total' => $total,
+                    'identified_count' => count($cachedRows),
+                    'platform_counts' => [
+                        'x' => (int) data_get($dashboard, 'stats.x_clicks', 0),
+                        'instagram' => (int) data_get($dashboard, 'stats.instagram_clicks', 0),
+                        'youtube' => (int) data_get($dashboard, 'stats.youtube_clicks', 0),
+                    ],
+                    'rows' => $cachedRows,
+                ];
+            }
         }
 
         if (! Schema::hasTable('coach_database_tracking_events')) {
@@ -463,7 +537,17 @@ class LockerRoomDataService
             'label' => $definitions[$metric]['label'],
             'icon' => $definitions[$metric]['icon'],
             'total' => $total,
-            'identified_count' => count($rows),
+            'identified_count' => $metric === 'profile_views'
+                ? (int) data_get($dashboard, 'stats.profile_unique_contacts', count($rows))
+                : count($rows),
+            'schools_reached' => $metric === 'profile_views'
+                ? (int) data_get($dashboard, 'stats.profile_unique_schools', 0)
+                : null,
+            'platform_counts' => $metric === 'social_clicks' ? [
+                'x' => (int) data_get($dashboard, 'stats.x_clicks', 0),
+                'instagram' => (int) data_get($dashboard, 'stats.instagram_clicks', 0),
+                'youtube' => (int) data_get($dashboard, 'stats.youtube_clicks', 0),
+            ] : null,
             'rows' => $rows,
             'note' => $metric === 'profile_views' && $total > array_sum(array_map(fn (array $row): int => (int) ($row['count'] ?? 0), $rows))
                 ? 'Direct or anonymous visits are included in the total but are not shown as identified coaches.'
@@ -680,6 +764,151 @@ class LockerRoomDataService
             ->sortByDesc(fn (array $row): int => (int) ($row['count'] ?? 0))
             ->values()
             ->take(100)
+            ->all();
+    }
+
+    protected function cachedProfileViewRows(User $user): array
+    {
+        $rows = Cache::get($this->dashboardActivityHistoryCacheKey($user), []);
+
+        return collect(is_array($rows) ? $rows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->filter(function (array $row): bool {
+                $haystack = strtolower(implode(' ', [
+                    (string) ($row['type'] ?? ''),
+                    (string) ($row['title'] ?? ''),
+                    (string) ($row['copy'] ?? ''),
+                ]));
+                return str_contains($haystack, 'view') || str_contains($haystack, 'profile');
+            })
+            ->map(function (array $row): array {
+                $title = trim((string) ($row['coach_name'] ?? $row['title'] ?? 'Coach viewed profile')) ?: 'Coach viewed profile';
+                $copy = trim(strip_tags((string) ($row['copy'] ?? 'Tracked profile activity'))) ?: 'Tracked profile activity';
+                $views = max(1, (int) ($row['views'] ?? $row['count'] ?? 1));
+                if (preg_match('/(\d[\d,]*)\s+tracked\s+profile\s+views?/i', $copy, $matches)) {
+                    $views = max($views, (int) str_replace(',', '', $matches[1]));
+                }
+
+                $schoolRef = trim((string) ($row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? ''));
+                $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? ''));
+                $school = ($schoolRef !== '' || $schoolName !== '')
+                    ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
+                    : null;
+                $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
+
+                return [
+                    'identity_key' => $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $title),
+                    'contact_id' => $contactId ?: null,
+                    'coach_name' => $title,
+                    'coach_email' => $row['coach_email'] ?? $row['email'] ?? null,
+                    'coach_title' => null,
+                    'school' => $school ? $this->schoolPayload($school) : [
+                        'id' => null,
+                        'reference' => $schoolRef !== '' ? $schoolRef : ($schoolName !== '' ? 'school:' . $schoolName : null),
+                        'name' => $schoolName,
+                        'logo_url' => $row['logo'] ?? null,
+                        'conference' => null,
+                        'division' => null,
+                        'city' => null,
+                        'state' => null,
+                    ],
+                    'count' => $views,
+                    'platform_counts' => [],
+                    'last_at' => $row['time'] ?? $row['created_at'] ?? null,
+                    'last_at_label' => $this->activityTimeLabel($row['time'] ?? $row['created_at'] ?? null),
+                    'last_subject' => null,
+                ];
+            })
+            ->groupBy('identity_key')
+            ->map(fn ($group) => collect($group)->sortByDesc(fn ($row) => (int) ($row['count'] ?? 0))->first())
+            ->filter()
+            ->sortByDesc(fn ($row) => (int) ($row['count'] ?? 0))
+            ->take(100)
+            ->values()
+            ->all();
+    }
+
+    protected function cachedCoachEngagementRows(User $user): array
+    {
+        $rows = Cache::get($this->dashboardActivityHistoryCacheKey($user), []);
+
+        $normalizePlatform = static function (array $row): string {
+            $raw = strtolower(trim((string) (
+                $row['platform_icon_key']
+                ?? $row['platform']
+                ?? $row['platform_key']
+                ?? $row['type']
+                ?? $row['title']
+                ?? ''
+            )));
+
+            return match (true) {
+                str_contains($raw, 'instagram'), $raw === 'ig' => 'instagram',
+                str_contains($raw, 'youtube'), str_contains($raw, 'you_tube'), $raw === 'yt' => 'youtube',
+                $raw === 'x', str_contains($raw, 'twitter'), str_contains($raw, 'x.com'), str_contains($raw, 'social_click_x') => 'x',
+                default => '',
+            };
+        };
+
+        return collect(is_array($rows) ? $rows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(function (array $row) use ($normalizePlatform): ?array {
+                $platform = $normalizePlatform($row);
+                if ($platform === '') return null;
+
+                $title = trim((string) ($row['coach_name'] ?? $row['title'] ?? 'Tracked coach engagement')) ?: 'Tracked coach engagement';
+                $clicks = max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1));
+                $schoolRef = trim((string) ($row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? ''));
+                $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? ''));
+                $school = ($schoolRef !== '' || $schoolName !== '')
+                    ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
+                    : null;
+                $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
+                $identity = $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $title);
+
+                return [
+                    'identity_key' => $identity,
+                    'contact_id' => $contactId ?: null,
+                    'coach_name' => $title,
+                    'coach_email' => $row['coach_email'] ?? $row['email'] ?? null,
+                    'coach_title' => null,
+                    'school' => $school ? $this->schoolPayload($school) : [
+                        'id' => null,
+                        'reference' => $schoolRef !== '' ? $schoolRef : ($schoolName !== '' ? 'school:' . $schoolName : null),
+                        'name' => $schoolName,
+                        'logo_url' => null,
+                        'conference' => null,
+                        'division' => null,
+                        'city' => null,
+                        'state' => null,
+                    ],
+                    'count' => $clicks,
+                    'platform_counts' => [
+                        'instagram' => $platform === 'instagram' ? $clicks : 0,
+                        'youtube' => $platform === 'youtube' ? $clicks : 0,
+                        'x' => $platform === 'x' ? $clicks : 0,
+                    ],
+                    'last_at' => $row['time'] ?? $row['created_at'] ?? null,
+                    'last_at_label' => $this->activityTimeLabel($row['time'] ?? $row['created_at'] ?? null),
+                    'last_subject' => null,
+                ];
+            })
+            ->filter()
+            ->groupBy('identity_key')
+            ->map(function ($group): array {
+                $group = collect($group);
+                $base = (array) $group->sortByDesc(fn ($row) => (int) ($row['count'] ?? 0))->first();
+                $base['platform_counts'] = [
+                    'instagram' => (int) $group->sum(fn ($row) => (int) data_get($row, 'platform_counts.instagram', 0)),
+                    'youtube' => (int) $group->sum(fn ($row) => (int) data_get($row, 'platform_counts.youtube', 0)),
+                    'x' => (int) $group->sum(fn ($row) => (int) data_get($row, 'platform_counts.x', 0)),
+                ];
+                $base['count'] = array_sum($base['platform_counts']);
+                return $base;
+            })
+            ->sortByDesc(fn ($row) => (int) ($row['count'] ?? 0))
+            ->take(100)
+            ->values()
             ->all();
     }
 
@@ -1025,15 +1254,20 @@ class LockerRoomDataService
 
     protected function profileCompletion(User $user): int
     {
-        $checks = [
-            filled($user->first_name), filled($user->last_name), filled($user->email), filled($user->personal_email),
-            filled($user->phone), filled($user->sport), filled($user->position), filled($user->gender), filled($user->year),
-            filled($user->birth), filled($user->school_id), filled($user->height), filled($user->weight), filled($user->player_bio),
-            filled($user->city), filled($user->state), filled($user->country), filled($user->player_image) || filled($user->plyrcard_image),
-            filled($user->league_id), filled($user->club_id), filled($user->team_name),
-        ];
+        // Use the exact same completion calculator as the Coach Database dashboard.
+        try {
+            return (int) app(ProfileCompletionService::class)->calculate($user);
+        } catch (\Throwable) {
+            $checks = [
+                filled($user->first_name), filled($user->last_name), filled($user->email), filled($user->personal_email),
+                filled($user->phone), filled($user->sport), filled($user->position), filled($user->gender), filled($user->year),
+                filled($user->birth), filled($user->school_id), filled($user->height), filled($user->weight), filled($user->player_bio),
+                filled($user->city), filled($user->state), filled($user->country), filled($user->player_image) || filled($user->plyrcard_image),
+                filled($user->league_id), filled($user->club_id), filled($user->team_name),
+            ];
 
-        return (int) round((collect($checks)->filter()->count() / max(count($checks), 1)) * 100);
+            return (int) round((collect($checks)->filter()->count() / max(count($checks), 1)) * 100);
+        }
     }
 
     protected function dateInputValue($value): ?string

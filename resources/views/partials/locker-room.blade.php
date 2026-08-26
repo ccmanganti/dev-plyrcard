@@ -122,6 +122,20 @@
     .lr-activity-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px 14px; margin-bottom:11px; }
     .lr-activity-summary strong { font-size:20px; color:#111827; }
     .lr-activity-summary span { color:#667085; font-size:11px; }
+    .lr-detail-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+    .lr-detail-kpi { border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:13px; min-width:0; }
+    .lr-detail-kpi small { display:block; color:#667085; font-size:10px; font-weight:700; }
+    .lr-detail-kpi strong { display:block; margin-top:4px; color:#111827; font-size:23px; line-height:1; letter-spacing:-.04em; }
+    .lr-detail-kpi em { display:block; margin-top:5px; color:#98a2b3; font-size:9px; font-style:normal; line-height:1.3; }
+    .lr-engagement-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+    .lr-engagement-filter { border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px; text-align:center; cursor:pointer; transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease; }
+    .lr-engagement-filter:hover { transform:translateY(-1px); border-color:#ffc3b1; }
+    .lr-engagement-filter.is-active { border-color:#ff6338; box-shadow:0 0 0 2px rgba(255,99,56,.1); }
+    .lr-engagement-filter span { display:block; color:#667085; font-size:10px; font-weight:750; }
+    .lr-engagement-filter strong { display:block; margin-top:5px; color:#111827; font-size:24px; line-height:1; }
+    .lr-skeleton { position:relative; overflow:hidden; background:#edf0f4!important; color:transparent!important; border-color:#edf0f4!important; }
+    .lr-skeleton::after { content:''; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent); animation:lrShimmer 1s infinite; }
+    @keyframes lrShimmer { to { transform:translateX(100%); } }
     .lr-activity-list { display:grid; gap:9px; }
     .lr-activity-row { width:100%; border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px; display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:10px; align-items:center; text-align:left; color:#111827; }
     .lr-activity-row.is-clickable, button.lr-activity-row { cursor:pointer; transition:border-color .14s ease, transform .14s ease, box-shadow .14s ease; }
@@ -491,6 +505,13 @@
         #plyrcard-action-drawer.lr-drawer .lr-menu-icon { width:38px !important; height:38px !important; flex-basis:38px !important; border-radius:11px !important; }
         #plyrcard-action-drawer.lr-drawer .lr-menu-copy strong { font-size:12.5px !important; line-height:1.2 !important; }
         #plyrcard-action-drawer.lr-drawer .lr-menu-copy small { font-size:10px !important; line-height:1.25 !important; margin-top:3px !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-detail-kpis,
+        #plyrcard-action-drawer.lr-drawer .lr-engagement-filters { grid-template-columns:repeat(3,minmax(0,1fr)) !important; gap:6px !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-detail-kpi,
+        #plyrcard-action-drawer.lr-drawer .lr-engagement-filter { padding:9px 6px !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-detail-kpi strong,
+        #plyrcard-action-drawer.lr-drawer .lr-engagement-filter strong { font-size:19px !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-detail-kpi em { font-size:8px !important; }
         #plyrcard-action-drawer.lr-drawer .lr-home-section-head span { display:none; }
     }
 </style>
@@ -855,6 +876,9 @@
     let dashboardSchoolState = null;
     let dashboardActivityLoading = false;
     let dashboardSchoolLoading = false;
+    let dashboardEngagementFilter = '';
+    const dashboardMetricCache = new Map();
+    const dashboardMetricPromises = new Map();
     const profileOptionCache = new Map();
     let profileOptionsLoadVersion = 0;
     const q = (s, r = drawer) => r.querySelector(s);
@@ -954,40 +978,45 @@
         if (!panel || !body) return;
 
         panel.classList.add('is-open');
-        if (dashboardActivityLoading) {
+        if (dashboardActivityLoading && !dashboardActivityState) {
             if (title) title.textContent = 'Recruiting Activity';
-            if (subtitle) subtitle.textContent = 'Loading identified coach activity...';
-            body.innerHTML = '<div class="lr-detail-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading activity...</div>';
+            if (subtitle) subtitle.textContent = 'Loading activity...';
+            body.innerHTML = `<div class="lr-detail-kpis"><div class="lr-detail-kpi lr-skeleton">.</div><div class="lr-detail-kpi lr-skeleton">.</div><div class="lr-detail-kpi lr-skeleton">.</div></div><div class="lr-activity-list"><div class="lr-activity-row lr-skeleton" style="height:66px">.</div><div class="lr-activity-row lr-skeleton" style="height:66px">.</div><div class="lr-activity-row lr-skeleton" style="height:66px">.</div></div>`;
             return;
         }
 
         const data = dashboardActivityState || {};
-        const rows = Array.isArray(data.rows) ? data.rows : [];
+        let rows = Array.isArray(data.rows) ? data.rows : [];
+        const metric = data.metric || '';
         if (title) title.textContent = data.label || 'Recruiting Activity';
-        if (subtitle) subtitle.textContent = data.metric === 'schools_engaged'
-            ? 'Schools connected to tracked recruiting activity.'
-            : 'Identified coaches connected to this activity.';
+        if (subtitle) subtitle.textContent = metric === 'profile_views'
+            ? 'Tracked profile views from your PLYRCARD activity.'
+            : metric === 'social_clicks'
+                ? 'How coaches are engaging with your social platforms.'
+                : 'Identified coaches connected to this activity.';
 
         const note = data.note ? `<div class="lr-preparing" style="margin-bottom:11px;border-color:#e5e7eb;background:#fff;"><i class="fa-solid fa-circle-info" style="color:#667085"></i><div><span style="margin-top:0;color:#667085;">${esc(data.note)}</span></div></div>` : '';
-        const summary = `<div class="lr-activity-summary"><div><span>Total activity</span><strong>${Number(data.total || 0).toLocaleString()}</strong></div><div style="text-align:right"><span>${data.metric === 'schools_engaged' ? 'Schools listed' : 'Identified coaches'}</span><strong>${Number(data.identified_count || rows.length || 0).toLocaleString()}</strong></div></div>`;
 
-        if (!rows.length) {
-            body.innerHTML = summary + note + '<div class="lr-detail-empty">No identified coach rows are available for this stat yet.</div>';
-            return;
+        let summary = '';
+        if (metric === 'profile_views') {
+            summary = `<div class="lr-detail-kpis">
+                <div class="lr-detail-kpi"><small>Total Views</small><strong>${Number(data.total || 0).toLocaleString()}</strong><em>Player website/profile views</em></div>
+                <div class="lr-detail-kpi"><small>Unique Contacts</small><strong>${Number(data.identified_count || 0).toLocaleString()}</strong><em>Distinct coaches who viewed your profile</em></div>
+                <div class="lr-detail-kpi"><small>Schools Reached</small><strong>${Number(data.schools_reached || 0).toLocaleString()}</strong><em>Schools represented by those viewers</em></div>
+            </div>`;
+        } else if (metric === 'social_clicks') {
+            const pc = data.platform_counts || {};
+            const filters = [['x','X (Twitter)'],['instagram','Instagram'],['youtube','YouTube']];
+            summary = `<div class="lr-engagement-filters">${filters.map(([key,label]) => `<button type="button" class="lr-engagement-filter${dashboardEngagementFilter === key ? ' is-active' : ''}" data-lr-engagement-filter="${key}"><span>${label}</span><strong>${Number(pc[key] || 0).toLocaleString()}</strong></button>`).join('')}</div>`;
+            if (dashboardEngagementFilter) {
+                rows = rows.filter(row => Number((row.platform_counts || {})[dashboardEngagementFilter] || 0) > 0);
+            }
+        } else {
+            summary = `<div class="lr-activity-summary"><div><span>Total activity</span><strong>${Number(data.total || 0).toLocaleString()}</strong></div><div style="text-align:right"><span>Identified coaches</span><strong>${Number(data.identified_count || rows.length || 0).toLocaleString()}</strong></div></div>`;
         }
 
-        if (data.metric === 'schools_engaged') {
-            const html = rows.map(row => {
-                const school = row.school || {};
-                const reference = school.reference || school.id || school.name || '';
-                const meta = [school.division, school.conference, [school.city, school.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
-                return `<button type="button" class="lr-activity-row" data-lr-dashboard-school="${esc(reference)}">
-                    <span class="lr-activity-avatar"><i class="fa-solid fa-building-columns"></i></span>
-                    <span class="lr-activity-copy"><strong>${esc(school.name || 'School')}</strong><small>${esc(meta || `${Number(row.coach_count || 0)} identified coach${Number(row.coach_count || 0) === 1 ? '' : 'es'}`)}</small></span>
-                    <span style="display:grid;justify-items:end;gap:3px;"><b>${Number(row.count || 0).toLocaleString()}</b><small style="color:#98a2b3;font-size:9px;">${esc(row.last_at_label || '')}</small></span>
-                </button>`;
-            }).join('');
-            body.innerHTML = summary + note + `<div class="lr-activity-list">${html}</div>`;
+        if (!rows.length) {
+            body.innerHTML = summary + note + '<div class="lr-detail-empty">No identified coach rows are available for this view yet.</div>';
             return;
         }
 
@@ -995,33 +1024,57 @@
             const school = row.school || {};
             const reference = school.reference || school.id || school.name || '';
             const schoolName = school.name || '';
-            const platforms = Object.entries(row.platform_counts || {}).filter(([,count]) => Number(count) > 0).map(([platform,count]) => `${platform === 'x' ? 'X' : platform.charAt(0).toUpperCase()+platform.slice(1)} ${count}`).join(' · ');
-            const subtitleText = [metricRowSubtitle(row), platforms].filter(Boolean).join(' · ');
+            const platformEntries = Object.entries(row.platform_counts || {}).filter(([,count]) => Number(count) > 0);
+            const platforms = platformEntries.map(([platform,count]) => `${platform === 'x' ? 'X' : platform.charAt(0).toUpperCase()+platform.slice(1)} ${count}`).join(' · ');
+            const count = metric === 'social_clicks' && dashboardEngagementFilter
+                ? Number((row.platform_counts || {})[dashboardEngagementFilter] || 0)
+                : Number(row.count || 0);
+            const subtitleText = [row.coach_email, row.last_at_label, platforms].filter(Boolean).join(' · ');
             const tag = reference
                 ? `<button type="button" class="lr-school-link" data-lr-dashboard-school="${esc(reference)}">${esc(schoolName || 'View School')} <i class="fa-solid fa-chevron-right"></i></button>`
-                : `<span style="color:#98a2b3;font-size:10px;">${Number(row.count || 0).toLocaleString()} event${Number(row.count || 0) === 1 ? '' : 's'}</span>`;
+                : `<span style="color:#98a2b3;font-size:10px;">${count.toLocaleString()} ${metric === 'social_clicks' ? 'click' : 'view'}${count === 1 ? '' : 's'}</span>`;
             return `<div class="lr-activity-row${reference ? ' is-clickable' : ''}" ${reference ? `data-lr-dashboard-school="${esc(reference)}" role="button" tabindex="0"` : ''}>
                 <span class="lr-activity-avatar">${esc(lrInitials(row.coach_name))}</span>
-                <span class="lr-activity-copy"><strong>${esc(row.coach_name || 'Coach')}</strong><small>${esc(schoolName || 'School not matched')}${subtitleText ? `<br>${esc(subtitleText)}` : ''}<br><b>${Number(row.count || 0).toLocaleString()}</b> tracked event${Number(row.count || 0) === 1 ? '' : 's'}</small></span>
+                <span class="lr-activity-copy"><strong>${esc(row.coach_name || 'Coach')}</strong><small>${esc(schoolName || 'School not matched')}${subtitleText ? `<br>${esc(subtitleText)}` : ''}<br><b>${count.toLocaleString()}</b> ${metric === 'social_clicks' ? 'click' : 'tracked view'}${count === 1 ? '' : 's'}</small></span>
                 ${tag}
             </div>`;
         }).join('');
         body.innerHTML = summary + note + `<div class="lr-activity-list">${html}</div>`;
     }
 
-    async function openDashboardMetric(metric) {
-        if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
-        closeDashboardSchool();
-        dashboardActivityLoading = true;
-        dashboardActivityState = null;
-        renderDashboardActivityDetail();
-        try {
+    async function fetchDashboardMetric(metric) {
+        if (dashboardMetricCache.has(metric)) return dashboardMetricCache.get(metric);
+        if (dashboardMetricPromises.has(metric)) return dashboardMetricPromises.get(metric);
+        const promise = (async () => {
             const url = new URL(drawer.dataset.dashboardActivityUrl, window.location.origin);
             url.searchParams.set('metric', metric);
             const json = await request(url.toString());
-            dashboardActivityState = json.data || {};
+            const data = json.data || {};
+            dashboardMetricCache.set(metric, data);
+            return data;
+        })().finally(() => dashboardMetricPromises.delete(metric));
+        dashboardMetricPromises.set(metric, promise);
+        return promise;
+    }
+
+    function prefetchDashboardMetrics() {
+        if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
+        const run = () => ['profile_views','social_clicks'].forEach(metric => fetchDashboardMetric(metric).catch(() => {}));
+        if ('requestIdleCallback' in window) window.requestIdleCallback(run, {timeout:900});
+        else setTimeout(run, 180);
+    }
+
+    async function openDashboardMetric(metric) {
+        if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
+        closeDashboardSchool();
+        dashboardEngagementFilter = '';
+        dashboardActivityState = dashboardMetricCache.get(metric) || null;
+        dashboardActivityLoading = !dashboardActivityState;
+        renderDashboardActivityDetail();
+        try {
+            dashboardActivityState = await fetchDashboardMetric(metric);
         } catch (error) {
-            dashboardActivityState = {label:'Recruiting Activity', total:0, identified_count:0, rows:[], note:error.message};
+            dashboardActivityState = {metric,label:'Recruiting Activity', total:0, identified_count:0, rows:[], note:error.message};
         } finally {
             dashboardActivityLoading = false;
             renderDashboardActivityDetail();
@@ -1110,6 +1163,7 @@
             : `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`;
 
         renderProfile(); renderSchedule(); renderSettings(); renderPlans(); renderBilling(); renderShare();
+        prefetchDashboardMetrics();
     }
 
     async function fetchProfileOptions(type, params = {}) {
@@ -1386,6 +1440,7 @@
         const back = event.target.closest('[data-lr-back]'); if (back) { event.preventDefault(); goBack(); return; }
         const nav = event.target.closest('[data-lr-nav]'); if (nav && drawer.contains(nav)) { event.preventDefault(); setView(nav.dataset.lrNav); return; }
         const metric = event.target.closest('[data-lr-dashboard-metric]'); if (metric && drawer.contains(metric)) { event.preventDefault(); openDashboardMetric(metric.dataset.lrDashboardMetric); return; }
+        const engagementFilter = event.target.closest('[data-lr-engagement-filter]'); if (engagementFilter && drawer.contains(engagementFilter)) { event.preventDefault(); dashboardEngagementFilter = dashboardEngagementFilter === engagementFilter.dataset.lrEngagementFilter ? '' : engagementFilter.dataset.lrEngagementFilter; renderDashboardActivityDetail(); return; }
         if (event.target.closest('[data-lr-dashboard-detail-close]')) { event.preventDefault(); closeDashboardActivity(); return; }
         if (event.target.closest('[data-lr-dashboard-school-close]')) { event.preventDefault(); closeDashboardSchool(); return; }
         const schoolDetail = event.target.closest('[data-lr-dashboard-school]'); if (schoolDetail && drawer.contains(schoolDetail)) { event.preventDefault(); event.stopPropagation(); openDashboardSchool(schoolDetail.dataset.lrDashboardSchool); return; }
