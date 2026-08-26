@@ -117,7 +117,7 @@ class BillingProfileService
         );
 
         $replace = [
-            '{contact_id}' => rawurlencode((string) ($billing->ghl_contact_id ?? '')),
+            '{contact_id}' => rawurlencode((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id ?: '')),
             '{customer_id}' => rawurlencode((string) ($billing->ghl_customer_id ?? '')),
             '{payment_method_id}' => rawurlencode((string) ($billing->ghl_payment_method_id ?? '')),
             '{subscription_id}' => rawurlencode((string) ($billing->ghl_subscription_id ?? '')),
@@ -131,7 +131,7 @@ class BillingProfileService
         if ($url === $template) {
             $separator = str_contains($url, '?') ? '&' : '?';
             $url .= $separator . http_build_query([
-                'contact_id' => $billing->ghl_contact_id,
+                'contact_id' => $user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id,
                 'customer_id' => $billing->ghl_customer_id,
                 'subscription_id' => $billing->ghl_subscription_id,
                 'email' => $billing->billing_email ?: $user->email,

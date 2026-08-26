@@ -620,6 +620,13 @@ class UserResource extends Resource
                                         ->maxLength(255)
                                         ->helperText('Preferred identifier. Use this when the exact GHL subaccount/location is known.'),
 
+                                    TextInput::make('ghl_subscriber_contact_id')
+                                        ->label('Subscriber Contact ID')
+                                        ->prefixIcon('heroicon-m-credit-card')
+                                        ->placeholder('Enter subscriber/payment contact ID')
+                                        ->maxLength(255)
+                                        ->helperText('Billing subscriber contact used for membership payments, upgrades, and saved payment methods. This is separate from the athlete recruiting contact.'),
+
                                     TextInput::make('ghl_api_key')
                                         ->label('GHL API Key')
                                         ->prefixIcon('heroicon-m-key')

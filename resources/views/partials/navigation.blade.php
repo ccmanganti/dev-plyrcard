@@ -104,7 +104,7 @@
               || 'www.' . $baseDomain === $plyrCurrentHostNormalized;
       };
 
-      $plyrWebsiteMatchesCurrentRequest = function (Website $website) use ($plyrDomainMatchesHost, $plyrCurrentPath) {
+      $plyrWebsiteMatchesCurrentRequest = function (\App\Models\Website $website) use ($plyrDomainMatchesHost, $plyrCurrentPath) {
           if (! blank($website->domain) && $plyrDomainMatchesHost($website->domain)) {
               return true;
           }
@@ -175,7 +175,7 @@
                   ->get();
           }
 
-          $plyrWebsite = $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website))
+          $plyrWebsite = $plyrOwnedWebsites->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website))
               ?: $plyrOwnedWebsites->first();
 
           if ($plyrWebsite) {
@@ -196,7 +196,7 @@
           // First detect the logged-in player's own website from their User -> Website relationship.
           // This is the important custom-domain path for player-owned domains such as selinpehlivan.com.
           if ($plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
-              $plyrViewedWebsite = $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
+              $plyrViewedWebsite = $plyrOwnedWebsites->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
           }
 
           // Custom-domain player site detection for public visits and other players' domains.
@@ -206,7 +206,7 @@
                   ->where('is_published', true)
                   ->whereNotNull('domain')
                   ->get()
-                  ->first(fn (Website $website) => $plyrDomainMatchesHost($website->domain));
+                  ->first(fn (\App\Models\Website $website) => $plyrDomainMatchesHost($website->domain));
           }
 
           // Path-based player site detection for main-domain URLs like /selin-pehlivan.
@@ -225,7 +225,7 @@
                       ->where('is_active', true)
                       ->where('is_published', true)
                       ->get()
-                      ->first(function (Website $website) use ($pathSlug) {
+                      ->first(function (\App\Models\Website $website) use ($pathSlug) {
                           return \Illuminate\Support\Str::slug($website->name) === $pathSlug;
                       });
               }
@@ -244,7 +244,7 @@
 
       // Final fallback for custom-domain templates where activePage is passed but the request was not matched earlier.
       if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
-          $plyrOwnsViewedWebsite = (bool) $plyrOwnedWebsites->first(fn (Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
+          $plyrOwnsViewedWebsite = (bool) $plyrOwnedWebsites->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
       }
 
       // Player websites use only the pull-up control; Admin must never render it.

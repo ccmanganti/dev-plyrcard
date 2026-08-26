@@ -23,7 +23,7 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
 
     protected $fillable = [
         'first_name','last_name','gender','personal_email','email','phone','country','state','city','street','gpa','ncaa_field_id','year','birth','height','weight','jersey_number','sport','position','dominant_foot','academic_accolades','sports_accolades','natl_team_exp','team_name','team_id','ig_handle','x_handle','yt_url','press','parent','parent_email','parent_phone','sec_parent','sec_parent_email','sec_parent_phone','club_coach','club_coach_email','club_coach_phone','natl_coach','natl_coach_email','natl_coach_phone','tech_trainer','tech_trainer_email','tech_trainer_phone','snc_trainer','snc_trainer_email','snc_trainer_phone','school_id','club_id','league_id','club_league_id','pro_club_name','pro_club_logo','legacy_club_id','legacy_league_id','legacy_team_name','national_team_id','password','plyrcard_image','player_image','action_image','national_team_image','mobile_hero_image','youtube_thumbnail','raw_player_images','player_bio','featured_video_url','featured_video_urls','youtube_channel_id','youtube_uploads_playlist_id','youtube_cached_videos','youtube_cache_refreshed_at','national_team_period','max_speed','profile_completion_percentage','profile_completion_threshold_sent_at',
-        'ghl_contact_id','ghl_location_id','ghl_api_key','total_emails_sent',
+        'ghl_contact_id','ghl_subscriber_contact_id','ghl_location_id','ghl_api_key','total_emails_sent',
         'club_referral_id','registration_source','utm_club_id','utm_league_id','utm_team_name',
         'must_change_password','onboarding_completed_at','email_verification_sent_at',
     ];
@@ -54,24 +54,11 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
         $this->forceFill(['youtube_channel_id'=>null,'youtube_uploads_playlist_id'=>null,'youtube_cached_videos'=>null,'youtube_cache_refreshed_at'=>null])->save();
     }
 
-    /**
-     * Filament still expects a MustVerifyEmail user when the panel's
-     * email-verification feature is registered. PLYRCARD does not force
-     * email verification, so authenticated users are always treated as
-     * verified for access-control purposes.
-     */
     public function hasVerifiedEmail(): bool
     {
         return true;
     }
 
-    /**
-     * PLYRCARD registration does not use Laravel's verification notification.
-     * The custom RegistrationController sends the branded registration welcome
-     * email with a /admin dashboard CTA. Keeping this override prevents a
-     * legacy Registered listener / Filament verification hook from also sending
-     * the old "Confirm email" notification.
-     */
     public function sendEmailVerificationNotification(): void
     {
         \Illuminate\Support\Facades\Log::debug('PLYRCARD suppressed Laravel verification notification.', [
@@ -80,11 +67,6 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
         ]);
     }
 
-    /**
-     * Route every Laravel password-reset notification through the same native
-     * PLYRCARD mail transport used by the registration/activity emails.
-     * Filament's custom request page also calls this service directly.
-     */
     public function sendPasswordResetNotification($token): void
     {
         $result = app(\App\Services\PlyrcardSystemEmailService::class)

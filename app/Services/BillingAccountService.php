@@ -31,7 +31,9 @@ class BillingAccountService
 
     /**
      * Create or update the payer/subscriber contact in PLYRCARD's billing
-     * subaccount. This ID belongs on BillingInformation, not User.
+     * subaccount. User::ghl_subscriber_contact_id is the authoritative user-level
+     * pointer. BillingInformation::ghl_contact_id is mirrored for billing records
+     * and existing payment services.
      */
     public function ensureBillingContact(User $user, BillingInformation $billing): ?string
     {
@@ -57,7 +59,7 @@ class BillingAccountService
             'companyName' => $billing->billing_company,
         ], fn ($value) => filled($value));
 
-        $existingContactId = trim((string) $billing->ghl_contact_id);
+        $existingContactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
 
         try {
             if ($existingContactId !== '') {
@@ -69,16 +71,24 @@ class BillingAccountService
                     ->put(rtrim((string) config('ghl.base_url', 'https://services.leadconnectorhq.com'), '/') . '/contacts/' . rawurlencode($existingContactId), $payload);
 
                 if ($response->successful()) {
+                    $this->persistSubscriberContact($user, $billing, $existingContactId, $locationId);
                     return $existingContactId;
                 }
 
                 Log::warning('Billing contact update failed; falling back to contact upsert.', [
+                    'user_id' => $user->getKey(),
                     'billing_id' => $billing->getKey(),
                     'status' => $response->status(),
                 ]);
             }
 
-            return $this->ghl->upsertContact($payload, $locationId, $token);
+            $contactId = $this->ghl->upsertContact($payload, $locationId, $token);
+
+            if ($contactId) {
+                $this->persistSubscriberContact($user, $billing, $contactId, $locationId);
+            }
+
+            return $contactId;
         } catch (\Throwable $exception) {
             Log::warning('Billing contact synchronization failed.', [
                 'user_id' => $user->getKey(),
@@ -91,8 +101,8 @@ class BillingAccountService
     }
 
     /**
-     * Hydrate the billing owner and reusable payment references from the actual
-     * subscription. This is the authoritative post-payment association.
+     * Hydrate the subscriber identity and reusable payment references from the
+     * actual subscription. This is the authoritative post-payment association.
      */
     public function refreshPaymentIdentity(BillingInformation $billing): array
     {
@@ -161,6 +171,13 @@ class BillingAccountService
 
             $billing->forceFill($updates)->save();
 
+            if ($contactId !== '') {
+                $user = $billing->user;
+                if ($user) {
+                    $user->forceFill(['ghl_subscriber_contact_id' => $contactId])->save();
+                }
+            }
+
             return [
                 'success' => true,
                 'contact_id' => $contactId ?: null,
@@ -177,6 +194,18 @@ class BillingAccountService
 
             return ['success' => false, 'reason' => 'exception'];
         }
+    }
+
+    protected function persistSubscriberContact(User $user, BillingInformation $billing, string $contactId, string $locationId): void
+    {
+        $user->forceFill([
+            'ghl_subscriber_contact_id' => $contactId,
+        ])->save();
+
+        $billing->forceFill([
+            'ghl_contact_id' => $contactId,
+            'ghl_location_id' => $locationId,
+        ])->save();
     }
 
     protected function firstName(?string $name): ?string
