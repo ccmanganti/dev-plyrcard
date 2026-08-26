@@ -485,8 +485,12 @@
         #plyrcard-action-drawer.lr-drawer .lr-menu-card { min-height:84px !important; padding:13px !important; }
     }
     @media (max-width: 520px) {
-        #plyrcard-action-drawer.lr-drawer .lr-menu-grid { grid-template-columns:1fr !important; }
-        #plyrcard-action-drawer.lr-drawer .lr-menu-card { min-height:76px !important; }
+        /* Keep Locker Room navigation compact on phones: two actions per row. */
+        #plyrcard-action-drawer.lr-drawer .lr-menu-grid { grid-template-columns:repeat(2,minmax(0,1fr)) !important; gap:8px !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-menu-card { min-height:88px !important; padding:11px 10px !important; gap:9px !important; align-items:flex-start !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-menu-icon { width:38px !important; height:38px !important; flex-basis:38px !important; border-radius:11px !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-menu-copy strong { font-size:12.5px !important; line-height:1.2 !important; }
+        #plyrcard-action-drawer.lr-drawer .lr-menu-copy small { font-size:10px !important; line-height:1.25 !important; margin-top:3px !important; }
         #plyrcard-action-drawer.lr-drawer .lr-home-section-head span { display:none; }
     }
 </style>

@@ -135,6 +135,8 @@ class BillingAccountService
             return (array) Cache::get($cacheKey);
         }
 
+        $transactionContactId = $subscriberContactId;
+
         $result = [
             'success' => true,
             'contact_id' => $subscriberContactId,
@@ -167,6 +169,7 @@ class BillingAccountService
                     $result = array_merge($result, $subscriptionState, [
                         'subscription_found' => true,
                     ]);
+                    $transactionContactId = trim((string) ($subscriptionState['contact_id'] ?? '')) ?: $subscriberContactId;
                 } else {
                     $billing->forceFill([
                         'subscription_status' => 'not_subscribed',
@@ -186,7 +189,7 @@ class BillingAccountService
                 $result['plan_key'] = $rolePlanKey;
             }
 
-            $this->refreshLatestTransactionMetadata($user, $billing, $subscriberContactId, $credentials);
+            $this->refreshLatestTransactionMetadata($user, $billing, $transactionContactId, $credentials);
             $billing->refresh();
 
             $result['billing_id'] = $billing->getKey();
@@ -321,53 +324,181 @@ class BillingAccountService
 
     protected function listSubscriptions(string $contactId, array $credentials): array
     {
-        $params = [
+        $baseParams = [
             'altId' => $credentials['location_id'],
             'altType' => 'location',
-            'contactId' => $contactId,
             'limit' => 50,
             'offset' => 0,
         ];
 
-        $response = Http::withHeaders(['Version' => 'v3'])
+        // First use the documented v3 contactId filter.
+        $response = $this->paymentsGet('/payments/subscriptions', array_merge($baseParams, [
+            'contactId' => $contactId,
+        ]), $credentials);
+
+        $rows = $response->successful()
+            ? $this->paymentRows($response->json())
+            : [];
+
+        $rows = $this->filterSubscriptionsForContact($rows, $contactId);
+
+        // Some older payment backends/tenants have accepted `contact` instead of
+        // `contactId`. Do this fallback even when the first request returns 200 +
+        // an empty data set, because a silently ignored filter otherwise looks
+        // exactly like "not subscribed".
+        if ($rows === []) {
+            $legacy = $this->paymentsGet('/payments/subscriptions', array_merge($baseParams, [
+                'contact' => $contactId,
+            ]), $credentials);
+
+            if ($legacy->successful()) {
+                $rows = $this->filterSubscriptionsForContact(
+                    $this->paymentRows($legacy->json()),
+                    $contactId,
+                );
+            }
+        }
+
+        // Most reliable fallback for older/merged contacts: transactions are
+        // filterable by contactId and expose subscriptionId. Follow those IDs
+        // back to the authoritative subscription record instead of declaring the
+        // account unsubscribed just because the list endpoint missed it.
+        if ($rows === []) {
+            $transactionRows = $this->listTransactionRows($contactId, $credentials, 50);
+            $subscriptionIds = collect($transactionRows)
+                ->filter(fn ($row) => is_array($row))
+                ->flatMap(function (array $row) use ($contactId): array {
+                    $rowContactId = trim((string) (data_get($row, 'contactId') ?? ''));
+                    $mergedFrom = trim((string) (data_get($row, 'mergedFromContactId') ?? ''));
+                    if ($rowContactId !== '' && $rowContactId !== $contactId && $mergedFrom !== $contactId) {
+                        return [];
+                    }
+
+                    return array_values(array_filter([
+                        trim((string) (data_get($row, 'subscriptionId') ?? '')),
+                        trim((string) (data_get($row, 'entityId') ?? '')),
+                    ]));
+                })
+                ->filter()
+                ->unique()
+                ->values();
+
+            foreach ($subscriptionIds as $subscriptionId) {
+                $detail = $this->getSubscriptionById((string) $subscriptionId, $credentials);
+                if (! is_array($detail)) {
+                    continue;
+                }
+
+                $detailContactId = trim((string) (data_get($detail, 'contactId') ?? ''));
+                if ($detailContactId === '' || $detailContactId === $contactId) {
+                    $rows[] = $detail;
+                    continue;
+                }
+
+                // A merged transaction is still valid evidence that this user
+                // belongs to the subscription even if HighLevel retained the old
+                // contact ID on the subscription itself.
+                $transactionMatches = collect($transactionRows)->contains(function ($row) use ($subscriptionId, $contactId): bool {
+                    return is_array($row)
+                        && trim((string) (data_get($row, 'subscriptionId') ?? '')) === (string) $subscriptionId
+                        && in_array($contactId, array_filter([
+                            trim((string) (data_get($row, 'contactId') ?? '')),
+                            trim((string) (data_get($row, 'mergedFromContactId') ?? '')),
+                        ]), true);
+                });
+
+                if ($transactionMatches) {
+                    $rows[] = $detail;
+                }
+            }
+        }
+
+        if ($rows !== []) {
+            return ['success' => true, 'subscriptions' => collect($rows)->unique(function ($row) {
+                return (string) (data_get($row, '_id') ?? data_get($row, 'id') ?? data_get($row, 'subscriptionId') ?? md5(json_encode($row)));
+            })->values()->all()];
+        }
+
+        if (isset($response) && $response->failed()) {
+            return [
+                'success' => false,
+                'reason' => 'subscription_list_failed',
+                'status' => $response->status(),
+            ];
+        }
+
+        return ['success' => true, 'subscriptions' => []];
+    }
+
+    protected function paymentsGet(string $path, array $params, array $credentials)
+    {
+        return Http::withHeaders(['Version' => 'v3'])
             ->withToken($credentials['token'])
             ->acceptJson()
             ->timeout((int) config('ghl.timeout', 20))
-            ->get($this->baseUrl() . '/payments/subscriptions', $params);
+            ->get($this->baseUrl() . $path, $params);
+    }
 
-        // Some older HighLevel payment responses used `contact` as the filter
-        // name. Retry that spelling only when the current endpoint rejects the
-        // documented/current contactId query.
-        if (in_array($response->status(), [400, 422], true)) {
-            unset($params['contactId']);
-            $params['contact'] = $contactId;
-            $response = Http::withHeaders(['Version' => 'v3'])
-                ->withToken($credentials['token'])
-                ->acceptJson()
-                ->timeout((int) config('ghl.timeout', 20))
-                ->get($this->baseUrl() . '/payments/subscriptions', $params);
-        }
-
-        if ($response->failed()) {
-            return ['success' => false, 'reason' => 'subscription_list_failed', 'status' => $response->status()];
-        }
-
-        $body = $response->json();
+    protected function paymentRows(mixed $body): array
+    {
         $body = is_array($body) ? $body : [];
         $rows = data_get($body, 'data', data_get($body, 'subscriptions', []));
-        $rows = is_array($rows) ? $rows : [];
 
-        // Never accept another contact's subscription when the remote endpoint
-        // returns broader results than requested.
-        $rows = collect($rows)->filter(function ($row) use ($contactId): bool {
+        // A few API wrappers return { data: { data: [...] } }.
+        if (is_array($rows) && array_key_exists('data', $rows) && is_array($rows['data'])) {
+            $rows = $rows['data'];
+        }
+
+        return is_array($rows) ? array_values($rows) : [];
+    }
+
+    protected function filterSubscriptionsForContact(array $rows, string $contactId): array
+    {
+        return collect($rows)->filter(function ($row) use ($contactId): bool {
             if (! is_array($row)) {
                 return false;
             }
-            $rowContact = trim((string) (data_get($row, 'contactId') ?? data_get($row, 'contact.id') ?? ''));
-            return $rowContact === '' || hash_equals($contactId, $rowContact);
-        })->values()->all();
 
-        return ['success' => true, 'subscriptions' => $rows];
+            $rowContact = trim((string) (data_get($row, 'contactId') ?? data_get($row, 'contact.id') ?? ''));
+            return $rowContact === '' || $rowContact === $contactId;
+        })->values()->all();
+    }
+
+    protected function listTransactionRows(string $contactId, array $credentials, int $limit = 50): array
+    {
+        $response = $this->paymentsGet('/payments/transactions', [
+            'altId' => $credentials['location_id'],
+            'altType' => 'location',
+            'locationId' => $credentials['location_id'],
+            'contactId' => $contactId,
+            'limit' => $limit,
+            'offset' => 0,
+        ], $credentials);
+
+        if ($response->failed()) {
+            return [];
+        }
+
+        return $this->paymentRows($response->json());
+    }
+
+    protected function getSubscriptionById(string $subscriptionId, array $credentials): ?array
+    {
+        if ($subscriptionId === '') {
+            return null;
+        }
+
+        $response = $this->paymentsGet('/payments/subscriptions/' . rawurlencode($subscriptionId), [
+            'altId' => $credentials['location_id'],
+            'altType' => 'location',
+        ], $credentials);
+
+        if ($response->failed()) {
+            return null;
+        }
+
+        $body = $response->json();
+        return is_array($body) ? $body : null;
     }
 
     protected function chooseSubscription(array $subscriptions): ?array
@@ -413,8 +544,14 @@ class BillingAccountService
     {
         $contactId = trim((string) (data_get($subscription, 'contactId') ?? data_get($subscription, 'contact.id') ?? ''));
         $subscriptionId = trim((string) (data_get($subscription, '_id') ?? data_get($subscription, 'id') ?? data_get($subscription, 'subscriptionId') ?? ''));
-        $customerId = trim((string) (data_get($subscription, 'autoPayment.customerId') ?? ''));
-        $paymentMethodId = trim((string) (data_get($subscription, 'autoPayment.paymentMethodId') ?? ''));
+        $customerId = trim((string) (data_get($subscription, 'autoPayment.customerId')
+            ?? data_get($subscription, 'autoPayment.customer.id')
+            ?? data_get($subscription, 'customerId')
+            ?? ''));
+        $paymentMethodId = trim((string) (data_get($subscription, 'autoPayment.paymentMethodId')
+            ?? data_get($subscription, 'autoPayment.paymentMethod.id')
+            ?? data_get($subscription, 'paymentMethodId')
+            ?? ''));
         $provider = data_get($subscription, 'paymentProvider.type') ?? data_get($subscription, 'paymentProviderType');
         $status = $this->subscriptionStatus($subscription);
         $liveMode = data_get($subscription, 'liveMode');
@@ -426,6 +563,13 @@ class BillingAccountService
             'subscription_status' => $status ?: 'unknown',
             'payment_synced_at' => now(),
         ];
+
+        if ($this->isActiveSubscriptionStatus($status)) {
+            // An active recurring subscription is positive evidence that billing
+            // has been established. Keep the high-level payment indicator from
+            // remaining at the stale/null "Not Available" state.
+            $updates['payment_status'] = 'paid';
+        }
 
         if ($contactId !== '') {
             $updates['ghl_contact_id'] = $contactId;
@@ -472,25 +616,8 @@ class BillingAccountService
     protected function refreshLatestTransactionMetadata(User $user, BillingInformation $billing, string $contactId, array $credentials): void
     {
         try {
-            $response = Http::withHeaders(['Version' => 'v3'])
-                ->withToken($credentials['token'])
-                ->acceptJson()
-                ->timeout((int) config('ghl.timeout', 20))
-                ->get($this->baseUrl() . '/payments/transactions', [
-                    'altId' => $credentials['location_id'],
-                    'altType' => 'location',
-                    'locationId' => $credentials['location_id'],
-                    'contactId' => $contactId,
-                    'limit' => 10,
-                    'offset' => 0,
-                ]);
-
-            if ($response->failed()) {
-                return;
-            }
-
-            $rows = data_get($response->json(), 'data', []);
-            if (! is_array($rows) || $rows === []) {
+            $rows = $this->listTransactionRows($contactId, $credentials, 25);
+            if ($rows === []) {
                 return;
             }
 
@@ -503,14 +630,19 @@ class BillingAccountService
                 return;
             }
 
-            $brand = data_get($latest, 'paymentMethod.card.brand')
-                ?? data_get($latest, 'paymentMethod.brand')
+            $paymentMethod = $this->normalizePaymentMethod(data_get($latest, 'paymentMethod'));
+            $brand = data_get($paymentMethod, 'card.brand')
+                ?? data_get($paymentMethod, 'brand')
                 ?? data_get($latest, 'card.brand');
-            $lastFour = data_get($latest, 'paymentMethod.card.last4')
-                ?? data_get($latest, 'paymentMethod.last4')
+            $lastFour = data_get($paymentMethod, 'card.last4')
+                ?? data_get($paymentMethod, 'last4')
                 ?? data_get($latest, 'card.last4');
-            $expMonth = data_get($latest, 'paymentMethod.card.expMonth') ?? data_get($latest, 'card.expMonth');
-            $expYear = data_get($latest, 'paymentMethod.card.expYear') ?? data_get($latest, 'card.expYear');
+            $expMonth = data_get($paymentMethod, 'card.expMonth')
+                ?? data_get($paymentMethod, 'expMonth')
+                ?? data_get($latest, 'card.expMonth');
+            $expYear = data_get($paymentMethod, 'card.expYear')
+                ?? data_get($paymentMethod, 'expYear')
+                ?? data_get($latest, 'card.expYear');
             $transactionId = trim((string) (data_get($latest, '_id') ?? data_get($latest, 'id') ?? ''));
             $status = trim((string) (data_get($latest, 'status') ?? ''));
             $amount = data_get($latest, 'amount');
@@ -557,6 +689,40 @@ class BillingAccountService
                 'error' => $exception->getMessage(),
             ]);
         }
+    }
+
+    protected function normalizePaymentMethod(mixed $value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        // The Payments API documentation also shows paymentMethod as a serialized
+        // object string. Extract only safe display metadata from that form.
+        $safe = [];
+        if (preg_match('/["\']?brand["\']?\s*[:=]\s*["\']?([a-z0-9 _-]+)/i', $value, $match)) {
+            $safe['brand'] = trim($match[1]);
+        }
+        if (preg_match('/["\']?last4["\']?\s*[:=]\s*["\']?(\d{4})/i', $value, $match)) {
+            $safe['last4'] = $match[1];
+        }
+        if (preg_match('/["\']?expMonth["\']?\s*[:=]\s*["\']?(\d{1,2})/i', $value, $match)) {
+            $safe['expMonth'] = (int) $match[1];
+        }
+        if (preg_match('/["\']?expYear["\']?\s*[:=]\s*["\']?(\d{2,4})/i', $value, $match)) {
+            $safe['expYear'] = (int) $match[1];
+        }
+
+        return $safe;
     }
 
     protected function subscriptionStatus(array $subscription): string
@@ -616,7 +782,7 @@ class BillingAccountService
 
     protected function syncCacheKey(User $user, string $contactId): string
     {
-        return 'plyrcard:billing-sync:' . $user->getKey() . ':' . sha1($contactId);
+        return 'plyrcard:billing-sync:v10-49:' . $user->getKey() . ':' . sha1($contactId);
     }
 
     protected function forgetSyncCache(User $user): void
