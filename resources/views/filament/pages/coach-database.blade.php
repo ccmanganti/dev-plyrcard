@@ -1,6 +1,6 @@
 @php
     // v10.55: compute the canonical drawer catalog before Alpine serializes it.
-    $globalSchoolDrawerCatalog = in_array($section, ['dashboard', 'schools', 'favorites', 'lists'], true)
+    $globalSchoolDrawerCatalog = in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'conversations'], true)
         ? $this->discoverClientSchools
         : [];
 @endphp
@@ -2154,8 +2154,28 @@ discoverSelectedIds: [],
         .rc-profile-action-v56.is-favorited svg { fill:currentColor; }
         .rc-profile-action-wrap-v57 { position:relative; min-width:0; }
         .rc-profile-action-wrap-v57 > .rc-profile-action-v56 { width:100%; height:100%; }
-        .rc-profile-list-menu-v57 { top:calc(100% + .45rem) !important; left:0 !important; right:auto !important; width:min(22rem,calc(100vw - 2rem)) !important; z-index:120 !important; }
-        .rc-profile-list-menu-v57 button { grid-template-columns:1.1rem minmax(8rem,1fr) auto !important; }
+        .rc-profile-list-menu-v57 {
+            top:calc(100% + .35rem) !important;
+            left:50% !important;
+            right:auto !important;
+            transform:translateX(-50%) !important;
+            width:min(14.5rem,calc(100vw - 1.5rem)) !important;
+            max-height:15.5rem !important;
+            overflow-y:auto !important;
+            padding:.45rem !important;
+            border-radius:.75rem !important;
+            z-index:120 !important;
+        }
+        .rc-profile-list-menu-v57 h4 { margin:.12rem .35rem .35rem !important; font-size:.7rem !important; }
+        .rc-profile-list-menu-v57 button {
+            grid-template-columns:.95rem minmax(0,1fr) auto !important;
+            min-height:2.2rem !important;
+            padding:.38rem .45rem !important;
+            gap:.38rem !important;
+            font-size:.69rem !important;
+            border-radius:.55rem !important;
+        }
+        .rc-profile-list-menu-v57 .rc-list-count-v81 { font-size:.62rem !important; }
         .rc-about-grid-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
         .rc-about-item-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.45rem; color:var(--rc-muted); font-size:.72rem; }
         .rc-about-item-v56 strong { display:block; color:var(--rc-text); font-size:.86rem; margin-bottom:.12rem; }
@@ -6610,7 +6630,7 @@ discoverSelectedIds: [],
         x-on:rc-discover-school-state.window="applyGlobalSchoolState($event.detail)"
         x-on:rc-discover-count.window="discoverClientCount = Number($event.detail?.total || 0); discoverClientShown = Number($event.detail?.shown || 0)"
         x-on:rc-discover-conferences.window="discoverAvailableConferences = Array.isArray($event.detail?.conferences) ? $event.detail.conferences : []; if (discoverConference && !discoverAvailableConferences.includes(discoverConference)) discoverConference = ''"
-        @if(! in_array($section, ['schools', 'favorites', 'lists'], true))
+        @if(! in_array($section, ['schools', 'favorites', 'lists', 'conversations'], true))
             wire:poll.5s.visible="pollRealtime"
         @endif
     >
@@ -10912,6 +10932,7 @@ CSS;
                                         favorite: @js($selectedInboxFavorite),
                                         favoritePending: false,
                                         listsOpen: false,
+                                        openingSchool: false,
                                         listKeys: @js($selectedInboxListKeys),
                                         lists: @js($selectedInboxLists),
                                         normalizeKey(value) { return String(value || '').trim().toLowerCase(); },
@@ -10921,10 +10942,14 @@ CSS;
                                         listCount(list) { return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0); },
                                         inList(key) { return this.listKeys.map(v => this.normalizeKey(v)).includes(this.normalizeKey(key)); },
                                         openSchool() {
-                                            if (!this.schoolId && !this.school?.name) return;
+                                            if (this.openingSchool || (!this.schoolId && !this.school?.name)) return;
+                                            this.openingSchool = true;
                                             const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
                                             this.listsOpen = false;
-                                            openGlobalSchool(payload);
+                                            this.$nextTick(() => {
+                                                openGlobalSchool(payload);
+                                                window.setTimeout(() => { this.openingSchool = false; }, 350);
+                                            });
                                         },
                                         async toggleFavorite() {
                                             if (!this.schoolId || this.favoritePending) return;
@@ -10950,7 +10975,7 @@ CSS;
                                         }
                                     }"
                                 >
-                                    <button type="button" class="rc-profile-action-v56" x-on:click.stop="openSchool()" title="View school">
+                                    <button type="button" class="rc-profile-action-v56" x-on:click.stop.prevent="openSchool()" x-bind:disabled="openingSchool" title="View school">
                                         <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
                                         <span>View School</span>
                                     </button>
