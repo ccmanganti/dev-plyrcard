@@ -55,44 +55,17 @@ discoverSelectedIds: [],
             discoverNewDrawerListName: '',
             discoverCreatingList: false,
             optimisticSchool: null,
+            schoolDrawerOpen: false,
             globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
             init() {
-                // Restore the drawer only when the browser-side value still resolves to
-                // a real school in the current canonical catalog. Old placeholder values
-                // such as { id: 'school', name: 'School' } must never reopen the drawer.
-                const stale = window.__plyrSchoolDrawerOptimistic || null;
-                if (!stale || typeof stale !== 'object') {
-                    window.__plyrSchoolDrawerOptimistic = null;
-                    return;
-                }
-
-                const staleId = String(stale.id ?? stale.school_id ?? stale.business_id ?? stale.company_id ?? stale.ghl_business_id ?? '').trim();
-                const staleName = this.normalizeGlobalSchoolName(stale.name ?? stale.school ?? stale.school_name ?? stale.company_name ?? '');
-                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
-                const canonical = rows.find(row => {
-                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
-                        .map(value => String(value ?? '').trim())
-                        .filter(Boolean);
-                    if (staleId && ids.includes(staleId)) return true;
-                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
-                    return !!staleName && staleName !== 'school' && rowName === staleName;
-                }) || null;
-
-                if (!canonical) {
-                    window.__plyrSchoolDrawerOptimistic = null;
-                    this.optimisticSchool = null;
-                    return;
-                }
-
-                const restored = { ...stale, ...canonical };
-                restored.id = canonical.id;
-                restored.school_id = canonical.school_id ?? canonical.id;
-                restored.name = canonical.name;
-                restored.coaches = Array.isArray(canonical.coaches) ? canonical.coaches : [];
-                restored.is_favorite = !!canonical.is_favorite;
-                restored.list_keys = Array.isArray(canonical.list_keys) ? [...canonical.list_keys] : [];
-                window.__plyrSchoolDrawerOptimistic = restored;
-                this.optimisticSchool = restored;
+                // v10.64: the school drawer never restores browser-global state.
+                // A drawer may only open from an explicit user action that resolves
+                // to a real school in the current canonical school catalog.
+                window.__plyrSchoolDrawerOptimistic = null;
+                this.optimisticSchool = null;
+                this.schoolDrawerOpen = false;
+                this.discoverListsOpen = false;
+                this.discoverDrawerTab = 'coaches';
             },
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -111,36 +84,47 @@ discoverSelectedIds: [],
                 const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
                 const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
                 const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+
+                // Never open from a generic/placeholder payload.
+                if ((!sourceId && !sourceName) || sourceName === 'school') {
+                    this.closeDiscoverSchool();
+                    return;
+                }
+
                 const local = rows.find(row => {
                     const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
                         .map(value => String(value ?? '').trim())
                         .filter(Boolean);
                     if (sourceId && ids.includes(sourceId)) return true;
                     const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
-                    return !!sourceName && rowName === sourceName;
+                    return !!sourceName && sourceName !== 'school' && rowName === sourceName;
                 }) || null;
 
-                if (!local && (!source || typeof source !== 'object')) return;
-
-                const merged = { ...(local || {}), ...(source || {}) };
-                if (local) {
-                    // Canonical local values must win for all interactive identity/state.
-                    merged.id = local.id;
-                    merged.school_id = local.school_id ?? local.id;
-                    merged.name = local.name ?? merged.name;
-                    merged.logo_url = local.logo_url || merged.logo_url || '';
-                    merged.city = local.city ?? merged.city;
-                    merged.state = local.state ?? merged.state;
-                    merged.division = local.division ?? merged.division;
-                    merged.conference = local.conference ?? merged.conference;
-                    merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
-                    merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coach_count ?? merged.coaches.length ?? 0);
-                    merged.is_favorite = !!local.is_favorite;
-                    merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+                // Critical: do not fall back to rendering the incoming object. The
+                // canonical catalog is the only valid source for an Admin school drawer.
+                if (!local) {
+                    this.closeDiscoverSchool();
+                    return;
                 }
 
-                window.__plyrSchoolDrawerOptimistic = merged;
+                const merged = { ...source, ...local };
+                merged.id = local.id;
+                merged.school_id = local.school_id ?? local.id;
+                merged.name = local.name;
+                merged.logo_url = local.logo_url || '';
+                merged.city = local.city ?? '';
+                merged.state = local.state ?? '';
+                merged.division = local.division ?? '';
+                merged.conference = local.conference ?? '';
+                merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
+                merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coaches.length ?? 0);
+                merged.is_favorite = !!local.is_favorite;
+                merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+
                 this.optimisticSchool = merged;
+                this.schoolDrawerOpen = true;
+                // Keep the legacy global empty so Livewire/browser state cannot reopen it.
+                window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
                 this.discoverSchoolComms = [];
                 this.discoverSchoolCommsLoading = false;
@@ -259,6 +243,7 @@ discoverSelectedIds: [],
             },
             closeDiscoverSchool() {
                 window.__plyrSchoolDrawerOptimistic = null;
+                this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
                 this.optimisticSchool = null;
@@ -271,20 +256,17 @@ discoverSelectedIds: [],
                 const previous = !!this.optimisticSchool.is_favorite;
                 const next = !previous;
                 this.optimisticSchool.is_favorite = next;
-                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
                 window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [] } }));
                 Promise.resolve(this.$wire.call('queueSchoolFavoriteState', String(this.optimisticSchool.id), next))
                     .then(result => {
                         if (!result || result.success === false) {
                             if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
-                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
+                                        if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
                         }
                     })
                     .catch(() => {
                         if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
-                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                    });
+                            });
             },
             toggleDiscoverList(key) {
                 if (!this.optimisticSchool || !key) return;
@@ -297,15 +279,13 @@ discoverSelectedIds: [],
                     ? previous.filter(v => String(v).toLowerCase() !== key)
                     : [...previous, key];
                 if (list) this.setDiscoverListCount(key, previousCount + (has ? -1 : 1));
-                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
                 window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: this.optimisticSchool.list_keys || [] } }));
                 Promise.resolve(this.$wire.call('queueSchoolListMemberships', String(this.optimisticSchool.id), { [key]: !has }))
                     .then(result => {
                         if (!result || result.success === false) {
                             if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
                             if (list) this.setDiscoverListCount(key, previousCount);
-                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
+                                        if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
                             return;
                         }
                         const serverCount = Number(result?.list_counts?.[key]);
@@ -314,8 +294,7 @@ discoverSelectedIds: [],
                     .catch(() => {
                         if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
                         if (list) this.setDiscoverListCount(key, previousCount);
-                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                    });
+                            });
             },
             discoverInList(key) {
                 const keys = Array.isArray(this.optimisticSchool?.list_keys) ? this.optimisticSchool.list_keys : [];
@@ -12351,7 +12330,7 @@ CSS;
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
              x-cloak
-             x-show="optimisticSchool && (optimisticSchool.id || optimisticSchool.school_id) && optimisticSchool.name && String(optimisticSchool.name).trim().toLowerCase() !== 'school'" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
+             x-show="schoolDrawerOpen && optimisticSchool && (optimisticSchool.id || optimisticSchool.school_id) && optimisticSchool.name && String(optimisticSchool.name).trim().toLowerCase() !== 'school'" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
                     <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
 
