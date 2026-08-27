@@ -54,8 +54,46 @@ discoverSelectedIds: [],
             discoverNewBulkListName: '',
             discoverNewDrawerListName: '',
             discoverCreatingList: false,
-            optimisticSchool: (() => { const s = window.__plyrSchoolDrawerOptimistic; return (s && (s.id || s.school_id) && s.name) ? s : null; })(),
+            optimisticSchool: null,
             globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
+            init() {
+                // Restore the drawer only when the browser-side value still resolves to
+                // a real school in the current canonical catalog. Old placeholder values
+                // such as { id: 'school', name: 'School' } must never reopen the drawer.
+                const stale = window.__plyrSchoolDrawerOptimistic || null;
+                if (!stale || typeof stale !== 'object') {
+                    window.__plyrSchoolDrawerOptimistic = null;
+                    return;
+                }
+
+                const staleId = String(stale.id ?? stale.school_id ?? stale.business_id ?? stale.company_id ?? stale.ghl_business_id ?? '').trim();
+                const staleName = this.normalizeGlobalSchoolName(stale.name ?? stale.school ?? stale.school_name ?? stale.company_name ?? '');
+                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+                const canonical = rows.find(row => {
+                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
+                        .map(value => String(value ?? '').trim())
+                        .filter(Boolean);
+                    if (staleId && ids.includes(staleId)) return true;
+                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
+                    return !!staleName && staleName !== 'school' && rowName === staleName;
+                }) || null;
+
+                if (!canonical) {
+                    window.__plyrSchoolDrawerOptimistic = null;
+                    this.optimisticSchool = null;
+                    return;
+                }
+
+                const restored = { ...stale, ...canonical };
+                restored.id = canonical.id;
+                restored.school_id = canonical.school_id ?? canonical.id;
+                restored.name = canonical.name;
+                restored.coaches = Array.isArray(canonical.coaches) ? canonical.coaches : [];
+                restored.is_favorite = !!canonical.is_favorite;
+                restored.list_keys = Array.isArray(canonical.list_keys) ? [...canonical.list_keys] : [];
+                window.__plyrSchoolDrawerOptimistic = restored;
+                this.optimisticSchool = restored;
+            },
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
             },
@@ -12313,7 +12351,7 @@ CSS;
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
              x-cloak
-             x-show="optimisticSchool" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
+             x-show="optimisticSchool && (optimisticSchool.id || optimisticSchool.school_id) && optimisticSchool.name && String(optimisticSchool.name).trim().toLowerCase() !== 'school'" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
                     <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
 
