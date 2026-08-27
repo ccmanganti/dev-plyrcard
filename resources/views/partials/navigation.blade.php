@@ -77,9 +77,26 @@
       };
 
       $plyrReservedPaths = ['', '/', 'about', 'pricing', 'podcast', 'book-demo', 'registration', 'login', 'admin'];
+
+      // v10.67: player domains can be parked beneath the PLYRCARD parent domain
+      // (for example athlete-name.plyrcard.com). Only the root/platform hosts are
+      // treated as the marketing application; every other *.plyrcard.com host can
+      // resolve to a player Website by its saved domain, slug, or website-name slug.
+      $plyrParentDomain = 'plyrcard.com';
+      $plyrPlatformSubdomains = ['www', 'dev', 'app', 'systems', 'admin'];
+      $plyrParkedSubdomain = null;
+      if (str_ends_with($plyrCurrentHostBase, '.' . $plyrParentDomain)) {
+          $candidate = substr($plyrCurrentHostBase, 0, -strlen('.' . $plyrParentDomain));
+          $candidate = strtolower(trim((string) $candidate, '.'));
+          if ($candidate !== '' && ! str_contains($candidate, '.') && ! in_array($candidate, $plyrPlatformSubdomains, true)) {
+              $plyrParkedSubdomain = $candidate;
+          }
+      }
+
       $plyrMainHosts = array_filter(array_map('strtolower', [
           'plyrcard.com',
           'www.plyrcard.com',
+          'dev.plyrcard.com',
           parse_url(config('app.url'), PHP_URL_HOST),
           '127.0.0.1',
           'localhost',
@@ -104,19 +121,25 @@
               || 'www.' . $baseDomain === $plyrCurrentHostNormalized;
       };
 
-      $plyrWebsiteMatchesCurrentRequest = function (\App\Models\Website $website) use ($plyrDomainMatchesHost, $plyrCurrentPath) {
+      $plyrWebsiteMatchesCurrentRequest = function (\App\Models\Website $website) use ($plyrDomainMatchesHost, $plyrCurrentPath, $plyrParkedSubdomain) {
           if (! blank($website->domain) && $plyrDomainMatchesHost($website->domain)) {
               return true;
           }
 
-          $pathSlug = strtolower(trim((string) $plyrCurrentPath, '/'));
+          $websiteSlug = strtolower(trim((string) $website->slug, '/'));
+          $websiteNameSlug = \Illuminate\Support\Str::slug((string) $website->name);
 
+          // Parked *.plyrcard.com domains are allowed to resolve by slug/name even
+          // when Website.domain is blank or stores a different canonical domain.
+          if ($plyrParkedSubdomain !== null) {
+              return ($websiteSlug !== '' && $websiteSlug === $plyrParkedSubdomain)
+                  || ($websiteNameSlug !== '' && $websiteNameSlug === $plyrParkedSubdomain);
+          }
+
+          $pathSlug = strtolower(trim((string) $plyrCurrentPath, '/'));
           if ($pathSlug === '') {
               return false;
           }
-
-          $websiteSlug = strtolower(trim((string) $website->slug, '/'));
-          $websiteNameSlug = \Illuminate\Support\Str::slug((string) $website->name);
 
           return ($websiteSlug && $websiteSlug === $pathSlug)
               || ($websiteNameSlug && $websiteNameSlug === $pathSlug);
@@ -199,14 +222,17 @@
               $plyrViewedWebsite = $plyrOwnedWebsites->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
           }
 
-          // Custom-domain player site detection for public visits and other players' domains.
-          if (! $plyrViewedWebsite && ! $plyrOnMainPlyrSite) {
-              $plyrViewedWebsite = \App\Models\Website::query()
+          // Custom-domain and parked-subdomain detection for public visits and
+          // other players' websites. We deliberately resolve the current Website
+          // first; ownership is checked separately against auth()->id().
+          if (! $plyrViewedWebsite && (! $plyrOnMainPlyrSite || $plyrParkedSubdomain !== null)) {
+              $candidateWebsites = \App\Models\Website::query()
                   ->where('is_active', true)
                   ->where('is_published', true)
-                  ->whereNotNull('domain')
-                  ->get()
-                  ->first(fn (\App\Models\Website $website) => $plyrDomainMatchesHost($website->domain));
+                  ->get();
+
+              $plyrViewedWebsite = $candidateWebsites
+                  ->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
           }
 
           // Path-based player site detection for main-domain URLs like /selin-pehlivan.
@@ -233,6 +259,7 @@
       }
 
       $plyrOnPlayerWebsite = in_array($plyrActivePage, ['website', 'player', 'player-website'], true)
+          || $plyrParkedSubdomain !== null
           || (bool) $plyrViewedWebsite
           || (bool) $plyrRenderedWebsite;
 
