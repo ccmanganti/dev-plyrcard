@@ -155,6 +155,21 @@
     .lr-school-coach { border:1px solid #e5e7eb; border-radius:12px; background:#fff; padding:10px 11px; }
     .lr-school-coach strong { display:block; font-size:12px; }
     .lr-school-coach span { display:block; margin-top:2px; color:#667085; font-size:10px; }
+    .lr-school-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; padding:5px; border:1px solid #e5e7eb; background:#f8fafc; border-radius:12px; margin-top:12px; }
+    .lr-school-tab { border:0; background:transparent; border-radius:9px; padding:9px 5px; font-size:10px; line-height:1.15; font-weight:850; color:#667085; cursor:pointer; }
+    .lr-school-tab.is-active { background:#fff; color:#101828; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+    .lr-school-tab-panel { margin-top:11px; }
+    .lr-school-coming { min-height:190px; display:grid; place-items:center; text-align:center; border:1px solid #e5e7eb; border-radius:14px; background:#fff; padding:22px; }
+    .lr-school-coming i { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; background:#fff1ec; color:#ff5c35; margin:0 auto 10px; }
+    .lr-school-coming strong { display:block; font-size:13px; color:#101828; }
+    .lr-school-coming span { display:block; max-width:280px; margin:5px auto 0; color:#667085; font-size:10px; line-height:1.5; }
+    .lr-school-comms { display:grid; gap:8px; }
+    .lr-school-comm { display:grid; grid-template-columns:30px minmax(0,1fr); gap:9px; border:1px solid #e5e7eb; border-radius:12px; padding:10px; background:#fff; }
+    .lr-school-comm-dir { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-weight:900; background:#fff1ec; color:#ff5c35; }
+    .lr-school-comm-dir.is-inbound { background:#ecfdf3; color:#039855; }
+    .lr-school-comm strong { display:block; font-size:11px; color:#101828; }
+    .lr-school-comm span { display:block; margin-top:2px; font-size:10px; line-height:1.45; color:#475467; }
+    .lr-school-comm small { display:block; margin-top:4px; font-size:9px; color:#98a2b3; }
     .lr-detail-empty { border:1px dashed #d0d5dd; border-radius:14px; padding:18px; text-align:center; color:#667085; font-size:12px; background:#fff; }
     .lr-card { border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:15px; }
     .lr-card-title { margin:0; font-size:14px; font-weight:800; color:#111827; }
@@ -863,7 +878,7 @@
             <div class="lr-dashboard-detail-head">
                 <div class="lr-dashboard-detail-head-main">
                     <button type="button" class="lr-back" data-lr-dashboard-school-close aria-label="Back to activity"><i class="fa-solid fa-chevron-left"></i></button>
-                    <div><h3>School Details</h3><p>Local school information and coach roster.</p></div>
+                    <div><h3>School Details</h3><p>Coaching staff, roster information, and communications.</p></div>
                 </div>
                 <button type="button" class="lr-close" data-lr-dashboard-school-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
             </div>
@@ -1147,8 +1162,20 @@
             : `<span class="lr-school-logo-fallback">${esc(lrInitials(school.name))}</span>`;
         const roster = coaches.length
             ? coaches.map(coach => `<div class="lr-school-coach"><strong>${esc(coach.name || 'Coach')}</strong><span>${esc([coach.title, coach.email, coach.phone].filter(Boolean).join(' · ') || 'Coach')}</span></div>`).join('')
-            : '<div class="lr-detail-empty">No local coach roster is currently attached to this school.</div>';
-        body.innerHTML = `<div class="lr-school-hero">${logo}<div class="lr-school-meta"><h4>${esc(school.name || 'School')}</h4><p>${esc(meta || 'School information')}</p></div></div><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;"><h4 style="margin:0;font-size:13px;">Coach Roster</h4><span class="lr-chip">${coaches.length} coach${coaches.length === 1 ? '' : 'es'}</span></div><div class="lr-school-roster">${roster}</div>`;
+            : '<div class="lr-detail-empty">No local coaches are currently attached to this school.</div>';
+        const communications = Array.isArray(data.communications) ? data.communications : [];
+        const comms = communications.length
+            ? communications.map(row => `<div class="lr-school-comm"><span class="lr-school-comm-dir${row.direction === 'inbound' ? ' is-inbound' : ''}">${row.direction === 'inbound' ? '↙' : '↗'}</span><div><strong>${esc(row.title || 'Conversation activity')}</strong><span>${esc(row.preview || 'No message preview available.')}</span><small>${esc([row.date_label, row.opened ? 'Opened' : '', row.reply ? 'Reply' : ''].filter(Boolean).join(' · '))}</small></div></div>`).join('')
+            : '<div class="lr-detail-empty">No conversation history yet. Emails and replies with coaches from this school will appear here.</div>';
+        body.innerHTML = `<div class="lr-school-hero">${logo}<div class="lr-school-meta"><h4>${esc(school.name || 'School')}</h4><p>${esc(meta || 'School information')}</p></div></div>
+            <div class="lr-school-tabs" role="tablist" aria-label="School detail tabs">
+                <button type="button" class="lr-school-tab is-active" data-lr-school-tab="coaches">Coaching Staff</button>
+                <button type="button" class="lr-school-tab" data-lr-school-tab="roster">Roster &amp; Stats</button>
+                <button type="button" class="lr-school-tab" data-lr-school-tab="comms">Communications</button>
+            </div>
+            <div class="lr-school-tab-panel" data-lr-school-tab-panel="coaches"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;"><h4 style="margin:0;font-size:13px;">Coaching Staff</h4><span class="lr-chip">${coaches.length} coach${coaches.length === 1 ? '' : 'es'}</span></div><div class="lr-school-roster">${roster}</div></div>
+            <div class="lr-school-tab-panel" data-lr-school-tab-panel="roster" hidden><div class="lr-school-coming"><div><i class="fa-solid fa-arrow-trend-up"></i><strong>Roster &amp; Stats Coming Soon</strong><span>${esc(data.roster?.message || 'Team roster and school performance insights will be available here soon.')}</span></div></div></div>
+            <div class="lr-school-tab-panel" data-lr-school-tab-panel="comms" hidden><div class="lr-school-comms">${comms}</div></div>`;
     }
 
     async function openDashboardSchool(reference) {
@@ -1498,6 +1525,14 @@
         const engagementFilter = event.target.closest('[data-lr-engagement-filter]'); if (engagementFilter && drawer.contains(engagementFilter)) { event.preventDefault(); dashboardEngagementFilter = dashboardEngagementFilter === engagementFilter.dataset.lrEngagementFilter ? '' : engagementFilter.dataset.lrEngagementFilter; renderDashboardActivityDetail(); return; }
         if (event.target.closest('[data-lr-dashboard-detail-close]')) { event.preventDefault(); closeDashboardActivity(); return; }
         if (event.target.closest('[data-lr-dashboard-school-close]')) { event.preventDefault(); closeDashboardSchool(); return; }
+        const schoolTab = event.target.closest('[data-lr-school-tab]');
+        if (schoolTab && drawer.contains(schoolTab)) {
+            event.preventDefault();
+            const key = schoolTab.dataset.lrSchoolTab;
+            qa('[data-lr-school-tab]').forEach(tab => tab.classList.toggle('is-active', tab === schoolTab));
+            qa('[data-lr-school-tab-panel]').forEach(panel => { panel.hidden = panel.dataset.lrSchoolTabPanel !== key; });
+            return;
+        }
         const schoolDetail = event.target.closest('[data-lr-dashboard-school]'); if (schoolDetail && drawer.contains(schoolDetail)) { event.preventDefault(); event.stopPropagation(); openDashboardSchool(schoolDetail.dataset.lrDashboardSchool); return; }
         const tab = event.target.closest('[data-pane]'); if (tab && drawer.contains(tab)) { qa('[data-pane]').forEach(x=>x.classList.toggle('is-active',x===tab)); qa('[data-lr-profile-pane]').forEach(x=>x.classList.toggle('is-active',x.dataset.lrProfilePane===tab.dataset.pane)); return; }
         const positionTrigger = event.target.closest('[data-lr-position-trigger]'); if (positionTrigger && drawer.contains(positionTrigger)) { event.preventDefault(); const menu=q('[data-lr-position-menu]'); if(menu) menu.hidden=!menu.hidden; return; }

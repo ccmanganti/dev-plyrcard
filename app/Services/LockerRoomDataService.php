@@ -799,6 +799,147 @@ class LockerRoomDataService
         return [
             'school' => $this->schoolPayload($school),
             'coaches' => $coaches,
+            // Keep parity with the Coach Database school drawer. Roster & Stats is
+            // intentionally a coming-soon panel there as well; Communications is
+            // real recruiting history for coaches tied to this school.
+            'roster' => [
+                'available' => false,
+                'message' => 'Team roster and school performance insights will be available here soon.',
+            ],
+            'communications' => $this->dashboardSchoolCommunications($user, $school, $coaches),
+        ];
+    }
+
+    protected function dashboardSchoolCommunications(User $user, School $school, array $coaches): array
+    {
+        $schoolId = (string) $school->getKey();
+        $schoolName = trim((string) $school->name);
+        $businessId = trim((string) ($school->ghl_business_id ?? ''));
+        $cacheKey = 'locker-room:school-comms:' . $user->getKey() . ':' . md5($schoolId . '|' . $businessId . '|' . strtolower($schoolName));
+
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user, $schoolId, $schoolName, $businessId, $coaches): array {
+            try {
+                $coachIds = collect($coaches)
+                    ->flatMap(fn (array $coach): array => [
+                        $coach['contact_id'] ?? null,
+                        $coach['ghl_contact_id'] ?? null,
+                        $coach['id'] ?? null,
+                    ])
+                    ->map(fn ($value): string => strtolower(trim((string) $value)))
+                    ->filter()->unique()->values();
+
+                $coachEmails = collect($coaches)
+                    ->map(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))))
+                    ->filter()->unique()->values();
+
+                $coachNames = collect($coaches)
+                    ->map(fn (array $coach): string => strtolower(trim((string) ($coach['name'] ?? ''))))
+                    ->filter()->unique()->values();
+
+                $schoolIds = collect([$schoolId, $businessId])
+                    ->map(fn ($value): string => strtolower(trim((string) $value)))
+                    ->filter()->unique()->values();
+                $schoolNameKey = strtolower($schoolName);
+
+                $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
+                    'limit' => 200,
+                    'status' => 'all',
+                    'search' => '',
+                    'fetch_all' => true,
+                ]);
+
+                if (! ($result['success'] ?? false)) {
+                    return [];
+                }
+
+                $matched = collect((array) ($result['conversations'] ?? []))
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->filter(function (array $conversation) use ($coachIds, $coachEmails, $coachNames, $schoolIds, $schoolNameKey): bool {
+                        $conversationContactIds = collect([
+                            $conversation['contact_id'] ?? null,
+                            $conversation['contactId'] ?? null,
+                            $conversation['coach_id'] ?? null,
+                            $conversation['coach_contact_id'] ?? null,
+                        ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique();
+
+                        $conversationSchoolIds = collect([
+                            $conversation['school_id'] ?? null,
+                            $conversation['school_business_id'] ?? null,
+                            $conversation['business_id'] ?? null,
+                            $conversation['company_id'] ?? null,
+                            $conversation['ghl_business_id'] ?? null,
+                        ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique();
+
+                        $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
+                        $name = strtolower(trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? '')));
+                        $conversationSchool = strtolower(trim((string) ($conversation['school'] ?? $conversation['school_name'] ?? $conversation['company_name'] ?? $conversation['company'] ?? '')));
+
+                        return ($conversationContactIds->isNotEmpty() && $coachIds->intersect($conversationContactIds)->isNotEmpty())
+                            || ($email !== '' && $coachEmails->contains($email))
+                            || ($conversationSchoolIds->isNotEmpty() && $schoolIds->intersect($conversationSchoolIds)->isNotEmpty())
+                            || ($schoolNameKey !== '' && $conversationSchool === $schoolNameKey)
+                            || ($name !== '' && $coachNames->contains($name));
+                    })
+                    ->take(30)
+                    ->values();
+
+                $rows = [];
+                foreach ($matched as $conversation) {
+                    $conversationId = trim((string) ($conversation['id'] ?? ''));
+                    if ($conversationId === '') {
+                        continue;
+                    }
+
+                    $messages = app(GoHighLevelService::class)->getConversationMessagesForUser($user, $conversationId, null, 20);
+                    $messageRows = collect(($messages['success'] ?? false) ? ($messages['messages'] ?? []) : [])
+                        ->filter(fn ($row): bool => is_array($row))
+                        ->values();
+
+                    if ($messageRows->isEmpty()) {
+                        $rows[] = $this->dashboardSchoolCommunicationRow($conversation, $conversation);
+                        continue;
+                    }
+
+                    foreach ($messageRows as $message) {
+                        $rows[] = $this->dashboardSchoolCommunicationRow($message, $conversation);
+                    }
+                }
+
+                return collect($rows)
+                    ->filter(fn (array $row): bool => trim((string) ($row['preview'] ?? '')) !== '')
+                    ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+                    ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
+                    ->take(30)
+                    ->map(function (array $row): array { unset($row['_timestamp']); return $row; })
+                    ->values()->all();
+            } catch (\Throwable) {
+                // School details should still open even when conversation history is
+                // temporarily unavailable from the connected recruiting account.
+                return [];
+            }
+        });
+    }
+
+    protected function dashboardSchoolCommunicationRow(array $message, array $conversation = []): array
+    {
+        $directionRaw = strtolower(trim((string) ($message['direction'] ?? $message['messageDirection'] ?? $conversation['direction'] ?? '')));
+        $direction = str_contains($directionRaw, 'in') ? 'inbound' : 'outbound';
+        $coachName = trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? $message['contact_name'] ?? 'Coach')) ?: 'Coach';
+        $body = trim(strip_tags((string) ($message['body'] ?? $message['message'] ?? $message['text'] ?? $message['subject'] ?? $conversation['last_message'] ?? $conversation['snippet'] ?? 'Recruiting email activity')));
+        $preview = Str::limit(preg_replace('/\s+/', ' ', $body) ?: 'Recruiting email activity', 180);
+        $time = $message['dateAdded'] ?? $message['createdAt'] ?? $message['created_at'] ?? $conversation['last_message_at'] ?? $conversation['updated_at'] ?? $conversation['created_at'] ?? null;
+        $carbon = null;
+        try { if ($time) $carbon = Carbon::parse($time); } catch (\Throwable) { $carbon = null; }
+
+        return [
+            'id' => (string) ($message['id'] ?? $message['_id'] ?? $conversation['id'] ?? md5($coachName . '|' . $preview . '|' . (string) $time)),
+            'direction' => $direction,
+            'title' => $coachName,
+            'preview' => $preview,
+            'date_label' => $carbon ? $carbon->diffForHumans() : '',
+            'opened' => (bool) ($message['opened'] ?? $message['isOpened'] ?? false),
+            'reply' => $direction === 'inbound',
+            '_timestamp' => $carbon ? $carbon->getTimestamp() : 0,
         ];
     }
 
