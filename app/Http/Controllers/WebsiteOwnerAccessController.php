@@ -3,122 +3,176 @@
 namespace App\Http\Controllers;
 
 use App\Models\Website;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 
 class WebsiteOwnerAccessController extends Controller
 {
-    public function redirectToOwnedWebsite(Request $request, Website $website)
+    /**
+     * Main-domain owner probe.
+     *
+     * A custom player domain cannot read the plyrcard.com auth cookie. This
+     * endpoint is intentionally called on APP_URL so it can see the platform
+     * session. Only the authenticated owner of this exact Website is bridged.
+     */
+    public function probe(Request $request, Website $website): RedirectResponse
     {
-        abort_unless(Auth::check(), 403);
-        abort_unless((int) $website->user_id === (int) Auth::id(), 403);
-        abort_unless($website->is_active && $website->is_published, 404);
+        $this->ensureWebsiteIsPublic($website);
 
-        $token = Crypt::encryptString(json_encode([
-            'user_id' => Auth::id(),
-            'website_id' => $website->id,
-            'expires_at' => now()->addMinutes(5)->timestamp,
+        if ($request->user() && (int) $request->user()->getKey() === (int) $website->user_id) {
+            return $this->redirectToOwnedWebsite($request, $website);
+        }
+
+        return redirect()->away($this->websiteUrl($website, ['plyr_owner_checked' => '1']));
+    }
+
+    /**
+     * Start a short-lived cross-domain owner bridge from PLYRCARD.
+     */
+    public function redirectToOwnedWebsite(Request $request, Website $website): RedirectResponse
+    {
+        $this->ensureWebsiteIsPublic($website);
+
+        $user = $request->user();
+        abort_unless($user && (int) $user->getKey() === (int) $website->user_id, 403);
+
+        $host = $this->websiteHost($website);
+
+        // Slug/path-hosted websites share the same PLYRCARD session already.
+        if ($host === null) {
+            return redirect()->to($this->websiteUrl($website));
+        }
+
+        $payload = $this->encodePayload([
+            'website_id' => (int) $website->getKey(),
+            'user_id' => (int) $user->getKey(),
+            'host' => $host,
+            'expires' => now()->addMinutes(2)->timestamp,
             'nonce' => Str::random(32),
-        ]));
+        ]);
 
-        $target = $this->websiteBaseUrl($website);
+        $signature = hash_hmac('sha256', $payload, $this->signingKey());
 
-        if (! $target) {
-            return redirect('/')->with('error', 'Your website is not ready yet.');
-        }
+        $target = 'https://' . $host . '/locker-room/owner-access?' . http_build_query([
+            'token' => $payload,
+            'signature' => $signature,
+        ], '', '&', PHP_QUERY_RFC3986);
 
-        return redirect()->away(rtrim($target, '/') . '/locker-room/owner-access?token=' . urlencode($token));
+        return redirect()->away($target);
     }
 
-    public function consumeOwnerAccess(Request $request)
+    /**
+     * Consume the bridge on the player's actual custom domain and create a
+     * normal Laravel session for that host.
+     */
+    public function consumeOwnerAccess(Request $request): RedirectResponse
     {
-        $token = (string) $request->query('token', '');
+        $payload = (string) $request->query('token', '');
+        $signature = (string) $request->query('signature', '');
 
-        abort_if($token === '', 403);
+        abort_if($payload === '' || $signature === '', 403);
 
-        try {
-            $payload = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
-        } catch (\Throwable $e) {
-            abort(403);
-        }
+        $expected = hash_hmac('sha256', $payload, $this->signingKey());
+        abort_unless(hash_equals($expected, $signature), 403);
 
-        abort_unless(isset($payload['user_id'], $payload['website_id'], $payload['expires_at']), 403);
-        abort_if(now()->timestamp > (int) $payload['expires_at'], 403);
+        $data = $this->decodePayload($payload);
+        abort_unless(is_array($data), 403);
+        abort_unless((int) ($data['expires'] ?? 0) >= now()->timestamp, 403);
 
-        $website = Website::query()
-            ->whereKey($payload['website_id'])
-            ->where('user_id', $payload['user_id'])
-            ->where('is_active', true)
-            ->where('is_published', true)
-            ->firstOrFail();
+        $website = Website::query()->find((int) ($data['website_id'] ?? 0));
+        abort_unless($website, 404);
+        $this->ensureWebsiteIsPublic($website);
 
-        if (! blank($website->domain)) {
-            abort_unless($this->domainsMatch($request->getHost(), $website->domain), 403);
-        }
+        $userId = (int) ($data['user_id'] ?? 0);
+        abort_unless($userId > 0 && (int) $website->user_id === $userId, 403);
 
-        Auth::loginUsingId((int) $payload['user_id'], true);
+        $expectedHost = $this->websiteHost($website);
+        $tokenHost = $this->normalizeHost((string) ($data['host'] ?? ''));
+        $requestHost = $this->normalizeHost($request->getHost());
+
+        abort_unless(
+            $expectedHost !== null
+            && $tokenHost === $expectedHost
+            && $requestHost === $expectedHost,
+            403
+        );
+
+        Auth::loginUsingId($userId, false);
         $request->session()->regenerate();
+        $request->session()->put('plyrcard_owner_website_id', (int) $website->getKey());
 
-        if (! blank($website->domain)) {
-            return redirect('/');
-        }
-
-        if (! blank($website->slug)) {
-            return redirect('/' . ltrim($website->slug, '/'));
-        }
-
-        if (! blank($website->name)) {
-            return redirect('/' . Str::slug($website->name));
-        }
-
-        return redirect('/');
+        return redirect()->away($this->websiteUrl($website));
     }
 
-    private function websiteBaseUrl(Website $website): ?string
+    protected function ensureWebsiteIsPublic(Website $website): void
     {
-        if (! blank($website->domain)) {
-            $domain = $this->normalizeDomain($website->domain);
-
-            return $domain ? 'https://' . $domain : null;
-        }
-
-        if (! blank($website->slug)) {
-            return url('/' . ltrim($website->slug, '/'));
-        }
-
-        if (! blank($website->name)) {
-            return url('/' . Str::slug($website->name));
-        }
-
-        return null;
+        abort_unless((bool) $website->is_active && (bool) $website->is_published, 404);
     }
 
-    private function normalizeDomain(?string $value): string
+    protected function websiteUrl(Website $website, array $query = []): string
     {
-        $domain = strtolower(trim((string) $value));
-        $domain = preg_replace('#^https?://#i', '', $domain);
-        $domain = preg_replace('#/.*$#', '', $domain);
-        $domain = preg_replace('/:\d+$/', '', $domain);
+        $host = $this->websiteHost($website);
 
-        return rtrim($domain, '/');
+        if ($host !== null) {
+            $url = 'https://' . $host . '/';
+        } elseif (filled($website->slug)) {
+            $url = rtrim((string) config('app.url', url('/')), '/') . '/' . ltrim((string) $website->slug, '/');
+        } else {
+            $slug = Str::slug((string) $website->name);
+            $url = rtrim((string) config('app.url', url('/')), '/') . '/' . ltrim($slug, '/');
+        }
+
+        if ($query !== []) {
+            $url .= (str_contains($url, '?') ? '&' : '?') . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        }
+
+        return $url;
     }
 
-    private function domainBase(?string $value): string
+    protected function websiteHost(Website $website): ?string
     {
-        return preg_replace('/^www\./i', '', $this->normalizeDomain($value));
+        if (blank($website->domain)) {
+            return null;
+        }
+
+        $host = $this->normalizeHost((string) $website->domain);
+        return $host !== '' ? $host : null;
     }
 
-    private function domainsMatch(?string $requestHost, ?string $websiteDomain): bool
+    protected function normalizeHost(string $value): string
     {
-        $host = $this->normalizeDomain($requestHost);
-        $hostBase = $this->domainBase($host);
-        $domain = $this->normalizeDomain($websiteDomain);
-        $domainBase = $this->domainBase($domain);
+        $value = strtolower(trim($value));
+        $value = preg_replace('#^https?://#i', '', $value);
+        $value = preg_replace('#/.*$#', '', $value);
+        $value = preg_replace('/:\d+$/', '', $value);
+        return preg_replace('/^www\./i', '', rtrim($value, '/'));
+    }
 
-        return filled($hostBase)
-            && filled($domainBase)
-            && ($host === $domain || $hostBase === $domainBase);
+    protected function signingKey(): string
+    {
+        return (string) config('app.key');
+    }
+
+    protected function encodePayload(array $payload): string
+    {
+        return rtrim(strtr(base64_encode(json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)), '+/', '-_'), '=');
+    }
+
+    protected function decodePayload(string $payload): ?array
+    {
+        $padding = strlen($payload) % 4;
+        if ($padding > 0) {
+            $payload .= str_repeat('=', 4 - $padding);
+        }
+
+        $decoded = base64_decode(strtr($payload, '-_', '+/'), true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $data = json_decode($decoded, true);
+        return is_array($data) ? $data : null;
     }
 }

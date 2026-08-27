@@ -299,6 +299,33 @@
           $plyrShouldRenderPullup = true;
       }
 
+      /*
+       * v10.68: custom player domains such as scarlettambrose.com cannot read
+       * the plyrcard.com session cookie. When the rendered player website has
+       * no local-domain session yet, perform a one-time top-level owner probe
+       * against APP_URL. The probe can see the existing PLYRCARD session, and
+       * only if that authenticated user owns THIS Website does it issue a
+       * short-lived signed bridge back to this exact custom domain.
+       *
+       * This is deliberately never attempted on /admin, the marketing host,
+       * preview URLs on plyrcard.com, or when a local session already exists.
+       */
+      $plyrOwnerProbeWebsite = $plyrRenderedWebsite ?: $plyrViewedWebsite;
+      $plyrShouldAttemptOwnerProbe = ! $plyrOnAdmin
+          && $plyrOnPlayerWebsite
+          && ! $plyrOnMainPlyrSite
+          && ! $plyrLoggedIn
+          && $plyrOwnerProbeWebsite
+          && filled($plyrOwnerProbeWebsite->domain ?? null);
+
+      $plyrOwnerProbeUrl = null;
+      if ($plyrShouldAttemptOwnerProbe) {
+          $plyrMainAppUrl = rtrim((string) config('app.url', 'https://plyrcard.com'), '/');
+          $plyrOwnerProbeUrl = $plyrMainAppUrl
+              . '/locker-room/owner-probe/'
+              . rawurlencode((string) $plyrOwnerProbeWebsite->getKey());
+      }
+
 
       /*
       * Club / Team landing pages for Locker Room.
@@ -2751,6 +2778,38 @@
   </nav>
   @endif
 
+
+  @if($plyrShouldAttemptOwnerProbe && $plyrOwnerProbeUrl)
+    <script>
+      (() => {
+        const websiteId = @json((string) $plyrOwnerProbeWebsite->getKey());
+        const probeUrl = @json($plyrOwnerProbeUrl);
+        const key = `plyrcard-owner-probe-v1068-${websiteId}`;
+        const now = Date.now();
+        const retryAfterMs = 30000;
+        const params = new URLSearchParams(window.location.search);
+
+        // The platform probe returns non-owners/guests with this marker. Remove
+        // it from the visible URL and remember the check briefly to prevent loops.
+        if (params.get('plyr_owner_checked') === '1') {
+          try { sessionStorage.setItem(key, String(now)); } catch (_) {}
+          params.delete('plyr_owner_checked');
+          const clean = window.location.pathname
+            + (params.toString() ? `?${params.toString()}` : '')
+            + window.location.hash;
+          window.history.replaceState({}, '', clean);
+          return;
+        }
+
+        let lastProbe = 0;
+        try { lastProbe = Number(sessionStorage.getItem(key) || 0); } catch (_) {}
+        if (lastProbe && (now - lastProbe) < retryAfterMs) return;
+
+        try { sessionStorage.setItem(key, String(now)); } catch (_) {}
+        window.location.replace(probeUrl);
+      })();
+    </script>
+  @endif
 
   @include("partials.locker-room")
 

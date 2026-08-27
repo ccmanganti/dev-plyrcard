@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\LockerRoomController;
+use App\Http\Controllers\LockerRoomSchoolActionController;
 use App\Http\Controllers\AmplifyUpgradeController;
 use App\Http\Controllers\BillingCancellationController;
 use App\Http\Controllers\PublicClubTeamController;
@@ -389,6 +390,10 @@ Route::post('/locker-room/login', function (Request $request) {
 |
 */
 
+Route::middleware(['web'])
+    ->get('/locker-room/owner-probe/{website}', [WebsiteOwnerAccessController::class, 'probe'])
+    ->name('locker-room.website.owner-probe');
+
 Route::middleware(['web', 'auth'])
     ->get('/locker-room/visit-my-website/{website}', [WebsiteOwnerAccessController::class, 'redirectToOwnedWebsite'])
     ->name('locker-room.website.visit');
@@ -431,6 +436,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/locker-room/dashboard/school/{school}', [LockerRoomController::class, 'dashboardSchool'])
         ->where('school', '[^/]+')
         ->name('locker-room.dashboard.school');
+
+    Route::post('/locker-room/dashboard/school/favorite', [LockerRoomSchoolActionController::class, 'favorite'])
+        ->name('locker-room.dashboard.school.favorite');
+
+    Route::post('/locker-room/dashboard/school/list', [LockerRoomSchoolActionController::class, 'list'])
+        ->name('locker-room.dashboard.school.list');
 
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
         ->name('locker-room.profile.update');
