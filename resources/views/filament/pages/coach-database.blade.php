@@ -6,6 +6,11 @@
 @endphp
 
 <x-filament-panels::page>
+    <style>
+        /* v10.66: fail closed. If Alpine/Livewire JS is delayed or errors, the
+           school drawer must remain invisible instead of rendering placeholders. */
+        .rc-school-optimistic-shell-v106[hidden] { display: none !important; }
+    </style>
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
         data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
@@ -12350,9 +12355,11 @@ CSS;
              interaction state. Favorite/list calls only persist the already-applied state in
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
+             hidden
              x-cloak
+             x-bind:hidden="!isValidOpenSchool()"
              x-show="isValidOpenSchool()"
-             x-bind:style="isValidOpenSchool() ? 'z-index:9999' : 'display:none !important;z-index:9999'"
+             x-bind:style="isValidOpenSchool() ? 'display:flex !important;z-index:9999' : 'display:none !important;z-index:9999'"
              x-effect="if (schoolDrawerOpen && !isValidOpenSchool()) { closeDiscoverSchool(); }"
              x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
