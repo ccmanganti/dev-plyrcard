@@ -54,7 +54,7 @@ discoverSelectedIds: [],
             discoverNewBulkListName: '',
             discoverNewDrawerListName: '',
             discoverCreatingList: false,
-            optimisticSchool: window.__plyrSchoolDrawerOptimistic || null,
+            optimisticSchool: (() => { const s = window.__plyrSchoolDrawerOptimistic; return (s && (s.id || s.school_id) && s.name) ? s : null; })(),
             globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');

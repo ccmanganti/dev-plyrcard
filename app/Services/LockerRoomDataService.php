@@ -750,58 +750,76 @@ class LockerRoomDataService
     {
         $reference = trim(urldecode($reference));
         if ($reference === '') {
-            return ['school' => null, 'coaches' => []];
+            return ['school' => null, 'coaches' => [], 'lists' => []];
         }
 
         $school = $this->resolveSchool($reference);
         if (! $school) {
-            return [
-                'school' => [
-                    'id' => null,
-                    'reference' => $reference,
-                    'name' => str_starts_with($reference, 'school:') ? substr($reference, 7) : $reference,
-                    'logo_url' => null,
-                    'conference' => null,
-                    'division' => null,
-                    'city' => null,
-                    'state' => null,
-                ],
-                'coaches' => [],
-            ];
+            return ['school' => null, 'coaches' => [], 'lists' => []];
         }
 
-        $coaches = [];
-        if (Schema::hasTable('coaches')) {
-            $query = DB::table('coaches')->where('school_id', $school->getKey());
-            if (Schema::hasColumn('coaches', 'deleted_at')) {
-                $query->whereNull('deleted_at');
+        // Use the same local Recruiting Center row builder as the Admin school drawer.
+        // This keeps favorite/list state, canonical local school identity, logo/meta,
+        // and local coaching staff aligned between Admin and Locker Room.
+        $schoolRow = null;
+        $lists = [];
+        try {
+            if (class_exists(\App\Services\LocalRecruitingDatabaseService::class)) {
+                $database = app(\App\Services\LocalRecruitingDatabaseService::class);
+                $schoolRow = $database->schoolRow($user, (string) $school->getKey());
+                $lists = collect($database->lists($user))
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values()->all();
             }
+        } catch (\Throwable) {
+            $schoolRow = null;
+            $lists = [];
+        }
 
+        $coaches = collect(is_array($schoolRow) ? ($schoolRow['coaches'] ?? []) : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(function (array $row): array {
+                return [
+                    'id' => $row['id'] ?? null,
+                    'contact_id' => $row['contact_id'] ?? $row['ghl_contact_id'] ?? null,
+                    'name' => trim((string) ($row['name'] ?? (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')))) ?: 'Coach',
+                    'email' => $row['email'] ?? null,
+                    'phone' => $row['phone'] ?? null,
+                    'title' => $row['title'] ?? $row['position'] ?? null,
+                ];
+            })->values()->all();
+
+        if ($coaches === [] && Schema::hasTable('coaches')) {
+            $query = DB::table('coaches')->where('school_id', $school->getKey());
+            if (Schema::hasColumn('coaches', 'deleted_at')) $query->whereNull('deleted_at');
             $coaches = $query->get()->map(function ($row): array {
                 $row = (array) $row;
-                $name = trim((string) ($row['display_name'] ?? ''))
-                    ?: trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')))
-                    ?: 'Coach';
-
                 return [
                     'id' => $row['id'] ?? null,
                     'contact_id' => $row['ghl_contact_id'] ?? null,
-                    'name' => $name,
+                    'name' => trim((string) ($row['display_name'] ?? '')) ?: trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? ''))) ?: 'Coach',
                     'email' => $row['email'] ?? null,
                     'phone' => $row['phone'] ?? null,
                     'title' => $row['title'] ?? null,
-                    'conference' => $row['conference'] ?? null,
-                    'division' => $row['division'] ?? null,
                 ];
-            })->sortBy(fn (array $row): string => strtolower((string) ($row['name'] ?? '')))->values()->all();
+            })->sortBy(fn (array $row): string => strtolower((string) $row['name']))->values()->all();
         }
 
+        $payload = is_array($schoolRow) ? $schoolRow : $this->schoolPayload($school);
+        $payload['id'] = (string) ($payload['id'] ?? $school->getKey());
+        $payload['school_id'] = (string) ($payload['school_id'] ?? $school->getKey());
+        $payload['name'] = (string) ($payload['name'] ?? $school->name);
+        $payload['logo_url'] = $payload['logo_url'] ?? $school->logo_url ?? null;
+        $payload['conference'] = $payload['conference'] ?? $school->conference ?? null;
+        $payload['division'] = $payload['division'] ?? $school->division ?? null;
+        $payload['city'] = $payload['city'] ?? $school->city ?? null;
+        $payload['state'] = $payload['state'] ?? $school->state ?? null;
+        $payload['coaches'] = $coaches;
+
         return [
-            'school' => $this->schoolPayload($school),
+            'school' => $payload,
             'coaches' => $coaches,
-            // Keep parity with the Coach Database school drawer. Roster & Stats is
-            // intentionally a coming-soon panel there as well; Communications is
-            // real recruiting history for coaches tied to this school.
+            'lists' => $lists,
             'roster' => [
                 'available' => false,
                 'message' => 'Team roster and school performance insights will be available here soon.',

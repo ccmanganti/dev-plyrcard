@@ -20,6 +20,12 @@
     $lrDashboardSchoolUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.school')
         ? route('locker-room.dashboard.school', ['school' => '__SCHOOL__'])
         : null;
+    $lrDashboardSchoolFavoriteUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.school.favorite')
+        ? route('locker-room.dashboard.school.favorite')
+        : null;
+    $lrDashboardSchoolListUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.school.list')
+        ? route('locker-room.dashboard.school.list')
+        : null;
     $lrScheduleStoreUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.schedule.store')
         ? route('locker-room.schedule.store')
         : null;
@@ -537,6 +543,10 @@
     .lr-inline-success-v59{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border:1px solid #a7f3d0;border-radius:12px;background:#ecfdf5;color:#065f46;font-size:11px;line-height:1.5}.lr-inline-success-v59[hidden]{display:none!important}.lr-inline-success-v59 i{margin-top:2px}
     .lr-btn.is-busy{pointer-events:none;opacity:.72}.lr-btn.is-busy:before{content:'';width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:lr-v59-spin .7s linear infinite}@keyframes lr-v59-spin{to{transform:rotate(360deg)}}
     @media(max-width:520px){.lr-dashboard-detail-body{padding:11px 10px 20px}.lr-detail-kpis,.lr-engagement-filters{gap:6px!important}.lr-detail-kpi,.lr-engagement-filter{min-height:78px;padding:8px!important}.lr-detail-kpi strong,.lr-engagement-filter strong{font-size:18px!important}.lr-detail-kpi em{display:none}.lr-activity-row{grid-template-columns:34px minmax(0,1fr) auto;padding:9px;gap:8px}.lr-school-link{max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+
+    /* v10.61: Locker Room school drawer mirrors the Admin school slider while staying compact. */
+    .lr-school-adminlike-hero{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:14px;align-items:start;padding:4px 0 16px}.lr-school-adminlike-logo{width:62px;height:62px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;display:grid;place-items:center;overflow:hidden;font-weight:850}.lr-school-adminlike-logo img{width:100%;height:100%;object-fit:contain}.lr-school-adminlike-main{min-width:0}.lr-school-adminlike-main .lr-school-division{display:inline-flex;padding:4px 8px;border-radius:8px;background:#fff0eb;color:#ff5c35;font-size:10px;font-weight:850}.lr-school-adminlike-main h3{margin:7px 0 3px;font-size:22px;line-height:1.06;color:#111827}.lr-school-adminlike-main p{margin:0;color:#7c8798;font-size:12px}.lr-school-scorebox{display:grid;justify-items:center;gap:3px}.lr-school-score-ring{width:54px;height:54px;border:5px solid #ff5c35;border-radius:999px;display:grid;place-items:center;font-weight:900;font-size:14px}.lr-school-scorebox small{color:#ff5c35;font-size:9px;font-weight:900}.lr-school-actions{display:grid;grid-template-columns:1.2fr 1fr 1.15fr;gap:8px;margin-bottom:14px}.lr-school-action{min-height:42px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;color:#111827;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}.lr-school-action.is-primary{background:#ff5c35;border-color:#ff5c35;color:#fff}.lr-school-action.is-active{border-color:#ffb7a2;background:#fff3ee;color:#f05b34}.lr-school-list-wrap{position:relative}.lr-school-list-menu{position:absolute;z-index:20;top:calc(100% + 6px);right:0;width:min(240px,72vw);max-height:260px;overflow:auto;padding:8px;border:1px solid #e5e7eb;border-radius:13px;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.15)}.lr-school-list-menu[hidden]{display:none}.lr-school-list-menu h5{margin:2px 5px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#98a2b3}.lr-school-list-option{width:100%;border:0;background:transparent;border-radius:9px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font-size:12px;font-weight:750;cursor:pointer}.lr-school-list-option:hover{background:#f8fafc}.lr-school-list-option.is-active{background:#fff3ee;color:#f05b34}.lr-school-tabs{grid-template-columns:repeat(3,minmax(0,1fr));background:#f7f8fa;padding:4px;border:1px solid #e5e7eb;border-radius:14px}.lr-school-tab{min-height:44px;border-radius:10px}.lr-school-tab.is-active{background:#fff;box-shadow:0 5px 14px rgba(15,23,42,.06)}.lr-school-coach{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:13px;background:#fff}.lr-school-coach-avatar{width:42px;height:42px;border-radius:12px;background:#f2f4f7;display:grid;place-items:center;font-size:11px;font-weight:850}.lr-school-coach-copy{min-width:0}.lr-school-coach-copy strong{display:block}.lr-school-coach-copy span,.lr-school-coach-copy a{display:block;margin-top:2px;color:#667085;font-size:11px;text-decoration:none;overflow:hidden;text-overflow:ellipsis}.lr-school-mailbtn{width:34px;height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;display:grid;place-items:center;color:#ff5c35;text-decoration:none}.lr-school-comms{display:grid;gap:8px}.lr-school-comm{background:#fff}.lr-school-backlabel{font-size:11px;color:#667085;margin-bottom:10px}.lr-school-busy{opacity:.6;pointer-events:none}
+    @media(max-width:620px){.lr-school-adminlike-hero{grid-template-columns:52px minmax(0,1fr) auto;gap:10px}.lr-school-adminlike-logo{width:52px;height:52px;border-radius:13px}.lr-school-adminlike-main h3{font-size:18px}.lr-school-score-ring{width:46px;height:46px;border-width:4px}.lr-school-actions{grid-template-columns:1.2fr .9fr 1.05fr;gap:6px}.lr-school-action{font-size:10px;padding:0 6px}.lr-school-tab{font-size:10px}}
 </style>
 
 <script type="application/json" id="plyrcard-locker-room-initial">@json($lrInitialData)</script>
@@ -546,6 +556,8 @@
      data-profile-options-url="{{ $lrProfileOptionsUrl }}"
      data-dashboard-activity-url="{{ $lrDashboardActivityUrl }}"
      data-dashboard-school-url="{{ $lrDashboardSchoolUrl }}"
+     data-dashboard-school-favorite-url="{{ $lrDashboardSchoolFavoriteUrl }}"
+     data-dashboard-school-list-url="{{ $lrDashboardSchoolListUrl }}"
      data-schedule-url="{{ $lrScheduleStoreUrl }}"
      data-schedule-base-url="{{ $lrScheduleBaseUrl }}"
      data-settings-url="{{ $lrSettingsUrl }}"
@@ -1146,36 +1158,86 @@
         if (!panel || !body) return;
         panel.classList.add('is-open');
         if (dashboardSchoolLoading) {
-            body.innerHTML = '<div class="lr-detail-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading school...</div>';
+            body.innerHTML = '<div class="lr-detail-empty"><i class="fa-solid fa-circle-notch fa-spin"></i> Loading school details...</div>';
             return;
         }
         const data = dashboardSchoolState || {};
         const school = data.school || null;
         const coaches = Array.isArray(data.coaches) ? data.coaches : [];
-        if (!school) {
+        const lists = Array.isArray(data.lists) ? data.lists : [];
+        if (!school || !school.id) {
             body.innerHTML = '<div class="lr-detail-empty">School information could not be matched to the local school database.</div>';
             return;
         }
-        const meta = [school.division, school.conference, [school.city, school.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
         const logo = school.logo_url
-            ? `<img class="lr-school-logo" src="${esc(school.logo_url)}" alt="${esc(school.name || 'School')} logo">`
-            : `<span class="lr-school-logo-fallback">${esc(lrInitials(school.name))}</span>`;
-        const roster = coaches.length
-            ? coaches.map(coach => `<div class="lr-school-coach"><strong>${esc(coach.name || 'Coach')}</strong><span>${esc([coach.title, coach.email, coach.phone].filter(Boolean).join(' · ') || 'Coach')}</span></div>`).join('')
-            : '<div class="lr-detail-empty">No local coaches are currently attached to this school.</div>';
+            ? `<img src="${esc(school.logo_url)}" alt="${esc(school.name || 'School')} logo">`
+            : `<span>${esc(lrInitials(school.name))}</span>`;
+        const score = Math.max(0, Math.min(100, Number(school.engagement_score || school.lead_score || 0)));
+        const scoreLabel = score >= 70 ? 'HOT' : (score >= 35 ? 'WARM' : 'NEW');
+        const isFavorite = !!(school.is_favorite || school.is_favorite_school);
+        const listKeys = (Array.isArray(school.list_keys) ? school.list_keys : []).map(v => String(v).toLowerCase());
+        const coachEmails = coaches.map(c => String(c.email || '').trim()).filter(Boolean);
+        const mailHref = coachEmails.length ? `mailto:${encodeURIComponent(coachEmails.join(','))}` : '#';
+        const roster = coaches.length ? coaches.map(coach => {
+            const initials = lrInitials(coach.name || 'Coach');
+            return `<div class="lr-school-coach"><div class="lr-school-coach-avatar">${esc(initials)}</div><div class="lr-school-coach-copy"><strong>${esc(coach.name || 'Coach')}</strong><span>${esc(coach.title || 'Coach')}</span>${coach.email ? `<a href="mailto:${esc(coach.email)}">${esc(coach.email)}</a>` : ''}</div>${coach.email ? `<a class="lr-school-mailbtn" href="mailto:${esc(coach.email)}" aria-label="Email ${esc(coach.name || 'coach')}"><i class="fa-regular fa-envelope"></i></a>` : ''}</div>`;
+        }).join('') : '<div class="lr-detail-empty"><strong>No local coaches found.</strong></div>';
         const communications = Array.isArray(data.communications) ? data.communications : [];
-        const comms = communications.length
-            ? communications.map(row => `<div class="lr-school-comm"><span class="lr-school-comm-dir${row.direction === 'inbound' ? ' is-inbound' : ''}">${row.direction === 'inbound' ? '↙' : '↗'}</span><div><strong>${esc(row.title || 'Conversation activity')}</strong><span>${esc(row.preview || 'No message preview available.')}</span><small>${esc([row.date_label, row.opened ? 'Opened' : '', row.reply ? 'Reply' : ''].filter(Boolean).join(' · '))}</small></div></div>`).join('')
-            : '<div class="lr-detail-empty">No conversation history yet. Emails and replies with coaches from this school will appear here.</div>';
-        body.innerHTML = `<div class="lr-school-hero">${logo}<div class="lr-school-meta"><h4>${esc(school.name || 'School')}</h4><p>${esc(meta || 'School information')}</p></div></div>
+        const comms = communications.length ? communications.map(row => `<div class="lr-school-comm"><span class="lr-school-comm-dir${row.direction === 'inbound' ? ' is-inbound' : ''}">${row.direction === 'inbound' ? '↙' : '↗'}</span><div><strong>${esc(row.title || 'Conversation activity')}</strong><span>${esc(row.preview || 'No message preview available.')}</span><small>${esc([row.date_label, row.opened ? 'Opened' : '', row.reply ? 'Reply' : ''].filter(Boolean).join(' · '))}</small></div></div>`).join('') : '<div class="lr-detail-empty"><strong>No conversation history yet.</strong><br>Emails and replies with coaches from this school will appear here.</div>';
+        const listMenu = lists.length ? lists.map(list => {
+            const key = String(list.key || list.id || '');
+            const label = String(list.label || list.name || key || 'List');
+            const active = listKeys.includes(key.toLowerCase());
+            return `<button type="button" class="lr-school-list-option${active ? ' is-active' : ''}" data-lr-school-list-key="${esc(key)}" data-lr-school-list-active="${active ? '1' : '0'}"><span>${esc(label)}</span><span>${active ? '✓' : '+'}</span></button>`;
+        }).join('') : '<div class="lr-detail-empty" style="padding:10px">No lists yet.</div>';
+        body.innerHTML = `
+            <div class="lr-school-adminlike-hero">
+                <div class="lr-school-adminlike-logo">${logo}</div>
+                <div class="lr-school-adminlike-main"><span class="lr-school-division">${esc(school.division || 'Division')}</span><h3>${esc(school.name || 'School')}</h3><p>◎ ${esc(school.conference || 'Conference unavailable')}${school.city || school.state ? ` · ${esc([school.city, school.state].filter(Boolean).join(', '))}` : ''}</p></div>
+                <div class="lr-school-scorebox"><div class="lr-school-score-ring">${score}</div><small>${scoreLabel}</small></div>
+            </div>
+            <div class="lr-school-actions">
+                <a class="lr-school-action is-primary${coachEmails.length ? '' : ' lr-school-busy'}" href="${mailHref}" ${coachEmails.length ? '' : 'aria-disabled="true"'}><i class="fa-regular fa-envelope"></i><span>Email Coaches</span></a>
+                <button type="button" class="lr-school-action${isFavorite ? ' is-active' : ''}" data-lr-school-favorite data-school-id="${esc(String(school.id))}" data-favorite="${isFavorite ? '1' : '0'}"><i class="fa-${isFavorite ? 'solid' : 'regular'} fa-star"></i><span>${isFavorite ? 'Favorited' : 'Favorite'}</span></button>
+                <div class="lr-school-list-wrap"><button type="button" class="lr-school-action${listKeys.length ? ' is-active' : ''}" data-lr-school-list-toggle><i class="fa-solid fa-plus"></i><span>${listKeys.length ? 'In Lists' : 'Add to List'}</span><i class="fa-solid fa-chevron-down"></i></button><div class="lr-school-list-menu" data-lr-school-list-menu hidden><h5>Add to a list</h5>${listMenu}</div></div>
+            </div>
             <div class="lr-school-tabs" role="tablist" aria-label="School detail tabs">
                 <button type="button" class="lr-school-tab is-active" data-lr-school-tab="coaches">Coaching Staff</button>
                 <button type="button" class="lr-school-tab" data-lr-school-tab="roster">Roster &amp; Stats</button>
                 <button type="button" class="lr-school-tab" data-lr-school-tab="comms">Communications</button>
             </div>
-            <div class="lr-school-tab-panel" data-lr-school-tab-panel="coaches"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;"><h4 style="margin:0;font-size:13px;">Coaching Staff</h4><span class="lr-chip">${coaches.length} coach${coaches.length === 1 ? '' : 'es'}</span></div><div class="lr-school-roster">${roster}</div></div>
+            <div class="lr-school-tab-panel" data-lr-school-tab-panel="coaches"><div class="lr-school-roster">${roster}</div></div>
             <div class="lr-school-tab-panel" data-lr-school-tab-panel="roster" hidden><div class="lr-school-coming"><div><i class="fa-solid fa-arrow-trend-up"></i><strong>Roster &amp; Stats Coming Soon</strong><span>${esc(data.roster?.message || 'Team roster and school performance insights will be available here soon.')}</span></div></div></div>
             <div class="lr-school-tab-panel" data-lr-school-tab-panel="comms" hidden><div class="lr-school-comms">${comms}</div></div>`;
+    }
+
+    async function toggleDashboardSchoolFavorite(button) {
+        if (!button || !drawer.dataset.dashboardSchoolFavoriteUrl || !dashboardSchoolState?.school?.id) return;
+        const next = button.dataset.favorite !== '1';
+        button.classList.add('lr-school-busy');
+        try {
+            await request(drawer.dataset.dashboardSchoolFavoriteUrl, {method:'POST', body: {school_id:String(dashboardSchoolState.school.id), favorite:next}});
+            dashboardSchoolState.school.is_favorite = next;
+            dashboardSchoolState.school.is_favorite_school = next;
+            renderDashboardSchoolDetail();
+        } catch (error) { showAlert(error.message || 'Unable to update favorite.', 'error'); }
+    }
+
+    async function toggleDashboardSchoolList(button) {
+        if (!button || !drawer.dataset.dashboardSchoolListUrl || !dashboardSchoolState?.school?.id) return;
+        const key = String(button.dataset.lrSchoolListKey || '').trim();
+        if (!key) return;
+        const next = button.dataset.lrSchoolListActive !== '1';
+        button.classList.add('lr-school-busy');
+        try {
+            await request(drawer.dataset.dashboardSchoolListUrl, {method:'POST', body: {school_id:String(dashboardSchoolState.school.id), list_key:key, in_list:next}});
+            let keys = Array.isArray(dashboardSchoolState.school.list_keys) ? dashboardSchoolState.school.list_keys.map(String) : [];
+            keys = keys.filter(v => v.toLowerCase() !== key.toLowerCase());
+            if (next) keys.push(key);
+            dashboardSchoolState.school.list_keys = keys;
+            renderDashboardSchoolDetail();
+            const menu = q('[data-lr-school-list-menu]'); if (menu) menu.hidden = false;
+        } catch (error) { showAlert(error.message || 'Unable to update list.', 'error'); }
     }
 
     async function openDashboardSchool(reference) {
@@ -1533,6 +1595,9 @@
             qa('[data-lr-school-tab-panel]').forEach(panel => { panel.hidden = panel.dataset.lrSchoolTabPanel !== key; });
             return;
         }
+        const schoolFavorite = event.target.closest('[data-lr-school-favorite]'); if (schoolFavorite && drawer.contains(schoolFavorite)) { event.preventDefault(); event.stopPropagation(); toggleDashboardSchoolFavorite(schoolFavorite); return; }
+        const schoolListToggle = event.target.closest('[data-lr-school-list-toggle]'); if (schoolListToggle && drawer.contains(schoolListToggle)) { event.preventDefault(); event.stopPropagation(); const menu=q('[data-lr-school-list-menu]'); if(menu) menu.hidden=!menu.hidden; return; }
+        const schoolListOption = event.target.closest('[data-lr-school-list-key]'); if (schoolListOption && drawer.contains(schoolListOption)) { event.preventDefault(); event.stopPropagation(); toggleDashboardSchoolList(schoolListOption); return; }
         const schoolDetail = event.target.closest('[data-lr-dashboard-school]'); if (schoolDetail && drawer.contains(schoolDetail)) { event.preventDefault(); event.stopPropagation(); openDashboardSchool(schoolDetail.dataset.lrDashboardSchool); return; }
         const tab = event.target.closest('[data-pane]'); if (tab && drawer.contains(tab)) { qa('[data-pane]').forEach(x=>x.classList.toggle('is-active',x===tab)); qa('[data-lr-profile-pane]').forEach(x=>x.classList.toggle('is-active',x.dataset.lrProfilePane===tab.dataset.pane)); return; }
         const positionTrigger = event.target.closest('[data-lr-position-trigger]'); if (positionTrigger && drawer.contains(positionTrigger)) { event.preventDefault(); const menu=q('[data-lr-position-menu]'); if(menu) menu.hidden=!menu.hidden; return; }
