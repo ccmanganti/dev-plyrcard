@@ -70,6 +70,27 @@ discoverSelectedIds: [],
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
             },
+            isValidOpenSchool() {
+                if (!this.schoolDrawerOpen || !this.optimisticSchool) return false;
+
+                const source = this.optimisticSchool;
+                const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
+                const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
+                if ((!sourceId && !sourceName) || !sourceName || sourceName === 'school') return false;
+
+                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+                return rows.some(row => {
+                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
+                    if (!rowName || rowName === 'school') return false;
+
+                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
+                        .map(value => String(value ?? '').trim())
+                        .filter(Boolean);
+
+                    if (sourceId && ids.includes(sourceId)) return true;
+                    return sourceName === rowName;
+                });
+            },
             applyGlobalSchoolState(detail) {
                 if (!detail) return;
                 const id = String(detail.id ?? '').trim();
@@ -12330,7 +12351,10 @@ CSS;
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
              x-cloak
-             x-show="schoolDrawerOpen && optimisticSchool && (optimisticSchool.id || optimisticSchool.school_id) && optimisticSchool.name && String(optimisticSchool.name).trim().toLowerCase() !== 'school'" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
+             x-show="isValidOpenSchool()"
+             x-bind:style="isValidOpenSchool() ? 'z-index:9999' : 'display:none !important;z-index:9999'"
+             x-effect="if (schoolDrawerOpen && !isValidOpenSchool()) { closeDiscoverSchool(); }"
+             x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
                     <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
 
