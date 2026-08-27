@@ -2680,7 +2680,8 @@
       }
   </style>
 
-  <header id="site-header" class="plyrcard-site-header over-hero {{ $plyrPullUpOnly ? 'is-pullup-only' : '' }} {{ $plyrHideHeaderNavigation ? 'is-player-website-header-hidden' : '' }}">
+  @if (! $plyrHideHeaderNavigation)
+  <header id="site-header" class="plyrcard-site-header over-hero">
     <a data-nav href="/" class="logo-wrap" aria-label="PLYRCARD Home">
       <img src="{{ asset('images/plyr-logo.png') }}" alt="PLYRCARD Logo">
     </a>
@@ -2721,6 +2722,7 @@
       <a data-nav href="/registration?utm_plan=free" class="nav-cta-pill{{ ($activePage ?? '') === 'registration' ? ' active' : '' }}">Start Free</a>
     @endguest
   </nav>
+  @endif
 
 
   @include("partials.locker-room")

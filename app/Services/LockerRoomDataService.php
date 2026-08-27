@@ -562,6 +562,19 @@ class LockerRoomDataService
                         'city' => $row['city'] ?? null,
                         'state' => $row['state'] ?? null,
                     ],
+                    // Keep coach rows actionable even when the tracking payload only
+                    // contains a coach/contact identity and no canonical school id.
+                    // dashboardSchool() resolves these coach references back to the
+                    // same local school record used by Coach Database.
+                    'school_open_reference' => $school
+                        ? (string) ($this->schoolPayload($school)['reference'] ?? $school->getKey())
+                        : ($schoolRef !== ''
+                            ? $schoolRef
+                            : ($schoolName !== ''
+                                ? 'school:' . $schoolName
+                                : ($contactId !== ''
+                                    ? 'coach:' . $contactId
+                                    : (filled($row['coach_email'] ?? $row['email'] ?? null) ? 'coach-email:' . trim((string) ($row['coach_email'] ?? $row['email'])) : null)))),
                     'count' => $clicks,
                     'platform_counts' => [
                         'instagram' => $platform === 'instagram' ? $clicks : 0,
@@ -754,6 +767,15 @@ class LockerRoomDataService
         }
 
         $school = $this->resolveSchool($reference);
+
+        // Analytics rows are coach-first. If a historical tracking row does not
+        // carry a canonical school id/business id, resolve the coach back to its
+        // local Coach Database school so clicking the coach remains equivalent to
+        // clicking that school inside Recruiting Center.
+        if (! $school && (str_starts_with($reference, 'coach:') || str_starts_with($reference, 'coach-email:'))) {
+            $school = $this->resolveSchoolFromCoachReference($reference);
+        }
+
         if (! $school) {
             return ['school' => null, 'coaches' => [], 'lists' => []];
         }
@@ -1037,6 +1059,13 @@ class LockerRoomDataService
                     'coach_email' => $email !== '' ? $email : null,
                     'coach_title' => $title !== '' ? $title : null,
                     'school' => $schoolPayload,
+                    'school_open_reference' => $school
+                        ? (string) ($schoolPayload['reference'] ?? $school->getKey())
+                        : ($schoolReference !== ''
+                            ? $schoolReference
+                            : ($schoolName !== ''
+                                ? 'school:' . $schoolName
+                                : ($contactId !== '' ? 'coach:' . $contactId : ($email !== '' ? 'coach-email:' . $email : null)))),
                     'count' => 0,
                     'platform_counts' => ['instagram' => 0, 'youtube' => 0, 'x' => 0, 'website' => 0, 'email' => 0],
                     'last_at' => $event['occurred_at'] ?? $event['created_at'] ?? null,
@@ -1162,6 +1191,15 @@ class LockerRoomDataService
                         'city' => null,
                         'state' => null,
                     ],
+                    'school_open_reference' => $school
+                        ? (string) ($this->schoolPayload($school)['reference'] ?? $school->getKey())
+                        : ($schoolRef !== ''
+                            ? $schoolRef
+                            : ($schoolName !== ''
+                                ? 'school:' . $schoolName
+                                : ($contactId !== ''
+                                    ? 'coach:' . $contactId
+                                    : (filled($row['coach_email'] ?? $row['email'] ?? null) ? 'coach-email:' . trim((string) ($row['coach_email'] ?? $row['email'])) : null)))),
                     'count' => $views,
                     'platform_counts' => [],
                     'last_at' => $row['time'] ?? $row['created_at'] ?? null,
@@ -1333,6 +1371,75 @@ class LockerRoomDataService
 
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : [];
+    }
+
+    protected function resolveSchoolFromCoachReference(string $reference): ?School
+    {
+        if (! Schema::hasTable('coaches')) {
+            return null;
+        }
+
+        $query = DB::table('coaches');
+        if (Schema::hasColumn('coaches', 'deleted_at')) {
+            $query->whereNull('deleted_at');
+        }
+
+        if (str_starts_with($reference, 'coach-email:')) {
+            $email = trim(substr($reference, strlen('coach-email:')));
+            if ($email === '' || ! Schema::hasColumn('coaches', 'email')) {
+                return null;
+            }
+            $query->whereRaw('LOWER(email) = ?', [strtolower($email)]);
+        } else {
+            $contactId = trim(substr($reference, strlen('coach:')));
+            if ($contactId === '') {
+                return null;
+            }
+
+            $query->where(function ($builder) use ($contactId): void {
+                $matched = false;
+                foreach (['ghl_contact_id', 'contact_id', 'id'] as $column) {
+                    if (! Schema::hasColumn('coaches', $column)) {
+                        continue;
+                    }
+                    if (! $matched) {
+                        $builder->where($column, $contactId);
+                        $matched = true;
+                    } else {
+                        $builder->orWhere($column, $contactId);
+                    }
+                }
+                if (! $matched) {
+                    $builder->whereRaw('1 = 0');
+                }
+            });
+        }
+
+        $coach = $query->first();
+        if (! $coach) {
+            return null;
+        }
+
+        $coach = (array) $coach;
+        if (! empty($coach['school_id'])) {
+            $school = School::query()->find($coach['school_id']);
+            if ($school) {
+                return $school;
+            }
+        }
+
+        foreach (['school_business_id', 'business_id', 'ghl_business_id'] as $column) {
+            $value = trim((string) ($coach[$column] ?? ''));
+            if ($value !== '') {
+                $school = $this->resolveSchool($value);
+                if ($school) {
+                    return $school;
+                }
+            }
+        }
+
+        $schoolName = trim((string) ($coach['school_name'] ?? $coach['school'] ?? ''));
+        return $schoolName !== '' ? $this->resolveSchool('school:' . $schoolName) : null;
     }
 
     protected function resolveSchool(string $reference): ?School
