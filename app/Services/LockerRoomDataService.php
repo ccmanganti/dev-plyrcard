@@ -1351,6 +1351,8 @@ class LockerRoomDataService
             'amount_refunded_cents' => (int) ($billing?->amount_refunded_cents ?? $transaction?->refunded_amount_cents ?? 0),
             'payment_status' => $billing?->payment_status,
             'subscription_status' => $billing?->subscription_status,
+            'cancellation_requested' => (bool) data_get($billing?->registration_meta ?? [], 'cancellation_requested_at'),
+            'cancellation_requested_at' => data_get($billing?->registration_meta ?? [], 'cancellation_requested_at'),
             'cardholder_name' => $billing?->cardholder_name,
             'payment_brand' => $brand,
             'card_last_four' => $lastFour,

@@ -173,6 +173,7 @@ class BillingAccountService
                 } else {
                     $billing->forceFill([
                         'subscription_status' => 'not_subscribed',
+                        'payment_status' => $billing->payment_status ?: 'not_available',
                         'payment_synced_at' => now(),
                     ])->save();
                 }
@@ -654,6 +655,13 @@ class BillingAccountService
                 'card_expiration' => ($expMonth && $expYear) ? sprintf('%02d/%s', (int) $expMonth, substr((string) $expYear, -2)) : null,
                 'ghl_transaction_id' => $transactionId,
             ], fn ($value) => filled($value));
+
+            $normalizedStatus = strtolower($status);
+            if (in_array($normalizedStatus, ['succeeded','success','paid','complete','completed'], true)) {
+                $billingUpdates['payment_status'] = 'paid';
+            } elseif ($normalizedStatus !== '' && ! $this->isActiveSubscriptionStatus((string) $billing->subscription_status)) {
+                $billingUpdates['payment_status'] = $normalizedStatus;
+            }
 
             if ($billingUpdates !== []) {
                 $billing->forceFill($billingUpdates)->save();

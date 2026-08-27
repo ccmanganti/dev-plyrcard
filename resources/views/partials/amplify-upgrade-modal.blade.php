@@ -1,6 +1,6 @@
 @once
     <style>
-        .plyr-amplify-modal[hidden]{display:none!important}
+        .plyr-amplify-modal[hidden],.plyr-amplify-state[hidden],.plyr-amplify-frame[hidden]{display:none!important}
         .plyr-amplify-modal{position:fixed;inset:0;z-index:100500;display:grid;place-items:center;padding:18px;background:rgba(2,6,23,.72);backdrop-filter:blur(7px)}
         .plyr-amplify-panel{width:min(760px,100%);max-height:min(900px,calc(100vh - 30px));display:flex;flex-direction:column;background:#fff;border:1px solid #e5e7eb;border-radius:22px;box-shadow:0 28px 80px rgba(0,0,0,.3);overflow:hidden;color:#101828}
         .plyr-amplify-head{display:flex;align-items:flex-start;gap:14px;padding:18px 20px;border-bottom:1px solid #eaecf0;background:linear-gradient(135deg,#fff7f3,#fff)}
@@ -75,6 +75,8 @@
             if (!modal) return;
 
             const frame = modal.querySelector('[data-plyrcard-amplify-frame]');
+            const panel = modal.querySelector('.plyr-amplify-panel');
+            const foot = modal.querySelector('.plyr-amplify-foot');
             const loading = modal.querySelector('[data-plyrcard-amplify-loading]');
             const success = modal.querySelector('[data-plyrcard-amplify-success]');
             const error = modal.querySelector('[data-plyrcard-amplify-error]');
@@ -87,6 +89,8 @@
             const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value || '';
             const show = (target) => {
                 [loading, success, error, frame].forEach(el => { if (el) el.hidden = el !== target; });
+                panel?.classList.toggle('is-checkout', target === frame);
+                if (foot) foot.hidden = target === frame;
             };
             const stopPolling = () => { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; };
             const close = () => { stopPolling(); modal.hidden = true; document.documentElement.style.overflow = ''; };

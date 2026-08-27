@@ -2159,23 +2159,24 @@ discoverSelectedIds: [],
             left:50% !important;
             right:auto !important;
             transform:translateX(-50%) !important;
-            width:min(14.5rem,calc(100vw - 1.5rem)) !important;
-            max-height:15.5rem !important;
+            width:min(11.25rem,calc(100vw - 1rem)) !important;
+            max-height:10.75rem !important;
             overflow-y:auto !important;
-            padding:.45rem !important;
-            border-radius:.75rem !important;
+            padding:.28rem !important;
+            border-radius:.62rem !important;
+            box-shadow:0 12px 28px rgba(15,23,42,.14) !important;
             z-index:120 !important;
         }
-        .rc-profile-list-menu-v57 h4 { margin:.12rem .35rem .35rem !important; font-size:.7rem !important; }
+        .rc-profile-list-menu-v57 h4 { margin:.06rem .25rem .2rem !important; font-size:.61rem !important; }
         .rc-profile-list-menu-v57 button {
             grid-template-columns:.95rem minmax(0,1fr) auto !important;
-            min-height:2.2rem !important;
-            padding:.38rem .45rem !important;
-            gap:.38rem !important;
-            font-size:.69rem !important;
-            border-radius:.55rem !important;
+            min-height:1.78rem !important;
+            padding:.24rem .32rem !important;
+            gap:.28rem !important;
+            font-size:.61rem !important;
+            border-radius:.45rem !important;
         }
-        .rc-profile-list-menu-v57 .rc-list-count-v81 { font-size:.62rem !important; }
+        .rc-profile-list-menu-v57 .rc-list-count-v81 { font-size:.55rem !important; opacity:.68; }
         .rc-about-grid-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
         .rc-about-item-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.45rem; color:var(--rc-muted); font-size:.72rem; }
         .rc-about-item-v56 strong { display:block; color:var(--rc-text); font-size:.86rem; margin-bottom:.12rem; }
@@ -10933,6 +10934,7 @@ CSS;
                                         favoritePending: false,
                                         listsOpen: false,
                                         openingSchool: false,
+                                        listPending: {},
                                         listKeys: @js($selectedInboxListKeys),
                                         lists: @js($selectedInboxLists),
                                         normalizeKey(value) { return String(value || '').trim().toLowerCase(); },
@@ -10941,15 +10943,18 @@ CSS;
                                         listColor(list) { return String(list?.color || '#ff6338'); },
                                         listCount(list) { return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0); },
                                         inList(key) { return this.listKeys.map(v => this.normalizeKey(v)).includes(this.normalizeKey(key)); },
+                                        isListPending(key) { return Boolean(this.listPending[this.normalizeKey(key)]); },
                                         openSchool() {
-                                            if (this.openingSchool || (!this.schoolId && !this.school?.name)) return;
+                                            if (!this.schoolId && !this.school?.name) return;
+                                            const now = Date.now();
+                                            const last = Number(window.__plyrInboxSchoolOpenAt || 0);
+                                            if (this.openingSchool || (now - last) < 500) return;
+                                            window.__plyrInboxSchoolOpenAt = now;
                                             this.openingSchool = true;
-                                            const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
                                             this.listsOpen = false;
-                                            this.$nextTick(() => {
-                                                openGlobalSchool(payload);
-                                                window.setTimeout(() => { this.openingSchool = false; }, 350);
-                                            });
+                                            const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
+                                            window.dispatchEvent(new CustomEvent('rc-open-school-global', { detail: { school: payload } }));
+                                            window.setTimeout(() => { this.openingSchool = false; }, 520);
                                         },
                                         async toggleFavorite() {
                                             if (!this.schoolId || this.favoritePending) return;
@@ -10964,19 +10969,26 @@ CSS;
                                         },
                                         async toggleList(key) {
                                             key = this.normalizeKey(key);
-                                            if (!this.schoolId || !key) return;
+                                            if (!this.schoolId || !key || this.isListPending(key)) return;
                                             const previous = [...this.listKeys];
                                             const has = this.inList(key);
+                                            this.listPending = { ...this.listPending, [key]: true };
                                             this.listKeys = has ? previous.filter(v => this.normalizeKey(v) !== key) : [...previous, key];
                                             try {
                                                 const result = await this.$wire.call('queueSchoolListMemberships', this.schoolId, { [key]: !has });
                                                 if (!result || result.success === false) this.listKeys = previous;
                                             } catch (_) { this.listKeys = previous; }
+                                            finally {
+                                                const nextPending = { ...this.listPending };
+                                                delete nextPending[key];
+                                                this.listPending = nextPending;
+                                            }
                                         }
                                     }"
                                 >
                                     <button type="button" class="rc-profile-action-v56" x-on:click.stop.prevent="openSchool()" x-bind:disabled="openingSchool" title="View school">
-                                        <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                        <svg x-show="!openingSchool" viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+                                        <span class="rc-action-spinner-v81" x-cloak x-show="openingSchool"></span>
                                         <span>View School</span>
                                     </button>
 
@@ -11000,14 +11012,16 @@ CSS;
                                                 <button
                                                     type="button"
                                                     x-bind:style="`--list-color:${listColor(list)}`"
-                                                    x-bind:class="inList(listKey(list)) ? 'is-active' : ''"
+                                                    x-bind:class="{ 'is-active': inList(listKey(list)), 'is-saving': isListPending(listKey(list)) }"
+                                                    x-bind:disabled="isListPending(listKey(list))"
                                                     x-on:click.stop="toggleList(listKey(list))"
                                                     role="menuitemcheckbox"
                                                     x-bind:aria-checked="inList(listKey(list)) ? 'true' : 'false'"
                                                 >
                                                     <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                                                     <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" x-bind:style="`--dot:${listColor(list)}`"></span><span x-text="listLabel(list)"></span></span>
-                                                    <small class="rc-list-count-v81" x-text="listCount(list)"></small>
+                                                    <span class="rc-action-spinner-v81" x-cloak x-show="isListPending(listKey(list))"></span>
+                                                    <small class="rc-list-count-v81" x-show="!isListPending(listKey(list))" x-text="listCount(list)"></small>
                                                 </button>
                                             </template>
                                             <div class="rc-school-list-empty" x-show="lists.length === 0">No lists yet.</div>
@@ -11217,9 +11231,11 @@ CSS;
 
                 @php
                     $settingsBillingService = app(\App\Services\BillingProfileService::class);
-                    $settingsBilling = $settingsBillingService->get(auth()->user());
+                    // Force an authoritative subscription/payment refresh when Billing & Payments is opened.
+                    $settingsBilling = $settingsBillingService->refreshPaymentIdentity(auth()->user());
                     $settingsPaymentUpdateUrl = $settingsBillingService->paymentMethodUpdateUrl(auth()->user(), $settingsBilling);
                     $settingsBillingConnected = filled($settingsBilling->ghl_contact_id);
+                    $settingsCancellationRequested = (bool) data_get($settingsBilling->registration_meta ?? [], 'cancellation_requested_at');
                     $settingsBrand = strtoupper((string) ($settingsBilling->payment_brand ?: 'CARD'));
                 @endphp
 
@@ -11242,7 +11258,7 @@ CSS;
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem;margin-bottom:1rem;">
                         <div class="rc-card is-flat"><div class="rc-subtle">Billing account</div><strong>{{ $settingsBillingConnected ? 'Connected' : 'Not connected yet' }}</strong></div>
                         <div class="rc-card is-flat"><div class="rc-subtle">Plan</div><strong>{{ str($settingsBilling->plan_key ?: 'free')->replace('-', ' ')->title() }}</strong></div>
-                        <div class="rc-card is-flat"><div class="rc-subtle">Subscription</div><strong>{{ str($settingsBilling->subscription_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
+                        <div class="rc-card is-flat"><div class="rc-subtle">Subscription</div><strong>{{ $settingsCancellationRequested ? 'Cancellation Requested' : str($settingsBilling->subscription_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
                         <div class="rc-card is-flat"><div class="rc-subtle">Payment</div><strong>{{ str($settingsBilling->payment_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
                     </div>
 
@@ -11274,19 +11290,24 @@ CSS;
                     <form method="POST" action="{{ route('locker-room.billing.update') }}" style="margin-top:1rem;">
                         @csrf
                         <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;">
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Name<input class="rc-input" style="width:100%;" name="billing_name" value="{{ old('billing_name', $settingsBilling->billing_name) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Email<input class="rc-input" style="width:100%;" type="email" name="billing_email" value="{{ old('billing_email', $settingsBilling->billing_email) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Phone<input class="rc-input" style="width:100%;" name="billing_phone" value="{{ old('billing_phone', $settingsBilling->billing_phone) }}"></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Company / Organization<input class="rc-input" style="width:100%;" name="billing_company" value="{{ old('billing_company', $settingsBilling->billing_company) }}"></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 1<input class="rc-input" style="width:100%;" name="billing_address_1" value="{{ old('billing_address_1', $settingsBilling->billing_address_1) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 2<input class="rc-input" style="width:100%;" name="billing_address_2" value="{{ old('billing_address_2', $settingsBilling->billing_address_2) }}"></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">City<input class="rc-input" style="width:100%;" name="billing_city" value="{{ old('billing_city', $settingsBilling->billing_city) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">State / Province<input class="rc-input" style="width:100%;" name="billing_state" value="{{ old('billing_state', $settingsBilling->billing_state) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Postal Code<input class="rc-input" style="width:100%;" name="billing_postal_code" value="{{ old('billing_postal_code', $settingsBilling->billing_postal_code) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Country<input class="rc-input" style="width:100%;" name="billing_country" value="{{ old('billing_country', $settingsBilling->billing_country ?: 'US') }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Name<input class="rc-input" style="width:100%;" name="billing_name" placeholder="Parent or cardholder name" value="{{ old('billing_name', $settingsBilling->billing_name) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Email<input class="rc-input" style="width:100%;" type="email" name="billing_email" placeholder="billing@example.com" value="{{ old('billing_email', $settingsBilling->billing_email) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Phone<input class="rc-input" style="width:100%;" name="billing_phone" placeholder="(555) 123-4567" value="{{ old('billing_phone', $settingsBilling->billing_phone) }}"></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Company / Organization<input class="rc-input" style="width:100%;" name="billing_company" placeholder="Optional organization" value="{{ old('billing_company', $settingsBilling->billing_company) }}"></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 1<input class="rc-input" style="width:100%;" name="billing_address_1" placeholder="123 Main Street" value="{{ old('billing_address_1', $settingsBilling->billing_address_1) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 2<input class="rc-input" style="width:100%;" name="billing_address_2" placeholder="Apt, suite, unit (optional)" value="{{ old('billing_address_2', $settingsBilling->billing_address_2) }}"></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">City<input class="rc-input" style="width:100%;" name="billing_city" placeholder="City" value="{{ old('billing_city', $settingsBilling->billing_city) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">State / Province<input class="rc-input" style="width:100%;" name="billing_state" placeholder="State / Province" value="{{ old('billing_state', $settingsBilling->billing_state) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Postal Code<input class="rc-input" style="width:100%;" name="billing_postal_code" placeholder="Postal code" value="{{ old('billing_postal_code', $settingsBilling->billing_postal_code) }}" required></label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Country<input class="rc-input" style="width:100%;" name="billing_country" placeholder="US" value="{{ old('billing_country', $settingsBilling->billing_country ?: 'US') }}" required></label>
                         </div>
                         <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-top:1rem;">
-                            <button class="rc-btn rc-btn-primary" type="submit">Save Billing Information</button>
+                            <button class="rc-btn rc-btn-primary" type="submit" data-rc-billing-save>Save Billing Information</button>
+                            @if(!$settingsCancellationRequested && in_array(strtolower((string) $settingsBilling->subscription_status), ['active','trialing','trial','past_due'], true))
+                                <button class="rc-btn" style="border-color:#fecaca;color:#b42318;background:#fff7f7;" type="button" data-rc-cancel-plan>Cancel Plan</button>
+                            @elseif($settingsCancellationRequested)
+                                <span class="rc-subtle" style="color:#b54708;font-weight:750;">Cancellation requested</span>
+                            @endif
                             @if(!$settingsBillingConnected)
                                 <span class="rc-subtle">Saving will automatically connect this billing profile to your PLYRCARD billing account.</span>
                             @endif
@@ -12290,8 +12311,9 @@ CSS;
         {{-- v109 Discover drawer: entirely browser-local for opening/closing/filtering and
              interaction state. Favorite/list calls only persist the already-applied state in
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
-        <template x-if="optimisticSchool">
-            <div class="rc-drawer rc-school-optimistic-shell-v106" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
+        <div class="rc-drawer rc-school-optimistic-shell-v106"
+             x-cloak
+             x-show="optimisticSchool" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
                     <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
 
@@ -12431,7 +12453,6 @@ CSS;
                 </section>
             </div>
         </div>
-        </template>
 
         {{-- v113: legacy section-specific server drawer removed. The Discover drawer above
              is the single global drawer for Dashboard, Discover, Favorites, and My Lists. --}}
@@ -15016,6 +15037,36 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     color: #ff6338 !important;
 }
 </style>
+
+
+        <div class="rc-cancel-plan-modal-v59" data-rc-cancel-modal hidden>
+            <div class="rc-cancel-plan-card-v59" role="dialog" aria-modal="true" aria-labelledby="rc-cancel-title">
+                <h3 id="rc-cancel-title">Cancel your plan?</h3>
+                <p>Your cancellation request will be recorded for this subscription. Your current access remains available until the billing cancellation is confirmed.</p>
+                <div style="display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap;">
+                    <button class="rc-btn" type="button" data-rc-cancel-close>Keep Plan</button>
+                    <button class="rc-btn" style="background:#b42318;border-color:#b42318;color:#fff;" type="button" data-rc-cancel-confirm>Request Cancellation</button>
+                </div>
+            </div>
+        </div>
+        <style>
+            .rc-cancel-plan-modal-v59[hidden]{display:none!important}.rc-cancel-plan-modal-v59{position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.46);display:grid;place-items:center;padding:1rem}.rc-cancel-plan-card-v59{width:min(29rem,100%);background:var(--rc-surface,#fff);border:1px solid var(--rc-border,#e5e7eb);border-radius:1rem;padding:1.1rem;box-shadow:0 24px 70px rgba(15,23,42,.22)}.rc-cancel-plan-card-v59 h3{margin:0;font-size:1rem}.rc-cancel-plan-card-v59 p{color:var(--rc-muted,#667085);font-size:.8rem;line-height:1.55;margin:.55rem 0 1rem}.rc-btn.is-api-busy,.rc-profile-action-v56.is-api-busy{pointer-events:none;opacity:.72}.rc-btn.is-api-busy:before,.rc-profile-action-v56.is-api-busy:before{content:'';width:.85rem;height:.85rem;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rc-v59-spin .7s linear infinite}@keyframes rc-v59-spin{to{transform:rotate(360deg)}}
+        </style>
+        <script>
+        (() => {
+            const placeholderMap={email:'you@example.com',phone:'(555) 123-4567',first_name:'First name',last_name:'Last name',subject:'Email subject',message:'Write your message…',opponent:'Opponent or event',location:'City or venue',venue:'Venue name',notes:'Add notes…'};
+            document.querySelectorAll('.rc-livewire-root input:not([placeholder]), .rc-livewire-root textarea:not([placeholder])').forEach(el=>{ const key=String(el.name||'').replace(/\[.*?\]/g,''); if(placeholderMap[key]) el.placeholder=placeholderMap[key]; });
+            const modal=document.querySelector('[data-rc-cancel-modal]');
+            const open=()=>{if(modal) modal.hidden=false}, close=()=>{if(modal) modal.hidden=true};
+            document.addEventListener('click', async e=>{
+                if(e.target.closest('[data-rc-cancel-plan]')){e.preventDefault();open();return;}
+                if(e.target.closest('[data-rc-cancel-close]')||e.target===modal){close();return;}
+                const confirm=e.target.closest('[data-rc-cancel-confirm]');
+                if(confirm){e.preventDefault();confirm.disabled=true;confirm.classList.add('is-api-busy');try{const r=await fetch(@js(route('billing.cancel-request')),{method:'POST',headers:{'X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content||'',Accept:'application/json'}});const j=await r.json();if(!r.ok||j.success===false)throw new Error(j.message||'Cancellation request failed.');close();window.location.reload();}catch(err){alert(err.message||'Cancellation request failed.');}finally{confirm.disabled=false;confirm.classList.remove('is-api-busy');}}
+            });
+            document.addEventListener('submit', e=>{const form=e.target;if(!form.matches('#billing-payments form'))return;const btn=e.submitter;if(btn){btn.classList.add('is-api-busy');btn.disabled=true;}});
+        })();
+        </script>
 
     @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>

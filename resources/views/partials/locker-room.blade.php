@@ -514,6 +514,14 @@
         #plyrcard-action-drawer.lr-drawer .lr-detail-kpi em { font-size:8px !important; }
         #plyrcard-action-drawer.lr-drawer .lr-home-section-head span { display:none; }
     }
+
+    /* v10.59: Admin-stat visual parity, adapted to the compact Locker Room drawer. */
+    .lr-dashboard-detail-body{background:#f7f8fa}.lr-detail-kpi,.lr-engagement-filter{min-height:92px;border:1px solid #e4e7ec!important;border-radius:15px!important;background:#fff!important;padding:12px!important;box-shadow:0 4px 16px rgba(15,23,42,.025)}
+    .lr-detail-kpi small,.lr-engagement-filter span{font-size:9px!important;text-transform:none!important;letter-spacing:0!important;color:#667085!important;font-weight:750!important}.lr-detail-kpi strong,.lr-engagement-filter strong{font-size:22px!important;color:#101828!important}.lr-detail-kpi em{font-style:normal;font-size:9px;color:#98a2b3;line-height:1.25}.lr-engagement-filter.is-active{border-color:#ff6338!important;box-shadow:0 0 0 2px rgba(255,99,56,.10)!important}
+    .lr-activity-list{gap:8px}.lr-activity-row{border-radius:13px;padding:10px;box-shadow:none}.lr-activity-avatar{width:36px;height:36px}.lr-dashboard-detail-head{position:sticky;top:0;z-index:2}
+    .lr-inline-success-v59{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border:1px solid #a7f3d0;border-radius:12px;background:#ecfdf5;color:#065f46;font-size:11px;line-height:1.5}.lr-inline-success-v59[hidden]{display:none!important}.lr-inline-success-v59 i{margin-top:2px}
+    .lr-btn.is-busy{pointer-events:none;opacity:.72}.lr-btn.is-busy:before{content:'';width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:lr-v59-spin .7s linear infinite}@keyframes lr-v59-spin{to{transform:rotate(360deg)}}
+    @media(max-width:520px){.lr-dashboard-detail-body{padding:11px 10px 20px}.lr-detail-kpis,.lr-engagement-filters{gap:6px!important}.lr-detail-kpi,.lr-engagement-filter{min-height:78px;padding:8px!important}.lr-detail-kpi strong,.lr-engagement-filter strong{font-size:18px!important}.lr-detail-kpi em{display:none}.lr-activity-row{grid-template-columns:34px minmax(0,1fr) auto;padding:9px;gap:8px}.lr-school-link{max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 
 <script type="application/json" id="plyrcard-locker-room-initial">@json($lrInitialData)</script>
@@ -526,7 +534,7 @@
      data-schedule-url="{{ $lrScheduleStoreUrl }}"
      data-schedule-base-url="{{ $lrScheduleBaseUrl }}"
      data-settings-url="{{ $lrSettingsUrl }}"
-     data-billing-url="{{ $lrBillingUrl }}"
+     data-billing-url="{{ $lrBillingUrl }}" data-cancel-billing-url="{{ route('billing.cancel-request') }}"
      data-referral-url="{{ $lrReferralUrl }}"
      data-additional-service-url="{{ $lrAdditionalServiceUrl }}"
      data-login-url="{{ $lrLoginUrl }}"
@@ -711,11 +719,11 @@
                             <div class="lr-field"><label>Time</label><input class="lr-input" type="time" name="game_time"></div>
                             <div class="lr-field"><label>Status</label><select class="lr-select" name="status"><option value="upcoming">Upcoming</option><option value="completed">Completed</option><option value="cancelled">Cancelled</option><option value="postponed">Postponed</option></select></div>
                             <div class="lr-field"><label>Home / Away</label><select class="lr-select" name="is_home"><option value="1">Home</option><option value="0">Away</option></select></div>
-                            <div class="lr-field"><label>Location</label><input class="lr-input" name="location"></div>
-                            <div class="lr-field"><label>Venue</label><input class="lr-input" name="venue"></div>
-                            <div class="lr-field"><label>Result</label><input class="lr-input" name="result"></div>
-                            <div class="lr-field"><label>Score</label><input class="lr-input" name="score"></div>
-                            <div class="lr-field is-full"><label>Notes</label><textarea class="lr-textarea" name="notes"></textarea></div>
+                            <div class="lr-field"><label>Location</label><input class="lr-input" name="location" placeholder="City or location"></div>
+                            <div class="lr-field"><label>Venue</label><input class="lr-input" name="venue" placeholder="Venue name"></div>
+                            <div class="lr-field"><label>Result</label><input class="lr-input" name="result" placeholder="W / L / Draw"></div>
+                            <div class="lr-field"><label>Score</label><input class="lr-input" name="score" placeholder="e.g. 3-1"></div>
+                            <div class="lr-field is-full"><label>Notes</label><textarea class="lr-textarea" name="notes" placeholder="Optional notes"></textarea></div>
                         </div><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit">Save Schedule</button><button class="lr-btn" type="button" data-lr-cancel-schedule>Cancel</button></div></form>
                         <div class="lr-schedule-list" data-lr-schedule-list></div>
                     </div>
@@ -756,7 +764,7 @@
 
                 <section class="lr-view" data-lr-view="show"><div class="lr-section"><div class="lr-hero"><span class="lr-eyebrow">PLYRCARD Show</span><h3>Stories, Recruiting & The Game</h3><p class="lr-muted">Explore PLYRCARD conversations and athlete stories. Opening the show is an intentional external action, not Locker Room navigation.</p><div class="lr-actions"><a class="lr-btn lr-btn-primary" href="/podcast">Open PLYRCARD Show</a></div></div></div></section>
 
-                <section class="lr-view" data-lr-view="refer"><form class="lr-form" data-lr-referral-form><div class="lr-form-section"><h4>Refer a Friend</h4><p class="lr-card-copy">Invite another athlete to PLYRCARD. We only need their name and email.</p><div class="lr-form-grid" style="margin-top:12px;"><div class="lr-field"><label>Friend's Name</label><input class="lr-input" name="friend_name" required></div><div class="lr-field"><label>Friend's Email</label><input class="lr-input" type="email" name="friend_email" required></div><div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="message" placeholder="Optional message"></textarea></div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Invitation Email</button><div class="lr-upload-status" data-lr-referral-status>The invitation will be emailed directly to your friend.</div></form></section>
+                <section class="lr-view" data-lr-view="refer"><form class="lr-form" data-lr-referral-form><div class="lr-form-section"><h4>Refer a Friend</h4><p class="lr-card-copy">Invite another athlete to PLYRCARD. We only need their name and email.</p><div class="lr-form-grid" style="margin-top:12px;"><div class="lr-field"><label>Friend's Name</label><input class="lr-input" name="friend_name" placeholder="Friend's full name" required></div><div class="lr-field"><label>Friend's Email</label><input class="lr-input" type="email" name="friend_email" placeholder="friend@example.com" required></div><div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="message" placeholder="Optional message"></textarea></div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Invitation Email</button><div class="lr-upload-status" data-lr-referral-status>The invitation will be emailed directly to your friend.</div></form></section>
 
                 <section class="lr-view" data-lr-view="support"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Support</h3><p class="lr-card-copy">Tell us what you need help with.</p></div><div data-lr-support-embed></div></div></section>
 
@@ -766,9 +774,9 @@
                     <form class="lr-form" data-lr-billing-form>
                         <div class="lr-card" data-lr-billing-summary></div>
                         <div class="lr-form-section"><h4>Payment Method</h4><div data-lr-payment-method></div></div>
-                        <div class="lr-form-section"><h4>Billing Contact</h4><div class="lr-form-grid"><div class="lr-field"><label>Full Name</label><input class="lr-input" name="billing_name" required></div><div class="lr-field"><label>Email</label><input class="lr-input" type="email" name="billing_email" required></div><div class="lr-field"><label>Phone</label><input class="lr-input" name="billing_phone"></div><div class="lr-field"><label>Company / Organization</label><input class="lr-input" name="billing_company"></div></div></div>
-                        <div class="lr-form-section"><h4>Billing Address</h4><div class="lr-form-grid"><div class="lr-field is-full"><label>Address Line 1</label><input class="lr-input" name="billing_address_1" required></div><div class="lr-field is-full"><label>Address Line 2</label><input class="lr-input" name="billing_address_2"></div><div class="lr-field"><label>City</label><input class="lr-input" name="billing_city" required></div><div class="lr-field"><label>State / Province</label><input class="lr-input" name="billing_state" required></div><div class="lr-field"><label>Postal Code</label><input class="lr-input" name="billing_postal_code" required></div><div class="lr-field"><label>Country</label><input class="lr-input" name="billing_country" required></div></div></div>
-                        <button class="lr-btn lr-btn-primary" type="submit">Save Billing Information</button>
+                        <div class="lr-form-section"><h4>Billing Contact</h4><div class="lr-form-grid"><div class="lr-field"><label>Full Name</label><input class="lr-input" name="billing_name" placeholder="Parent or cardholder name" required></div><div class="lr-field"><label>Email</label><input class="lr-input" type="email" name="billing_email" placeholder="billing@example.com" required></div><div class="lr-field"><label>Phone</label><input class="lr-input" name="billing_phone" placeholder="(555) 123-4567"></div><div class="lr-field"><label>Company / Organization</label><input class="lr-input" name="billing_company" placeholder="Optional organization"></div></div></div>
+                        <div class="lr-form-section"><h4>Billing Address</h4><div class="lr-form-grid"><div class="lr-field is-full"><label>Address Line 1</label><input class="lr-input" name="billing_address_1" placeholder="123 Main Street" required></div><div class="lr-field is-full"><label>Address Line 2</label><input class="lr-input" name="billing_address_2" placeholder="Apt, suite, unit (optional)"></div><div class="lr-field"><label>City</label><input class="lr-input" name="billing_city" placeholder="City" required></div><div class="lr-field"><label>State / Province</label><input class="lr-input" name="billing_state" placeholder="State / Province" required></div><div class="lr-field"><label>Postal Code</label><input class="lr-input" name="billing_postal_code" placeholder="Postal code" required></div><div class="lr-field"><label>Country</label><input class="lr-input" name="billing_country" placeholder="US" required></div></div></div>
+                        <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit">Save Billing Information</button><button class="lr-btn lr-btn-danger" type="button" data-lr-cancel-plan hidden>Cancel Plan</button></div>
                     </form>
                 </section>
 
@@ -827,15 +835,15 @@
                             <h4>Sign In</h4>
                             <p class="lr-card-copy">Sign in to open your Locker Room.</p>
                             <div class="lr-form-grid" style="margin-top:12px;">
-                                <div class="lr-field is-full"><label>Email</label><input class="lr-input" type="email" name="email" autocomplete="email" required></div>
-                                <div class="lr-field is-full"><label>Password</label><input class="lr-input" type="password" name="password" autocomplete="current-password" required></div>
+                                <div class="lr-field is-full"><label>Email</label><input class="lr-input" type="email" name="email" autocomplete="email" placeholder="you@example.com" required></div>
+                                <div class="lr-field is-full"><label>Password</label><input class="lr-input" type="password" name="password" autocomplete="current-password" placeholder="Password" required></div>
                                 <label class="lr-login-remember is-full"><input type="checkbox" name="remember" value="1"><span>Remember me</span></label>
                             </div>
                             <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit">Sign In</button><button class="lr-btn" type="button" data-lr-nav="forgot-password">Forgot Password?</button></div>
                         </div>
                     </form>
                 </section>
-                <section class="lr-view" data-lr-view="forgot-password"><form class="lr-form" data-lr-password-reset-form><div class="lr-form-section"><h4>Reset Password</h4><p class="lr-card-copy">Enter your email and we’ll send password reset instructions.</p><div class="lr-field" style="margin-top:12px;"><label>Email</label><input class="lr-input" type="email" name="email" required></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Reset Link</button></form></section>
+                <section class="lr-view" data-lr-view="forgot-password"><form class="lr-form" data-lr-password-reset-form><div class="lr-form-section"><h4>Reset Password</h4><p class="lr-card-copy">Enter your email and we’ll send password reset instructions.</p><div class="lr-field" style="margin-top:12px;"><label>Email</label><input class="lr-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" required></div><div class="lr-inline-success-v59" data-lr-password-reset-success hidden aria-live="polite"><i class="fa-solid fa-circle-check"></i><div><strong>Reset link sent.</strong><br>If a PLYRCARD account exists for that email, check the inbox and spam folder for reset instructions.</div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Reset Link</button></form></section>
                 <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book Demo</h3><p class="lr-card-copy">Choose a time to see how PLYRCARD works.</p></div><div data-lr-book-embed></div></div></section>
             @endauth
         </div>
@@ -914,6 +922,23 @@
         el.style.background = error ? '#991b1b' : '#111827';
         el.classList.add('is-showing');
         clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('is-showing'), 3200);
+    }
+
+    function setFormBusy(form, busy, label = 'Working…') {
+        if (!form) return;
+        const button = form.querySelector('button[type="submit"]');
+        if (!button) return;
+        if (busy) {
+            if (!button.dataset.lrOriginalLabel) button.dataset.lrOriginalLabel = button.innerHTML;
+            button.classList.add('is-busy');
+            button.disabled = true;
+            const text = button.textContent.trim();
+            if (!/working|saving|sending|signing/i.test(text)) button.dataset.lrBusyLabel = label;
+        } else {
+            button.classList.remove('is-busy');
+            button.disabled = false;
+            if (button.dataset.lrOriginalLabel) { button.innerHTML = button.dataset.lrOriginalLabel; delete button.dataset.lrOriginalLabel; }
+        }
     }
 
     function openDrawer() {
@@ -1038,6 +1063,7 @@
             return;
         }
 
+        const sectionHeading = metric === 'profile_views' ? "Who's Viewing You" : (metric === 'social_clicks' ? "Who's Clicking" : 'Activity');
         const html = rows.map(row => {
             const school = row.school || {};
             const reference = school.reference || school.id || school.name || '';
@@ -1057,7 +1083,7 @@
                 ${tag}
             </div>`;
         }).join('');
-        body.innerHTML = summary + note + `<div class="lr-activity-list">${html}</div>`;
+        body.innerHTML = summary + note + `<div style="font-size:12px;font-weight:850;color:#101828;margin:13px 2px 8px;">${esc(sectionHeading)}</div><div class="lr-activity-list">${html}</div>`;
     }
 
     async function fetchDashboardMetric(metric) {
@@ -1419,7 +1445,13 @@
         const paidAtLabel = paidAt && !Number.isNaN(paidAt.getTime()) ? paidAt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : null;
 
         if (summary) {
-            summary.innerHTML = `<h3 class="lr-card-title">${esc(state.plan?.label || 'Free')} Plan</h3><div class="lr-billing-meta"><div><small>Payment Status</small><strong>${esc(statusLabel(billing.payment_status))}</strong></div><div><small>Subscription</small><strong>${esc(statusLabel(billing.subscription_status))}</strong></div><div><small>Recurring</small><strong>${billing.recurring_amount_cents ? `${money(billing.recurring_amount_cents)}/mo` : '—'}</strong></div>${billing.setup_fee_cents ? `<div><small>Setup Fee</small><strong>${money(billing.setup_fee_cents)}</strong></div>` : ''}${billing.amount_paid_cents ? `<div><small>Total Recorded</small><strong>${money(billing.amount_paid_cents)}</strong></div>` : ''}${billing.amount_refunded_cents ? `<div><small>Refunded</small><strong>${money(billing.amount_refunded_cents)}</strong></div>` : ''}</div>`;
+            summary.innerHTML = `<h3 class="lr-card-title">${esc(state.plan?.label || 'Free')} Plan</h3><div class="lr-billing-meta"><div><small>Payment Status</small><strong>${esc(statusLabel(billing.payment_status))}</strong></div><div><small>Subscription</small><strong>${esc(billing.cancellation_requested ? 'Cancellation Requested' : statusLabel(billing.subscription_status))}</strong></div><div><small>Recurring</small><strong>${billing.recurring_amount_cents ? `${money(billing.recurring_amount_cents)}/mo` : '—'}</strong></div>${billing.setup_fee_cents ? `<div><small>Setup Fee</small><strong>${money(billing.setup_fee_cents)}</strong></div>` : ''}${billing.amount_paid_cents ? `<div><small>Total Recorded</small><strong>${money(billing.amount_paid_cents)}</strong></div>` : ''}${billing.amount_refunded_cents ? `<div><small>Refunded</small><strong>${money(billing.amount_refunded_cents)}</strong></div>` : ''}</div>`;
+        }
+
+        const cancelButton = q('[data-lr-cancel-plan]');
+        if (cancelButton) {
+            const sub = String(billing.subscription_status || '').toLowerCase();
+            cancelButton.hidden = !!billing.cancellation_requested || !['active','trialing','trial','past_due'].includes(sub);
         }
 
         if (method) {
@@ -1485,6 +1517,10 @@
         const del = event.target.closest('[data-lr-delete-schedule]'); if (del) { if(!confirm('Remove this schedule item?')) return; request(`${drawer.dataset.scheduleBaseUrl}/${del.dataset.lrDeleteSchedule}`,{method:'DELETE'}).then(json=>{if(json.data)state=json.data; render(); showToast('Schedule removed.');}).catch(err=>showToast(err.message,true)); return; }
     }, true);
 
+    // Fill sensible placeholders for Locker Room fields that do not define one explicitly.
+    const placeholderMap = {first_name:'First name',last_name:'Last name',personal_email:'you@example.com',email:'you@example.com',phone:'(555) 123-4567',street:'123 Main Street',city:'City',state:'State / Province',country:'US',gpa:'3.8',jersey_number:'10',player_bio:'Tell coaches who you are as a player…',parent:'Parent or guardian name',parent_email:'parent@example.com',parent_phone:'(555) 123-4567',club_coach:'Coach name',club_coach_email:'coach@example.com',club_coach_phone:'(555) 123-4567',friend_name:"Friend's full name",friend_email:'friend@example.com',billing_name:'Parent or cardholder name',billing_email:'billing@example.com',billing_phone:'(555) 123-4567',billing_company:'Optional organization',billing_address_1:'123 Main Street',billing_address_2:'Apt, suite, unit (optional)',billing_city:'City',billing_state:'State / Province',billing_postal_code:'Postal code',billing_country:'US',opponent:'Opponent or event',location:'City or location',venue:'Venue name',result:'W / L / Draw',score:'e.g. 3-1',notes:'Optional notes'};
+    qa('input:not([placeholder]), textarea:not([placeholder])').forEach(el => { const key=String(el.name||'').replace(/\[.*?\]/g,''); if(placeholderMap[key]) el.placeholder=placeholderMap[key]; });
+
     q('[data-lr-sport]')?.addEventListener('change', () => { state.user.sport=q('[data-lr-sport]').value; state.user.position=[]; state.user.league_id=null; state.user.club_id=null; state.user.team_name=null; profilePositionSelection.clear(); renderPositions(false); profileOptionCache.clear(); loadProfileAssociationOptions(); });
     q('[data-lr-gender]')?.addEventListener('change', () => { state.user.gender=q('[data-lr-gender]').value; state.user.league_id=null; state.user.club_id=null; state.user.team_name=null; profileOptionCache.clear(); loadProfileAssociationOptions(); });
     q('[data-lr-league]')?.addEventListener('change', () => { state.user.league_id=q('[data-lr-league]').value || null; state.user.club_id=null; state.user.team_name=null; loadClubOptions(); });
@@ -1507,23 +1543,24 @@
     q('[data-lr-profile-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget;
         if (!profilePositionSelection.size) { showToast('Choose at least one position.', true); return; }
+        setFormBusy(form,true,'Saving…');
         const fd=new FormData(form); fd.delete('email_display'); fd.delete('raw_player_images_new[]');
         pendingRawFiles.forEach(file => fd.append('raw_player_images_new[]', file, file.name));
         const uploadingCount = pendingRawFiles.length;
         if (uploadingCount > 0) { rawUploadStatusMessage = `Uploading ${uploadingCount} image${uploadingCount === 1 ? '' : 's'}...`; rawUploadStatusTone = 'ready'; updateRawUploadStatus(Array.isArray(state.user?.raw_player_images) ? state.user.raw_player_images.length : 0); }
-        try { const json=await request(drawer.dataset.profileUrl,{method:'POST',body:fd}); if(json.data)state=json.data; pendingRawFiles=[]; clearPendingRawPreviewUrls(); rawUploadStatusMessage=uploadingCount > 0 ? `${uploadingCount} image${uploadingCount === 1 ? '' : 's'} uploaded successfully.` : 'Profile saved successfully.'; rawUploadStatusTone='success'; const rawInput=form.querySelector('[name="raw_player_images_new[]"]'); if(rawInput) rawInput.value=''; const proLogo=form.querySelector('[name="pro_club_logo"]'); if(proLogo) proLogo.value=''; render(); showToast(uploadingCount > 0 ? 'Profile and player images saved.' : 'Profile saved.'); } catch(err){ rawUploadStatusMessage = uploadingCount > 0 ? 'Image upload failed. Your selected previews are still here so you can retry.' : ''; rawUploadStatusTone = uploadingCount > 0 ? 'error' : ''; renderMedia(); showToast(err.message,true); }
+        try { const json=await request(drawer.dataset.profileUrl,{method:'POST',body:fd}); if(json.data)state=json.data; pendingRawFiles=[]; clearPendingRawPreviewUrls(); rawUploadStatusMessage=uploadingCount > 0 ? `${uploadingCount} image${uploadingCount === 1 ? '' : 's'} uploaded successfully.` : 'Profile saved successfully.'; rawUploadStatusTone='success'; const rawInput=form.querySelector('[name="raw_player_images_new[]"]'); if(rawInput) rawInput.value=''; const proLogo=form.querySelector('[name="pro_club_logo"]'); if(proLogo) proLogo.value=''; render(); showToast(uploadingCount > 0 ? 'Profile and player images saved.' : 'Profile saved.'); } catch(err){ rawUploadStatusMessage = uploadingCount > 0 ? 'Image upload failed. Your selected previews are still here so you can retry.' : ''; rawUploadStatusTone = uploadingCount > 0 ? 'error' : ''; renderMedia(); showToast(err.message,true); } finally { setFormBusy(form,false); }
     });
     q('[data-lr-schedule-form]')?.addEventListener('submit', async event => {
-        event.preventDefault(); const form=event.currentTarget; const fd=new FormData(form); const id=fd.get('schedule_id'); fd.delete('schedule_id'); const url=id?`${drawer.dataset.scheduleBaseUrl}/${id}`:drawer.dataset.scheduleUrl; if(id)fd.append('_method','PUT');
-        try { const json=await request(url,{method:'POST',body:fd}); if(json.data)state=json.data; form.hidden=true; render(); showToast(id?'Schedule updated.':'Schedule added.'); } catch(err){ showToast(err.message,true); }
+        event.preventDefault(); const form=event.currentTarget; setFormBusy(form,true,'Saving…'); const fd=new FormData(form); const id=fd.get('schedule_id'); fd.delete('schedule_id'); const url=id?`${drawer.dataset.scheduleBaseUrl}/${id}`:drawer.dataset.scheduleUrl; if(id)fd.append('_method','PUT');
+        try { const json=await request(url,{method:'POST',body:fd}); if(json.data)state=json.data; form.hidden=true; render(); showToast(id?'Schedule updated.':'Schedule added.'); } catch(err){ showToast(err.message,true); } finally { setFormBusy(form,false); }
     });
     q('[data-lr-settings-form]')?.addEventListener('submit', async event => {
-        event.preventDefault(); const notifications={}; qa('[data-lr-setting]').forEach(el=>notifications[el.dataset.lrSetting]=el.checked); const body={notifications}; if(state.plan?.is_premium) body.article_section_type=q('[data-lr-article-value]').value;
-        try { const json=await request(drawer.dataset.settingsUrl,{method:'POST',body}); if(json.data)state=json.data; render(); showToast('Settings saved.'); } catch(err){ showToast(err.message,true); }
+        event.preventDefault(); const form=event.currentTarget; setFormBusy(form,true,'Saving…'); const notifications={}; qa('[data-lr-setting]').forEach(el=>notifications[el.dataset.lrSetting]=el.checked); const body={notifications}; if(state.plan?.is_premium) body.article_section_type=q('[data-lr-article-value]').value;
+        try { const json=await request(drawer.dataset.settingsUrl,{method:'POST',body}); if(json.data)state=json.data; render(); showToast('Settings saved.'); } catch(err){ showToast(err.message,true); } finally { setFormBusy(form,false); }
     });
     q('[data-lr-billing-form]')?.addEventListener('submit', async event => {
-        event.preventDefault(); const fd=new FormData(event.currentTarget);
-        try { const json=await request(drawer.dataset.billingUrl,{method:'POST',body:fd}); if(json.data)state=json.data; render(); showToast('Billing information saved.'); } catch(err){ showToast(err.message,true); }
+        event.preventDefault(); const form=event.currentTarget; const fd=new FormData(form); setFormBusy(form,true,'Saving…');
+        try { const json=await request(drawer.dataset.billingUrl,{method:'POST',body:fd}); if(json.data)state=json.data; render(); showToast('Billing information saved.'); } catch(err){ showToast(err.message,true); } finally { setFormBusy(form,false); }
     });
     q('[data-lr-service-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget;
@@ -1532,17 +1569,24 @@
     q('[data-lr-referral-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget; const status=q('[data-lr-referral-status]'); const submit=form.querySelector('[type="submit"]');
         if(status){ status.textContent='Sending invitation email...'; status.className='lr-upload-status is-ready'; }
-        if(submit) submit.disabled=true;
-        try { const json=await request(drawer.dataset.referralUrl,{method:'POST',body:new FormData(form)}); form.reset(); if(status){ status.textContent=json.message || 'Invitation email sent.'; status.className='lr-upload-status is-success'; } showToast(json.message || 'Invitation email sent.'); } catch(err){ if(status){ status.textContent=err.message; status.className='lr-upload-status is-error'; } showToast(err.message,true); } finally { if(submit) submit.disabled=false; }
+        if(submit) submit.disabled=true; setFormBusy(form,true,'Sending…');
+        try { const json=await request(drawer.dataset.referralUrl,{method:'POST',body:new FormData(form)}); form.reset(); if(status){ status.textContent=json.message || 'Invitation email sent.'; status.className='lr-upload-status is-success'; } showToast(json.message || 'Invitation email sent.'); } catch(err){ if(status){ status.textContent=err.message; status.className='lr-upload-status is-error'; } showToast(err.message,true); } finally { if(submit) submit.disabled=false; setFormBusy(form,false); }
     });
     q('[data-lr-login-form]')?.addEventListener('submit', async event => {
-        event.preventDefault(); const form=event.currentTarget;
-        try { const json=await request(drawer.dataset.loginUrl,{method:'POST',body:new FormData(form)}); window.location.href=json.redirect_url || window.location.href; } catch(err){ showToast(err.message,true); }
+        event.preventDefault(); const form=event.currentTarget; setFormBusy(form,true,'Signing in…');
+        try { const json=await request(drawer.dataset.loginUrl,{method:'POST',body:new FormData(form)}); window.location.href=json.redirect_url || window.location.href; } catch(err){ showToast(err.message,true); setFormBusy(form,false); }
     });
     q('[data-lr-password-reset-form]')?.addEventListener('submit', async event => {
-        event.preventDefault(); const form=event.currentTarget;
-        try { await request(drawer.dataset.passwordResetUrl,{method:'POST',body:new FormData(form)}); form.reset(); showToast('If a PLYRCARD account exists for that email, a password reset link has been sent.'); } catch(err){ showToast(err.message,true); }
+        event.preventDefault(); const form=event.currentTarget; setFormBusy(form,true,'Sending…'); const success=q('[data-lr-password-reset-success]'); if(success) success.hidden=true;
+        try { await request(drawer.dataset.passwordResetUrl,{method:'POST',body:new FormData(form)}); form.reset(); if(success) success.hidden=false; showToast('Reset instructions sent.'); } catch(err){ showToast(err.message,true); } finally { setFormBusy(form,false); }
     });
+    q('[data-lr-cancel-plan]')?.addEventListener('click', async event => {
+        const button=event.currentTarget;
+        if (!confirm('Cancel your current PLYRCARD plan? Your access remains active until cancellation is confirmed.')) return;
+        button.disabled=true; button.classList.add('is-busy');
+        try { const json=await request(drawer.dataset.cancelBillingUrl || drawer.dataset.lrCancelBillingUrl || '/billing/cancel-request',{method:'POST',body:{}}); if(json.data) state=json.data; await refreshData(); render(); showToast(json.message || 'Cancellation requested.'); } catch(err){ showToast(err.message,true); } finally { button.disabled=false; button.classList.remove('is-busy'); }
+    });
+
     q('[data-lr-password-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget;
         try {

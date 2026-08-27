@@ -128,7 +128,7 @@
       * Trust that variable first so custom domains and /slug player cards always
       * hide the normal header navigation, even if request/domain matching changes.
       */
-      $plyrRenderedWebsite = (isset($website) && $website instanceof Website) ? $website : null;
+      $plyrRenderedWebsite = (isset($website) && $website instanceof \App\Models\Website) ? $website : null;
       $plyrControllerSaysOwnerCanSeeLocker = (bool) ($showPlyrNavigation ?? false);
 
       $plyrOwnedWebsites = collect();
@@ -236,15 +236,20 @@
           || (bool) $plyrViewedWebsite
           || (bool) $plyrRenderedWebsite;
 
-      // v10.38: ownership is determined from the actual Website record only.
-      // Do not let a generic controller flag make Locker Room appear on another
-      // player's public PLYRCARD.
-      $plyrOwnsViewedWebsite = ($plyrLoggedIn && $plyrUser && $plyrViewedWebsite && ((int) $plyrViewedWebsite->user_id === (int) $plyrUser->id))
-          || ($plyrLoggedIn && $plyrUser && $plyrRenderedWebsite && ((int) $plyrRenderedWebsite->user_id === (int) $plyrUser->id));
+      // v10.59: player-site Locker Room ownership comes ONLY from the authenticated
+      // session on the current host and the Website record being viewed. This avoids
+      // showing one athlete's Locker Room while browsing another athlete's site.
+      $plyrSessionUserId = $plyrLoggedIn ? (int) auth()->id() : 0;
+      $plyrOwnershipWebsite = $plyrRenderedWebsite ?: $plyrViewedWebsite;
+      $plyrOwnsViewedWebsite = $plyrSessionUserId > 0
+          && $plyrOwnershipWebsite
+          && ((int) $plyrOwnershipWebsite->user_id === $plyrSessionUserId);
 
-      // Final fallback for custom-domain templates where activePage is passed but the request was not matched earlier.
-      if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrLoggedIn && $plyrOwnedWebsites->isNotEmpty()) {
-          $plyrOwnsViewedWebsite = (bool) $plyrOwnedWebsites->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
+      // If the controller did not pass $website, resolve only a request-matching website.
+      // Never fall back to the user's first website on an unrelated player page.
+      if (! $plyrOwnsViewedWebsite && $plyrOnPlayerWebsite && $plyrSessionUserId > 0 && $plyrOwnedWebsites->isNotEmpty()) {
+          $requestMatchedOwnedWebsite = $plyrOwnedWebsites->first(fn (\App\Models\Website $website) => $plyrWebsiteMatchesCurrentRequest($website));
+          $plyrOwnsViewedWebsite = $requestMatchedOwnedWebsite && ((int) $requestMatchedOwnedWebsite->user_id === $plyrSessionUserId);
       }
 
       // Player websites use only the pull-up control; Admin must never render it.
