@@ -2195,20 +2195,34 @@ discoverSelectedIds: [],
         .rc-profile-action-v56.is-active { border-color:#ff6338; background:rgba(255,99,56,.10); color:#ff6338; }
         .rc-profile-action-v56.is-favorited { border-color:#ff6338; background:#ff6338; color:#fff; }
         .rc-profile-action-v56.is-favorited svg { fill:currentColor; }
-        .rc-profile-action-wrap-v57 { position:relative; min-width:0; }
+        .rc-profile-action-wrap-v57 { position:relative; min-width:0; overflow:visible; }
         .rc-profile-action-wrap-v57 > .rc-profile-action-v56 { width:100%; height:100%; }
+        /* v10.71: Inbox Add to List must stay physically anchored under its button.
+           Do not use translateX here because the shared v72 menu animation also animates
+           transform and can overwrite the horizontal positioning after it opens. */
         .rc-profile-list-menu-v57 {
+            position:absolute !important;
             top:calc(100% + .35rem) !important;
-            left:50% !important;
+            left:0 !important;
             right:auto !important;
-            transform:translateX(-50%) !important;
-            width:min(11.25rem,calc(100vw - 1rem)) !important;
+            bottom:auto !important;
+            transform:none !important;
+            width:min(10.5rem,calc(100vw - 1rem)) !important;
+            min-width:100% !important;
+            max-width:min(10.5rem,calc(100vw - 1rem)) !important;
             max-height:10.75rem !important;
             overflow-y:auto !important;
+            overflow-x:hidden !important;
+            box-sizing:border-box !important;
             padding:.28rem !important;
             border-radius:.62rem !important;
             box-shadow:0 12px 28px rgba(15,23,42,.14) !important;
             z-index:120 !important;
+            animation:rcProfileListMenuInV71 .14s ease-out both !important;
+        }
+        @keyframes rcProfileListMenuInV71 {
+            from { opacity:0; }
+            to { opacity:1; }
         }
         .rc-profile-list-menu-v57 h4 { margin:.06rem .25rem .2rem !important; font-size:.61rem !important; }
         .rc-profile-list-menu-v57 button {
