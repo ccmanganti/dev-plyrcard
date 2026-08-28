@@ -11075,36 +11075,48 @@ CSS;
 
                                         <div class="rc-school-list-menu-v72 rc-profile-list-menu-v57" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left x-on:click.stop role="menu">
                                             <h4>Add to a list</h4>
-                                            <template x-for="list in lists" :key="`inbox-list-${listKey(list)}`">
-                                                <button
-                                                    type="button"
-                                                    x-bind:style="`--list-color:${listColor(list)}`"
-                                                    x-bind:class="{ 'is-active': inList(listKey(list)), 'is-saving': isListPending(listKey(list)) }"
-                                                    x-bind:disabled="isListPending(listKey(list))"
-                                                    x-on:click.stop="toggleList(listKey(list))"
-                                                    role="menuitemcheckbox"
-                                                    x-bind:aria-checked="inList(listKey(list)) ? 'true' : 'false'"
+                                            {{-- v10.75: render Inbox lists on the server. The list collection is already
+                                                 available in this Blade render, so do not wait for Alpine x-for/x-text
+                                                 hydration just to paint labels, dots, and counts. Alpine only owns
+                                                 membership state and async persistence after the menu is visible. --}}
+                                            @forelse($selectedInboxLists as $inboxList)
+                                                @php
+                                                    $inboxListKey = trim((string) ($inboxList['key'] ?? $inboxList['slug'] ?? $inboxList['id'] ?? ''));
+                                                    $inboxListLabel = trim((string) ($inboxList['label'] ?? $inboxList['name'] ?? $inboxListKey ?: 'List'));
+                                                    $inboxListColor = trim((string) ($inboxList['color'] ?? '#ff6338')) ?: '#ff6338';
+                                                    $inboxListCount = (int) ($inboxList['schools_count'] ?? $inboxList['school_count'] ?? (is_array($inboxList['schools'] ?? null) ? count($inboxList['schools']) : 0));
+                                                @endphp
+                                                @if($inboxListKey !== '')
+                                                    <button
+                                                        type="button"
+                                                        style="--list-color:{{ $inboxListColor }}"
+                                                        x-bind:class="{ 'is-active': inList(@js($inboxListKey)), 'is-saving': isListPending(@js($inboxListKey)) }"
+                                                        x-bind:disabled="isListPending(@js($inboxListKey))"
+                                                        x-on:click.stop="toggleList(@js($inboxListKey))"
+                                                        role="menuitemcheckbox"
+                                                        x-bind:aria-checked="inList(@js($inboxListKey)) ? 'true' : 'false'"
+                                                    >
+                                                        <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                                                        <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot:{{ $inboxListColor }}"></span><span>{{ $inboxListLabel }}</span></span>
+                                                        <span class="rc-action-spinner-v81" x-cloak x-show="isListPending(@js($inboxListKey))"></span>
+                                                        <small class="rc-list-count-v81" x-show="!isListPending(@js($inboxListKey))">{{ $inboxListCount }}</small>
+                                                    </button>
+                                                @endif
+                                            @empty
+                                                <div
+                                                    class="rc-school-list-empty"
+                                                    style="padding:.7rem .62rem;text-align:center;display:grid;gap:.42rem;min-width:10rem;"
                                                 >
-                                                    <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                                                    <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" x-bind:style="`--dot:${listColor(list)}`"></span><span x-text="listLabel(list)"></span></span>
-                                                    <span class="rc-action-spinner-v81" x-cloak x-show="isListPending(listKey(list))"></span>
-                                                    <small class="rc-list-count-v81" x-show="!isListPending(listKey(list))" x-text="listCount(list)"></small>
-                                                </button>
-                                            </template>
-                                            <div
-                                                class="rc-school-list-empty"
-                                                x-show="lists.length === 0"
-                                                style="padding:.7rem .62rem;text-align:center;display:grid;gap:.42rem;min-width:10rem;"
-                                            >
-                                                <strong style="display:block;color:var(--rc-text);font-size:.68rem;">No lists yet</strong>
-                                                <span style="display:block;color:var(--rc-muted);font-size:.6rem;line-height:1.35;">Create a list first, then add this school to it.</span>
-                                                <button
-                                                    type="button"
-                                                    class="rc-btn"
-                                                    style="width:100%;min-height:1.85rem;padding:.3rem .45rem;font-size:.61rem;margin-top:.1rem;"
-                                                    x-on:click.stop="listsOpen=false; $wire.switchRecruitingSection('lists')"
-                                                >Go to My Lists</button>
-                                            </div>
+                                                    <strong style="display:block;color:var(--rc-text);font-size:.68rem;">No lists yet</strong>
+                                                    <span style="display:block;color:var(--rc-muted);font-size:.6rem;line-height:1.35;">Create a list first, then add this school to it.</span>
+                                                    <button
+                                                        type="button"
+                                                        class="rc-btn"
+                                                        style="width:100%;min-height:1.85rem;padding:.3rem .45rem;font-size:.61rem;margin-top:.1rem;"
+                                                        x-on:click.stop="listsOpen=false; $wire.switchRecruitingSection('lists')"
+                                                    >Go to My Lists</button>
+                                                </div>
+                                            @endforelse
                                         </div>
                                     </div>
 
@@ -15154,8 +15166,8 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         </script>
 
     @include('partials.amplify-upgrade-modal')
-<style id="rc-inbox-list-dropdown-v1074">
-    /* v10.74: balanced Inbox-only list menu. It stays anchored directly under
+<style id="rc-inbox-list-dropdown-v1075">
+    /* v10.75: instant server-rendered Inbox list menu; preserves v10.74 sizing. It stays anchored directly under
        Add to List, but remains wide enough to display list names cleanly. */
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 {
         position: relative !important;
