@@ -15155,3 +15155,73 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 
     @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>
+<style id="rc-inbox-list-dropdown-v1072">
+    /* v10.72: final Inbox-only dropdown sizing override.
+       This intentionally comes after the shared v87 school-menu rules so the
+       narrow Inbox action is not expanded to the global 31rem drawer menu. */
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 {
+        position: absolute !important;
+        top: calc(100% + .35rem) !important;
+        left: 0 !important;
+        right: auto !important;
+        bottom: auto !important;
+        transform: none !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        max-height: 10.5rem !important;
+        padding: .3rem !important;
+        gap: .2rem !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        border-radius: .65rem !important;
+        box-sizing: border-box !important;
+        z-index: 180 !important;
+    }
+
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 h4 {
+        margin: .1rem .28rem .22rem !important;
+        font-size: .58rem !important;
+        line-height: 1.2 !important;
+        letter-spacing: .055em !important;
+    }
+
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 button {
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 1.9rem !important;
+        grid-template-columns: .9rem minmax(0,1fr) auto !important;
+        gap: .28rem !important;
+        padding: .28rem .34rem !important;
+        font-size: .6rem !important;
+        line-height: 1.15 !important;
+        border-radius: .45rem !important;
+    }
+
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-label-v87 {
+        min-width: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-label-v87 span:last-child {
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+    }
+
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-empty {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding: .58rem .42rem !important;
+        box-sizing: border-box !important;
+    }
+
+    .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-empty button {
+        display: flex !important;
+        justify-content: center !important;
+        grid-template-columns: none !important;
+        margin-top: .12rem !important;
+    }
+</style>
