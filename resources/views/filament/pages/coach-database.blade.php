@@ -15154,9 +15154,8 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         </script>
 
     @include('partials.amplify-upgrade-modal')
-</x-filament-panels::page>
 <style id="rc-inbox-list-dropdown-v1072">
-    /* v10.72: final Inbox-only dropdown sizing override.
+    /* v10.73: Inbox-only dropdown sizing override kept inside the Livewire root.
        This intentionally comes after the shared v87 school-menu rules so the
        narrow Inbox action is not expanded to the global 31rem drawer menu. */
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 {
@@ -15225,3 +15224,4 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         margin-top: .12rem !important;
     }
 </style>
+</x-filament-panels::page>
