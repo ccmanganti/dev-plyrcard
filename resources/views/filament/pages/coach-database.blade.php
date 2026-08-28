@@ -6,6 +6,11 @@
 @endphp
 
 <x-filament-panels::page>
+    <style>
+        /* v10.66: fail closed. If Alpine/Livewire JS is delayed or errors, the
+           school drawer must remain invisible instead of rendering placeholders. */
+        .rc-school-optimistic-shell-v106[hidden] { display: none !important; }
+    </style>
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
         data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
@@ -54,10 +59,42 @@ discoverSelectedIds: [],
             discoverNewBulkListName: '',
             discoverNewDrawerListName: '',
             discoverCreatingList: false,
-            optimisticSchool: window.__plyrSchoolDrawerOptimistic || null,
+            optimisticSchool: null,
+            schoolDrawerOpen: false,
             globalSchoolCatalog: @js($globalSchoolDrawerCatalog),
+            init() {
+                // v10.64: the school drawer never restores browser-global state.
+                // A drawer may only open from an explicit user action that resolves
+                // to a real school in the current canonical school catalog.
+                window.__plyrSchoolDrawerOptimistic = null;
+                this.optimisticSchool = null;
+                this.schoolDrawerOpen = false;
+                this.discoverListsOpen = false;
+                this.discoverDrawerTab = 'coaches';
+            },
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            },
+            isValidOpenSchool() {
+                if (!this.schoolDrawerOpen || !this.optimisticSchool) return false;
+
+                const source = this.optimisticSchool;
+                const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
+                const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
+                if ((!sourceId && !sourceName) || !sourceName || sourceName === 'school') return false;
+
+                const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+                return rows.some(row => {
+                    const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
+                    if (!rowName || rowName === 'school') return false;
+
+                    const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
+                        .map(value => String(value ?? '').trim())
+                        .filter(Boolean);
+
+                    if (sourceId && ids.includes(sourceId)) return true;
+                    return sourceName === rowName;
+                });
             },
             applyGlobalSchoolState(detail) {
                 if (!detail) return;
@@ -73,36 +110,47 @@ discoverSelectedIds: [],
                 const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
                 const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
                 const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
+
+                // Never open from a generic/placeholder payload.
+                if ((!sourceId && !sourceName) || sourceName === 'school') {
+                    this.closeDiscoverSchool();
+                    return;
+                }
+
                 const local = rows.find(row => {
                     const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
                         .map(value => String(value ?? '').trim())
                         .filter(Boolean);
                     if (sourceId && ids.includes(sourceId)) return true;
                     const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
-                    return !!sourceName && rowName === sourceName;
+                    return !!sourceName && sourceName !== 'school' && rowName === sourceName;
                 }) || null;
 
-                if (!local && (!source || typeof source !== 'object')) return;
-
-                const merged = { ...(local || {}), ...(source || {}) };
-                if (local) {
-                    // Canonical local values must win for all interactive identity/state.
-                    merged.id = local.id;
-                    merged.school_id = local.school_id ?? local.id;
-                    merged.name = local.name ?? merged.name;
-                    merged.logo_url = local.logo_url || merged.logo_url || '';
-                    merged.city = local.city ?? merged.city;
-                    merged.state = local.state ?? merged.state;
-                    merged.division = local.division ?? merged.division;
-                    merged.conference = local.conference ?? merged.conference;
-                    merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
-                    merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coach_count ?? merged.coaches.length ?? 0);
-                    merged.is_favorite = !!local.is_favorite;
-                    merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+                // Critical: do not fall back to rendering the incoming object. The
+                // canonical catalog is the only valid source for an Admin school drawer.
+                if (!local) {
+                    this.closeDiscoverSchool();
+                    return;
                 }
 
-                window.__plyrSchoolDrawerOptimistic = merged;
+                const merged = { ...source, ...local };
+                merged.id = local.id;
+                merged.school_id = local.school_id ?? local.id;
+                merged.name = local.name;
+                merged.logo_url = local.logo_url || '';
+                merged.city = local.city ?? '';
+                merged.state = local.state ?? '';
+                merged.division = local.division ?? '';
+                merged.conference = local.conference ?? '';
+                merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
+                merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coaches.length ?? 0);
+                merged.is_favorite = !!local.is_favorite;
+                merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+
                 this.optimisticSchool = merged;
+                this.schoolDrawerOpen = true;
+                // Keep the legacy global empty so Livewire/browser state cannot reopen it.
+                window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
                 this.discoverSchoolComms = [];
                 this.discoverSchoolCommsLoading = false;
@@ -221,6 +269,7 @@ discoverSelectedIds: [],
             },
             closeDiscoverSchool() {
                 window.__plyrSchoolDrawerOptimistic = null;
+                this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
                 this.optimisticSchool = null;
@@ -233,20 +282,17 @@ discoverSelectedIds: [],
                 const previous = !!this.optimisticSchool.is_favorite;
                 const next = !previous;
                 this.optimisticSchool.is_favorite = next;
-                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
                 window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [] } }));
                 Promise.resolve(this.$wire.call('queueSchoolFavoriteState', String(this.optimisticSchool.id), next))
                     .then(result => {
                         if (!result || result.success === false) {
                             if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
-                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
+                                        if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: previous, list_keys: this.optimisticSchool.list_keys || [] } }));
                         }
                     })
                     .catch(() => {
                         if (this.optimisticSchool) this.optimisticSchool.is_favorite = previous;
-                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                    });
+                            });
             },
             toggleDiscoverList(key) {
                 if (!this.optimisticSchool || !key) return;
@@ -259,15 +305,13 @@ discoverSelectedIds: [],
                     ? previous.filter(v => String(v).toLowerCase() !== key)
                     : [...previous, key];
                 if (list) this.setDiscoverListCount(key, previousCount + (has ? -1 : 1));
-                window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
                 window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: this.optimisticSchool.list_keys || [] } }));
                 Promise.resolve(this.$wire.call('queueSchoolListMemberships', String(this.optimisticSchool.id), { [key]: !has }))
                     .then(result => {
                         if (!result || result.success === false) {
                             if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
                             if (list) this.setDiscoverListCount(key, previousCount);
-                            window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
+                                        if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
                             return;
                         }
                         const serverCount = Number(result?.list_counts?.[key]);
@@ -276,8 +320,7 @@ discoverSelectedIds: [],
                     .catch(() => {
                         if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
                         if (list) this.setDiscoverListCount(key, previousCount);
-                        window.__plyrSchoolDrawerOptimistic = this.optimisticSchool;
-                    });
+                            });
             },
             discoverInList(key) {
                 const keys = Array.isArray(this.optimisticSchool?.list_keys) ? this.optimisticSchool.list_keys : [];
@@ -2177,32 +2220,6 @@ discoverSelectedIds: [],
             border-radius:.45rem !important;
         }
         .rc-profile-list-menu-v57 .rc-list-count-v81 { font-size:.55rem !important; opacity:.68; }
-        .rc-inbox-list-empty-v69 {
-            min-width:13.5rem;
-            padding:.8rem .75rem .72rem;
-            display:flex;
-            flex-direction:column;
-            align-items:center;
-            justify-content:center;
-            gap:.28rem;
-            text-align:center;
-            color:var(--rc-muted);
-            background:var(--rc-surface);
-            border-radius:.65rem;
-        }
-        .rc-inbox-list-empty-v69[style*=\"display: none\"] { display:none !important; }
-        .rc-inbox-list-empty-icon-v69 {
-            width:2rem; height:2rem; border-radius:.58rem; display:grid; place-items:center;
-            color:#ff6338; background:rgba(255,99,56,.09); margin-bottom:.08rem;
-        }
-        .rc-inbox-list-empty-v69 strong { color:var(--rc-text); font-size:.72rem; line-height:1.2; }
-        .rc-inbox-list-empty-v69 > span:not(.rc-inbox-list-empty-icon-v69) { max-width:11.5rem; font-size:.61rem; line-height:1.4; }
-        .rc-inbox-list-empty-v69 a {
-            margin-top:.22rem; min-height:1.85rem; padding:0 .65rem; border-radius:.52rem;
-            display:inline-flex; align-items:center; justify-content:center;
-            background:#ff6338; color:#fff; font-size:.61rem; font-weight:800; text-decoration:none;
-        }
-        .rc-inbox-list-empty-v69 a:hover { filter:brightness(.96); }
         .rc-about-grid-v56 { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
         .rc-about-item-v56 { display:grid; grid-template-columns:1.1rem minmax(0,1fr); gap:.45rem; color:var(--rc-muted); font-size:.72rem; }
         .rc-about-item-v56 strong { display:block; color:var(--rc-text); font-size:.86rem; margin-bottom:.12rem; }
@@ -9759,7 +9776,17 @@ discoverSelectedIds: [],
                     ->map(fn ($key) => strtolower(trim((string) $key)))
                     ->filter(fn ($key) => $key !== '' && $key !== '__favorite__')
                     ->unique()->values()->all();
-                $selectedInboxLists = collect($lists ?? [])->filter(fn ($row) => is_array($row))->values()->all();
+                // v10.70: Inbox must use the same list collection rendered by My Lists.
+                // Merge both sources defensively so the dropdown cannot be empty just because
+                // one Livewire accessor/property has not been hydrated on the Conversations section.
+                $selectedInboxLists = collect($lists ?? [])
+                    ->merge(collect($this->lists ?? []))
+                    ->filter(fn ($row) => is_array($row))
+                    ->unique(function (array $row): string {
+                        return strtolower(trim((string) ($row['key'] ?? $row['slug'] ?? $row['id'] ?? $row['name'] ?? '')));
+                    })
+                    ->values()
+                    ->all();
 
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
                 $filterStatus = $conversationStatusFilter ?? 'all';
@@ -11026,7 +11053,7 @@ CSS;
                                             x-bind:class="listKeys.length ? 'is-active' : ''"
                                             x-bind:aria-expanded="listsOpen ? 'true' : 'false'"
                                             aria-haspopup="menu"
-                                            x-bind:title="lists.length ? 'Add school to list' : 'No lists available yet'"
+                                            title="Add school to list"
                                         >
                                             <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                             <span x-text="listKeys.length ? 'In Lists' : 'Add to List'"></span>
@@ -11050,13 +11077,19 @@ CSS;
                                                     <small class="rc-list-count-v81" x-show="!isListPending(listKey(list))" x-text="listCount(list)"></small>
                                                 </button>
                                             </template>
-                                            <div class="rc-inbox-list-empty-v69" x-show="lists.length === 0">
-                                                <span class="rc-inbox-list-empty-icon-v69" aria-hidden="true">
-                                                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-                                                </span>
-                                                <strong>No lists yet</strong>
-                                                <span>Create a list in My Lists first, then come back here to add this school.</span>
-                                                <a href="{{ url('/admin/coach-database/lists') }}" x-on:click.stop>Go to My Lists</a>
+                                            <div
+                                                class="rc-school-list-empty"
+                                                x-show="lists.length === 0"
+                                                style="padding:.7rem .62rem;text-align:center;display:grid;gap:.42rem;min-width:10rem;"
+                                            >
+                                                <strong style="display:block;color:var(--rc-text);font-size:.68rem;">No lists yet</strong>
+                                                <span style="display:block;color:var(--rc-muted);font-size:.6rem;line-height:1.35;">Create a list first, then add this school to it.</span>
+                                                <button
+                                                    type="button"
+                                                    class="rc-btn"
+                                                    style="width:100%;min-height:1.85rem;padding:.3rem .45rem;font-size:.61rem;margin-top:.1rem;"
+                                                    x-on:click.stop="listsOpen=false; $wire.switchRecruitingSection('lists')"
+                                                >Go to My Lists</button>
                                             </div>
                                         </div>
                                     </div>
@@ -12345,8 +12378,13 @@ CSS;
              interaction state. Favorite/list calls only persist the already-applied state in
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
+             hidden
              x-cloak
-             x-show="optimisticSchool" x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()" style="z-index:9999">
+             x-bind:hidden="!isValidOpenSchool()"
+             x-show="isValidOpenSchool()"
+             x-bind:style="isValidOpenSchool() ? 'display:flex !important;z-index:9999' : 'display:none !important;z-index:9999'"
+             x-effect="if (schoolDrawerOpen && !isValidOpenSchool()) { closeDiscoverSchool(); }"
+             x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
                     <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
 
