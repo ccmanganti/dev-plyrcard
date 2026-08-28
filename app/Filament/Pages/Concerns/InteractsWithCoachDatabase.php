@@ -371,7 +371,9 @@ trait InteractsWithCoachDatabase
 
         // These sections need the player's local lists for the global school drawer,
         // Compose list targeting, or the My Lists page itself. Do one local load only.
-        if (in_array($this->section, ['schools', 'favorites', 'lists', 'compose'], true)) {
+        if (in_array($this->section, ['schools', 'favorites', 'lists', 'compose', 'conversations'], true)) {
+            // v10.77: Inbox Add to List must have the player's local lists and counts
+            // on the first render instead of waiting for a later Livewire refresh.
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
@@ -507,7 +509,8 @@ trait InteractsWithCoachDatabase
             $this->dashboardVisitVersion++;
         }
 
-        if (in_array($section, ['schools', 'favorites', 'lists', 'compose'], true) && empty($this->lists)) {
+        if (in_array($section, ['schools', 'favorites', 'lists', 'compose', 'conversations'], true) && empty($this->lists)) {
+            // v10.77: Keep Inbox list definitions/counts warm when switching sections.
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
@@ -2576,12 +2579,20 @@ trait InteractsWithCoachDatabase
         }
 
         $this->allSchoolsMemo = null;
+        $this->discoverClientSchoolsMemo = null;
+        $this->favoriteSchoolsMemo = null;
         $this->filteredSchoolsQueryMemo = [];
+
+        // v10.77: Re-read the lightweight local list summaries immediately after
+        // the pivot write so the count badge and any later render use the same
+        // canonical count returned to the browser.
+        $this->lists = $database->lists($user);
 
         return [
             'success' => true,
             'states' => $states,
             'list_counts' => $listCounts,
+            'lists' => $this->lists,
             'school_id' => (int) $school->getKey(),
             'school_updates' => 1,
         ];
@@ -3317,6 +3328,13 @@ trait InteractsWithCoachDatabase
                 if ($this->selectedConversationId !== '') {
                     $this->hydrateCachedConversationMessages($this->selectedConversationId);
                 }
+            }
+
+            // v10.77: A newly loaded Inbox must not stop at a selected conversation
+            // with an empty message pane. If there is no cached thread yet, fetch the
+            // selected first conversation now so it is populated without another click.
+            if ($this->selectedConversationId && empty($this->messages)) {
+                $this->loadConversationMessages(true);
             }
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversations for inbox.', [

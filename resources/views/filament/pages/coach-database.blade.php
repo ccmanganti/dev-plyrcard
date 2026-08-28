@@ -11004,11 +11004,28 @@ CSS;
                                         listPending: {},
                                         listKeys: @js($selectedInboxListKeys),
                                         lists: @js($selectedInboxLists),
+                                        listCounts: @js(collect($selectedInboxLists)->mapWithKeys(function ($row) {
+                                            $key = strtolower(trim((string) ($row['key'] ?? $row['slug'] ?? $row['id'] ?? '')));
+                                            $count = (int) ($row['schools_count'] ?? $row['school_count'] ?? (is_array($row['schools'] ?? null) ? count($row['schools']) : 0));
+                                            return $key !== '' ? [$key => $count] : [];
+                                        })->all()),
                                         normalizeKey(value) { return String(value || '').trim().toLowerCase(); },
                                         listKey(list) { return String(list?.key || list?.slug || list?.id || '').trim(); },
                                         listLabel(list) { return String(list?.label || list?.name || this.listKey(list) || 'List'); },
                                         listColor(list) { return String(list?.color || '#ff6338'); },
-                                        listCount(list) { return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0); },
+                                        listCount(list) {
+                                            const key = this.normalizeKey(this.listKey(list));
+                                            if (Object.prototype.hasOwnProperty.call(this.listCounts, key)) return Number(this.listCounts[key] || 0);
+                                            return Number(list?.schools_count ?? list?.school_count ?? (Array.isArray(list?.schools) ? list.schools.length : 0) ?? 0);
+                                        },
+                                        listCountByKey(key, fallback = 0) {
+                                            key = this.normalizeKey(key);
+                                            return Object.prototype.hasOwnProperty.call(this.listCounts, key) ? Number(this.listCounts[key] || 0) : Number(fallback || 0);
+                                        },
+                                        setListCount(key, value) {
+                                            key = this.normalizeKey(key);
+                                            this.listCounts = { ...this.listCounts, [key]: Math.max(0, Number(value || 0)) };
+                                        },
                                         inList(key) { return this.listKeys.map(v => this.normalizeKey(v)).includes(this.normalizeKey(key)); },
                                         isListPending(key) { return Boolean(this.listPending[this.normalizeKey(key)]); },
                                         openSchool() {
@@ -11039,13 +11056,23 @@ CSS;
                                             if (!this.schoolId || !key || this.isListPending(key)) return;
                                             const previous = [...this.listKeys];
                                             const has = this.inList(key);
+                                            const previousCount = this.listCountByKey(key, 0);
+                                            const optimisticCount = Math.max(0, previousCount + (has ? -1 : 1));
                                             this.listPending = { ...this.listPending, [key]: true };
                                             this.listKeys = has ? previous.filter(v => this.normalizeKey(v) !== key) : [...previous, key];
+                                            this.setListCount(key, optimisticCount);
                                             try {
                                                 const result = await this.$wire.call('queueSchoolListMemberships', this.schoolId, { [key]: !has });
-                                                if (!result || result.success === false) this.listKeys = previous;
-                                            } catch (_) { this.listKeys = previous; }
-                                            finally {
+                                                if (!result || result.success === false) {
+                                                    this.listKeys = previous;
+                                                    this.setListCount(key, previousCount);
+                                                } else if (result.list_counts && Object.prototype.hasOwnProperty.call(result.list_counts, key)) {
+                                                    this.setListCount(key, Number(result.list_counts[key] || 0));
+                                                }
+                                            } catch (_) {
+                                                this.listKeys = previous;
+                                                this.setListCount(key, previousCount);
+                                            } finally {
                                                 const nextPending = { ...this.listPending };
                                                 delete nextPending[key];
                                                 this.listPending = nextPending;
@@ -11099,7 +11126,7 @@ CSS;
                                                         <span class="rc-list-check-v81"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m5 10.5 3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                                                         <span class="rc-school-list-label-v87"><span class="rc-school-list-dot-v72" style="--dot:{{ $inboxListColor }}"></span><span>{{ $inboxListLabel }}</span></span>
                                                         <span class="rc-action-spinner-v81" x-cloak x-show="isListPending(@js($inboxListKey))"></span>
-                                                        <small class="rc-list-count-v81" x-show="!isListPending(@js($inboxListKey))">{{ $inboxListCount }}</small>
+                                                        <small class="rc-list-count-v81" x-show="!isListPending(@js($inboxListKey))" x-text="listCountByKey(@js($inboxListKey), @js($inboxListCount))">{{ $inboxListCount }}</small>
                                                     </button>
                                                 @endif
                                             @empty
