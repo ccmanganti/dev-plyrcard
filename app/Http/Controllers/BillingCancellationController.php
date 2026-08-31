@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\BillingInformation;
 use App\Services\BillingProfileService;
+use App\Services\SupportAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class BillingCancellationController extends Controller
 {
-    public function __invoke(Request $request, BillingProfileService $billingService): JsonResponse
+    public function __invoke(Request $request, BillingProfileService $billingService, SupportAlertService $alerts): JsonResponse
     {
         $user = $request->user();
         abort_unless($user, 403);
@@ -80,10 +81,23 @@ class BillingCancellationController extends Controller
             'registration_meta' => $meta,
         ])->save();
 
+        $currentRole = $hasAmplify ? 'Amplify' : 'My Journey';
+        $alert = $alerts->sendDowngradeRequest($user, $currentRole, [
+            'subscription_id' => $billing->ghl_subscription_id,
+            'subscriber_contact_id' => $user->ghl_subscriber_contact_id ?? null,
+        ]);
+
+        $meta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
+        $meta['cancellation_alert_status'] = ($alert['success'] ?? false) ? 'sent' : 'failed';
+        $meta['cancellation_alert_recipients'] = $alert['recipients'] ?? [];
+        $meta['cancellation_alert_sent_at'] = ($alert['success'] ?? false) ? now()->toIso8601String() : null;
+        $meta['cancellation_alert_error'] = ($alert['success'] ?? false) ? null : ($alert['error'] ?? 'Alert email was not accepted by the mail server.');
+        $billing->forceFill(['registration_meta' => $meta])->save();
+
         return response()->json([
             'success' => true,
             'message' => 'Your downgrade request has been submitted. Your current access stays active until the billing cancellation is confirmed, then your account can be moved to Free.',
-            'current_role' => $hasAmplify ? 'Amplify' : 'My Journey',
+            'current_role' => $currentRole,
             'target_role' => 'Free',
         ]);
     }

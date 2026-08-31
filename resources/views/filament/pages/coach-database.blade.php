@@ -11192,7 +11192,7 @@ CSS;
                     'showNewEmail' => true,
                 ])
 
-                <section class="rc-support-card-v1" x-data="{ loaded: false }">
+                <section class="rc-support-card-v1">
                     <header class="rc-support-head-v1">
                         <div>
                             <span class="rc-support-kicker-v1">PLYRCard Support</span>
@@ -11201,33 +11201,7 @@ CSS;
                         </div>
                     </header>
 
-                    <div class="rc-support-frame-wrap-v1">
-                        <div class="rc-support-frame-loader-v1" x-show="! loaded" x-transition.opacity>
-                            <span class="rc-support-spinner-v1" aria-label="Loading support form"></span>
-                        </div>
-                        <iframe
-                            src="https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K"
-                            id="inline-HDaBy0CDwdO7Fw54wi1K"
-                            data-layout="{'id':'INLINE'}"
-                            data-trigger-type="alwaysShow"
-                            data-trigger-value=""
-                            data-activation-type="alwaysActivated"
-                            data-activation-value=""
-                            data-deactivation-type="neverDeactivate"
-                            data-deactivation-value=""
-                            data-form-name="PLYRCard Support Ticket"
-                            data-height="760"
-                            data-layout-iframe-id="inline-HDaBy0CDwdO7Fw54wi1K"
-                            data-form-id="HDaBy0CDwdO7Fw54wi1K"
-                            title="PLYRCard support ticket form"
-                            class="rc-support-frame-v1"
-                            loading="eager"
-                            scrolling="no"
-                            referrerpolicy="strict-origin-when-cross-origin"
-                            x-on:load="loaded = true"
-                        ></iframe>
-                        <script src="https://link.msgsndr.com/js/form_embed.js" defer></script>
-                    </div>
+                    @include('filament.partials.support-ticket-form')
                 </section>
             </div>
         @endif

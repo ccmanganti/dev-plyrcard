@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\LockerRoomController;
+use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\LockerRoomSchoolActionController;
 use App\Http\Controllers\AmplifyUpgradeController;
 use App\Http\Controllers\BillingCancellationController;
@@ -32,6 +33,8 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.amplify.status');
     Route::post('/billing/cancel-request', BillingCancellationController::class)
         ->name('billing.cancel-request');
+    Route::post('/support/tickets', [SupportTicketController::class, 'store'])
+        ->name('support.tickets.store');
 
     Route::get('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'index'])
         ->name('admin.external-tracking-url-generator');
