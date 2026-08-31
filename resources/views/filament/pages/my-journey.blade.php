@@ -835,7 +835,7 @@
     </div>
     <style>
         .mj-downgrade-modal[hidden]{display:none!important}.mj-downgrade-modal{position:fixed;inset:0;z-index:100600;display:grid;place-items:center;padding:18px;background:rgba(2,6,23,.72);backdrop-filter:blur(7px)}
-        .mj-downgrade-card{width:min(480px,100%);background:#fff;color:#101828;border-radius:18px;padding:1.25rem;border:1px solid #e5e7eb;box-shadow:0 28px 80px rgba(0,0,0,.3)}.mj-downgrade-card h3{margin:0;font-size:1.15rem}.mj-downgrade-card p{margin:.65rem 0 1rem;color:#667085;line-height:1.55;font-size:.9rem}.mj-downgrade-actions{display:flex;justify-content:flex-end;gap:.6rem;flex-wrap:wrap}.mj-downgrade-actions .mj-btn{width:auto;margin:0;cursor:pointer}.mj-downgrade-confirm-btn{background:#ff6338!important;border:1px solid #ff6338!important;color:#fff!important;box-shadow:0 8px 22px rgba(255,99,56,.24)!important;opacity:1!important;visibility:visible!important;min-width:190px}.mj-downgrade-confirm-btn:hover{background:#e9532d!important;border-color:#e9532d!important;color:#fff!important}.mj-downgrade-confirm-btn:disabled{background:#ff9a7d!important;border-color:#ff9a7d!important;color:#fff!important;opacity:.82!important;cursor:wait!important}.mj-downgrade-status{margin:.7rem 0;padding:.75rem;border-radius:10px;background:#ecfdf3;color:#067647;font-size:.85rem;line-height:1.45}
+        .mj-downgrade-card{width:min(480px,100%);background:#fff;color:#101828;border-radius:18px;padding:1.25rem;border:1px solid #e5e7eb;box-shadow:0 28px 80px rgba(0,0,0,.3)}.mj-downgrade-card h3{margin:0;font-size:1.15rem}.mj-downgrade-card p{margin:.65rem 0 1rem;color:#667085;line-height:1.55;font-size:.9rem}.mj-downgrade-actions{display:flex;justify-content:flex-end;gap:.6rem;flex-wrap:wrap}.mj-downgrade-actions .mj-btn{width:auto;margin:0;cursor:pointer}.mj-downgrade-confirm-btn{background:#ff6338!important;border:1px solid #ff6338!important;color:#fff!important;box-shadow:0 8px 22px rgba(255,99,56,.24)!important;opacity:1!important;visibility:visible!important;min-width:190px}.mj-downgrade-confirm-btn:hover{background:#e9532d!important;border-color:#e9532d!important;color:#fff!important}.mj-downgrade-confirm-btn:disabled{background:#ff9a7d!important;border-color:#ff9a7d!important;color:#fff!important;opacity:.82!important;cursor:wait!important}.mj-downgrade-status{margin:.7rem 0;padding:.75rem;border-radius:10px;font-size:.85rem;line-height:1.45}.mj-downgrade-status.is-success{background:#ecfdf3;color:#067647}.mj-downgrade-status.is-error{background:#fef3f2;color:#b42318}
     </style>
     <script>
         (() => {
@@ -846,7 +846,7 @@
             const confirm = modal.querySelector('[data-mj-downgrade-confirm]');
             const close = () => { modal.hidden = true; };
             document.addEventListener('click', async (event) => {
-                if (event.target.closest('[data-plyrcard-downgrade-free]')) { event.preventDefault(); status.hidden = true; modal.hidden = false; return; }
+                if (event.target.closest('[data-plyrcard-downgrade-free]')) { event.preventDefault(); status.hidden = true; status.classList.remove('is-success','is-error'); confirm.hidden = false; modal.hidden = false; return; }
                 if (event.target.closest('[data-mj-downgrade-close]')) { close(); return; }
                 if (!event.target.closest('[data-mj-downgrade-confirm]')) return;
                 confirm.disabled = true; confirm.textContent = 'Submitting...';
@@ -854,9 +854,9 @@
                     const response = await fetch(@json(route('billing.cancel-request')), {method:'POST',credentials:'same-origin',headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content || ''}});
                     const data = await response.json().catch(() => ({}));
                     if (!response.ok) throw new Error(data.message || 'Unable to submit the downgrade request.');
-                    status.textContent = data.message || 'Your downgrade request was submitted.'; status.hidden = false;
+                    status.classList.remove('is-error'); status.classList.add('is-success'); status.textContent = data.message || 'Your downgrade request was submitted.'; status.hidden = false;
                     confirm.hidden = true;
-                } catch (error) { status.textContent = error.message || 'Unable to submit the downgrade request.'; status.hidden = false; }
+                } catch (error) { status.classList.remove('is-success'); status.classList.add('is-error'); status.textContent = error.message || 'Unable to submit the downgrade request.'; status.hidden = false; }
                 finally { confirm.disabled = false; confirm.textContent = 'Request Downgrade'; }
             });
         })();

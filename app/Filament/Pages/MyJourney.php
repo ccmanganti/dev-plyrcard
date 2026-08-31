@@ -44,7 +44,7 @@ class MyJourney extends Page
             return 'NEW';
         }
 
-        if ($user->hasRole('My Journey')) {
+        if ($user->hasRole('My Journey') || $user->hasRole('Amplify')) {
             return 'ACTIVE';
         }
 
@@ -63,7 +63,7 @@ class MyJourney extends Page
             return 'danger';
         }
 
-        if ($user->hasRole('My Journey')) {
+        if ($user->hasRole('My Journey') || $user->hasRole('Amplify')) {
             return 'success';
         }
 
@@ -84,7 +84,12 @@ class MyJourney extends Page
 
         // Amplify is a one-time service entitlement, not a subscription tier.
         // The recurring plan remains My Journey while Amplify work is active.
-        if ($user->hasRole('My Journey') || $user->hasRole('my journey')) {
+        if (
+            $user->hasRole('My Journey')
+            || $user->hasRole('my journey')
+            || $user->hasRole('Amplify')
+            || $user->hasRole('amplify')
+        ) {
             return 'my_journey';
         }
 
