@@ -6709,7 +6709,7 @@ discoverSelectedIds: [],
             </div>
         @endif
 
-        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings'], true) || $isStatDrawerOpen))
+        @if(! (in_array($section, ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'templates', 'campaigns', 'conversations', 'schedule', 'settings', 'support'], true) || $isStatDrawerOpen))
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -11176,33 +11176,9 @@ CSS;
         @endif
 
         @if($section === 'support')
-            @php
-                $supportUser = auth()->user();
-                $supportFirstName = trim((string) (
-                    $supportUser?->first_name
-                    ?? str($supportUser?->name ?? 'Athlete')->before(' ')
-                    ?? 'Athlete'
-                ));
-            @endphp
-
-            <div class="rc-support-page-v1">
-                @include('filament.partials.coach-database-header', [
-                    'firstName' => $supportFirstName !== '' ? $supportFirstName : 'Athlete',
-                    'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
-                    'showNewEmail' => true,
-                ])
-
-                <section class="rc-support-card-v1">
-                    <header class="rc-support-head-v1">
-                        <div>
-                            <span class="rc-support-kicker-v1">PLYRCard Support</span>
-                            <h2>How can we help?</h2>
-                            <p>Submit a support ticket and our team will review it.</p>
-                        </div>
-                    </header>
-
-                    @include('filament.partials.support-ticket-form')
-                </section>
+            {{-- v10.87: The Support page is intentionally self-contained. --}}
+            <div class="rc-support-page-v1 rc-support-page-clean-v87">
+                @include('filament.partials.support-ticket-form')
             </div>
         @endif
 

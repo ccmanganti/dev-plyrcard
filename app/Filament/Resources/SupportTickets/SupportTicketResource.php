@@ -4,6 +4,7 @@ namespace App\Filament\Resources\SupportTickets;
 
 use App\Filament\Resources\SupportTickets\Pages\EditSupportTicket;
 use App\Filament\Resources\SupportTickets\Pages\ListSupportTickets;
+use App\Filament\Resources\SupportTickets\Pages\SupportTicketSettings;
 use App\Models\SupportTicket;
 use BackedEnum;
 use Filament\Forms\Components\Select;
@@ -196,6 +197,7 @@ class SupportTicketResource extends Resource
     {
         return [
             'index' => ListSupportTickets::route('/'),
+            'settings' => SupportTicketSettings::route('/settings'),
             'edit' => EditSupportTicket::route('/{record}/edit'),
         ];
     }
