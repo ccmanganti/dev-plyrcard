@@ -54,7 +54,7 @@
                     data-plyrcard-amplify-frame
                     src="about:blank"
                     scrolling="no"
-                    id="FPx6oTagczUr0jH1X0ES"
+                    id="plyrcard-amplify-checkout"
                     title="Amplify secure checkout"
                     data-cookie-consent="true"
                     data-cookie-consent-provider="auto"
@@ -68,8 +68,8 @@
     <script src="https://systems.plyrcard.com/js/form_embed.js" defer></script>
     <script>
         (() => {
-            if (window.__plyrcardAmplifyCheckoutV1052) return;
-            window.__plyrcardAmplifyCheckoutV1052 = true;
+            if (window.__plyrcardAmplifyCheckoutV1078) return;
+            window.__plyrcardAmplifyCheckoutV1078 = true;
 
             const modal = document.querySelector('[data-plyrcard-amplify-modal]');
             if (!modal) return;
@@ -154,10 +154,16 @@
                         return;
                     }
                     if (!data.checkout_url) throw new Error(data.message || 'Secure checkout is unavailable.');
+                    try {
+                        const checkoutUrl = new URL(data.checkout_url, window.location.origin);
+                        const pathParts = checkoutUrl.pathname.split('/').filter(Boolean);
+                        const surveyId = pathParts[pathParts.length - 1] || '';
+                        if (surveyId) frame.id = surveyId;
+                    } catch (_) {}
                     frame.src = data.checkout_url;
                     show(frame);
                     pollStartedAt = Date.now();
-                    statusCopy.textContent = data.message || 'Complete checkout to continue.';
+                    statusCopy.textContent = data.message || (data.display_due_today ? `${data.display_due_today} due today.` : 'Complete checkout to continue.');
                     pollTimer = setTimeout(poll, 1800);
                 } catch (e) {
                     show(error);
