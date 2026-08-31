@@ -41,9 +41,10 @@ class SupportTicketResource extends Resource
                         ->disabled()
                         ->dehydrated(false),
                     TextInput::make('email')
+                        ->label('Account Email')
                         ->email()
-                        ->required()
-                        ->maxLength(255),
+                        ->disabled()
+                        ->dehydrated(false),
                     Select::make('category')
                         ->options(SupportTicket::categories())
                         ->required(),
@@ -61,7 +62,14 @@ class SupportTicketResource extends Resource
                         ->disabled()
                         ->dehydrated(false),
                     Textarea::make('message')
-                        ->rows(8)
+                        ->label('Initial Message')
+                        ->rows(5)
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->columnSpanFull(),
+                    Textarea::make('conversation_text')
+                        ->label('Client Conversation / Follow-ups')
+                        ->rows(12)
                         ->disabled()
                         ->dehydrated(false)
                         ->columnSpanFull(),

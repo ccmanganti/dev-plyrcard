@@ -33,8 +33,12 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.amplify.status');
     Route::post('/billing/cancel-request', BillingCancellationController::class)
         ->name('billing.cancel-request');
+    Route::get('/support/tickets', [SupportTicketController::class, 'index'])
+        ->name('support.tickets.index');
     Route::post('/support/tickets', [SupportTicketController::class, 'store'])
         ->name('support.tickets.store');
+    Route::post('/support/tickets/{ticket}/follow-up', [SupportTicketController::class, 'followUp'])
+        ->name('support.tickets.follow-up');
 
     Route::get('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'index'])
         ->name('admin.external-tracking-url-generator');

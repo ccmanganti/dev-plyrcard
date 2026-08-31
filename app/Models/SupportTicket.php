@@ -14,6 +14,7 @@ class SupportTicket extends Model
         'email',
         'category',
         'message',
+        'conversation',
         'status',
         'priority',
         'source',
@@ -26,6 +27,7 @@ class SupportTicket extends Model
     ];
 
     protected $casts = [
+        'conversation' => 'array',
         'resolved_at' => 'datetime',
         'email_alerted_at' => 'datetime',
         'metadata' => 'array',
@@ -58,6 +60,41 @@ class SupportTicket extends Model
     public function categoryLabel(): string
     {
         return (string) data_get(config('plyrcard-support.categories', []), $this->category, Str::headline($this->category));
+    }
+
+    public function statusLabel(): string
+    {
+        return (string) data_get(config('plyrcard-support.statuses', []), $this->status, Str::headline($this->status));
+    }
+
+    public function appendConversation(string $senderType, ?int $senderId, string $senderName, string $message): void
+    {
+        $conversation = is_array($this->conversation) ? $this->conversation : [];
+        $conversation[] = [
+            'sender_type' => $senderType,
+            'sender_id' => $senderId,
+            'sender_name' => trim($senderName) !== '' ? trim($senderName) : ucfirst($senderType),
+            'message' => trim($message),
+            'created_at' => now()->toIso8601String(),
+        ];
+
+        $this->conversation = $conversation;
+    }
+
+    public function getConversationTextAttribute(): string
+    {
+        $rows = collect(is_array($this->conversation) ? $this->conversation : [])
+            ->map(function (array $entry): string {
+                $name = trim((string) ($entry['sender_name'] ?? ucfirst((string) ($entry['sender_type'] ?? 'message'))));
+                $time = trim((string) ($entry['created_at'] ?? ''));
+                $message = trim((string) ($entry['message'] ?? ''));
+
+                return trim($name . ($time !== '' ? ' - ' . $time : '') . "\n" . $message);
+            })
+            ->filter()
+            ->implode("\n\n------------------------------\n\n");
+
+        return $rows !== '' ? $rows : $this->message;
     }
 
     public static function categories(): array

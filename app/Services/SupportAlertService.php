@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\SupportTicket;
+use App\Models\SystemSetting;
 use App\Models\User;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class SupportAlertService
 {
@@ -39,6 +41,41 @@ class SupportAlertService
         );
 
         return $this->sendToAdmins($subject, $html, $ticket->email, 'support_ticket', [
+            'ticket_id' => $ticket->getKey(),
+            'ticket_number' => $ticket->ticket_number,
+            'user_id' => $ticket->user_id,
+        ]);
+    }
+
+    public function sendSupportFollowUp(SupportTicket $ticket, string $followUpMessage): array
+    {
+        $ticket->loadMissing('user');
+        $requester = $ticket->user;
+        $requesterName = $requester
+            ? trim(collect([$requester->first_name, $requester->last_name])->filter()->implode(' '))
+            : '';
+        $requesterName = $requesterName !== '' ? $requesterName : 'PLYRCARD user';
+
+        $subject = '[PLYRCARD Support ' . $ticket->ticket_number . '] Client follow-up';
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/support-tickets/' . $ticket->getKey() . '/edit';
+
+        $html = $this->layout(
+            heading: 'Support ticket follow-up',
+            intro: 'A client added a new follow-up to an existing PLYRCARD support ticket.',
+            rows: [
+                'Ticket' => $ticket->ticket_number,
+                'From' => $requesterName,
+                'Email' => $ticket->email,
+                'Concern' => $ticket->categoryLabel(),
+                'Current status' => $ticket->statusLabel(),
+                'Updated' => now()->format('M j, Y g:i A'),
+            ],
+            message: $followUpMessage,
+            actionLabel: 'Open Support Ticket',
+            actionUrl: $adminUrl,
+        );
+
+        return $this->sendToAdmins($subject, $html, $ticket->email, 'support_follow_up', [
             'ticket_id' => $ticket->getKey(),
             'ticket_number' => $ticket->ticket_number,
             'user_id' => $ticket->user_id,
@@ -84,7 +121,23 @@ class SupportAlertService
 
     public function adminRecipients(): array
     {
-        return collect((array) config('plyrcard-support.admin_emails', []))
+        $configured = [];
+
+        try {
+            if (Schema::hasTable('system_settings')) {
+                $configured = SystemSetting::value('admin_alert_emails', []);
+            }
+        } catch (\Throwable $exception) {
+            Log::debug('PLYRCARD global admin alert settings could not be read; using config fallback.', [
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($configured === []) {
+            $configured = (array) config('plyrcard-support.admin_emails', []);
+        }
+
+        return collect($configured)
             ->map(fn ($email) => $this->sanitizeEmail((string) $email))
             ->filter()
             ->unique()
