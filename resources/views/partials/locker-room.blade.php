@@ -1209,7 +1209,6 @@
                 <div class="lr-school-scorebox"><div class="lr-school-score-ring">${score}</div><small>${scoreLabel}</small></div>
             </div>
             <div class="lr-school-actions">
-                <a class="lr-school-action is-primary${coachEmails.length ? '' : ' lr-school-busy'}" href="${mailHref}" ${coachEmails.length ? '' : 'aria-disabled="true"'}><i class="fa-regular fa-envelope"></i><span>Email Coaches</span></a>
                 <button type="button" class="lr-school-action${isFavorite ? ' is-active' : ''}" data-lr-school-favorite data-school-id="${esc(String(school.id))}" data-favorite="${isFavorite ? '1' : '0'}"><i class="fa-${isFavorite ? 'solid' : 'regular'} fa-star"></i><span>${isFavorite ? 'Favorited' : 'Favorite'}</span></button>
                 <div class="lr-school-list-wrap"><button type="button" class="lr-school-action${listKeys.length ? ' is-active' : ''}" data-lr-school-list-toggle><i class="fa-solid ${listKeys.length ? 'fa-list-check' : 'fa-plus'}"></i><span>${listKeys.length ? 'In Lists' : 'Add to List'}</span><i class="fa-solid fa-chevron-down"></i></button><div class="lr-school-list-menu" data-lr-school-list-menu hidden><h5>Add to a list</h5>${listMenu}</div></div>
             </div>
@@ -1728,4 +1727,4 @@
 </script>
 @endif
 
-@include('partials.amplify-upgrade-modal')  
+@include('partials.amplify-upgrade-modal')
