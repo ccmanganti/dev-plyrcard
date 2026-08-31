@@ -249,6 +249,35 @@
             border: 1px solid var(--mj-border);
         }
 
+        .mj-addon-active {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            padding: .38rem .7rem;
+            border-radius: 999px;
+            background: rgba(18, 183, 106, .14);
+            border: 1px solid rgba(18, 183, 106, .34);
+            color: #12b76a;
+            font-size: .72rem;
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+            z-index: 4;
+        }
+
+        .mj-addon-active::before {
+            content: '';
+            width: .48rem;
+            height: .48rem;
+            border-radius: 50%;
+            background: currentColor;
+            box-shadow: 0 0 0 3px rgba(18, 183, 106, .12);
+        }
+
         .mj-popular {
             position: absolute;
             top: -1px;
@@ -435,6 +464,17 @@
 
         .mj-btn.gold:hover {
             background: rgba(216, 155, 23, .19);
+        }
+
+        .mj-btn.gold.is-disabled {
+            background: var(--mj-gold-soft);
+            border-color: rgba(216, 155, 23, .35);
+            color: var(--mj-gold);
+            opacity: .55;
+            cursor: not-allowed;
+            pointer-events: none;
+            box-shadow: none;
+            transform: none;
         }
 
         .mj-btn.ghost {
@@ -668,6 +708,10 @@
                         <div class="mj-popular" @if (($plan['accent'] ?? '') === 'gold') style="background:#f5c451;color:#241701;" @endif>{{ $plan['badge'] ?? 'Most Popular' }}</div>
                     @endif
 
+                    @if (($plan['key'] ?? '') === 'amplify' && ($plan['active_addon'] ?? false))
+                        <div class="mj-addon-active">Active</div>
+                    @endif
+
                     <div class="mj-plan-icon">
                         {!! mjIcon($plan['icon']) !!}
                     </div>
@@ -709,14 +753,19 @@
 
                     <a
                         href="{{ $plan['button_href'] }}"
-                        class="mj-btn {{ $plan['button_style'] }}"
-                        @if (($plan['opens_amplify_checkout'] ?? false) && ! ($plan['current'] ?? false))
+                        class="mj-btn {{ $plan['button_style'] }} {{ ($plan['button_disabled'] ?? false) ? 'is-disabled' : '' }}"
+                        @if (($plan['opens_amplify_checkout'] ?? false) && ! ($plan['current'] ?? false) && ! ($plan['button_disabled'] ?? false))
                             data-plyrcard-amplify-open
                             role="button"
                         @endif
                         @if ($plan['requests_free_downgrade'] ?? false)
                             data-plyrcard-downgrade-free
                             role="button"
+                        @endif
+                        @if ($plan['button_disabled'] ?? false)
+                            aria-disabled="true"
+                            tabindex="-1"
+                            onclick="return false;"
                         @endif
                     >
                         {{ $plan['button'] }}
