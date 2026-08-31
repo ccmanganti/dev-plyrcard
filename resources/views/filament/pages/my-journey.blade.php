@@ -707,7 +707,14 @@
                         {{ $plan['note'] }}
                     </div>
 
-                    <a href="{{ $plan['button_href'] }}" class="mj-btn {{ $plan['button_style'] }}">
+                    <a
+                        href="{{ $plan['button_href'] }}"
+                        class="mj-btn {{ $plan['button_style'] }}"
+                        @if (($plan['opens_amplify_checkout'] ?? false) && ! ($plan['current'] ?? false))
+                            data-plyrcard-amplify-open
+                            role="button"
+                        @endif
+                    >
                         {{ $plan['button'] }}
                     </a>
                 </article>
@@ -761,4 +768,7 @@
             <span>{{ $this->getFooterCopy() }}</span>
         </section>
     </div>
+
+    {{-- Shared Amplify upgrade checkout. Kept inside the Filament page root. --}}
+    @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>
