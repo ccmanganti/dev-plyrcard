@@ -82,56 +82,58 @@ class MyJourney extends Page
             return 'free';
         }
 
-        if ($user->hasRole('Amplify') || $user->hasRole('amplify')) {
-            return 'amplify';
-        }
-
-        if ($user->hasRole('My Journey')) {
+        // Amplify is a one-time service entitlement, not a subscription tier.
+        // The recurring plan remains My Journey while Amplify work is active.
+        if ($user->hasRole('My Journey') || $user->hasRole('my journey')) {
             return 'my_journey';
         }
 
         return 'free';
     }
 
+    public function hasAmplifyAccess(): bool
+    {
+        $user = Auth::user();
+
+        return (bool) ($user && method_exists($user, 'hasRole')
+            && ($user->hasRole('Amplify') || $user->hasRole('amplify')));
+    }
+
     public function getHeroEyebrow(): string
     {
-        return match ($this->getCurrentPlanKey()) {
-            'amplify' => 'Done-for-you recruiting package',
-            'my_journey' => 'Manage your subscription',
-            default => 'Unlock My Journey',
-        };
+        return $this->getCurrentPlanKey() === 'my_journey'
+            ? 'Manage your subscription'
+            : 'Choose your plan';
     }
 
     public function getHeroTitle(): string
     {
-        return match ($this->getCurrentPlanKey()) {
-            'amplify' => 'You Are On <span>Amplify</span>',
-            'my_journey' => 'You Are On <span>My Journey</span>',
-            default => 'Choose Your <span>Plan</span>',
-        };
+        return $this->getCurrentPlanKey() === 'my_journey'
+            ? 'You Are On <span>My Journey</span>'
+            : 'Choose Your <span>Plan</span>';
     }
 
     public function getHeroDescription(): string
     {
-        return match ($this->getCurrentPlanKey()) {
-            'amplify' => 'You are on the complete done-for-you recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.',
-            'my_journey' => 'You are on My Journey. Upgrade to Amplify anytime for monthly done-for-you content, outreach, and support.',
-            default => 'Start free and upgrade when you are ready. My Journey unlocks your recruiting HQ, while Amplify adds done-for-you production and outreach.',
-        };
+        if ($this->getCurrentPlanKey() === 'my_journey') {
+            return $this->hasAmplifyAccess()
+                ? 'My Journey is active. Your Amplify one-time setup package is also active while our team completes your graphics, highlights, outreach setup, and onboarding.'
+                : 'My Journey is active. Add Amplify anytime for the one-time done-for-you setup package.';
+        }
+
+        return 'Start free or unlock My Journey for your recruiting HQ, personalized domain, coach database, outreach tools, and tracking.';
     }
 
     public function getHeroBadgeLabel(): string
     {
-        return match ($this->getCurrentPlanKey()) {
-            'amplify' => 'Done for you',
-            'my_journey' => 'Most popular',
-            default => 'Built for athletes',
-        };
+        return $this->getCurrentPlanKey() === 'my_journey' ? 'Active plan' : 'Built for athletes';
     }
 
     public function getPlans(): array
     {
         $currentPlan = $this->getCurrentPlanKey();
+        $amplifyActive = $this->hasAmplifyAccess();
+        $hasMyJourney = $currentPlan === 'my_journey';
 
         return [
             [
@@ -144,8 +146,9 @@ class MyJourney extends Page
                 'accent' => 'gray',
                 'popular' => false,
                 'badge' => null,
-                'button' => $currentPlan === 'free' ? 'CURRENT PLAN' : 'GO TO FREE',
-                'button_href' => $currentPlan === 'free' ? '#' : url('/registration?utm_plan=free'),
+                'button' => $currentPlan === 'free' ? 'CURRENT PLAN' : 'DOWNGRADE TO FREE',
+                'button_href' => '#',
+                'requests_free_downgrade' => $currentPlan !== 'free',
                 'button_style' => $currentPlan === 'free' ? 'disabled' : 'ghost',
                 'icon' => 'user',
                 'current' => $currentPlan === 'free',
@@ -160,7 +163,6 @@ class MyJourney extends Page
                 ],
                 'note' => 'Best for athletes who want a simple online presence before upgrading.',
             ],
-
             [
                 'key' => 'my_journey',
                 'name' => 'MY JOURNEY',
@@ -171,11 +173,11 @@ class MyJourney extends Page
                 'accent' => 'orange',
                 'popular' => true,
                 'badge' => 'Most Popular',
-                'button' => $currentPlan === 'my_journey' ? 'CURRENT PLAN' : 'GET MY JOURNEY',
-                'button_href' => $currentPlan === 'my_journey' ? '#' : url('/registration?utm_plan=my-journey'),
-                'button_style' => $currentPlan === 'my_journey' ? 'disabled' : 'orange',
+                'button' => $hasMyJourney ? 'ACTIVE' : 'GET MY JOURNEY',
+                'button_href' => $hasMyJourney ? '#' : url('/registration?utm_plan=my-journey'),
+                'button_style' => $hasMyJourney ? 'disabled' : 'orange',
                 'icon' => 'bolt',
-                'current' => $currentPlan === 'my_journey',
+                'current' => $hasMyJourney,
                 'features' => [
                     ['text' => 'Everything in Free', 'included' => true],
                     ['text' => 'Your own personalized domain', 'included' => true],
@@ -185,34 +187,33 @@ class MyJourney extends Page
                     ['text' => 'Coach database access — weekly verifications', 'included' => true],
                     ['text' => '1-on-1 onboarding', 'included' => true],
                 ],
-                'note' => 'Best for athletes who want a complete recruiting workspace and coach outreach tools.',
+                'note' => 'Your recurring recruiting workspace and subscription plan.',
             ],
-
             [
                 'key' => 'amplify',
                 'name' => 'AMPLIFY',
-                'price' => '$49',
-                'suffix' => '/mo',
-                'setup' => '$500 one-time setup fee · Covers graphics, production, and done-for-you setup',
-                'tagline' => 'Your complete recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.',
+                'price' => '$500',
+                'suffix' => 'one time',
+                'setup' => 'One-time done-for-you setup package · My Journey membership required',
+                'tagline' => 'A one-time production and recruiting setup package layered on top of My Journey.',
                 'accent' => 'gold',
                 'popular' => true,
                 'badge' => 'Done For You',
-                'button' => $currentPlan === 'amplify' ? 'CURRENT PLAN' : 'AMPLIFY MY RECRUITING',
-                'button_href' => '#',
-                'opens_amplify_checkout' => $currentPlan !== 'amplify',
-                'button_style' => $currentPlan === 'amplify' ? 'disabled' : 'gold',
+                'button' => $amplifyActive ? 'ACTIVE' : ($hasMyJourney ? 'AMPLIFY MY RECRUITING' : 'MY JOURNEY REQUIRED'),
+                'button_href' => $hasMyJourney ? '#' : url('/registration?utm_plan=my-journey'),
+                'opens_amplify_checkout' => $hasMyJourney && ! $amplifyActive,
+                'button_style' => $amplifyActive ? 'disabled' : ($hasMyJourney ? 'gold' : 'ghost'),
                 'icon' => 'crown',
-                'current' => $currentPlan === 'amplify',
+                'current' => false,
+                'active_addon' => $amplifyActive,
                 'features' => [
-                    ['text' => 'Everything in My Journey', 'included' => true],
                     ['text' => '4 Highlight Reels', 'included' => true],
                     ['text' => '4 Custom Graphics', 'included' => true],
                     ['text' => '4 Managed Coach Outreach sends', 'included' => true],
                     ['text' => '8 Hours of Support', 'included' => true],
-                    ['text' => 'Full onboarding', 'included' => true],
+                    ['text' => 'Full onboarding and account setup', 'included' => true],
                 ],
-                'note' => 'Best for athletes who want a full done-for-you recruiting package every month.',
+                'note' => 'Amplify does not replace your plan. After our setup work is complete, your plan remains My Journey.',
             ],
         ];
     }

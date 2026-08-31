@@ -30,6 +30,8 @@ class BillingCancellationController extends Controller
         $meta['cancellation_requested_at'] = now()->toIso8601String();
         $meta['cancellation_requested_by_user_id'] = $user->getKey();
         $meta['cancellation_subscription_id'] = $billing->ghl_subscription_id;
+        $meta['cancellation_target_plan'] = 'free';
+        $meta['cancellation_source'] = 'my_journey_page';
 
         $billing->forceFill([
             'registration_meta' => $meta,

@@ -225,21 +225,21 @@ class AmplifyUpgradeService
         ])->values()->all();
 
         $billing->forceFill([
-            'plan_key' => 'amplify',
+            'plan_key' => 'my-journey',
             'billing_cycle' => $plan['billing_cycle'] ?? ($billing->billing_cycle ?: 'monthly'),
             'currency' => strtoupper((string) ($plan['currency'] ?? $billing->currency ?? 'USD')),
-            'recurring_amount_cents' => (int) ($plan['recurring_amount_cents'] ?? 4900),
+            'recurring_amount_cents' => (int) ($billing->recurring_amount_cents ?: 4900),
             'setup_fee_cents' => (int) ($plan['setup_fee_cents'] ?? 50000),
-            'initial_amount_cents' => $expectedCents,
-            'payment_status' => 'paid',
-            'subscription_status' => 'active',
+            // Keep recurring My Journey billing intact. The $500 payment is an Amplify purchase.
+            'payment_status' => $billing->payment_status ?: 'paid',
+            'subscription_status' => $billing->subscription_status ?: 'active',
             'ghl_transaction_id' => $ids[0] ?? $billing->ghl_transaction_id,
-            'ghl_subscription_id' => $subscriptionId ?: $billing->ghl_subscription_id,
+            'ghl_subscription_id' => $billing->ghl_subscription_id,
             'ghl_payment_completed_at' => now(),
             'ghl_last_event_at' => now(),
             'ghl_sync_status' => 'amplify_upgrade_payment_confirmed',
             'ghl_sync_response' => array_merge($existingSync, [
-                'amplify_upgrade' => [
+                'amplify_purchase' => [
                     'checkout_id' => $checkout['checkout_id'] ?? null,
                     'verified_at' => now()->toIso8601String(),
                     'source' => $source,
@@ -312,10 +312,10 @@ class AmplifyUpgradeService
         return [
             'success' => true,
             'completed' => true,
-            'plan_key' => 'amplify',
+            'plan_key' => 'my-journey',
             'payment_status' => 'paid',
             'subscription_status' => $billing->subscription_status ?: 'active',
-            'message' => 'Amplify is active. Your account has been updated.',
+            'message' => 'Purchase confirmed. PLYRCARD will verify your Amplify purchase and you will receive a message soon.',
         ];
     }
 
@@ -381,12 +381,18 @@ class AmplifyUpgradeService
 
     protected function currentPlanKey(User $user, BillingInformation $billing): string
     {
+        $user->loadMissing('roles');
+        if (method_exists($user, 'hasRole') && ($user->hasRole('My Journey') || $user->hasRole('my journey'))) {
+            return 'my-journey';
+        }
+
         return (string) ($this->billingAccount->rolePlanKey($user) ?: $billing->plan_key ?: 'free');
     }
 
     protected function isAmplify(User $user): bool
     {
-        return $this->billingAccount->rolePlanKey($user) === 'amplify';
+        $user->loadMissing('roles');
+        return method_exists($user, 'hasRole') && ($user->hasRole('Amplify') || $user->hasRole('amplify'));
     }
 
     protected function fetchRows(

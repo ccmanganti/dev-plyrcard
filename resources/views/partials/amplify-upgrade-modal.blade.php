@@ -44,7 +44,7 @@
                     <div class="plyr-amplify-state-inner"><div class="plyr-amplify-spinner"></div><strong>Preparing secure checkout</strong><span>Connecting this purchase to your billing profile…</span></div>
                 </div>
                 <div class="plyr-amplify-state" data-plyrcard-amplify-success hidden>
-                    <div class="plyr-amplify-state-inner plyr-amplify-success"><div class="plyr-amplify-success-icon">✓</div><strong>Amplify is active</strong><span>Your account has been upgraded successfully.</span></div>
+                    <div class="plyr-amplify-state-inner plyr-amplify-success"><div class="plyr-amplify-success-icon">✓</div><strong>Purchase successful</strong><span>We received the payment signal. PLYRCARD will verify your Amplify purchase and you will receive a message soon.</span><button class="plyr-amplify-retry" type="button" data-plyrcard-amplify-done>Done</button></div>
                 </div>
                 <div class="plyr-amplify-state" data-plyrcard-amplify-error hidden>
                     <div class="plyr-amplify-state-inner plyr-amplify-error"><strong>Checkout could not be prepared</strong><span data-plyrcard-amplify-error-copy>Please try again.</span><button class="plyr-amplify-retry" type="button" data-plyrcard-amplify-retry>Try Again</button></div>
@@ -123,9 +123,6 @@
                         show(success);
                         statusCopy.textContent = 'Payment confirmed. Updating your PLYRCARD…';
                         window.dispatchEvent(new CustomEvent('plyrcard:amplify-upgraded', {detail: data}));
-                        setTimeout(() => {
-                            if (!document.querySelector('[data-lr-drawer]')) window.location.reload();
-                        }, 900);
                         return;
                     }
                     statusCopy.textContent = data.message || 'Waiting for payment confirmation…';
@@ -150,7 +147,6 @@
                         show(success);
                         statusCopy.textContent = data.message || 'Amplify is active.';
                         window.dispatchEvent(new CustomEvent('plyrcard:amplify-upgraded', {detail:data}));
-                        setTimeout(() => { if (!document.querySelector('[data-lr-drawer]')) window.location.reload(); }, 700);
                         return;
                     }
                     if (!data.checkout_url) throw new Error(data.message || 'Secure checkout is unavailable.');
@@ -179,6 +175,7 @@
                 if (opener) { event.preventDefault(); start(); return; }
                 if (event.target.closest('[data-plyrcard-amplify-close]')) { close(); return; }
                 if (event.target.closest('[data-plyrcard-amplify-retry]')) { start(); return; }
+                if (event.target.closest('[data-plyrcard-amplify-done]')) { window.location.reload(); return; }
                 if (event.target === modal) close();
             });
             document.addEventListener('keydown', event => { if (event.key === 'Escape' && !modal.hidden) close(); });

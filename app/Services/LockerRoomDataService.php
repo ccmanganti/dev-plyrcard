@@ -90,6 +90,7 @@ class LockerRoomDataService
                 'is_premium' => $isPremium,
                 'workspace_ready' => $workspaceReady,
                 'show_preparing' => $isPremium && ! $workspaceReady,
+                'amplify_active' => $this->hasRole($user, 'Amplify'),
             ],
             'dashboard' => $this->dashboardPayload($user),
             'schedule' => $this->schedulePayload($user),
@@ -109,10 +110,7 @@ class LockerRoomDataService
         // PLYRCARD roles are authoritative for product access/current tier.
         // Billing subscription state is verified separately against the payer
         // contact and must not accidentally promote/downgrade application access.
-        if ($this->hasRole($user, 'Amplify')) {
-            return 'amplify';
-        }
-
+        // Amplify is a one-time service entitlement, not a plan tier.
         if ($this->hasRole($user, 'My Journey')) {
             return 'my-journey';
         }
@@ -124,7 +122,7 @@ class LockerRoomDataService
         // Compatibility fallback for legacy users that do not yet have a tier role.
         $billingPlan = strtolower(trim((string) ($billing?->plan_key ?? '')));
         if ($billingPlan === 'amplify') {
-            return 'amplify';
+            return 'my-journey';
         }
         if (in_array($billingPlan, ['my-journey', 'my_journey'], true)) {
             return 'my-journey';
@@ -1661,10 +1659,7 @@ class LockerRoomDataService
     {
         $configured = (array) config('plyrcard-registration.plans', []);
         $journeyRecurring = (int) data_get($configured, 'my-journey.recurring_amount_cents', 4900);
-        $amplifyRecurring = (int) data_get($configured, 'amplify.recurring_amount_cents', 4900);
         $amplifySetup = (int) data_get($configured, 'amplify.setup_fee_cents', 50000);
-        $amplifyFirstMonthUpfront = (bool) data_get($configured, 'amplify.charge_first_month_upfront', true);
-        $amplifyDueToday = $amplifySetup + ($amplifyFirstMonthUpfront ? $amplifyRecurring : 0);
 
         $money = static function (int $cents): string {
             $amount = $cents / 100;
@@ -1682,8 +1677,8 @@ class LockerRoomDataService
                 'current' => $currentPlan === 'free',
                 'description' => 'A simple PLYRCARD with your essential athlete information.',
                 'features' => ['Simple PLYRCARD page', 'Quick athlete info', 'Bio & basic stats', 'Email support'],
-                'action_label' => 'Go to Free',
-                'action_url' => url('/registration?utm_plan=free'),
+                'action_label' => $currentPlan === 'free' ? 'Current Plan' : 'Downgrade to Free',
+                'action_url' => '#',
             ],
             [
                 'key' => 'my-journey',
@@ -1700,13 +1695,13 @@ class LockerRoomDataService
                 'key' => 'amplify',
                 'name' => 'Amplify',
                 'price' => $money($amplifySetup),
-                'suffix' => 'one-time setup + ' . $money($amplifyRecurring) . '/mo',
-                'due_today' => $money($amplifyDueToday) . ' due at enrollment',
-                'current' => $currentPlan === 'amplify',
-                'description' => 'My Journey plus done-for-you recruiting production, graphics, highlights, outreach, and support.',
+                'suffix' => 'one time',
+                'due_today' => $money($amplifySetup) . ' one-time purchase',
+                'current' => false,
+                'description' => 'A one-time done-for-you setup package for active My Journey members.',
                 'features' => ['Everything in My Journey', '4 Highlight Reels', '4 Custom Graphics', '4 Managed Coach Outreach sends', '8 Hours of Support', 'Full onboarding'],
                 'action_label' => 'Amplify My Recruiting',
-                'action_url' => url('/registration?utm_plan=amplify'),
+                'action_url' => '#',
             ],
         ];
     }

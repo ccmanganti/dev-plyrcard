@@ -291,9 +291,8 @@ class BillingAccountService
         $user->loadMissing('roles');
         $roles = $user->getRoleNames()->map(fn ($role) => strtolower(trim((string) $role)));
 
-        if ($roles->contains('amplify')) {
-            return 'amplify';
-        }
+        // Amplify is a one-time service entitlement, not a recurring tier.
+        // My Journey remains the subscription plan while Amplify access is active.
         if ($roles->contains('my journey') || $roles->contains('my-journey') || $roles->contains('my_journey')) {
             return 'my-journey';
         }

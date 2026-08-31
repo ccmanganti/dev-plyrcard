@@ -714,6 +714,10 @@
                             data-plyrcard-amplify-open
                             role="button"
                         @endif
+                        @if ($plan['requests_free_downgrade'] ?? false)
+                            data-plyrcard-downgrade-free
+                            role="button"
+                        @endif
                     >
                         {{ $plan['button'] }}
                     </a>
@@ -769,6 +773,46 @@
         </section>
     </div>
 
-    {{-- Shared Amplify upgrade checkout. Kept inside the Filament page root. --}}
+    <div class="mj-downgrade-modal" data-mj-downgrade-modal hidden>
+        <div class="mj-downgrade-card" role="dialog" aria-modal="true" aria-labelledby="mj-downgrade-title">
+            <h3 id="mj-downgrade-title">Downgrade to Free?</h3>
+            <p>This will submit a cancellation request for your active My Journey subscription. Your paid access stays active until the billing cancellation is confirmed, then your account can return to Free.</p>
+            <div class="mj-downgrade-status" data-mj-downgrade-status hidden></div>
+            <div class="mj-downgrade-actions">
+                <button type="button" class="mj-btn ghost" data-mj-downgrade-close>Keep My Journey</button>
+                <button type="button" class="mj-btn orange" data-mj-downgrade-confirm>Request Downgrade</button>
+            </div>
+        </div>
+    </div>
+    <style>
+        .mj-downgrade-modal[hidden]{display:none!important}.mj-downgrade-modal{position:fixed;inset:0;z-index:100600;display:grid;place-items:center;padding:18px;background:rgba(2,6,23,.72);backdrop-filter:blur(7px)}
+        .mj-downgrade-card{width:min(480px,100%);background:#fff;color:#101828;border-radius:18px;padding:1.25rem;border:1px solid #e5e7eb;box-shadow:0 28px 80px rgba(0,0,0,.3)}.mj-downgrade-card h3{margin:0;font-size:1.15rem}.mj-downgrade-card p{margin:.65rem 0 1rem;color:#667085;line-height:1.55;font-size:.9rem}.mj-downgrade-actions{display:flex;justify-content:flex-end;gap:.6rem;flex-wrap:wrap}.mj-downgrade-actions .mj-btn{width:auto;margin:0;cursor:pointer}.mj-downgrade-status{margin:.7rem 0;padding:.75rem;border-radius:10px;background:#ecfdf3;color:#067647;font-size:.85rem;line-height:1.45}
+    </style>
+    <script>
+        (() => {
+            const modal = document.querySelector('[data-mj-downgrade-modal]');
+            if (!modal || modal.dataset.bound === '1') return;
+            modal.dataset.bound = '1';
+            const status = modal.querySelector('[data-mj-downgrade-status]');
+            const confirm = modal.querySelector('[data-mj-downgrade-confirm]');
+            const close = () => { modal.hidden = true; };
+            document.addEventListener('click', async (event) => {
+                if (event.target.closest('[data-plyrcard-downgrade-free]')) { event.preventDefault(); status.hidden = true; modal.hidden = false; return; }
+                if (event.target.closest('[data-mj-downgrade-close]')) { close(); return; }
+                if (!event.target.closest('[data-mj-downgrade-confirm]')) return;
+                confirm.disabled = true; confirm.textContent = 'Submitting...';
+                try {
+                    const response = await fetch(@json(route('billing.cancel-request')), {method:'POST',credentials:'same-origin',headers:{'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':document.querySelector('meta[name="csrf-token"]')?.content || ''}});
+                    const data = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(data.message || 'Unable to submit the downgrade request.');
+                    status.textContent = data.message || 'Your downgrade request was submitted.'; status.hidden = false;
+                    confirm.hidden = true;
+                } catch (error) { status.textContent = error.message || 'Unable to submit the downgrade request.'; status.hidden = false; }
+                finally { confirm.disabled = false; confirm.textContent = 'Request Downgrade'; }
+            });
+        })();
+    </script>
+
+    {{-- Shared Amplify purchase checkout. Kept inside the Filament page root. --}}
     @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>
