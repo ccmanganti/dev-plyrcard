@@ -42,6 +42,13 @@
     $lrAdditionalServiceUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.additional-service.store')
         ? route('locker-room.additional-service.store')
         : null;
+    $lrSupportTicketsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('support.tickets.index')
+        ? route('support.tickets.index')
+        : null;
+    $lrSupportTicketStoreUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('support.tickets.store')
+        ? route('support.tickets.store')
+        : null;
+    $lrSupportTicketFollowupBaseUrl = $lrLoggedIn ? url('/support/tickets') : null;
     $lrLoginUrl = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
         ? route('plyrcard.drawer-login')
         : url('/admin/login');
@@ -236,6 +243,21 @@
     .lr-plan-price small { font-size:11px; font-weight:700; color:#667085; letter-spacing:0; }
     .lr-plan-list { display:grid; gap:6px; margin:11px 0 0; padding:0; list-style:none; color:#475467; font-size:11px; }
     .lr-plan-list li:before { content:"✓"; color:#16a34a; font-weight:900; margin-right:7px; }
+    .lr-support-history { display:grid; gap:9px; margin-top:12px; }
+    .lr-support-ticket { border:1px solid #e5e7eb; border-radius:14px; background:#fff; overflow:hidden; }
+    .lr-support-ticket-summary { width:100%; border:0; background:#fff; padding:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left; cursor:pointer; }
+    .lr-support-ticket-summary strong { display:block; color:#101828; font-size:12px; }
+    .lr-support-ticket-summary small { display:block; margin-top:3px; color:#667085; font-size:9px; }
+    .lr-support-status { display:inline-flex; margin-top:6px; padding:3px 7px; border-radius:999px; background:#fff1ec; color:#e94c28; font-size:8px; font-weight:850; text-transform:uppercase; }
+    .lr-support-status.is-resolved { background:#ecfdf3; color:#067647; }
+    .lr-support-status.is-progress { background:#fff7ed; color:#c2410c; }
+    .lr-support-status.is-waiting { background:#eff8ff; color:#175cd3; }
+    .lr-support-ticket-body { border-top:1px solid #eef0f3; padding:12px; display:grid; gap:9px; }
+    .lr-support-message { border:1px solid #eef0f3; background:#f8fafc; border-radius:11px; padding:10px; }
+    .lr-support-message-head { display:flex; justify-content:space-between; gap:8px; color:#667085; font-size:8px; }
+    .lr-support-message-head strong { color:#344054; font-size:9px; }
+    .lr-support-message p { margin:5px 0 0; color:#344054; font-size:10px; line-height:1.5; white-space:pre-wrap; }
+    .lr-support-followup { display:grid; gap:7px; padding-top:5px; }
     .lr-embed { width:100%; height:calc(100dvh - 165px); min-height:620px; border:0; border-radius:14px; background:#fff; }
     .lr-gate { text-align:center; padding:30px 18px; }
     .lr-gate-icon { width:60px; height:60px; margin:0 auto 14px; border-radius:18px; display:grid; place-items:center; background:#fff1ec; color:#ff5c35; font-size:22px; }
@@ -564,6 +586,9 @@
      data-billing-url="{{ $lrBillingUrl }}" data-cancel-billing-url="{{ route('billing.cancel-request') }}"
      data-referral-url="{{ $lrReferralUrl }}"
      data-additional-service-url="{{ $lrAdditionalServiceUrl }}"
+     data-support-tickets-url="{{ $lrSupportTicketsUrl }}"
+     data-support-ticket-store-url="{{ $lrSupportTicketStoreUrl }}"
+     data-support-ticket-followup-base-url="{{ $lrSupportTicketFollowupBaseUrl }}"
      data-login-url="{{ $lrLoginUrl }}"
      data-password-reset-url="{{ $lrPasswordResetUrl }}"
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
@@ -793,7 +818,15 @@
 
                 <section class="lr-view" data-lr-view="refer"><form class="lr-form" data-lr-referral-form><div class="lr-form-section"><h4>Refer a Friend</h4><p class="lr-card-copy">Invite another athlete to PLYRCARD. We only need their name and email.</p><div class="lr-form-grid" style="margin-top:12px;"><div class="lr-field"><label>Friend's Name</label><input class="lr-input" name="friend_name" placeholder="Friend's full name" required></div><div class="lr-field"><label>Friend's Email</label><input class="lr-input" type="email" name="friend_email" placeholder="friend@example.com" required></div><div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="message" placeholder="Optional message"></textarea></div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Invitation Email</button><div class="lr-upload-status" data-lr-referral-status>The invitation will be emailed directly to your friend.</div></form></section>
 
-                <section class="lr-view" data-lr-view="support"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Support</h3><p class="lr-card-copy">Tell us what you need help with.</p></div><div data-lr-support-embed></div></div></section>
+                <section class="lr-view" data-lr-view="support">
+                    <div class="lr-section">
+                        <div class="lr-hero"><span class="lr-eyebrow">Support</span><h3>How can we help?</h3><p class="lr-muted">Send a request, track its status, and follow up without leaving Locker Room.</p></div>
+                        <form class="lr-form" data-lr-support-ticket-form>
+                            <div class="lr-form-section"><h4>New Support Ticket</h4><div class="lr-field"><label>Concern</label><div class="lr-select-wrap"><select class="lr-select" name="category" data-lr-support-category required><option value="">Loading concerns…</option></select><i class="fa-solid fa-chevron-down"></i></div></div><div class="lr-field" style="margin-top:11px"><label>Message</label><textarea class="lr-textarea" name="message" minlength="10" maxlength="5000" placeholder="Describe what happened, what you expected, and any details that can help us review it." required></textarea></div><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit"><i class="fa-regular fa-paper-plane"></i> Submit Ticket</button></div></div>
+                        </form>
+                        <div class="lr-card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><h3 class="lr-card-title">Your Requests</h3><p class="lr-card-copy">Track status and add follow-ups to existing tickets.</p></div><span class="lr-chip" data-lr-support-count>0 tickets</span></div><div class="lr-support-history" data-lr-support-history><div class="lr-detail-empty" style="margin-top:12px">Loading your support tickets…</div></div></div>
+                    </div>
+                </section>
 
                 <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book a Call</h3><p class="lr-card-copy">Choose a time that works for you. Booking stays inside Locker Room.</p></div><div data-lr-book-embed></div></div></section>
 
@@ -930,6 +963,8 @@
     let dashboardActivityLoading = false;
     let dashboardSchoolLoading = false;
     let dashboardEngagementFilter = '';
+    let supportTicketState = {categories:{}, statuses:{}, tickets:[]};
+    let supportTicketsLoaded = false;
     const dashboardMetricCache = new Map();
     const dashboardMetricPromises = new Map();
     const profileOptionCache = new Map();
@@ -1008,7 +1043,7 @@
         q('[data-lr-subtitle]').textContent = subtitles[view] || '';
         const back = q('[data-lr-back].lr-back'); if (back) back.hidden = forcePassword || view === (authenticated ? 'home' : 'guest-home');
         q('.lr-body')?.scrollTo({top:0, behavior:'auto'});
-        if (view === 'support') ensureSupportEmbed();
+        if (view === 'support') ensureSupportTickets();
         if (view === 'book-call') ensureBookEmbed();
         render();
     }
@@ -1528,9 +1563,16 @@
     function renderPlans() {
         const box = q('[data-lr-plans]'); if (!box) return;
         box.innerHTML = (state.plans || []).map(plan => {
-            const action = plan.current ? '' : (plan.key === 'amplify'
-                ? `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-plyrcard-amplify-open>${esc(plan.action_label || 'Upgrade to Amplify')}</button></div>`
-                : `<div class="lr-actions"><a class="lr-btn lr-btn-primary" href="${esc(plan.action_url)}">${esc(plan.action_label || 'Choose Plan')}</a></div>`);
+            let action = '';
+            if (!plan.current) {
+                if (plan.action_kind === 'my_journey_checkout' || plan.key === 'my-journey') {
+                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-plyrcard-my-journey-open>${esc(plan.action_label || 'Get My Journey')}</button></div>`;
+                } else if (plan.action_kind === 'amplify_checkout' || plan.key === 'amplify') {
+                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-plyrcard-amplify-open>${esc(plan.action_label || 'Upgrade to Amplify')}</button></div>`;
+                } else if (plan.action_url && plan.action_url !== '#') {
+                    action = `<div class="lr-actions"><a class="lr-btn lr-btn-primary" href="${esc(plan.action_url)}">${esc(plan.action_label || 'Choose Plan')}</a></div>`;
+                }
+            }
             return `<article class="lr-plan-card ${plan.current?'is-current':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${plan.current?'<span class="lr-chip">Current Plan</span>':''}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
         }).join('');
     }
@@ -1577,11 +1619,67 @@
         box.innerHTML=`<h3 class="lr-card-title">Your PLYRCARD Link</h3><p class="lr-card-copy">${esc(status)}</p><div class="lr-field" style="margin-top:12px;"><input class="lr-input" value="${esc(url)}" readonly data-lr-share-input></div><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-copy-link>Copy Link</button><button class="lr-btn" type="button" data-lr-native-share>Share</button></div>`;
     }
 
-    function ensureSupportEmbed() {
-        const holder = q('[data-lr-support-embed]'); if (!holder || holder.dataset.loaded === '1') return; holder.dataset.loaded='1';
-        const url = state.integrations?.support_form_url || 'https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K';
-        holder.innerHTML = `<iframe class="lr-embed" src="${esc(url)}" id="inline-HDaBy0CDwdO7Fw54wi1K" data-form-id="HDaBy0CDwdO7Fw54wi1K" title="PLYRCARD Support"></iframe>`;
+    function supportStatusClass(status) {
+        status=String(status||'').toLowerCase();
+        if (['resolved','closed'].includes(status)) return 'is-resolved';
+        if (status==='in_progress') return 'is-progress';
+        if (status==='waiting_on_user') return 'is-waiting';
+        return '';
     }
+
+    function supportDate(value) {
+        const date=new Date(value||'');
+        return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
+    }
+
+    function renderSupportTickets() {
+        const select=q('[data-lr-support-category]');
+        if(select){
+            const current=select.value;
+            const entries=Object.entries(supportTicketState.categories||{});
+            select.innerHTML='<option value="">Select the area you need help with</option>'+entries.map(([key,label])=>`<option value="${esc(key)}">${esc(label)}</option>`).join('');
+            if(current && entries.some(([key])=>key===current)) select.value=current;
+        }
+        const tickets=Array.isArray(supportTicketState.tickets)?supportTicketState.tickets:[];
+        const count=q('[data-lr-support-count]'); if(count) count.textContent=`${tickets.length} ${tickets.length===1?'ticket':'tickets'}`;
+        const holder=q('[data-lr-support-history]'); if(!holder)return;
+        if(!tickets.length){ holder.innerHTML='<div class="lr-detail-empty">No support tickets yet.<br>Your submitted requests will appear here.</div>'; return; }
+        holder.innerHTML=tickets.map(ticket=>{
+            const conversation=Array.isArray(ticket.conversation)?ticket.conversation:[];
+            const messages=conversation.map(entry=>`<div class="lr-support-message"><div class="lr-support-message-head"><strong>${esc(entry.sender_name||'You')}</strong><span>${esc(supportDate(entry.created_at))}</span></div><p>${esc(entry.message||'')}</p></div>`).join('');
+            return `<article class="lr-support-ticket" data-lr-support-ticket="${esc(ticket.id)}"><button type="button" class="lr-support-ticket-summary" data-lr-support-ticket-toggle><div><strong>${esc(ticket.category_label||ticket.category||'Support Ticket')}</strong><small>${esc(ticket.ticket_number||'')} · Updated ${esc(supportDate(ticket.updated_at))}</small><span class="lr-support-status ${supportStatusClass(ticket.status)}">${esc(ticket.status_label||ticket.status||'Open')}</span></div><i class="fa-solid fa-chevron-down"></i></button><div class="lr-support-ticket-body" data-lr-support-ticket-body hidden>${messages||'<div class="lr-detail-empty">No messages yet.</div>'}<div class="lr-support-followup"><textarea class="lr-textarea" rows="3" data-lr-support-followup-message placeholder="Add more details or ask for an update…"></textarea><div class="lr-actions"><button type="button" class="lr-btn lr-btn-primary" data-lr-support-followup data-ticket-id="${esc(ticket.id)}"><i class="fa-regular fa-paper-plane"></i> Send Follow-up</button></div></div></div></article>`;
+        }).join('');
+    }
+
+    async function ensureSupportTickets(force=false) {
+        if(!authenticated || !drawer.dataset.supportTicketsUrl)return;
+        if(supportTicketsLoaded && !force){ renderSupportTickets(); return; }
+        try{
+            const json=await request(drawer.dataset.supportTicketsUrl);
+            supportTicketState={categories:json.categories||{},statuses:json.statuses||{},tickets:json.tickets||[]};
+            supportTicketsLoaded=true; renderSupportTickets();
+        }catch(err){ const holder=q('[data-lr-support-history]'); if(holder)holder.innerHTML=`<div class="lr-detail-empty">${esc(err.message||'Unable to load support tickets.')}</div>`; }
+    }
+
+    async function submitLockerSupportTicket(form) {
+        setFormBusy(form,true,'Submitting…');
+        try{
+            const fd=new FormData(form); fd.append('source','locker_room');
+            const json=await request(drawer.dataset.supportTicketStoreUrl,{method:'POST',body:fd});
+            supportTicketState.tickets=json.tickets||supportTicketState.tickets; supportTicketsLoaded=true; form.reset(); renderSupportTickets(); showToast(json.message||'Support ticket submitted.');
+        }catch(err){showToast(err.message,true)}finally{setFormBusy(form,false)}
+    }
+
+    async function followUpLockerSupportTicket(button) {
+        const card=button.closest('[data-lr-support-ticket]'), textarea=card?.querySelector('[data-lr-support-followup-message]');
+        const message=String(textarea?.value||'').trim(); if(!message)return showToast('Enter a follow-up message.',true);
+        button.disabled=true; button.classList.add('is-busy');
+        try{
+            const url=`${drawer.dataset.supportTicketFollowupBaseUrl}/${encodeURIComponent(button.dataset.ticketId)}/follow-up`;
+            const json=await request(url,{method:'POST',body:{message}}); supportTicketState.tickets=json.tickets||supportTicketState.tickets; supportTicketsLoaded=true; renderSupportTickets(); showToast(json.message||'Follow-up added.');
+        }catch(err){showToast(err.message,true)}finally{button.disabled=false;button.classList.remove('is-busy')}
+    }
+
     function ensureBookEmbed() {
         const holder = q('[data-lr-book-embed]'); if (!holder || holder.dataset.loaded === '1') return; holder.dataset.loaded='1';
         const url = state.integrations?.book_call_url || 'https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l';
@@ -1598,6 +1696,8 @@
         const engagementFilter = event.target.closest('[data-lr-engagement-filter]'); if (engagementFilter && drawer.contains(engagementFilter)) { event.preventDefault(); dashboardEngagementFilter = dashboardEngagementFilter === engagementFilter.dataset.lrEngagementFilter ? '' : engagementFilter.dataset.lrEngagementFilter; renderDashboardActivityDetail(); return; }
         if (event.target.closest('[data-lr-dashboard-detail-close]')) { event.preventDefault(); closeDashboardActivity(); return; }
         if (event.target.closest('[data-lr-dashboard-school-close]')) { event.preventDefault(); closeDashboardSchool(); return; }
+        const supportToggle=event.target.closest('[data-lr-support-ticket-toggle]'); if(supportToggle && drawer.contains(supportToggle)){ event.preventDefault(); const body=supportToggle.closest('[data-lr-support-ticket]')?.querySelector('[data-lr-support-ticket-body]'); if(body) body.hidden=!body.hidden; return; }
+        const supportFollow=event.target.closest('[data-lr-support-followup]'); if(supportFollow && drawer.contains(supportFollow)){ event.preventDefault(); followUpLockerSupportTicket(supportFollow); return; }
         const schoolTab = event.target.closest('[data-lr-school-tab]');
         if (schoolTab && drawer.contains(schoolTab)) {
             event.preventDefault();
@@ -1677,6 +1777,7 @@
         event.preventDefault(); const form=event.currentTarget;
         try { await request(drawer.dataset.additionalServiceUrl,{method:'POST',body:new FormData(form)}); form.reset(); showToast('Service request sent.'); } catch(err){ showToast(err.message,true); }
     });
+    q('[data-lr-support-ticket-form]')?.addEventListener('submit', async event => { event.preventDefault(); await submitLockerSupportTicket(event.currentTarget); });
     q('[data-lr-referral-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget; const status=q('[data-lr-referral-status]'); const submit=form.querySelector('[type="submit"]');
         if(status){ status.textContent='Sending invitation email...'; status.className='lr-upload-status is-ready'; }
@@ -1720,6 +1821,7 @@
     if(menuButton && mobileNav && menuButton.dataset.lrBound!=='1') { menuButton.dataset.lrBound='1'; menuButton.addEventListener('click',()=>{const open=mobileNav.classList.toggle('open');menuButton.setAttribute('aria-expanded',open?'true':'false');}); }
     const header=document.getElementById('site-header'); if(header && header.dataset.lrScrollBound!=='1'){header.dataset.lrScrollBound='1'; const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>14); onScroll(); window.addEventListener('scroll',onScroll,{passive:true});}
 
+    window.addEventListener('plyrcard:my-journey-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('My Journey is active.'); });
     window.addEventListener('plyrcard:amplify-upgraded', () => { refreshData(); setView('upgrade', false); showToast('Amplify is active.'); });
     if (forcePassword) setView('password', false);
     else render();
@@ -1727,4 +1829,5 @@
 </script>
 @endif
 
+@include('partials.my-journey-upgrade-modal')
 @include('partials.amplify-upgrade-modal')

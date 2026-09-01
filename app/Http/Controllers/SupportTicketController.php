@@ -19,6 +19,8 @@ class SupportTicketController extends Controller
         return response()->json([
             'success' => true,
             'tickets' => $this->ticketsForUser($user->getKey()),
+            'categories' => SupportTicket::categories(),
+            'statuses' => SupportTicket::statuses(),
         ]);
     }
 

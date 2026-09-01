@@ -1689,7 +1689,8 @@ class LockerRoomDataService
                 'description' => 'Your recruiting HQ with a personalized domain, coach database, outreach tools, and tracking.',
                 'features' => ['Everything in Free', 'Personalized domain', 'Your own recruiting email', 'Coach engagement tracking', 'Outreach templates', 'Coach database access', '1-on-1 onboarding'],
                 'action_label' => 'Get My Journey',
-                'action_url' => url('/registration?utm_plan=my-journey'),
+                'action_url' => '#',
+                'action_kind' => 'my_journey_checkout',
             ],
             [
                 'key' => 'amplify',
@@ -1700,8 +1701,9 @@ class LockerRoomDataService
                 'current' => false,
                 'description' => 'A one-time done-for-you setup package for active My Journey members.',
                 'features' => ['Everything in My Journey', '4 Highlight Reels', '4 Custom Graphics', '4 Managed Coach Outreach sends', '8 Hours of Support', 'Full onboarding'],
-                'action_label' => 'Amplify My Recruiting',
+                'action_label' => $currentPlan === 'my-journey' ? 'Amplify My Recruiting' : 'My Journey Required',
                 'action_url' => '#',
+                'action_kind' => $currentPlan === 'my-journey' ? 'amplify_checkout' : 'my_journey_checkout',
             ],
         ];
     }

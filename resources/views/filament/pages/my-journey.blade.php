@@ -758,6 +758,10 @@
                             data-plyrcard-amplify-open
                             role="button"
                         @endif
+                        @if (($plan['opens_my_journey_checkout'] ?? false) && ! ($plan['current'] ?? false) && ! ($plan['button_disabled'] ?? false))
+                            data-plyrcard-my-journey-open
+                            role="button"
+                        @endif
                         @if ($plan['requests_free_downgrade'] ?? false)
                             data-plyrcard-downgrade-free
                             role="button"
@@ -862,6 +866,7 @@
         })();
     </script>
 
-    {{-- Shared Amplify purchase checkout. Kept inside the Filament page root. --}}
+    {{-- Authenticated in-page purchase checkouts. --}}
+    @include('partials.my-journey-upgrade-modal')
     @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>

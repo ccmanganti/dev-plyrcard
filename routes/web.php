@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\LockerRoomController;
 use App\Http\Controllers\SupportTicketController;
+use App\Http\Controllers\SupportTicketSettingsController;
 use App\Http\Controllers\LockerRoomSchoolActionController;
 use App\Http\Controllers\AmplifyUpgradeController;
+use App\Http\Controllers\MyJourneyUpgradeController;
 use App\Http\Controllers\BillingCancellationController;
 use App\Http\Controllers\PublicClubTeamController;
 use App\Http\Controllers\PublicPlayerIntakeController;
@@ -31,6 +33,10 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.amplify.start');
     Route::get('/billing/amplify/status', [AmplifyUpgradeController::class, 'status'])
         ->name('billing.amplify.status');
+    Route::post('/billing/my-journey/start', [MyJourneyUpgradeController::class, 'start'])
+        ->name('billing.my-journey.start');
+    Route::get('/billing/my-journey/status', [MyJourneyUpgradeController::class, 'status'])
+        ->name('billing.my-journey.status');
     Route::post('/billing/cancel-request', BillingCancellationController::class)
         ->name('billing.cancel-request');
     Route::get('/support/tickets', [SupportTicketController::class, 'index'])
@@ -39,6 +45,8 @@ Route::middleware('auth')->group(function (): void {
         ->name('support.tickets.store');
     Route::post('/support/tickets/{ticket}/follow-up', [SupportTicketController::class, 'followUp'])
         ->name('support.tickets.follow-up');
+    Route::post('/admin/support-tickets/settings', [SupportTicketSettingsController::class, 'update'])
+        ->name('support.ticket-settings.update');
 
     Route::get('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'index'])
         ->name('admin.external-tracking-url-generator');
