@@ -13,6 +13,7 @@ class MyJourneyUpgradeService
     public function __construct(
         protected BillingAccountService $billingAccounts,
         protected RegistrationPaymentVerificationService $paymentVerification,
+        protected SupportAlertService $alerts,
     ) {
     }
 
@@ -100,7 +101,7 @@ class MyJourneyUpgradeService
             'checkout_id' => $checkoutId,
             'checkout_url' => $checkoutUrl,
             'expected_amount_cents' => $initial,
-            'message' => 'Complete the $49 monthly membership checkout below. Payment confirmation is checked automatically.',
+            'message' => 'Complete the ' . $this->money($initial) . ' My Journey checkout below. Payment confirmation is checked automatically.',
         ];
     }
 
@@ -195,12 +196,30 @@ class MyJourneyUpgradeService
             ]);
         }
 
+        try {
+            $this->alerts->sendUpgradeCompleted($user->fresh('roles'), 'my-journey', (int) $billing->fresh()->initial_amount_cents, [
+                'previous_plan' => 'free',
+                'transaction_id' => $billing->fresh()->ghl_transaction_id,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('My Journey upgrade completed but the admin alert could not be sent.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
         return [
             'completed' => true,
             'message' => 'Payment confirmed. My Journey is now active and your billing information has been updated.',
             'payment_status' => 'paid',
             'subscription_status' => $billing->fresh()->subscription_status,
         ];
+    }
+
+    protected function money(int $cents): string
+    {
+        $amount = $cents / 100;
+        return '$' . (floor($amount) === $amount ? number_format($amount, 0) : number_format($amount, 2));
     }
 
     protected function hasMyJourney(User $user): bool

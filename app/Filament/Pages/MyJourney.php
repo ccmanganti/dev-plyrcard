@@ -139,6 +139,14 @@ class MyJourney extends Page
         $currentPlan = $this->getCurrentPlanKey();
         $amplifyActive = $this->hasAmplifyAccess();
         $hasMyJourney = $currentPlan === 'my_journey';
+        $journey = (array) config('plyrcard-registration.plans.my-journey', []);
+        $amplify = (array) config('plyrcard-registration.plans.amplify', []);
+        $journeyRecurring = (int) ($journey['recurring_amount_cents'] ?? 4900);
+        $amplifySetup = (int) ($amplify['setup_fee_cents'] ?? 50000);
+        $amplifyRecurring = $journeyRecurring;
+        $amplifyFirstMonth = (bool) ($amplify['charge_first_month_upfront'] ?? true);
+        $amplifyDue = $hasMyJourney ? $amplifySetup : $amplifySetup + ($amplifyFirstMonth ? $amplifyRecurring : 0);
+        $money = static fn (int $cents): string => '$' . number_format($cents / 100, ($cents % 100) === 0 ? 0 : 2);
 
         return [
             [
@@ -171,7 +179,7 @@ class MyJourney extends Page
             [
                 'key' => 'my_journey',
                 'name' => 'MY JOURNEY',
-                'price' => '$49',
+                'price' => $money($journeyRecurring),
                 'suffix' => '/mo',
                 'setup' => 'Monthly subscription · Cancel anytime',
                 'tagline' => 'Your own recruiting HQ — domain, email, tracking, templates, and the coach database.',
@@ -198,18 +206,20 @@ class MyJourney extends Page
             [
                 'key' => 'amplify',
                 'name' => 'AMPLIFY',
-                'price' => '$500',
+                'price' => $money($amplifyDue),
                 'suffix' => 'one time',
-                'setup' => 'One-time done-for-you setup package · My Journey membership required',
+                'setup' => $hasMyJourney
+                    ? ($money($amplifySetup) . ' one-time Amplify package')
+                    : ($money($amplifySetup) . ' setup + My Journey at ' . $money($amplifyRecurring) . '/mo' . ($amplifyFirstMonth ? ' (first month due today)' : '')),
                 'tagline' => 'A one-time production and recruiting setup package layered on top of My Journey.',
                 'accent' => 'gold',
                 'popular' => true,
                 'badge' => 'Done For You',
-                'button' => $hasMyJourney ? 'AMPLIFY MY RECRUITING' : 'MY JOURNEY REQUIRED',
+                'button' => $amplifyActive ? 'ACTIVE' : ($hasMyJourney ? 'AMPLIFY MY RECRUITING' : 'GET AMPLIFY'),
                 'button_href' => '#',
-                'opens_my_journey_checkout' => ! $hasMyJourney,
-                'opens_amplify_checkout' => $hasMyJourney && ! $amplifyActive,
-                'button_style' => $hasMyJourney ? 'gold' : 'ghost',
+                'opens_my_journey_checkout' => false,
+                'opens_amplify_checkout' => ! $amplifyActive,
+                'button_style' => $amplifyActive ? 'disabled' : 'gold',
                 'button_disabled' => $amplifyActive,
                 'icon' => 'crown',
                 'current' => false,

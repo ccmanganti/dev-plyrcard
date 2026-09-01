@@ -1660,12 +1660,15 @@ class LockerRoomDataService
         $configured = (array) config('plyrcard-registration.plans', []);
         $journeyRecurring = (int) data_get($configured, 'my-journey.recurring_amount_cents', 4900);
         $amplifySetup = (int) data_get($configured, 'amplify.setup_fee_cents', 50000);
+        $amplifyRecurring = $journeyRecurring;
+        $amplifyFirstMonth = (bool) data_get($configured, 'amplify.charge_first_month_upfront', true);
+        $amplifyDue = $currentPlan === 'my-journey'
+            ? $amplifySetup
+            : $amplifySetup + ($amplifyFirstMonth ? $amplifyRecurring : 0);
 
         $money = static function (int $cents): string {
             $amount = $cents / 100;
-            return '$' . (floor($amount) === $amount
-                ? number_format($amount, 0)
-                : number_format($amount, 2));
+            return '$' . (floor($amount) === $amount ? number_format($amount, 0) : number_format($amount, 2));
         };
 
         return [
@@ -1695,15 +1698,21 @@ class LockerRoomDataService
             [
                 'key' => 'amplify',
                 'name' => 'Amplify',
-                'price' => $money($amplifySetup),
-                'suffix' => 'one time',
-                'due_today' => $money($amplifySetup) . ' one-time purchase',
+                'price' => $money($amplifyDue),
+                'suffix' => $currentPlan === 'my-journey' ? 'one time' : 'due today',
+                'due_today' => $currentPlan === 'my-journey'
+                    ? $money($amplifySetup) . ' one-time Amplify purchase'
+                    : ($money($amplifyDue) . ' due today' . ($amplifyFirstMonth
+                        ? ': ' . $money($amplifySetup) . ' setup + ' . $money($amplifyRecurring) . ' first month'
+                        : ': ' . $money($amplifySetup) . ' setup; My Journey is ' . $money($amplifyRecurring) . '/mo')),
                 'current' => false,
-                'description' => 'A one-time done-for-you setup package for active My Journey members.',
+                'description' => $currentPlan === 'my-journey'
+                    ? 'A one-time done-for-you setup package added to your active My Journey membership.'
+                    : 'Start My Journey and add the one-time Amplify done-for-you package in one checkout.',
                 'features' => ['Everything in My Journey', '4 Highlight Reels', '4 Custom Graphics', '4 Managed Coach Outreach sends', '8 Hours of Support', 'Full onboarding'],
-                'action_label' => $currentPlan === 'my-journey' ? 'Amplify My Recruiting' : 'My Journey Required',
+                'action_label' => $currentPlan === 'my-journey' ? 'Amplify My Recruiting' : 'Get Amplify',
                 'action_url' => '#',
-                'action_kind' => $currentPlan === 'my-journey' ? 'amplify_checkout' : 'my_journey_checkout',
+                'action_kind' => 'amplify_checkout',
             ],
         ];
     }

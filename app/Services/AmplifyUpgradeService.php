@@ -16,6 +16,7 @@ class AmplifyUpgradeService
     public function __construct(
         protected BillingProfileService $billingProfiles,
         protected BillingAccountService $billingAccount,
+        protected SupportAlertService $alerts,
     ) {
     }
 
@@ -84,8 +85,8 @@ class AmplifyUpgradeService
             'display_due_today' => '$' . number_format($expectedCents / 100, 2),
             'checkout_mode' => $currentPlanKey === 'my-journey' ? 'my_journey_upgrade' : 'new_amplify_enrollment',
             'message' => $currentPlanKey === 'my-journey'
-                ? 'Complete the $500 Amplify upgrade below. Your existing My Journey monthly subscription stays in place.'
-                : 'Complete Amplify enrollment below. Today includes the $500 setup fee plus the first $49 monthly payment.',
+                ? 'Complete the ' . $this->money($expectedCents) . ' Amplify upgrade below. Your existing My Journey monthly subscription stays in place.'
+                : 'Complete Amplify enrollment below. ' . $this->money($expectedCents) . ' is due today based on the currently configured setup and first-month pricing.',
         ];
     }
 
@@ -224,17 +225,23 @@ class AmplifyUpgradeService
             'payment_provider' => $row['paymentProviderType'] ?? null,
         ])->values()->all();
 
+        $fromMyJourney = ($checkout['previous_plan_key'] ?? 'free') === 'my-journey';
+        $journeyPlan = (array) config('plyrcard-registration.plans.my-journey', []);
+        $journeyRecurring = (int) ($journeyPlan['recurring_amount_cents'] ?? $plan['recurring_amount_cents'] ?? 4900);
+
         $billing->forceFill([
             'plan_key' => 'my-journey',
-            'billing_cycle' => $plan['billing_cycle'] ?? ($billing->billing_cycle ?: 'monthly'),
+            'billing_cycle' => $journeyPlan['billing_cycle'] ?? $plan['billing_cycle'] ?? ($billing->billing_cycle ?: 'monthly'),
             'currency' => strtoupper((string) ($plan['currency'] ?? $billing->currency ?? 'USD')),
-            'recurring_amount_cents' => (int) ($billing->recurring_amount_cents ?: 4900),
+            'recurring_amount_cents' => $journeyRecurring,
             'setup_fee_cents' => (int) ($plan['setup_fee_cents'] ?? 50000),
-            // Keep recurring My Journey billing intact. The $500 payment is an Amplify purchase.
-            'payment_status' => $billing->payment_status ?: 'paid',
-            'subscription_status' => $billing->subscription_status ?: 'active',
+            // A confirmed Amplify checkout is always paid. If the player came
+            // from Free, this checkout also starts My Journey, so subscription
+            // state becomes active. Existing My Journey state is preserved.
+            'payment_status' => 'paid',
+            'subscription_status' => $fromMyJourney ? ($billing->subscription_status ?: 'active') : 'active',
             'ghl_transaction_id' => $ids[0] ?? $billing->ghl_transaction_id,
-            'ghl_subscription_id' => $billing->ghl_subscription_id,
+            'ghl_subscription_id' => $fromMyJourney ? $billing->ghl_subscription_id : ($subscriptionId ?: $billing->ghl_subscription_id),
             'ghl_payment_completed_at' => now(),
             'ghl_last_event_at' => now(),
             'ghl_sync_status' => 'amplify_upgrade_payment_confirmed',
@@ -273,19 +280,20 @@ class AmplifyUpgradeService
             ]);
         }
 
-        // Upgrading from My Journey must add Amplify access without stripping
-        // the subscriber's existing My Journey role/entitlement.
-        $role = 'Amplify';
+        // Amplify is a one-time entitlement layered on top of My Journey.
+        // A Free -> Amplify enrollment therefore receives both My Journey and
+        // Amplify, while an existing My Journey member simply gains Amplify.
+        $requiredRoles = ['My Journey', 'Amplify'];
         if (method_exists($user, 'assignRole')) {
-            if (! method_exists($user, 'hasRole') || ! $user->hasRole($role)) {
-                $user->assignRole($role);
+            foreach ($requiredRoles as $role) {
+                if (! method_exists($user, 'hasRole') || ! $user->hasRole($role)) {
+                    $user->assignRole($role);
+                }
             }
             $user->refresh();
         } elseif (method_exists($user, 'syncRoles')) {
-            $existingRoles = method_exists($user, 'getRoleNames')
-                ? $user->getRoleNames()->all()
-                : [];
-            $user->syncRoles(array_values(array_unique(array_merge($existingRoles, [$role]))));
+            $existingRoles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->all() : [];
+            $user->syncRoles(array_values(array_unique(array_merge($existingRoles, $requiredRoles))));
             $user->refresh();
         }
 
@@ -299,6 +307,18 @@ class AmplifyUpgradeService
             Log::warning('Amplify upgrade completed but billing identity refresh was delayed.', [
                 'user_id' => $user->getKey(),
                 'billing_id' => $billing->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        try {
+            $this->alerts->sendUpgradeCompleted($user->fresh('roles'), 'amplify', $expectedCents, [
+                'previous_plan' => (string) ($checkout['previous_plan_key'] ?? 'free'),
+                'transaction_id' => $ids[0] ?? null,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Amplify upgrade completed but the admin alert could not be sent.', [
+                'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);
         }
@@ -362,6 +382,12 @@ class AmplifyUpgradeService
         return is_array($plan) ? $plan : [];
     }
 
+    protected function money(int $cents): string
+    {
+        $amount = $cents / 100;
+        return '$' . (floor($amount) === $amount ? number_format($amount, 0) : number_format($amount, 2));
+    }
+
     protected function expectedAmountCents(array $plan, string $currentPlanKey = 'free'): int
     {
         $setup = (int) ($plan['setup_fee_cents'] ?? 50000);
@@ -374,7 +400,8 @@ class AmplifyUpgradeService
 
         // New Amplify enrollment uses the registration survey: $500 setup plus
         // the first $49 monthly payment when first-month-upfront is enabled.
-        $recurring = (int) ($plan['recurring_amount_cents'] ?? 4900);
+        $journey = (array) config('plyrcard-registration.plans.my-journey', []);
+        $recurring = (int) ($journey['recurring_amount_cents'] ?? $plan['recurring_amount_cents'] ?? 4900);
         $firstMonth = (bool) ($plan['charge_first_month_upfront'] ?? true);
         return $setup + ($firstMonth ? $recurring : 0);
     }

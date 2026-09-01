@@ -43,7 +43,6 @@ class SupportTicketResource extends Resource
                         ->dehydrated(false),
                     TextInput::make('email')
                         ->label('Account Email')
-                        ->email()
                         ->disabled()
                         ->dehydrated(false),
                     Select::make('category')
@@ -63,16 +62,27 @@ class SupportTicketResource extends Resource
                         ->disabled()
                         ->dehydrated(false),
                     Textarea::make('message')
-                        ->label('Initial Message')
-                        ->rows(5)
+                        ->rows(8)
                         ->disabled()
                         ->dehydrated(false)
                         ->columnSpanFull(),
-                    Textarea::make('conversation_text')
-                        ->label('Client Conversation / Follow-ups')
-                        ->rows(12)
+                    Textarea::make('conversation')
+                        ->label('Client Conversation')
+                        ->rows(10)
                         ->disabled()
                         ->dehydrated(false)
+                        ->formatStateUsing(function ($state, ?SupportTicket $record): string {
+                            if (! $record) {
+                                return '';
+                            }
+
+                            $record->loadMissing('publicMessages.user');
+                            return $record->publicMessages->map(function ($message): string {
+                                $author = $message->author_type === 'admin' ? 'PLYRCARD Support' : 'Client';
+                                $time = optional($message->created_at)->format('M j, Y g:i A');
+                                return '[' . $time . '] ' . $author . "\n" . $message->message;
+                            })->implode("\n\n");
+                        })
                         ->columnSpanFull(),
                     Textarea::make('admin_notes')
                         ->label('Internal Notes')

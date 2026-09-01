@@ -46,7 +46,7 @@ class SupportTicketSettings extends Page
 
         Notification::make()
             ->title('Admin alert recipients updated')
-            ->body('Support ticket, follow-up, and downgrade alerts will use this global list.')
+            ->body('New registration, upgrade, support ticket, follow-up, and downgrade alerts will use this global list.')
             ->success()->send();
     }
 }

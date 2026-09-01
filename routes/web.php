@@ -13,15 +13,73 @@ use App\Http\Controllers\PublicWebsiteController;
 use App\Http\Controllers\WebsiteEditorController;
 use App\Http\Controllers\WebsiteOwnerAccessController;
 use App\Models\Website;
+use App\Models\User;
+use App\Models\BillingInformation;
+use App\Services\SupportAlertService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\RecruitingProfileViewTrackingController;
 use App\Http\Controllers\Admin\ExternalTrackingUrlGeneratorController;
 use App\Http\Controllers\ExternalSocialTrackingController;
 use App\Http\Controllers\LockerRoomPasswordResetController;
 use App\Http\Middleware\SendPlayerActivityEmail;
+
+/*
+ * Admin registration alert.
+ *
+ * RegistrationController creates the User and BillingInformation in one DB
+ * transaction. Waiting until commit lets us identify true player registrations
+ * from registration_meta without changing the registration controller itself.
+ */
+User::created(function (User $user): void {
+    DB::afterCommit(function () use ($user): void {
+        try {
+            $billing = BillingInformation::query()
+                ->where('user_id', $user->getKey())
+                ->latest('id')
+                ->first();
+
+            if (! $billing) {
+                return;
+            }
+
+            $meta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
+
+            // Native player registration writes source_utm_plan. This prevents
+            // manual/admin-created users from producing a "new player" alert.
+            if (! array_key_exists('source_utm_plan', $meta)) {
+                return;
+            }
+
+            if (filled(data_get($meta, 'admin_registration_alert.attempted_at'))) {
+                return;
+            }
+
+            $result = app(SupportAlertService::class)->sendNewRegistration(
+                $user->fresh('roles'),
+                $billing,
+            );
+
+            $meta['admin_registration_alert'] = [
+                'attempted_at' => now()->toIso8601String(),
+                'sent' => (bool) ($result['success'] ?? false),
+                'recipients' => $result['recipients'] ?? [],
+                'error' => $result['error'] ?? null,
+            ];
+
+            $billing->forceFill(['registration_meta' => $meta])->save();
+        } catch (\Throwable $exception) {
+            Log::warning('New player registration was saved but the admin alert could not be processed.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    });
+});
 
 /*
  * Load this file from routes/web.php before any catch-all /{slug} route:

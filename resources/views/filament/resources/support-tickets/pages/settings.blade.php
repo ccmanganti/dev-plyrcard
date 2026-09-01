@@ -7,7 +7,7 @@
             <div class="pc-support-system-settings-copy-v87">
                 <span class="pc-support-system-settings-kicker-v87">Global system setting</span>
                 <h2>Admin alert recipients</h2>
-                <p>Manage the internal email list used across PLYRCARD for new support tickets, ticket follow-ups, and downgrade requests.</p>
+                <p>Manage the internal email list used across PLYRCARD for new player registrations, completed upgrades, support tickets, ticket follow-ups, and downgrade requests.</p>
             </div>
             <form wire:submit="save" class="pc-support-system-settings-form-v87">
                 <label>

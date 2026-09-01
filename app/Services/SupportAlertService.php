@@ -119,6 +119,147 @@ class SupportAlertService
         ]);
     }
 
+
+    public function sendNewRegistration(User $user, ?\App\Models\BillingInformation $billing = null): array
+    {
+        $user->loadMissing('roles');
+        $billing ??= \App\Models\BillingInformation::query()->where('user_id', $user->getKey())->latest('id')->first();
+        $name = trim(collect([$user->first_name, $user->last_name])->filter()->implode(' ')) ?: ($user->email ?: 'PLYRCARD player');
+        $email = $this->sanitizeEmail((string) $user->email);
+        $planKey = (string) ($billing?->plan_key ?: 'free');
+        $planLabel = (string) config('plyrcard-registration.plans.' . $planKey . '.label', ucwords(str_replace('-', ' ', $planKey)));
+        $roles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->implode(', ') : '';
+
+        $html = $this->layout(
+            heading: 'New player registered',
+            intro: 'A new player has created a PLYRCARD account.',
+            rows: [
+                'Player' => $name,
+                'Email' => $email ?: 'Not available',
+                'Selected plan' => $planLabel,
+                'Current role(s)' => $roles !== '' ? $roles : 'Not assigned yet',
+                'Payment status' => (string) ($billing?->payment_status ?: 'Not available'),
+                'User ID' => (string) $user->getKey(),
+                'Registered' => optional($user->created_at)->format('M j, Y g:i A') ?: now()->format('M j, Y g:i A'),
+            ],
+            message: 'Review the new player account and any pending onboarding or billing steps.',
+            actionLabel: 'Open User Management',
+            actionUrl: rtrim((string) config('app.url'), '/') . '/admin/users/users',
+        );
+
+        return $this->sendToAdmins(
+            '[PLYRCARD New Player] ' . $name . ' - ' . $planLabel,
+            $html,
+            $email,
+            'new_player_registration',
+            ['user_id' => $user->getKey(), 'plan_key' => $planKey],
+        );
+    }
+
+    public function sendUpgradeCompleted(User $user, string $upgrade, int $amountCents, array $context = []): array
+    {
+        $user->loadMissing('roles');
+        $name = trim(collect([$user->first_name, $user->last_name])->filter()->implode(' ')) ?: ($user->email ?: 'PLYRCARD player');
+        $email = $this->sanitizeEmail((string) $user->email);
+        $roles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->implode(', ') : '';
+        $label = $upgrade === 'amplify' ? 'Amplify' : 'My Journey';
+
+        $rows = [
+            'Player' => $name,
+            'Email' => $email ?: 'Not available',
+            'Upgrade' => $label,
+            'Amount detected' => '$' . number_format($amountCents / 100, 2),
+            'Current role(s)' => $roles !== '' ? $roles : 'Not available',
+            'User ID' => (string) $user->getKey(),
+            'Confirmed' => now()->format('M j, Y g:i A'),
+        ];
+        if (filled($context['previous_plan'] ?? null)) {
+            $rows['Previous plan'] = ucwords(str_replace('-', ' ', (string) $context['previous_plan']));
+        }
+        if (filled($context['transaction_id'] ?? null)) {
+            $rows['Transaction ID'] = (string) $context['transaction_id'];
+        }
+
+        $html = $this->layout(
+            heading: 'Player upgrade confirmed',
+            intro: 'A PLYRCARD player completed an upgrade and payment was detected successfully.',
+            rows: $rows,
+            message: $label === 'Amplify'
+                ? 'Amplify is a one-time service entitlement layered on top of My Journey. Review any onboarding or fulfillment work that now needs to begin.'
+                : 'My Journey is now active for this player. Review any onboarding or account setup work that needs attention.',
+            actionLabel: 'Open User Management',
+            actionUrl: rtrim((string) config('app.url'), '/') . '/admin/users/users',
+        );
+
+        return $this->sendToAdmins(
+            '[PLYRCARD Upgrade] ' . $name . ' - ' . $label,
+            $html,
+            $email,
+            'player_upgrade',
+            ['user_id' => $user->getKey(), 'upgrade' => $upgrade],
+        );
+    }
+
+    public function sendSupportReply(SupportTicket $ticket, string $reply): array
+    {
+        $recipient = $this->sanitizeEmail((string) $ticket->email);
+        $sender = $this->sanitizeEmail(PlyrcardMailSender::email());
+        if (! $recipient || ! $sender) {
+            return ['success' => false, 'error' => 'The ticket does not have a deliverable email address.'];
+        }
+
+        $html = $this->layout(
+            heading: 'PLYRCARD Support replied',
+            intro: 'Our support team replied to your request.',
+            rows: [
+                'Ticket' => $ticket->ticket_number,
+                'Concern' => $ticket->categoryLabel(),
+                'Status' => $ticket->statusLabel(),
+                'Updated' => now()->format('M j, Y g:i A'),
+            ],
+            message: $reply,
+            actionLabel: 'Open PLYRCARD',
+            actionUrl: rtrim((string) config('app.url'), '/') . '/admin/coach-database/support',
+        );
+
+        $subject = $this->sanitizeHeader('[PLYRCARD Support ' . $ticket->ticket_number . '] Reply from support');
+        $boundary = 'plyrcard_reply_' . bin2hex(random_bytes(12));
+        $headers = [
+            'MIME-Version: 1.0',
+            'From: ' . PlyrcardMailSender::name() . ' <' . $sender . '>',
+            'Reply-To: ' . $sender,
+            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+            'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
+        ];
+        $message = '--' . $boundary . "\r\n"
+            . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
+            . $this->plainText($html) . "\r\n"
+            . '--' . $boundary . "\r\n"
+            . "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
+            . $html . "\r\n"
+            . '--' . $boundary . '--';
+
+        $ok = false;
+        try {
+            $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers), '-f' . $sender);
+            if (! $ok) {
+                $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers));
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('PLYRCARD support reply email threw an exception.', [
+                'ticket_id' => $ticket->getKey(),
+                'recipient' => $recipient,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return [
+            'success' => $ok,
+            'recipient' => $recipient,
+            'error' => $ok ? null : 'The hosting mail server did not accept the support reply email.',
+        ];
+    }
+
     public function adminRecipients(): array
     {
         $configured = [];
