@@ -97,7 +97,7 @@ class LockerRoomDataService
             'settings' => $this->settingsPayload($user, $website, $isPremium),
             'billing' => $this->billingPayload($billing, $user, $latestPaymentTransaction),
             'website' => $this->websitePayload($website),
-            'plans' => $this->plans($planKey),
+            'plans' => $this->plans($planKey, $user),
             'integrations' => [
                 'support_form_url' => 'https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K',
                 'book_call_url' => 'https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l',
@@ -1655,7 +1655,7 @@ class LockerRoomDataService
         ];
     }
 
-    protected function plans(string $currentPlan): array
+    protected function plans(string $currentPlan, User $user): array
     {
         $configured = (array) config('plyrcard-registration.plans', []);
         $journeyRecurring = (int) data_get($configured, 'my-journey.recurring_amount_cents', 4900);
@@ -1665,6 +1665,7 @@ class LockerRoomDataService
         $amplifyDue = $currentPlan === 'my-journey'
             ? $amplifySetup
             : $amplifySetup + ($amplifyFirstMonth ? $amplifyRecurring : 0);
+        $amplifyActive = $this->hasRole($user, 'Amplify');
 
         $money = static function (int $cents): string {
             $amount = $cents / 100;
@@ -1713,6 +1714,8 @@ class LockerRoomDataService
                 'action_label' => $currentPlan === 'my-journey' ? 'Amplify My Recruiting' : 'Get Amplify',
                 'action_url' => '#',
                 'action_kind' => 'amplify_checkout',
+                'active_addon' => $amplifyActive,
+                'button_disabled' => $amplifyActive,
             ],
         ];
     }

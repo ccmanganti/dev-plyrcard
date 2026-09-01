@@ -49,6 +49,18 @@
         ? route('support.tickets.store')
         : null;
     $lrSupportTicketFollowupBaseUrl = $lrLoggedIn ? url('/support/tickets') : null;
+    $lrMyJourneyStartUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.my-journey.start')
+        ? route('billing.my-journey.start')
+        : null;
+    $lrMyJourneyStatusUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.my-journey.status')
+        ? route('billing.my-journey.status')
+        : null;
+    $lrAmplifyStartUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.amplify.start')
+        ? route('billing.amplify.start')
+        : null;
+    $lrAmplifyStatusUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.amplify.status')
+        ? route('billing.amplify.status')
+        : null;
     $lrLoginUrl = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
         ? route('plyrcard.drawer-login')
         : url('/admin/login');
@@ -236,6 +248,26 @@
     .lr-choice { border:1px solid #e5e7eb; border-radius:12px; background:#fff; padding:12px; cursor:pointer; text-align:left; }
     .lr-choice.is-active { border-color:#ff9d80; background:#fff5f1; }
     .lr-plan-grid { display:grid; gap:11px; }
+    .lr-checkout-shell { display:grid; gap:14px; }
+    .lr-checkout-card { overflow:hidden; border:1px solid #e5e7eb; background:#fff; border-radius:18px; box-shadow:0 8px 24px rgba(15,23,42,.045); }
+    .lr-checkout-intro { padding:18px 18px 14px; border-bottom:1px solid #eaecf0; }
+    .lr-checkout-intro h3 { margin:6px 0 0; font:700 28px/1 Antonio,Inter,sans-serif; color:#101828; }
+    .lr-checkout-intro p { margin:7px 0 0; color:#667085; font-size:12px; line-height:1.5; }
+    .lr-checkout-state { min-height:380px; display:grid; place-items:center; padding:32px 18px; text-align:center; }
+    .lr-checkout-state[hidden], .lr-checkout-frame[hidden] { display:none !important; }
+    .lr-checkout-state-inner { max-width:420px; }
+    .lr-checkout-state strong { display:block; font-size:16px; color:#101828; }
+    .lr-checkout-state span { display:block; margin-top:6px; color:#667085; font-size:12px; line-height:1.5; }
+    .lr-checkout-spinner { width:38px; height:38px; margin:0 auto 15px; border-radius:50%; border:4px solid #fee4dc; border-top-color:#ff5c35; animation:lrCheckoutSpin .8s linear infinite; }
+    .lr-checkout-success-icon { width:50px; height:50px; margin:0 auto 14px; border-radius:50%; display:grid; place-items:center; background:#dcfae6; color:#067647; font-size:23px; font-weight:900; }
+    .lr-checkout-state.is-success strong { color:#067647; }
+    .lr-checkout-state.is-error strong { color:#b42318; }
+    .lr-checkout-frame { display:block; width:100%; min-height:720px; border:0; background:#fff; }
+    .lr-checkout-foot { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:11px 15px; border-top:1px solid #eaecf0; color:#667085; font-size:11px; }
+    .lr-checkout-foot strong { color:#344054; white-space:nowrap; }
+    .lr-active-pill { display:inline-flex; align-items:center; gap:5px; padding:5px 9px; border-radius:999px; background:#dcfae6; color:#067647; border:1px solid #abefc6; font-size:10px; font-weight:900; letter-spacing:.04em; text-transform:uppercase; }
+    .lr-btn.lr-btn-amplify-active { background:#ff5c35; color:#fff; border-color:#ff5c35; opacity:.58; cursor:not-allowed; pointer-events:none; }
+    @keyframes lrCheckoutSpin { to { transform:rotate(360deg); } }
     .lr-plan-card { border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:16px; position:relative; }
     .lr-plan-card.is-current { border-color:#ffc1ae; box-shadow:0 0 0 2px rgba(255,92,53,.07); }
     .lr-plan-name { font:700 21px/1 Antonio, sans-serif; text-transform:uppercase; }
@@ -589,6 +621,10 @@
      data-support-tickets-url="{{ $lrSupportTicketsUrl }}"
      data-support-ticket-store-url="{{ $lrSupportTicketStoreUrl }}"
      data-support-ticket-followup-base-url="{{ $lrSupportTicketFollowupBaseUrl }}"
+     data-my-journey-start-url="{{ $lrMyJourneyStartUrl }}"
+     data-my-journey-status-url="{{ $lrMyJourneyStatusUrl }}"
+     data-amplify-start-url="{{ $lrAmplifyStartUrl }}"
+     data-amplify-status-url="{{ $lrAmplifyStatusUrl }}"
      data-login-url="{{ $lrLoginUrl }}"
      data-password-reset-url="{{ $lrPasswordResetUrl }}"
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
@@ -792,6 +828,29 @@
 
                 <section class="lr-view" data-lr-view="upgrade"><div class="lr-section"><div class="lr-hero"><span class="lr-eyebrow">Plans</span><h3>Build Your Recruiting Reach</h3><p class="lr-muted">Choose the level of support that fits where you are right now.</p></div><div class="lr-plan-grid" data-lr-plans></div></div></section>
 
+                <section class="lr-view" data-lr-view="checkout">
+                    <div class="lr-checkout-shell">
+                        <div class="lr-checkout-card">
+                            <div class="lr-checkout-intro">
+                                <span class="lr-eyebrow" data-lr-checkout-eyebrow>Secure Checkout</span>
+                                <h3 data-lr-checkout-heading>Complete your upgrade</h3>
+                                <p data-lr-checkout-copy>Your PLYRCARD billing profile will update automatically after payment is confirmed.</p>
+                            </div>
+                            <div class="lr-checkout-state" data-lr-checkout-loading>
+                                <div class="lr-checkout-state-inner"><div class="lr-checkout-spinner"></div><strong>Preparing secure checkout</strong><span>Connecting this purchase to your existing PLYRCARD account…</span></div>
+                            </div>
+                            <div class="lr-checkout-state is-success" data-lr-checkout-success hidden>
+                                <div class="lr-checkout-state-inner"><div class="lr-checkout-success-icon">✓</div><strong data-lr-checkout-success-title>Upgrade complete</strong><span data-lr-checkout-success-copy>Your payment was confirmed and your account has been updated.</span><div class="lr-actions" style="justify-content:center;margin-top:16px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-checkout-done>Back to Plans</button></div></div>
+                            </div>
+                            <div class="lr-checkout-state is-error" data-lr-checkout-error hidden>
+                                <div class="lr-checkout-state-inner"><strong>Checkout could not be prepared</strong><span data-lr-checkout-error-copy>Please try again.</span><div class="lr-actions" style="justify-content:center;margin-top:16px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-checkout-retry>Try Again</button></div></div>
+                            </div>
+                            <iframe class="lr-checkout-frame" data-lr-checkout-frame src="about:blank" scrolling="no" title="Secure checkout" data-cookie-consent="true" data-cookie-consent-provider="auto" hidden></iframe>
+                            <div class="lr-checkout-foot"><span data-lr-checkout-status>Payment confirmation is checked automatically.</span><strong>Secure checkout</strong></div>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="lr-view" data-lr-view="share"><div class="lr-section"><div class="lr-card" data-lr-share-card></div></div></section>
 
                 <section class="lr-view" data-lr-view="services">
@@ -965,6 +1024,10 @@
     let dashboardEngagementFilter = '';
     let supportTicketState = {categories:{}, statuses:{}, tickets:[]};
     let supportTicketsLoaded = false;
+    let lockerCheckoutType = null;
+    let lockerCheckoutTimer = null;
+    let lockerCheckoutStartedAt = 0;
+    let lockerCheckoutStarting = false;
     const dashboardMetricCache = new Map();
     const dashboardMetricPromises = new Map();
     const profileOptionCache = new Map();
@@ -975,8 +1038,8 @@
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 
-    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
-    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
+    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Secure Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
+    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
 
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
@@ -1024,7 +1087,7 @@
         dashboardActivityLoading = false;
     }
 
-    function closeDrawer() { closeDashboardActivity(); drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
+    function closeDrawer() { stopLockerCheckoutPolling(); closeDashboardActivity(); drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
 
     function isFree() { return state?.plan?.is_free === true; }
     function requiresPremium(view) { return ['dashboard','schedule'].includes(view); }
@@ -1047,7 +1110,7 @@
         if (view === 'book-call') ensureBookEmbed();
         render();
     }
-    function goBack() { const target = history.pop() || (authenticated ? 'home' : 'guest-home'); setView(target, false); }
+    function goBack() { if (currentView === 'checkout') stopLockerCheckoutPolling(); const target = history.pop() || (authenticated ? 'home' : 'guest-home'); setView(target, false); }
 
     async function request(url, options = {}) {
         const headers = Object.assign({'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrf()}, options.headers || {});
@@ -1560,20 +1623,132 @@
         qa('[data-lr-article]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.lrArticle === article));
     }
 
+    function stopLockerCheckoutPolling() {
+        if (lockerCheckoutTimer) clearTimeout(lockerCheckoutTimer);
+        lockerCheckoutTimer = null;
+    }
+
+    function showLockerCheckoutPart(part) {
+        const loading = q('[data-lr-checkout-loading]');
+        const success = q('[data-lr-checkout-success]');
+        const error = q('[data-lr-checkout-error]');
+        const frame = q('[data-lr-checkout-frame]');
+        [loading, success, error, frame].forEach(el => { if (el) el.hidden = el !== part; });
+    }
+
+    function lockerCheckoutUrls(type) {
+        if (type === 'amplify') {
+            return {start: drawer.dataset.amplifyStartUrl || '', status: drawer.dataset.amplifyStatusUrl || ''};
+        }
+        return {start: drawer.dataset.myJourneyStartUrl || '', status: drawer.dataset.myJourneyStatusUrl || ''};
+    }
+
+    function configureLockerCheckout(type) {
+        const isAmplify = type === 'amplify';
+        const plan = (state.plans || []).find(row => row.key === (isAmplify ? 'amplify' : 'my-journey')) || {};
+        q('[data-lr-checkout-eyebrow]').textContent = isAmplify ? 'Amplify' : 'My Journey';
+        q('[data-lr-checkout-heading]').textContent = isAmplify ? 'Upgrade to Amplify' : 'Upgrade to My Journey';
+        q('[data-lr-checkout-copy]').textContent = isAmplify
+            ? `Complete the ${plan.due_today || plan.price || ''} checkout below. Your Amplify entitlement will update automatically after payment is confirmed.`
+            : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`;
+        q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify is active' : 'My Journey is active';
+        q('[data-lr-checkout-success-copy]').textContent = isAmplify
+            ? 'Your purchase was confirmed. Amplify is now active on your PLYRCARD account.'
+            : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.';
+    }
+
+    async function pollLockerCheckout() {
+        if (currentView !== 'checkout' || !lockerCheckoutType) return;
+        if (Date.now() - lockerCheckoutStartedAt > 12 * 60 * 1000) {
+            q('[data-lr-checkout-status]').textContent = 'Checkout is still open. Complete payment to finish the upgrade.';
+            return;
+        }
+        const urls = lockerCheckoutUrls(lockerCheckoutType);
+        try {
+            const data = await request(urls.status);
+            if (data.completed) {
+                stopLockerCheckoutPolling();
+                showLockerCheckoutPart(q('[data-lr-checkout-success]'));
+                q('[data-lr-checkout-status]').textContent = 'Payment confirmed. Updating your Locker Room…';
+                await refreshData();
+                render();
+                showLockerCheckoutPart(q('[data-lr-checkout-success]'));
+                return;
+            }
+            q('[data-lr-checkout-status]').textContent = data.message || 'Waiting for payment confirmation…';
+        } catch (_) {
+            q('[data-lr-checkout-status]').textContent = 'Still checking payment confirmation…';
+        }
+        lockerCheckoutTimer = setTimeout(pollLockerCheckout, 2500);
+    }
+
+    async function openLockerCheckout(type) {
+        if (lockerCheckoutStarting) return;
+        lockerCheckoutType = type === 'amplify' ? 'amplify' : 'my-journey';
+        configureLockerCheckout(lockerCheckoutType);
+        stopLockerCheckoutPolling();
+        setView('checkout', true);
+        showLockerCheckoutPart(q('[data-lr-checkout-loading]'));
+        q('[data-lr-checkout-status]').textContent = 'Preparing secure checkout…';
+        lockerCheckoutStarting = true;
+        try {
+            const urls = lockerCheckoutUrls(lockerCheckoutType);
+            if (!urls.start || !urls.status) throw new Error('Secure checkout is not available right now.');
+            const data = await request(urls.start, {method:'POST', body:{}});
+            if (data.completed) {
+                await refreshData();
+                render();
+                showLockerCheckoutPart(q('[data-lr-checkout-success]'));
+                q('[data-lr-checkout-status]').textContent = data.message || 'Your upgrade is already active.';
+                return;
+            }
+            if (!data.checkout_url) throw new Error(data.message || 'Secure checkout is unavailable.');
+            const frame = q('[data-lr-checkout-frame]');
+            try {
+                const checkoutUrl = new URL(data.checkout_url, window.location.origin);
+                const pathParts = checkoutUrl.pathname.split('/').filter(Boolean);
+                const surveyId = pathParts[pathParts.length - 1] || '';
+                if (surveyId) frame.id = surveyId;
+            } catch (_) {}
+            frame.src = data.checkout_url;
+            showLockerCheckoutPart(frame);
+            lockerCheckoutStartedAt = Date.now();
+            q('[data-lr-checkout-status]').textContent = data.message || 'Complete checkout below to continue.';
+            lockerCheckoutTimer = setTimeout(pollLockerCheckout, 1800);
+        } catch (error) {
+            showLockerCheckoutPart(q('[data-lr-checkout-error]'));
+            q('[data-lr-checkout-error-copy]').textContent = error?.message || 'Please try again.';
+            q('[data-lr-checkout-status]').textContent = 'Checkout was not started.';
+        } finally {
+            lockerCheckoutStarting = false;
+        }
+    }
+
     function renderPlans() {
         const box = q('[data-lr-plans]'); if (!box) return;
+        const amplifyActive = state?.plan?.amplify_active === true;
         box.innerHTML = (state.plans || []).map(plan => {
+            const isAmplify = plan.key === 'amplify';
+            const isAmplifyActive = isAmplify && (plan.active_addon === true || amplifyActive);
             let action = '';
-            if (!plan.current) {
+
+            if (isAmplifyActive) {
+                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary lr-btn-amplify-active" type="button" disabled aria-disabled="true">${esc(plan.action_label || 'Amplify My Recruiting')}</button></div>`;
+            } else if (!plan.current) {
                 if (plan.action_kind === 'my_journey_checkout' || plan.key === 'my-journey') {
-                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-plyrcard-my-journey-open>${esc(plan.action_label || 'Get My Journey')}</button></div>`;
+                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="my-journey">${esc(plan.action_label || 'Get My Journey')}</button></div>`;
                 } else if (plan.action_kind === 'amplify_checkout' || plan.key === 'amplify') {
-                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-plyrcard-amplify-open>${esc(plan.action_label || 'Upgrade to Amplify')}</button></div>`;
+                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="amplify">${esc(plan.action_label || 'Upgrade to Amplify')}</button></div>`;
                 } else if (plan.action_url && plan.action_url !== '#') {
                     action = `<div class="lr-actions"><a class="lr-btn lr-btn-primary" href="${esc(plan.action_url)}">${esc(plan.action_label || 'Choose Plan')}</a></div>`;
                 }
             }
-            return `<article class="lr-plan-card ${plan.current?'is-current':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${plan.current?'<span class="lr-chip">Current Plan</span>':''}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
+
+            const statusPill = isAmplifyActive
+                ? '<span class="lr-active-pill"><i class="fa-solid fa-check"></i> Active</span>'
+                : (plan.current ? '<span class="lr-chip">Current Plan</span>' : '');
+
+            return `<article class="lr-plan-card ${plan.current?'is-current':''} ${isAmplifyActive?'is-amplify-active':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${statusPill}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
         }).join('');
     }
 
@@ -1821,6 +1996,17 @@
     if(menuButton && mobileNav && menuButton.dataset.lrBound!=='1') { menuButton.dataset.lrBound='1'; menuButton.addEventListener('click',()=>{const open=mobileNav.classList.toggle('open');menuButton.setAttribute('aria-expanded',open?'true':'false');}); }
     const header=document.getElementById('site-header'); if(header && header.dataset.lrScrollBound!=='1'){header.dataset.lrScrollBound='1'; const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>14); onScroll(); window.addEventListener('scroll',onScroll,{passive:true});}
 
+    document.addEventListener('click', event => {
+        const checkoutButton = event.target.closest('[data-lr-plan-checkout]');
+        if (checkoutButton && drawer.contains(checkoutButton)) {
+            event.preventDefault();
+            openLockerCheckout(checkoutButton.dataset.lrPlanCheckout);
+            return;
+        }
+        if (event.target.closest('[data-lr-checkout-retry]')) { openLockerCheckout(lockerCheckoutType || 'my-journey'); return; }
+        if (event.target.closest('[data-lr-checkout-done]')) { stopLockerCheckoutPolling(); setView('upgrade', false); return; }
+    });
+
     window.addEventListener('plyrcard:my-journey-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('My Journey is active.'); });
     window.addEventListener('plyrcard:amplify-upgraded', () => { refreshData(); setView('upgrade', false); showToast('Amplify is active.'); });
     if (forcePassword) setView('password', false);
@@ -1829,5 +2015,4 @@
 </script>
 @endif
 
-@include('partials.my-journey-upgrade-modal')
-@include('partials.amplify-upgrade-modal')
+<script src="https://systems.plyrcard.com/js/form_embed.js" defer></script>
