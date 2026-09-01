@@ -48,15 +48,40 @@ class EditSupportTicket extends EditRecord
                     $ticket->metadata = $metadata;
                     $ticket->save();
 
-                    $result = app(SupportAlertService::class)->sendSupportReply($ticket->fresh(), $reply);
+                    $result = app(SupportAlertService::class)->sendSupportReply($ticket->fresh('user'), $reply);
+
+                    // Keep an audit trail of whether the player notification was delivered.
+                    $ticket->refresh();
+                    $metadata = is_array($ticket->metadata) ? $ticket->metadata : [];
+                    $metadata['last_admin_reply_notification'] = [
+                        'sent_at' => now()->toIso8601String(),
+                        'success' => (bool) ($result['success'] ?? false),
+                        'recipients' => array_values((array) ($result['sent_recipients'] ?? ($result['recipient'] ?? []))),
+                        'failed_recipients' => array_values((array) ($result['failed_recipients'] ?? [])),
+                        'error' => $result['error'] ?? null,
+                    ];
+                    $ticket->metadata = $metadata;
+                    $ticket->save();
 
                     if ($result['success'] ?? false) {
-                        Notification::make()->title('Reply sent')->body('The reply was added to the ticket and emailed to the client.')->success()->send();
+                        $recipientLabel = collect((array) ($result['sent_recipients'] ?? []))->filter()->implode(', ');
+                        Notification::make()
+                            ->title('Reply sent to player')
+                            ->body($recipientLabel !== ''
+                                ? 'The reply was saved and emailed to ' . $recipientLabel . '.'
+                                : 'The reply was saved and the player notification was sent.')
+                            ->success()
+                            ->send();
                     } else {
-                        Notification::make()->title('Reply saved, email not sent')->body((string) ($result['error'] ?? 'The client email could not be sent.'))->warning()->send();
+                        Notification::make()
+                            ->title('Reply saved, notification not sent')
+                            ->body((string) ($result['error'] ?? 'The player email could not be sent.'))
+                            ->warning()
+                            ->send();
                     }
 
-                    $this->refreshFormData(['conversation_text', 'status', 'metadata']);
+                    $this->record = $ticket->fresh();
+                    $this->refreshFormData(['conversation', 'status']);
                 }),
             DeleteAction::make(),
         ];

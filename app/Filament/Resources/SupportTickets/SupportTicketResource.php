@@ -67,8 +67,8 @@ class SupportTicketResource extends Resource
                         ->dehydrated(false)
                         ->columnSpanFull(),
                     Textarea::make('conversation')
-                        ->label('Client Conversation')
-                        ->rows(10)
+                        ->label('Conversation')
+                        ->rows(12)
                         ->disabled()
                         ->dehydrated(false)
                         ->formatStateUsing(function ($state, ?SupportTicket $record): string {
@@ -76,12 +76,10 @@ class SupportTicketResource extends Resource
                                 return '';
                             }
 
-                            $record->loadMissing('publicMessages.user');
-                            return $record->publicMessages->map(function ($message): string {
-                                $author = $message->author_type === 'admin' ? 'PLYRCARD Support' : 'Client';
-                                $time = optional($message->created_at)->format('M j, Y g:i A');
-                                return '[' . $time . '] ' . $author . "\n" . $message->message;
-                            })->implode("\n\n");
+                            // Support replies live directly in support_tickets.conversation JSON.
+                            // Do not load a messages relationship: this project intentionally uses
+                            // the single-table ticket architecture.
+                            return (string) $record->conversation_text;
                         })
                         ->columnSpanFull(),
                     Textarea::make('admin_notes')

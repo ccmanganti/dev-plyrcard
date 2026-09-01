@@ -202,15 +202,46 @@ class SupportAlertService
 
     public function sendSupportReply(SupportTicket $ticket, string $reply): array
     {
-        $recipient = $this->sanitizeEmail((string) $ticket->email);
+        $ticket->loadMissing('user');
+
+        // Notify the actual player account. The stored ticket email remains first
+        // priority because it is captured when the ticket is created, while the
+        // current account emails provide a safe fallback if the user later updates
+        // their profile.
+        $recipients = collect([
+            $ticket->email,
+            $ticket->user?->email,
+            $ticket->user?->personal_email,
+        ])
+            ->map(fn ($email) => $this->sanitizeEmail((string) $email))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
         $sender = $this->sanitizeEmail(PlyrcardMailSender::email());
-        if (! $recipient || ! $sender) {
-            return ['success' => false, 'error' => 'The ticket does not have a deliverable email address.'];
+
+        if ($recipients === []) {
+            return [
+                'success' => false,
+                'sent_recipients' => [],
+                'failed_recipients' => [],
+                'error' => 'The ticket does not have a deliverable player email address.',
+            ];
+        }
+
+        if (! $sender || ! function_exists('mail') || ! is_callable('mail')) {
+            return [
+                'success' => false,
+                'sent_recipients' => [],
+                'failed_recipients' => $recipients,
+                'error' => 'The server mail transport is unavailable.',
+            ];
         }
 
         $html = $this->layout(
             heading: 'PLYRCARD Support replied',
-            intro: 'Our support team replied to your request.',
+            intro: 'Our support team replied to your request. The same reply is also available in your Support ticket history.',
             rows: [
                 'Ticket' => $ticket->ticket_number,
                 'Concern' => $ticket->categoryLabel(),
@@ -218,45 +249,67 @@ class SupportAlertService
                 'Updated' => now()->format('M j, Y g:i A'),
             ],
             message: $reply,
-            actionLabel: 'Open PLYRCARD',
+            actionLabel: 'View Support Ticket',
             actionUrl: rtrim((string) config('app.url'), '/') . '/admin/coach-database/support',
         );
 
         $subject = $this->sanitizeHeader('[PLYRCARD Support ' . $ticket->ticket_number . '] Reply from support');
-        $boundary = 'plyrcard_reply_' . bin2hex(random_bytes(12));
-        $headers = [
-            'MIME-Version: 1.0',
-            'From: ' . PlyrcardMailSender::name() . ' <' . $sender . '>',
-            'Reply-To: ' . $sender,
-            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-            'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
-        ];
-        $message = '--' . $boundary . "\r\n"
-            . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
-            . $this->plainText($html) . "\r\n"
-            . '--' . $boundary . "\r\n"
-            . "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
-            . $html . "\r\n"
-            . '--' . $boundary . '--';
+        $plain = $this->plainText($html);
+        $sent = [];
+        $failed = [];
 
-        $ok = false;
-        try {
-            $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers), '-f' . $sender);
-            if (! $ok) {
-                $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers));
+        foreach ($recipients as $recipient) {
+            $boundary = 'plyrcard_reply_' . bin2hex(random_bytes(12));
+            $headers = [
+                'MIME-Version: 1.0',
+                'From: ' . PlyrcardMailSender::name() . ' <' . $sender . '>',
+                'Reply-To: ' . $sender,
+                'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
+                'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
+            ];
+            $message = '--' . $boundary . "\r\n"
+                . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
+                . $plain . "\r\n"
+                . '--' . $boundary . "\r\n"
+                . "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
+                . $html . "\r\n"
+                . '--' . $boundary . '--';
+
+            $ok = false;
+            try {
+                $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers), '-f' . $sender);
+                if (! $ok) {
+                    $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers));
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('PLYRCARD support reply email threw an exception.', [
+                    'ticket_id' => $ticket->getKey(),
+                    'recipient' => $recipient,
+                    'error' => $exception->getMessage(),
+                ]);
             }
-        } catch (\Throwable $exception) {
-            Log::warning('PLYRCARD support reply email threw an exception.', [
+
+            if ($ok) {
+                $sent[] = $recipient;
+            } else {
+                $failed[] = $recipient;
+            }
+        }
+
+        if ($failed !== []) {
+            Log::warning('PLYRCARD support reply notification was not accepted for all player recipients.', [
                 'ticket_id' => $ticket->getKey(),
-                'recipient' => $recipient,
-                'error' => $exception->getMessage(),
+                'failed_recipients' => $failed,
+                'sent_recipients' => $sent,
             ]);
         }
 
         return [
-            'success' => $ok,
-            'recipient' => $recipient,
-            'error' => $ok ? null : 'The hosting mail server did not accept the support reply email.',
+            'success' => $sent !== [],
+            'sent' => count($sent),
+            'sent_recipients' => $sent,
+            'failed_recipients' => $failed,
+            'error' => $sent === [] ? 'The hosting mail server did not accept the player notification email.' : null,
         ];
     }
 
