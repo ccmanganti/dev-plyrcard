@@ -71,7 +71,11 @@
         ? route('locker-room.password.update')
         : null;
     $lrMustChangePassword = $lrLoggedIn && $lrUser && (bool) (($lrUser->must_change_password ?? false) || session('plyrcard_show_password_overlay'));
-    $lrLogoutUrl = url('/admin/logout');
+    // v10.95: logout on the current player/custom domain instead of posting to /admin/logout.
+    // Using a relative route keeps custom-domain owner sessions on the correct host.
+    $lrLogoutUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.logout')
+        ? route('locker-room.logout', [], false)
+        : url('/admin/logout');
     $lrSupportEmail = 'support@plyrcard.com';
     $lrSupportPhone = '+15718880852';
     $lrFacebookUrl = 'https://www.facebook.com/plyrcard';
@@ -684,7 +688,7 @@
                             <button class="lr-menu-card" type="button" data-lr-nav="refer"><span class="lr-menu-icon"><i class="fa-solid fa-user-plus"></i></span><span class="lr-menu-copy"><strong>Refer a Friend</strong><small>Invite an athlete by email</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="support"><span class="lr-menu-icon"><i class="fa-solid fa-headset"></i></span><span class="lr-menu-copy"><strong>Support</strong><small>Send a support request</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="book-call"><span class="lr-menu-icon"><i class="fa-solid fa-calendar-check"></i></span><span class="lr-menu-copy"><strong>Book a Call</strong><small>Schedule time with our team</small></span></button>
-                            <form method="POST" action="{{ $lrLogoutUrl }}" style="display:contents;">@csrf<button class="lr-menu-card" type="submit"><span class="lr-menu-icon"><i class="fa-solid fa-right-from-bracket"></i></span><span class="lr-menu-copy"><strong>Sign Out</strong><small>Securely end this session</small></span></button></form>
+                            <form method="POST" action="{{ $lrLogoutUrl }}" style="display:contents;">@csrf<input type="hidden" name="redirect" value="{{ request()->getRequestUri() }}"><button class="lr-menu-card" type="submit"><span class="lr-menu-icon"><i class="fa-solid fa-right-from-bracket"></i></span><span class="lr-menu-copy"><strong>Sign Out</strong><small>Securely end this session</small></span></button></form>
                         </div>
                     </div>
                 </section>
