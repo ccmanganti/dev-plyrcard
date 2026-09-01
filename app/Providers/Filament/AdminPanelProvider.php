@@ -37,10 +37,6 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            // v127: Keep the Filament shell mounted between Recruiting Center pages.
-            // Hover prefetching starts the next page request before the click, which makes
-            // sidebar navigation feel much closer to a single-page application.
-            ->spa(hasPrefetching: true)
             ->homeUrl(function (): string {
                 $user = auth()->user();
 
@@ -1275,34 +1271,6 @@ class AdminPanelProvider extends PanelProvider
                 HTML,
             )
             ->renderHook(
-                PanelsRenderHook::HEAD_END,
-                fn (): string => request()->is('admin/coach-database*')
-                    ? <<<'HTML'
-                        <style>
-                            /* Recruiting Center only: the custom page already renders its own
-                             * section content below the Welcome back header, so suppress the
-                             * duplicate Filament page title without affecting other admin pages. */
-                            .fi-page .fi-header-heading-ctn,
-                            .fi-page .fi-page-header-heading-ctn,
-                            .fi-page .fi-header-heading,
-                            .fi-page .fi-page-header-heading,
-                            .fi-page .fi-header-subheading,
-                            .fi-page .fi-page-header-subheading {
-                                display: none !important;
-                            }
-
-                            .fi-page > .fi-header,
-                            .fi-page > header.fi-header,
-                            .fi-page > .fi-page-header {
-                                min-height: 0 !important;
-                                margin-top: 0 !important;
-                                margin-bottom: 0 !important;
-                            }
-                        </style>
-                    HTML
-                    : '',
-            )
-            ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
                 fn (): string => request()->is('admin/force-password-change*')
                     ? ''
@@ -1400,7 +1368,15 @@ class AdminPanelProvider extends PanelProvider
                         ? $user->hasRole('Free')
                         : $normalizedRoles->contains(fn ($role) => strcasecmp($role, 'Free') === 0);
 
-                    $freeRestricted = $hasFreeRole && ! $hasMyJourneyRole;
+                    // Superadmin is the only platform role that bypasses player plan gating.
+                    // Do not infer admin access from similarly named roles.
+                    $isPrivilegedAdmin = method_exists($user, 'hasRole')
+                        ? $user->hasRole('Superadmin')
+                        : $normalizedRoles->contains(fn ($role) => strcasecmp($role, 'Superadmin') === 0);
+
+                    $freeRestricted = ! $isPrivilegedAdmin
+                        && $hasFreeRole
+                        && ! $hasMyJourneyRole;
 
                     $settingsUrl = class_exists(\App\Filament\Pages\CoachDatabaseSettings::class)
                         ? \App\Filament\Pages\CoachDatabaseSettings::getUrl()
@@ -1425,19 +1401,6 @@ class AdminPanelProvider extends PanelProvider
                                         </svg>
                                         <span>Settings</span>
                                     </a>
-
-                                    <div class="plyr-sidebar-user-actions-separator" aria-hidden="true"></div>
-
-                                    <form method="POST" action="{{ $logoutUrl }}" style="margin:0;">
-                                        @csrf
-                                        <button type="submit" class="plyr-sidebar-user-action-button plyr-sidebar-user-action-danger">
-                                            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                                                <path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-                                                <path d="M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-                                            </svg>
-                                            <span>Sign Out</span>
-                                        </button>
-                                    </form>
                                 </div>
 
                                 <button type="button" class="plyr-sidebar-profile plyr-sidebar-account-trigger" x-on:click="open = ! open" x-on:keydown.escape.window="open = false" aria-label="Open account menu">
