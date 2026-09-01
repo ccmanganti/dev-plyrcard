@@ -254,7 +254,10 @@
     .lr-checkout-intro h3 { margin:6px 0 0; font:700 28px/1 Antonio,Inter,sans-serif; color:#101828; }
     .lr-checkout-intro p { margin:7px 0 0; color:#667085; font-size:12px; line-height:1.5; }
     .lr-checkout-state { min-height:380px; display:grid; place-items:center; padding:32px 18px; text-align:center; }
-    .lr-checkout-state[hidden], .lr-checkout-frame[hidden] { display:none !important; }
+    .lr-checkout-state[hidden], .lr-checkout-frame[hidden], .lr-checkout-billing[hidden] { display:none !important; }
+    .lr-checkout-billing { padding:18px; background:#fff; }
+    .lr-checkout-billing .lr-form-section { margin:0 0 14px; }
+    .lr-checkout-billing-note { margin:0 0 14px; padding:11px 12px; border-radius:11px; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; font-size:11.5px; line-height:1.5; }
     .lr-checkout-state-inner { max-width:420px; }
     .lr-checkout-state strong { display:block; font-size:16px; color:#101828; }
     .lr-checkout-state span { display:block; margin-top:6px; color:#667085; font-size:12px; line-height:1.5; }
@@ -842,6 +845,14 @@
                             <div class="lr-checkout-state is-success" data-lr-checkout-success hidden>
                                 <div class="lr-checkout-state-inner"><div class="lr-checkout-success-icon">✓</div><strong data-lr-checkout-success-title>Upgrade complete</strong><span data-lr-checkout-success-copy>Your payment was confirmed and your account has been updated.</span><div class="lr-actions" style="justify-content:center;margin-top:16px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-checkout-done>Back to Plans</button></div></div>
                             </div>
+                            <div class="lr-checkout-billing" data-lr-checkout-billing hidden>
+                                <div class="lr-checkout-billing-note"><strong>Billing information needed</strong><br>Because this account was created before the current billing flow, we need the payer information saved to PLYRCARD before checkout can be connected. No card number or security code is collected here.</div>
+                                <form class="lr-form" data-lr-checkout-billing-form>
+                                    <div class="lr-form-section"><h4>Billing Contact</h4><div class="lr-form-grid"><div class="lr-field"><label>Full Name</label><input class="lr-input" name="billing_name" placeholder="Parent or cardholder name" required></div><div class="lr-field"><label>Email</label><input class="lr-input" type="email" name="billing_email" placeholder="billing@example.com" required></div><div class="lr-field"><label>Phone</label><input class="lr-input" name="billing_phone" placeholder="(555) 123-4567"></div><div class="lr-field"><label>Company / Organization</label><input class="lr-input" name="billing_company" placeholder="Optional organization"></div></div></div>
+                                    <div class="lr-form-section"><h4>Billing Address</h4><div class="lr-form-grid"><div class="lr-field is-full"><label>Address Line 1</label><input class="lr-input" name="billing_address_1" placeholder="123 Main Street" required></div><div class="lr-field is-full"><label>Address Line 2</label><input class="lr-input" name="billing_address_2" placeholder="Apt, suite, unit (optional)"></div><div class="lr-field"><label>City</label><input class="lr-input" name="billing_city" placeholder="City" required></div><div class="lr-field"><label>State / Province</label><input class="lr-input" name="billing_state" placeholder="State / Province" required></div><div class="lr-field"><label>Postal Code</label><input class="lr-input" name="billing_postal_code" placeholder="Postal code" required></div><div class="lr-field"><label>Country</label><input class="lr-input" name="billing_country" placeholder="US" required></div></div></div>
+                                    <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save &amp; Continue</button><button class="lr-btn" type="button" data-lr-checkout-billing-cancel>Back to Plans</button></div>
+                                </form>
+                            </div>
                             <div class="lr-checkout-state is-error" data-lr-checkout-error hidden>
                                 <div class="lr-checkout-state-inner"><strong>Checkout could not be prepared</strong><span data-lr-checkout-error-copy>Please try again.</span><div class="lr-actions" style="justify-content:center;margin-top:16px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-checkout-retry>Try Again</button></div></div>
                             </div>
@@ -1119,7 +1130,10 @@
         let json = {}; try { json = await response.json(); } catch (_) {}
         if (!response.ok || json.success === false) {
             const validation = json.errors ? Object.values(json.errors).flat().join(' ') : '';
-            throw new Error(validation || json.message || `Request failed (${response.status})`);
+            const error = new Error(validation || json.message || `Request failed (${response.status})`);
+            error.payload = json;
+            error.status = response.status;
+            throw error;
         }
         return json;
     }
@@ -1632,8 +1646,9 @@
         const loading = q('[data-lr-checkout-loading]');
         const success = q('[data-lr-checkout-success]');
         const error = q('[data-lr-checkout-error]');
+        const billing = q('[data-lr-checkout-billing]');
         const frame = q('[data-lr-checkout-frame]');
-        [loading, success, error, frame].forEach(el => { if (el) el.hidden = el !== part; });
+        [loading, success, error, billing, frame].forEach(el => { if (el) el.hidden = el !== part; });
     }
 
     function lockerCheckoutUrls(type) {
@@ -1682,7 +1697,31 @@
         lockerCheckoutTimer = setTimeout(pollLockerCheckout, 2500);
     }
 
-    async function openLockerCheckout(type) {
+    function showLockerCheckoutBilling(payload = {}) {
+        const form = q('[data-lr-checkout-billing-form]');
+        if (!form) return;
+        const billing = Object.assign({}, state?.billing || {}, payload?.billing || {});
+        fillForm(form, billing);
+        showLockerCheckoutPart(q('[data-lr-checkout-billing]'));
+        q('[data-lr-checkout-status]').textContent = 'Save the billing profile to continue checkout.';
+    }
+
+    async function saveLockerCheckoutBilling(form) {
+        if (!drawer.dataset.billingUrl) throw new Error('Billing update is unavailable right now.');
+        setFormBusy(form, true, 'Saving…');
+        try {
+            const data = await request(drawer.dataset.billingUrl, {method:'POST', body:new FormData(form)});
+            if (data.data) state = data.data;
+            else await refreshData();
+            render();
+            showToast(data.message || 'Billing information saved.');
+            await openLockerCheckout(lockerCheckoutType || 'my-journey', true);
+        } finally {
+            setFormBusy(form, false);
+        }
+    }
+
+    async function openLockerCheckout(type, retryAfterBilling = false) {
         if (lockerCheckoutStarting) return;
         lockerCheckoutType = type === 'amplify' ? 'amplify' : 'my-journey';
         configureLockerCheckout(lockerCheckoutType);
@@ -1716,9 +1755,15 @@
             q('[data-lr-checkout-status]').textContent = data.message || 'Complete checkout below to continue.';
             lockerCheckoutTimer = setTimeout(pollLockerCheckout, 1800);
         } catch (error) {
-            showLockerCheckoutPart(q('[data-lr-checkout-error]'));
-            q('[data-lr-checkout-error-copy]').textContent = error?.message || 'Please try again.';
-            q('[data-lr-checkout-status]').textContent = 'Checkout was not started.';
+            const payload = error?.payload || {};
+            if (payload.reason === 'billing_profile_required' || payload.reason === 'billing_contact_unavailable') {
+                showLockerCheckoutBilling(payload);
+                if (payload.message) showToast(payload.message, payload.reason === 'billing_contact_unavailable');
+            } else {
+                showLockerCheckoutPart(q('[data-lr-checkout-error]'));
+                q('[data-lr-checkout-error-copy]').textContent = error?.message || 'Please try again.';
+                q('[data-lr-checkout-status]').textContent = 'Checkout was not started.';
+            }
         } finally {
             lockerCheckoutStarting = false;
         }
@@ -1996,7 +2041,14 @@
     if(menuButton && mobileNav && menuButton.dataset.lrBound!=='1') { menuButton.dataset.lrBound='1'; menuButton.addEventListener('click',()=>{const open=mobileNav.classList.toggle('open');menuButton.setAttribute('aria-expanded',open?'true':'false');}); }
     const header=document.getElementById('site-header'); if(header && header.dataset.lrScrollBound!=='1'){header.dataset.lrScrollBound='1'; const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>14); onScroll(); window.addEventListener('scroll',onScroll,{passive:true});}
 
+    q('[data-lr-checkout-billing-form]')?.addEventListener('submit', async event => {
+        event.preventDefault();
+        try { await saveLockerCheckoutBilling(event.currentTarget); }
+        catch (err) { showToast(err.message || 'Unable to save billing information.', true); }
+    });
+
     document.addEventListener('click', event => {
+        if (event.target.closest('[data-lr-checkout-billing-cancel]')) { stopLockerCheckoutPolling(); setView('upgrade', false); return; }
         const checkoutButton = event.target.closest('[data-lr-plan-checkout]');
         if (checkoutButton && drawer.contains(checkoutButton)) {
             event.preventDefault();

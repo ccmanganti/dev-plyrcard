@@ -31,6 +31,55 @@ class BillingProfileService
         ];
     }
 
+
+    public function requiredProfileFields(): array
+    {
+        return [
+            'billing_name',
+            'billing_email',
+            'billing_address_1',
+            'billing_city',
+            'billing_state',
+            'billing_postal_code',
+            'billing_country',
+        ];
+    }
+
+    public function missingRequiredFields(BillingInformation $billing): array
+    {
+        return collect($this->requiredProfileFields())
+            ->filter(fn (string $field): bool => blank($billing->{$field}))
+            ->values()
+            ->all();
+    }
+
+    public function isComplete(BillingInformation $billing): bool
+    {
+        return $this->missingRequiredFields($billing) === [];
+    }
+
+    public function requirementPayload(User $user, ?BillingInformation $billing = null): array
+    {
+        $billing ??= $this->get($user);
+
+        return [
+            'profile_complete' => $this->isComplete($billing),
+            'missing_fields' => $this->missingRequiredFields($billing),
+            'billing' => Arr::only($billing->toArray(), [
+                'billing_name',
+                'billing_email',
+                'billing_phone',
+                'billing_company',
+                'billing_address_1',
+                'billing_address_2',
+                'billing_city',
+                'billing_state',
+                'billing_postal_code',
+                'billing_country',
+            ]),
+        ];
+    }
+
     public function update(User $user, array $input): BillingInformation
     {
         $data = Validator::make($input, $this->rules())->validate();

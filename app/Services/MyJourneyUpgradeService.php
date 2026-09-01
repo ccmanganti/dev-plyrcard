@@ -12,6 +12,7 @@ class MyJourneyUpgradeService
 {
     public function __construct(
         protected BillingAccountService $billingAccounts,
+        protected BillingProfileService $billingProfiles,
         protected RegistrationPaymentVerificationService $paymentVerification,
         protected SupportAlertService $alerts,
     ) {
@@ -28,13 +29,23 @@ class MyJourneyUpgradeService
             ];
         }
 
+        $billing = $this->billingProfiles->get($user);
+        if (! $this->billingProfiles->isComplete($billing)) {
+            return array_merge([
+                'success' => false,
+                'completed' => false,
+                'error' => true,
+                'reason' => 'billing_profile_required',
+                'message' => 'Complete your billing information to continue with secure checkout.',
+            ], $this->billingProfiles->requirementPayload($user, $billing));
+        }
+
         $plan = $this->plan();
         $recurring = (int) ($plan['recurring_amount_cents'] ?? 4900);
         $setup = (int) ($plan['setup_fee_cents'] ?? 0);
         $initial = $setup + ((bool) ($plan['charge_first_month_upfront'] ?? true) ? $recurring : 0);
         $checkoutId = (string) Str::uuid();
 
-        $billing = BillingInformation::query()->firstOrNew(['user_id' => $user->getKey()]);
         $meta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
         $meta['my_journey_upgrade'] = [
             'checkout_id' => $checkoutId,
@@ -79,11 +90,13 @@ class MyJourneyUpgradeService
                 'ghl_sync_status' => 'my_journey_upgrade_contact_error',
             ])->save();
 
-            return [
+            return array_merge([
+                'success' => false,
                 'completed' => false,
                 'error' => true,
-                'message' => 'We could not prepare your billing profile for checkout. Please try again.',
-            ];
+                'reason' => 'billing_contact_unavailable',
+                'message' => 'Your billing information was saved, but the billing contact could not be connected yet. Please review it and try again.',
+            ], $this->billingProfiles->requirementPayload($user, $billing));
         }
 
         $checkoutUrl = $this->checkoutUrl($user, $billing, $subscriberContactId, $plan);

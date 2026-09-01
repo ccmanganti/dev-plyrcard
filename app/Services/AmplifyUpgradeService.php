@@ -34,6 +34,16 @@ class AmplifyUpgradeService
         }
 
         $billing = $this->billingProfiles->get($user);
+
+        if (! $this->billingProfiles->isComplete($billing)) {
+            return array_merge([
+                'success' => false,
+                'completed' => false,
+                'reason' => 'billing_profile_required',
+                'message' => 'Complete your billing information to continue with secure checkout.',
+            ], $this->billingProfiles->requirementPayload($user, $billing));
+        }
+
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
 
         if ($contactId === '') {
@@ -43,11 +53,12 @@ class AmplifyUpgradeService
         }
 
         if ($contactId === '') {
-            return [
+            return array_merge([
                 'success' => false,
                 'completed' => false,
-                'message' => 'Please save your Billing Information first so the secure checkout can be connected to your account.',
-            ];
+                'reason' => 'billing_contact_unavailable',
+                'message' => 'Your billing information was saved, but the billing contact could not be connected yet. Please review it and try again.',
+            ], $this->billingProfiles->requirementPayload($user, $billing));
         }
 
         $credentials = $this->billingAccount->credentials($billing);

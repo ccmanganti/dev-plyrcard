@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AdditionalServiceRequest;
+use App\Models\BillingInformation;
 use App\Models\Club;
 use App\Models\ClubLeague;
 use App\Models\League;
@@ -12,8 +13,8 @@ use App\Models\NationalTeam;
 use App\Models\Schedule;
 use App\Models\School;
 use App\Models\Website;
-use App\Services\BillingProfileService;
 use App\Services\GoHighLevelService;
+use App\Services\BillingProfileService;
 use App\Services\LockerRoomDataService;
 use App\Services\LockerRoomReferralEmailService;
 use Illuminate\Database\Eloquent\Builder;
@@ -388,16 +389,24 @@ class LockerRoomController extends Controller
         ]);
     }
 
-    public function updateBilling(Request $request, BillingProfileService $billingService, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    public function updateBilling(Request $request, BillingProfileService $billingProfiles, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
         abort_unless($user, 403);
 
-        // Admin Billing and Locker Room both use BillingProfileService so there is
-        // one authoritative validation, persistence, and external sync path.
-        $billingService->update($user, $request->all());
+        // One canonical save path is used by Admin Settings, Locker Room, and
+        // upgrade-preparation. This writes the billing profile locally first, then
+        // creates/updates the payer contact in PLYRCARD's billing subaccount.
+        // Raw card numbers/CVC are never accepted by this endpoint.
+        $data = $request->validate($billingProfiles->rules());
+        $billing = $billingProfiles->update($user, $data);
+        $user->refresh();
 
-        return $this->success($request, 'Billing information updated.', [
+        $subscriberContactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
+
+        return $this->success($request, 'Billing information saved.', [
+            'billing_ready' => $billingProfiles->isComplete($billing) && $subscriberContactId !== '',
+            'missing_fields' => $billingProfiles->missingRequiredFields($billing),
             'data' => $dataService->snapshot($user->fresh()),
         ]);
     }
