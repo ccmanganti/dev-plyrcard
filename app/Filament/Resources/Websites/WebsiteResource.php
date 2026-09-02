@@ -13,6 +13,7 @@ use App\Models\HeroTemplate;
 use App\Models\SiteTemplate;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\WebsitePublishedEmailService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -348,9 +349,23 @@ class WebsiteResource extends Resource
                 ToggleColumn::make('is_published')
                     ->label('Website Published')
                     ->updateStateUsing(function (Website $record, bool $state): void {
+                        $wasPublished = (bool) $record->is_published;
+
                         $record->update([
                             'is_published' => $state,
                         ]);
+
+                        if ($state && ! $wasPublished) {
+                            try {
+                                $record->loadMissing('user');
+
+                                if ($record->user) {
+                                    app(WebsitePublishedEmailService::class)->send($record->user, $record);
+                                }
+                            } catch (\Throwable $exception) {
+                                report($exception);
+                            }
+                        }
                     }),
                 TextColumn::make('updated_at')->since()->label('Updated'),
             ])

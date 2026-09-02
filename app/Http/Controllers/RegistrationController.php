@@ -39,6 +39,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'planKey' => $planKey,
             'plan' => $this->planConfig($planKey),
             'isPaidPlan' => $planKey !== 'free',
+            'requiresDomain' => in_array($planKey, ['my-journey', 'amplify'], true),
             'sportPositions' => $this->sportPositions,
             'states' => $this->states(),
             'ageGroups' => $this->getAgeGroupOptions(),
@@ -221,6 +222,9 @@ class RegistrationController extends PublicPlayerIntakeController
         );
         $plan = $this->planConfig($planKey);
         $isPaid = $planKey !== 'free';
+        // Jumpstart is a paid one-time service, but it does not include a custom
+        // domain by itself. My Journey / Amplify keep the custom-domain flow.
+        $requiresDomain = in_array($planKey, ['my-journey', 'amplify'], true);
 
         $request->merge([
             'plan_key' => $planKey,
@@ -231,7 +235,7 @@ class RegistrationController extends PublicPlayerIntakeController
         ]);
 
         $rules = [
-            'plan_key' => ['required', Rule::in(['free', 'my-journey', 'amplify'])],
+            'plan_key' => ['required', Rule::in(['free', 'my-journey', 'jumpstart', 'amplify'])],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => [
@@ -287,8 +291,6 @@ class RegistrationController extends PublicPlayerIntakeController
 
         if ($isPaid) {
             $rules = array_merge($rules, [
-                'requested_domain' => ['required', 'string', 'max:255'],
-
                 'billing_name' => ['required', 'string', 'max:255'],
                 'billing_email' => ['required', 'email:rfc', 'max:255'],
                 'billing_phone' => ['required', 'string', 'max:50'],
@@ -298,6 +300,10 @@ class RegistrationController extends PublicPlayerIntakeController
                 'billing_postal_code' => ['required', 'string', 'max:30'],
                 'billing_country' => ['required', 'string', 'max:100'],
             ]);
+        }
+
+        if ($requiresDomain) {
+            $rules['requested_domain'] = ['required', 'string', 'max:255'];
         }
 
         $validated = $request->validate($rules, [
@@ -319,7 +325,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
         $domainLookup = null;
 
-        if ($isPaid) {
+        if ($requiresDomain) {
             if (! $this->domainLooksValid($validated['requested_domain'])) {
                 throw ValidationException::withMessages([
                     'requested_domain' => 'Please enter a valid domain name.',
@@ -362,6 +368,7 @@ class RegistrationController extends PublicPlayerIntakeController
             $plan,
             $planKey,
             $isPaid,
+            $requiresDomain,
             $gender,
             $sport,
             $positions,
@@ -414,11 +421,11 @@ class RegistrationController extends PublicPlayerIntakeController
             }
 
             $website = $this->createWebsiteIfSupported($user, ['sport' => $sport], []);
-            if (! $isPaid && $website) {
+            if (! $requiresDomain && $website) {
                 $website->forceFill(['slug' => $validated['requested_handle']])->save();
             }
 
-            if ($isPaid) {
+            if ($requiresDomain) {
                 $selectedDomain = $validated['requested_domain'];
 
                 // Save the selected domain directly on the player's website/profile.
@@ -450,9 +457,9 @@ class RegistrationController extends PublicPlayerIntakeController
                 'league_name' => $league?->name,
                 'club_name' => $club?->name,
                 'team_name' => $teamName,
-                'domain_rdap_verified' => $isPaid ? (bool) ($domainLookup['verified'] ?? false) : false,
-                'domain_rdap_status' => $isPaid ? ($domainLookup['status'] ?? null) : null,
-                'domain_lookup_source' => $isPaid ? 'selected-domain' : null,
+                'domain_rdap_verified' => $requiresDomain ? (bool) ($domainLookup['verified'] ?? false) : false,
+                'domain_rdap_status' => $requiresDomain ? ($domainLookup['status'] ?? null) : null,
+                'domain_lookup_source' => $requiresDomain ? 'selected-domain' : null,
                 'domain_registrar_verified' => false,
             ];
 
@@ -474,17 +481,17 @@ class RegistrationController extends PublicPlayerIntakeController
                 'billing_postal_code' => $validated['billing_postal_code'] ?? null,
                 'billing_country' => $validated['billing_country'] ?? 'US',
                 'plan_key' => $planKey,
-                'billing_cycle' => $isPaid ? 'monthly' : null,
+                'billing_cycle' => $planKey === 'my-journey' || $planKey === 'amplify' ? 'monthly' : null,
                 'currency' => 'USD',
                 'recurring_amount_cents' => $recurring,
                 'setup_fee_cents' => $setup,
                 'initial_amount_cents' => $initialAmount,
                 'payment_status' => $isPaid ? 'pending' : 'not_required',
-                'subscription_status' => $isPaid ? 'pending' : 'free',
+                'subscription_status' => $planKey === 'jumpstart' ? 'not_applicable' : ($isPaid ? 'pending' : 'free'),
                 'payment_provider' => $isPaid ? 'ghl_survey' : null,
                 'payment_type' => $isPaid ? 'card' : null,
-                'requested_domain' => $isPaid ? $validated['requested_domain'] : null,
-                'requested_handle' => ! $isPaid ? $validated['requested_handle'] : null,
+                'requested_domain' => $requiresDomain ? $validated['requested_domain'] : null,
+                'requested_handle' => ! $requiresDomain ? $validated['requested_handle'] : null,
                 'registration_meta' => $registrationMeta,
                 'ghl_location_id' => config('ghl.location_id'),
                 'ghl_sync_status' => 'pending',
@@ -641,6 +648,33 @@ class RegistrationController extends PublicPlayerIntakeController
                     ->verify($user, $billing);
 
                 $billing->refresh();
+
+                if (($verification['verified'] ?? false) && $billing->plan_key === 'jumpstart') {
+                    // Jumpstart is a one-time service entitlement. Do not let the
+                    // generic registration verifier replace the player's base tier.
+                    // Restore Free for a new registration and add Jumpstart on top.
+                    if (method_exists($user, 'assignRole')) {
+                        if (! $user->hasRole('Free') && ! $user->hasRole('My Journey')) {
+                            $user->assignRole('Free');
+                        }
+                        if (! $user->hasRole('Jumpstart')) {
+                            $user->assignRole('Jumpstart');
+                        }
+                    } elseif (method_exists($user, 'syncRoles')) {
+                        $roles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->all() : [];
+                        if (! in_array('Free', $roles, true) && ! in_array('My Journey', $roles, true)) {
+                            $roles[] = 'Free';
+                        }
+                        $roles[] = 'Jumpstart';
+                        $user->syncRoles(array_values(array_unique($roles)));
+                    }
+
+                    $billing->forceFill([
+                        'subscription_status' => 'not_applicable',
+                        'billing_cycle' => null,
+                        'recurring_amount_cents' => 0,
+                    ])->save();
+                }
             } catch (\Throwable $exception) {
                 Log::warning('Registration payment status check could not verify HighLevel payment yet.', [
                     'user_id' => $user->getKey(),
@@ -678,6 +712,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
         return match ($value) {
             'myjourney', 'my-journey', 'journey' => 'my-journey',
+            'jumpstart', 'jump-start' => 'jumpstart',
             'amplify', 'power-4', 'power4' => 'amplify',
             default => 'free',
         };
@@ -689,6 +724,18 @@ class RegistrationController extends PublicPlayerIntakeController
 
         if (is_array($configuredPlan)) {
             return $configuredPlan;
+        }
+
+        if ($planKey === 'jumpstart') {
+            return [
+                'label' => 'Jumpstart',
+                'recurring_amount_cents' => 0,
+                'setup_fee_cents' => (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900),
+                'charge_first_month_upfront' => false,
+                'role_after_registration' => 'Free',
+                'role_after_payment' => 'Jumpstart',
+                'payment_form_url' => (string) config('plyrcard-registration.plans.jumpstart.payment_form_url', 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true'),
+            ];
         }
 
         $configuredFreePlan = config('plyrcard-registration.plans.free');
@@ -708,6 +755,15 @@ class RegistrationController extends PublicPlayerIntakeController
                 'role_after_registration' => 'Free',
                 'role_after_payment' => 'My Journey',
                 'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
+            ],
+            'jumpstart' => [
+                'label' => 'Jumpstart',
+                'recurring_amount_cents' => 0,
+                'setup_fee_cents' => 14900,
+                'charge_first_month_upfront' => false,
+                'role_after_registration' => 'Free',
+                'role_after_payment' => 'Jumpstart',
+                'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true',
             ],
             'amplify' => [
                 'label' => 'Amplify',
@@ -741,6 +797,7 @@ class RegistrationController extends PublicPlayerIntakeController
         if ($baseUrl === '') {
             $baseUrl = match ($planKey) {
                 'my-journey' => 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
+                'jumpstart' => 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true',
                 'amplify' => 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
                 default => '',
             };

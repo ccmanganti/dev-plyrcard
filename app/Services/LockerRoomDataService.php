@@ -90,6 +90,7 @@ class LockerRoomDataService
                 'is_premium' => $isPremium,
                 'workspace_ready' => $workspaceReady,
                 'show_preparing' => $isPremium && ! $workspaceReady,
+                'jumpstart_active' => $this->hasRole($user, 'Jumpstart'),
                 'amplify_active' => $this->hasRole($user, 'Amplify'),
             ],
             'dashboard' => $this->dashboardPayload($user),
@@ -1669,6 +1670,8 @@ class LockerRoomDataService
             ? $amplifySetup
             : $amplifySetup + ($amplifyFirstMonth ? $amplifyRecurring : 0);
         $amplifyActive = $this->hasRole($user, 'Amplify');
+        $jumpstartActive = $this->hasRole($user, 'Jumpstart');
+        $jumpstartCents = (int) config('plyrcard-jumpstart.price_cents', 14900);
 
         $money = static function (int $cents): string {
             $amount = $cents / 100;
@@ -1698,6 +1701,21 @@ class LockerRoomDataService
                 'action_label' => 'Get My Journey',
                 'action_url' => '#',
                 'action_kind' => 'my_journey_checkout',
+            ],
+            [
+                'key' => 'jumpstart',
+                'name' => 'Jumpstart',
+                'price' => $money($jumpstartCents),
+                'suffix' => 'one time',
+                'due_today' => $money($jumpstartCents) . ' one-time purchase · no subscription required',
+                'current' => false,
+                'description' => 'One clean recruiting push whether you are on Free or My Journey.',
+                'features' => ['1 Coach Outreach Campaign', '1 Highlight Edit', '1 Custom Graphic', 'No subscription required'],
+                'action_label' => $jumpstartActive ? 'Jumpstart Purchased' : 'Get Jumpstart',
+                'action_url' => '#',
+                'action_kind' => 'jumpstart_checkout',
+                'active_addon' => $jumpstartActive,
+                'button_disabled' => $jumpstartActive,
             ],
             [
                 'key' => 'amplify',

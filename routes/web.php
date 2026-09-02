@@ -5,6 +5,7 @@ use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\SupportTicketSettingsController;
 use App\Http\Controllers\LockerRoomSchoolActionController;
 use App\Http\Controllers\AmplifyUpgradeController;
+use App\Http\Controllers\JumpstartUpgradeController;
 use App\Http\Controllers\MyJourneyUpgradeController;
 use App\Http\Controllers\BillingCancellationController;
 use App\Http\Controllers\PublicClubTeamController;
@@ -33,6 +34,12 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.amplify.start');
     Route::get('/billing/amplify/status', [AmplifyUpgradeController::class, 'status'])
         ->name('billing.amplify.status');
+
+    Route::post('/billing/jumpstart/start', [JumpstartUpgradeController::class, 'start'])
+        ->name('billing.jumpstart.start');
+
+    Route::get('/billing/jumpstart/status', [JumpstartUpgradeController::class, 'status'])
+        ->name('billing.jumpstart.status');
     Route::post('/billing/my-journey/start', [MyJourneyUpgradeController::class, 'start'])
         ->name('billing.my-journey.start');
     Route::get('/billing/my-journey/status', [MyJourneyUpgradeController::class, 'status'])

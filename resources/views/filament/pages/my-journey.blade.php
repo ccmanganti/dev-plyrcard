@@ -708,7 +708,7 @@
                         <div class="mj-popular" @if (($plan['accent'] ?? '') === 'gold') style="background:#f5c451;color:#241701;" @endif>{{ $plan['badge'] ?? 'Most Popular' }}</div>
                     @endif
 
-                    @if (($plan['key'] ?? '') === 'amplify' && ($plan['active_addon'] ?? false))
+                    @if (($plan['active_addon'] ?? false))
                         <div class="mj-addon-active">Active</div>
                     @endif
 
@@ -754,6 +754,10 @@
                     <a
                         href="{{ $plan['button_href'] }}"
                         class="mj-btn {{ $plan['button_style'] }} {{ ($plan['button_disabled'] ?? false) ? 'is-disabled' : '' }}"
+                        @if (($plan['opens_jumpstart_checkout'] ?? false) && ! ($plan['current'] ?? false) && ! ($plan['button_disabled'] ?? false))
+                            data-plyrcard-jumpstart-open
+                            role="button"
+                        @endif
                         @if (($plan['opens_amplify_checkout'] ?? false) && ! ($plan['current'] ?? false) && ! ($plan['button_disabled'] ?? false))
                             data-plyrcard-amplify-open
                             role="button"
@@ -868,5 +872,6 @@
 
     {{-- Authenticated in-page purchase checkouts. --}}
     @include('partials.my-journey-upgrade-modal')
+    @include('partials.jumpstart-upgrade-modal')
     @include('partials.amplify-upgrade-modal')
 </x-filament-panels::page>

@@ -1461,50 +1461,15 @@ class EditProfile extends Page implements HasForms
 
     public function canOpenPreviewCard(): bool
     {
-        return $this->getProfileProgressPercentage() >= 75
-            && $this->isWebsitePublished()
-            && filled($this->getPreviewUrl());
+        // Preview is an owner-facing shortcut, not a publication gate.
+        return filled($this->getPreviewUrl());
     }
 
     public function handlePreviewCardClick(): void
     {
-        if ($this->canOpenPreviewCard()) {
-            return;
-        }
-
-        $progress = $this->getProfileProgressPercentage();
-        $published = $this->isWebsitePublished();
-
-        if ($progress < 75 && ! $published) {
-            $this->previewAccessModalType = 'complete_profile';
-            $this->previewAccessModalTitle = 'COMPLETE <span>YOUR PROFILE</span>';
-            $this->previewAccessModalMessage = 'Your profile is currently ' . $progress . '% complete. Complete at least 75% of your profile before previewing your card.';
-            $this->previewAccessModalActionUrl = url('/admin/profile');
-            $this->previewAccessModalActionLabel = 'Complete Profile';
-            $this->showPreviewAccessModal = true;
-
-            return;
-        }
-
-        if ($progress >= 75 && ! $published) {
-            $this->previewAccessModalType = 'under_review';
-            $this->previewAccessModalTitle = 'SITE <span>UNDER REVIEW</span>';
-            $this->previewAccessModalMessage = 'Your profile is complete enough for launch, and your website is currently under review. We\'ll make it available once it has been approved and published.';
-            $this->previewAccessModalActionUrl = url('/admin/profile');
-            $this->previewAccessModalActionLabel = 'Back to Profile';
-            $this->showPreviewAccessModal = true;
-
-            return;
-        }
-
-        if ($progress < 75) {
-            $this->previewAccessModalType = 'complete_profile';
-            $this->previewAccessModalTitle = 'COMPLETE <span>YOUR PROFILE</span>';
-            $this->previewAccessModalMessage = 'Your profile is currently ' . $progress . '% complete. Complete at least 75% of your profile before previewing your card.';
-            $this->previewAccessModalActionUrl = url('/profile');
-            $this->previewAccessModalActionLabel = 'Complete Profile';
-            $this->showPreviewAccessModal = true;
-        }
+        // Backwards compatibility for any cached Blade still calling this method.
+        // The current profile view opens the resolved player URL directly.
+        $this->showPreviewAccessModal = false;
     }
 
     public function getProfileInitials(): string
@@ -1591,29 +1556,33 @@ class EditProfile extends Page implements HasForms
         return Storage::url($image);
     }
 
-    protected function getPreviewUrl(): ?string
+    public function getPreviewUrl(): ?string
     {
         if (! $this->user) {
             return null;
         }
 
-        $slugUrl = url(Str::slug($this->user->first_name . '-' . $this->user->last_name));
+        $fallbackSlug = Str::slug($this->user->first_name . '-' . $this->user->last_name);
+        $websiteSlug = trim((string) ($this->website?->slug ?: $fallbackSlug));
+        $sharedUrl = $websiteSlug !== '' ? url('/' . ltrim($websiteSlug, '/')) : null;
 
-        if ($this->user->hasRole('Free')) {
-            return $slugUrl;
+        // Free always previews the shared PLYRCARD URI.
+        if (method_exists($this->user, 'hasRole') && $this->user->hasRole('Free')) {
+            return $sharedUrl;
         }
 
-        $domain = trim((string) ($this->user->domain ?? ''));
+        // Website.domain is authoritative; user.domain remains a legacy fallback.
+        $domain = trim((string) ($this->website?->domain ?: ($this->user->domain ?? '')));
 
-        if (blank($domain)) {
-            return $slugUrl;
+        if ($domain === '') {
+            return $sharedUrl;
         }
 
         if (str_starts_with($domain, 'http://') || str_starts_with($domain, 'https://')) {
-            return $domain;
+            return rtrim($domain, '/');
         }
 
-        return 'https://' . ltrim($domain, '/');
+        return 'https://' . trim($domain, '/');
     }
 
     public function openLockedFeatureModal(): void

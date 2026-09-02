@@ -1,5 +1,12 @@
 @php
     $activePage = 'pricing';
+    $pricingPlans = (array) config('plyrcard-registration.plans', []);
+    $myJourneyCents = (int) data_get($pricingPlans, 'my-journey.recurring_amount_cents', 4900);
+    $amplifySetupCents = (int) data_get($pricingPlans, 'amplify.setup_fee_cents', 50000);
+    $amplifyFirstMonth = (bool) data_get($pricingPlans, 'amplify.charge_first_month_upfront', true);
+    $jumpstartCents = (int) config('plyrcard-jumpstart.price_cents', 14900);
+    $amplifyEnrollmentCents = $amplifySetupCents + ($amplifyFirstMonth ? $myJourneyCents : 0);
+    $pricingMoney = static fn (int $cents): string => '$' . (floor($cents / 100) === ($cents / 100) ? number_format($cents / 100, 0) : number_format($cents / 100, 2));
 @endphp
 
 @include('partials.images')
@@ -10,15 +17,15 @@
 	<!-- <script src="https://widgets.leadconnectorhq.com/loader.js" data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js" data-widget-id="6941fea74ca18223c7de491d"></script> -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="PLYRCARD Pricing — Choose Free, My Journey, or Amplify. Monthly plans built to strengthen your recruiting presence." />
-  <title>Pricing — PLYRCARD</title>
+  <meta name="description" content="PLYRCARD Pricing â€” Choose Free, My Journey, Jumpstart, or Amplify. Monthly plans built to strengthen your recruiting presence." />
+  <title>Pricing â€” PLYRCARD</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
 
   <style>
-    /* ─── RESET & TOKENS ────────────────────────────── */
+    /* â”€â”€â”€ RESET & TOKENS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --accent:       #FF5C35;
@@ -47,7 +54,7 @@
     img { display: block; max-width: 100%; }
     a   { color: inherit; text-decoration: none; }
 
-    /* ─── HEADER ────────────────────────────────────── */
+    /* â”€â”€â”€ HEADER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #site-header {
       position: fixed;
       top: 0; left: 0; right: 0;
@@ -153,7 +160,7 @@
       margin-top: 8px;
     }
 
-    /* ─── PAGE HERO ──────────────────────────────────── */
+    /* â”€â”€â”€ PAGE HERO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #page-hero {
       padding-top: calc(var(--header-h) + var(--safe-top) + 48px);
       padding-bottom: 56px;
@@ -242,7 +249,7 @@
       margin-left: 4px;
     }
 
-    /* ─── PRICING SECTION ───────────────────────────── */
+    /* â”€â”€â”€ PRICING SECTION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #pricing-cards {
       padding: 0 16px 72px;
       background: var(--black);
@@ -257,7 +264,7 @@
       backdrop-filter: blur(12px);
       border-bottom: 1px solid rgba(255,255,255,0.07);
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 0;
       text-align: center;
       padding: 10px 0;
@@ -467,7 +474,7 @@
       border-bottom: 1px solid rgba(255,255,255,0.06);
     }
 
-    /* ─── COMPARE TABLE (desktop) ───────────────────── */
+    /* â”€â”€â”€ COMPARE TABLE (desktop) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #compare-section {
       background: var(--surface-2);
       padding: 64px 24px;
@@ -547,7 +554,7 @@
       border-bottom: none;
     }
 
-    /* ─── FAQ ───────────────────────────────────────── */
+    /* â”€â”€â”€ FAQ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #faq {
       background: var(--black);
       padding: 64px 24px;
@@ -609,7 +616,7 @@
       color: rgba(255,255,255,0.58);
     }
 
-    /* ─── FINAL CTA ──────────────────────────────────── */
+    /* â”€â”€â”€ FINAL CTA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #final-cta {
       background: var(--accent);
       padding: 72px 24px calc(72px + var(--safe-bottom));
@@ -660,7 +667,7 @@
     .btn-outline-white-cta:hover { border-color: var(--white); }
     .fine-print { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 18px; }
 
-    /* ─── FOOTER ─────────────────────────────────────── */
+    /* â”€â”€â”€ FOOTER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     #site-footer {
       background: var(--black);
       border-top: 1px solid rgba(255,255,255,0.07);
@@ -675,18 +682,18 @@
     .footer-copy { font-size: 12px; color: rgba(255,255,255,0.25); }
     .footer-tagline { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.18); }
 
-    /* ─── REVEAL ─────────────────────────────────────── */
+    /* â”€â”€â”€ REVEAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
     .reveal.visible { opacity: 1; transform: translateY(0); }
 
     @media(min-width: 768px) {
       #pricing-cards { padding: 0 24px 80px; }
-      .pricing-stack { flex-direction: row; align-items: flex-start; gap: 16px; }
+      .pricing-stack { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px; }
       .plan-card { flex: 1; }
       section, #compare-section, #faq { padding: 80px 48px; }
     }
 
-    /* ─── MINIMAL DESKTOP ENHANCEMENTS ───────────────────────────── */
+    /* â”€â”€â”€ MINIMAL DESKTOP ENHANCEMENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     .desktop-nav {
       display: none;
       align-items: center;
@@ -722,6 +729,7 @@
 
     @media (min-width: 1024px) {
       :root { --header-h: 72px; }
+      .pricing-stack { grid-template-columns:repeat(4,minmax(0,1fr)); }
 
       #site-header {
         padding-left: 48px;
@@ -905,15 +913,15 @@
   </style>
 </head>
 <body>
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      HEADER
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 @include('partials.navigation')
 
 
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      PAGE HERO
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <section id="page-hero" aria-labelledby="pricing-title">
   <p class="page-eyebrow reveal">Simple, Transparent Pricing</p>
   <h1 class="page-hero-headline reveal" id="pricing-title">Choose Your Plan</h1>
@@ -923,15 +931,16 @@
 </section>
 
 
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      PRICING CARDS
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="pricing-cards">
 
   <!-- Sticky strip -->
   <div class="plan-strip" role="list" aria-label="Plan names">
     <div class="plan-strip-item" role="listitem">Free</div>
     <div class="plan-strip-item active" role="listitem">My Journey</div>
+    <div class="plan-strip-item" role="listitem">Jumpstart</div>
     <div class="plan-strip-item" role="listitem">Amplify</div>
   </div>
 
@@ -944,7 +953,7 @@
       </div>
       <div class="plan-price-wrap" aria-label="Free">
         <span class="plan-price-currency">$</span><span class="plan-price">0</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span><span class="plan-price-period">/mo</span></span>
+        <span class="plan-price-period">/mo</span>
       </div>
       <p class="plan-setup">No credit card required</p>
       <div class="plan-cta-wrap"><a href="/registration?utm_plan=free" class="plan-cta outline">Get Started Free</a></div>
@@ -959,29 +968,51 @@
       </ul>
     </article>
 
-    <article class="plan-card featured reveal" style="transition-delay:0.08s" aria-label="My Journey plan — most popular">
+    <article class="plan-card featured reveal" style="transition-delay:0.08s" aria-label="My Journey plan â€” most popular">
       <div class="plan-header">
         <div class="popular-badge">Most Popular</div>
         <div class="plan-name">My Journey</div>
-        <div class="plan-tagline">Your own recruiting HQ — domain, email, tracking, templates, and the coach database.</div>
+        <div class="plan-tagline">Your own recruiting HQ â€” domain, email, tracking, templates, and the coach database.</div>
       </div>
       <div class="plan-price-wrap" aria-label="$49 per month">
-        <span class="plan-price-currency">$</span><span class="plan-price">49</span>
+        <span class="plan-price">{{ $pricingMoney($myJourneyCents) }}</span>
         <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span><span class="plan-price-period">/mo</span></span>
       </div>
-      <p class="plan-setup">Monthly subscription &nbsp;· Cancel anytime</p>
+      <p class="plan-setup">Monthly subscription &nbsp;Â· Cancel anytime</p>
       <div class="plan-cta-wrap"><a href="/registration?utm_plan=my-journey" class="plan-cta solid">Get My Journey</a></div>
       <div class="plan-divider"></div>
       <ul class="plan-features" aria-label="My Journey plan features">
         <li class="feature-group-label">Everything in Free, plus:</li>
         <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own personalized domain</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own email — sends from you, not a third party</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own email â€” sends from you, not a third party</li>
         <li class="feature-group-label" style="margin-top:8px">Tools</li>
         <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach engagement tracking tool</li>
         <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Outreach templates</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach database access — weekly verifications</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach database access â€” weekly verifications</li>
         <li class="feature-group-label" style="margin-top:8px">Support</li>
         <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>1-on-1 onboarding</li>
+      </ul>
+    </article>
+
+
+    <article class="plan-card reveal" style="transition-delay:0.12s;border-color:rgba(25,167,255,.45)" aria-label="Jumpstart one-time package">
+      <div class="plan-header">
+        <div class="popular-badge" style="background:#19a7ff;color:#071522;">One-Time Push</div>
+        <div class="plan-name">Jumpstart</div>
+        <div class="plan-tagline">One clean recruiting push to see what a real campaign can do â€” no subscription required.</div>
+      </div>
+      <div class="plan-price-wrap" aria-label="Jumpstart one-time price">
+        <span class="plan-price">{{ $pricingMoney($jumpstartCents) }}</span>
+        <span class="plan-price-period">one time</span>
+      </div>
+      <p class="plan-setup"><strong>No subscription required</strong> &nbsp;Â· Same {{ $pricingMoney($jumpstartCents) }} whether or not you already have My Journey</p>
+      <div class="plan-cta-wrap"><a href="/registration?utm_plan=jumpstart" class="plan-cta outline">Get Jumpstart</a></div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features" aria-label="Jumpstart package features">
+        <li class="feature-group-label">One recruiting push</li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>1 Coach Outreach Campaign</strong></li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>1 Highlight Edit</strong></li>
+        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>1 Custom Graphic</strong></li>
       </ul>
     </article>
 
@@ -991,11 +1022,11 @@
         <div class="plan-name">Amplify</div>
         <div class="plan-tagline">Your complete recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.</div>
       </div>
-      <div class="plan-price-wrap" aria-label="$49 per month plus a one-time $500 setup fee">
-        <span class="plan-price-currency">$</span><span class="plan-price">500</span>
+      <div class="plan-price-wrap" aria-label="$500 Amplify service plus My Journey when needed">
+        <span class="plan-price">{{ $pricingMoney($amplifySetupCents) }}</span>
         <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span></span>
       </div>
-      <p class="plan-setup"><strong>$49/month</strong> &nbsp;· Covers graphics, production, and done-for-you setup</p>
+      <p class="plan-setup"><strong>{{ $pricingMoney($amplifySetupCents) }} one-time Amplify service</strong> &nbsp;Â· Free players also start My Journey at {{ $pricingMoney($myJourneyCents) }}/month ({{ $pricingMoney($amplifyEnrollmentCents) }} due today)</p>
       <div class="plan-cta-wrap"><a href="/registration?utm_plan=amplify" class="plan-cta outline">Amplify My Recruiting</a></div>
       <div class="plan-divider"></div>
       <ul class="plan-features" aria-label="Amplify plan features">
@@ -1013,42 +1044,42 @@
 </div><!-- /pricing-cards -->
 
 
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      COMPARE TABLE
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <section id="compare-section" aria-labelledby="compare">
   <p class="section-eyebrow reveal">Side by Side</p>
   <h2 class="section-title reveal" id="compare">Compare<br>Plans</h2>
   <div style="overflow-x:auto;" role="region" aria-label="Plan comparison table" tabindex="0">
-    <table class="compare-table" aria-label="Feature comparison across Free, My Journey, and Amplify plans">
-      <thead><tr><th scope="col">Feature</th><th scope="col">Free</th><th scope="col" class="accent-col">My Journey</th><th scope="col" style="color:#f5c451">Amplify</th></tr></thead>
+    <table class="compare-table" aria-label="Feature comparison across Free, My Journey, Jumpstart, and Amplify plans">
+      <thead><tr><th scope="col">Feature</th><th scope="col">Free</th><th scope="col" class="accent-col">My Journey</th><th scope="col" style="color:#19a7ff">Jumpstart</th><th scope="col" style="color:#f5c451">Amplify</th></tr></thead>
       <tbody>
-        <tr class="section-row"><td colspan="4">Your Presence</td></tr>
-        <tr><td>Simple PLYRSite page</td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Quick athlete info &amp; bio</td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Personalized domain</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
-        <tr><td>Personal email</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
-        <tr class="section-row"><td colspan="4">Recruiting Tools</td></tr>
-        <tr><td>Coach engagement tracking</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
-        <tr><td>Outreach templates</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
-        <tr><td>Coach database</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
-        <tr class="section-row"><td colspan="4">Done-For-You Production</td></tr>
-        <tr><td>Highlight reels included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>4</td></tr>
-        <tr><td>Custom graphics included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>4</td></tr>
-        <tr><td>Managed coach outreach included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>4 sends</td></tr>
-        <tr class="section-row"><td colspan="4">Support</td></tr>
-        <tr><td>Email support</td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>1-on-1 onboarding</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td></tr>
-        <tr><td>Dedicated support</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>8 hrs</td></tr>
+        <tr class="section-row"><td colspan="5">Your Presence</td></tr>
+        <tr><td>Simple PLYRSite page</td><td>âœ“</td><td>âœ“</td><td>âœ“</td><td>âœ“</td></tr>
+        <tr><td>Quick athlete info &amp; bio</td><td>âœ“</td><td>âœ“</td><td>âœ“</td><td>âœ“</td></tr>
+        <tr><td>Personalized domain</td><td><span class="dash">â€”</span></td><td>âœ“</td><td><span class="dash">â€”</span></td><td>âœ“</td></tr>
+        <tr><td>Personal email</td><td><span class="dash">â€”</span></td><td>âœ“</td><td><span class="dash">â€”</span></td><td>âœ“</td></tr>
+        <tr class="section-row"><td colspan="5">Recruiting Tools</td></tr>
+        <tr><td>Coach engagement tracking</td><td><span class="dash">â€”</span></td><td>âœ“</td><td><span class="dash">â€”</span></td><td>âœ“</td></tr>
+        <tr><td>Outreach templates</td><td><span class="dash">â€”</span></td><td>âœ“</td><td><span class="dash">â€”</span></td><td>âœ“</td></tr>
+        <tr><td>Coach database</td><td><span class="dash">â€”</span></td><td>âœ“</td><td><span class="dash">â€”</span></td><td>âœ“</td></tr>
+        <tr class="section-row"><td colspan="5">Done-For-You Production</td></tr>
+        <tr><td>Highlight edits / reels included</td><td><span class="dash">â€”</span></td><td><span class="dash">â€”</span></td><td>1</td><td>4</td></tr>
+        <tr><td>Custom graphics included</td><td><span class="dash">â€”</span></td><td><span class="dash">â€”</span></td><td>1</td><td>4</td></tr>
+        <tr><td>Managed coach outreach included</td><td><span class="dash">â€”</span></td><td><span class="dash">â€”</span></td><td>1 campaign</td><td>4 sends</td></tr>
+        <tr class="section-row"><td colspan="5">Support</td></tr>
+        <tr><td>Email support</td><td>âœ“</td><td>âœ“</td><td>âœ“</td><td>âœ“</td></tr>
+        <tr><td>1-on-1 onboarding</td><td><span class="dash">â€”</span></td><td>âœ“</td><td><span class="dash">â€”</span></td><td>âœ“</td></tr>
+        <tr><td>Dedicated support</td><td><span class="dash">â€”</span></td><td><span class="dash">â€”</span></td><td><span class="dash">â€”</span></td><td>8 hrs</td></tr>
       </tbody>
     </table>
   </div>
 </section>
 
 
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      FAQ
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <section id="faq" aria-labelledby="faq-title">
   <p class="section-eyebrow reveal">Got Questions</p>
   <h2 class="section-title reveal" id="faq-title">We've Got<br>Answers.</h2>
@@ -1061,7 +1092,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Amplify is $49 per month with a one-time $500 setup fee. The setup fee covers the initial graphics, highlight reels, coach outreach assets, onboarding, and done-for-you production work needed to launch the athlete's recruiting package.</p>
+        <p class="faq-answer-inner">Amplify is a {{ $pricingMoney($amplifySetupCents) }} one-time done-for-you service. Players who are not already on My Journey also start the {{ $pricingMoney($myJourneyCents) }}/month My Journey subscription, making {{ $pricingMoney($amplifyEnrollmentCents) }} due today for a new Amplify enrollment. The Amplify service covers the initial graphics, highlight reels, coach outreach assets, onboarding, and done-for-you production work needed to launch the athlete's recruiting package.</p>
       </div>
     </div>
 
@@ -1071,7 +1102,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Yes. My Journey and Amplify are monthly subscriptions and can be cancelled before the next billing cycle.</p>
+        <p class="faq-answer-inner">My Journey is the recurring {{ $pricingMoney($myJourneyCents) }}/month subscription and can be cancelled before the next billing cycle. Jumpstart and the Amplify service are one-time purchases, so there is no recurring Jumpstart or Amplify-service charge to cancel.</p>
       </div>
     </div>
 
@@ -1081,7 +1112,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Absolutely. You can upgrade from Free to My Journey or Amplify at any time. Your profile stays intact while the new features and support are added.</p>
+        <p class="faq-answer-inner">Absolutely. You can upgrade from Free to My Journey, add Jumpstart, or move into Amplify at any time. Your profile stays intact while the new features and support are added.</p>
       </div>
     </div>
 
@@ -1091,7 +1122,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">PLYRCARD works for any sport with a recruiting process — soccer, football, basketball, volleyball, softball, baseball, lacrosse, track, swimming, tennis, and more. If you're recruiting, we're built for you.</p>
+        <p class="faq-answer-inner">PLYRCARD works for any sport with a recruiting process â€” soccer, football, basketball, volleyball, softball, baseball, lacrosse, track, swimming, tennis, and more. If you're recruiting, we're built for you.</p>
       </div>
     </div>
 
@@ -1111,7 +1142,7 @@
         <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
       </div>
       <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Yes — you can create a free account and start building your profile. Upgrade to a paid plan when you're ready to unlock full card creation, sharing, and coach tracking features.</p>
+        <p class="faq-answer-inner">Yes â€” you can create a free account and start building your profile. Upgrade to a paid plan when you're ready to unlock full card creation, sharing, and coach tracking features.</p>
       </div>
     </div>
 
@@ -1119,9 +1150,9 @@
 </section>
 
 
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      FINAL CTA
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <section id="final-cta" aria-labelledby="pricing-cta-title">
   <p class="section-eyebrow">Ready to Stand Out</p>
   <h2 class="section-title" id="pricing-cta-title">Start Your<br>Journey</h2>
@@ -1130,13 +1161,13 @@
     <a href="/registration?utm_plan=free" class="btn-white-cta">Create Free Account</a>
     <a href="/book-demo" class="btn-outline-white-cta">Book a Demo</a>
   </div>
-  <p class="fine-print">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Set up in minutes</p>
+  <p class="fine-print">No credit card required &nbsp;Â·&nbsp; Free plan available &nbsp;Â·&nbsp; Set up in minutes</p>
 </section>
 
 
-<!-- ══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      FOOTER
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 @include('partials.footer')
 
 <script>

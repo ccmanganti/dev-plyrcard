@@ -31,6 +31,19 @@ return [
             'payment_form_url' => env('GHL_MY_JOURNEY_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true'),
         ],
 
+        'jumpstart' => [
+            'label' => 'Jumpstart',
+            'recurring_amount_cents' => 0,
+            'setup_fee_cents' => 14900,
+            'charge_first_month_upfront' => false,
+            'role_after_registration' => 'Free',
+            // RegistrationPaymentVerificationService syncs this role first.
+            // Keep the base tier Free; RegistrationController then adds the
+            // separate Jumpstart entitlement without replacing the base tier.
+            'role_after_payment' => 'Free',
+            'payment_form_url' => env('GHL_JUMPSTART_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true'),
+        ],
+
         'amplify' => [
             'label' => 'Amplify',
             'recurring_amount_cents' => 4900,

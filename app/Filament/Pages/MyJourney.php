@@ -104,6 +104,14 @@ class MyJourney extends Page
             && ($user->hasRole('Amplify') || $user->hasRole('amplify')));
     }
 
+    public function hasJumpstartAccess(): bool
+    {
+        $user = Auth::user();
+
+        return (bool) ($user && method_exists($user, 'hasRole')
+            && ($user->hasRole('Jumpstart') || $user->hasRole('jumpstart')));
+    }
+
     public function getHeroEyebrow(): string
     {
         return $this->getCurrentPlanKey() === 'my_journey'
@@ -138,15 +146,10 @@ class MyJourney extends Page
     {
         $currentPlan = $this->getCurrentPlanKey();
         $amplifyActive = $this->hasAmplifyAccess();
+        $jumpstartActive = $this->hasJumpstartAccess();
+        $jumpstartCents = (int) config('plyrcard-jumpstart.price_cents', 14900);
+        $jumpstartPrice = '$' . number_format($jumpstartCents / 100, 0);
         $hasMyJourney = $currentPlan === 'my_journey';
-        $journey = (array) config('plyrcard-registration.plans.my-journey', []);
-        $amplify = (array) config('plyrcard-registration.plans.amplify', []);
-        $journeyRecurring = (int) ($journey['recurring_amount_cents'] ?? 4900);
-        $amplifySetup = (int) ($amplify['setup_fee_cents'] ?? 50000);
-        $amplifyRecurring = $journeyRecurring;
-        $amplifyFirstMonth = (bool) ($amplify['charge_first_month_upfront'] ?? true);
-        $amplifyDue = $hasMyJourney ? $amplifySetup : $amplifySetup + ($amplifyFirstMonth ? $amplifyRecurring : 0);
-        $money = static fn (int $cents): string => '$' . number_format($cents / 100, ($cents % 100) === 0 ? 0 : 2);
 
         return [
             [
@@ -179,7 +182,7 @@ class MyJourney extends Page
             [
                 'key' => 'my_journey',
                 'name' => 'MY JOURNEY',
-                'price' => $money($journeyRecurring),
+                'price' => '$49',
                 'suffix' => '/mo',
                 'setup' => 'Monthly subscription · Cancel anytime',
                 'tagline' => 'Your own recruiting HQ — domain, email, tracking, templates, and the coach database.',
@@ -204,22 +207,46 @@ class MyJourney extends Page
                 'note' => 'Your recurring recruiting workspace and subscription plan.',
             ],
             [
+                'key' => 'jumpstart',
+                'name' => 'JUMPSTART',
+                'price' => $jumpstartPrice,
+                'suffix' => 'one time',
+                'setup' => 'One-time recruiting push · No subscription required',
+                'tagline' => 'One clean push to see what a real recruiting campaign can do.',
+                'accent' => 'blue',
+                'popular' => false,
+                'badge' => null,
+                'button' => $jumpstartActive ? 'JUMPSTART PURCHASED' : 'GET JUMPSTART',
+                'button_href' => '#',
+                'opens_jumpstart_checkout' => ! $jumpstartActive,
+                'button_style' => 'blue',
+                'button_disabled' => $jumpstartActive,
+                'icon' => 'sparkles',
+                'current' => false,
+                'active_addon' => $jumpstartActive,
+                'features' => [
+                    ['text' => '1 Coach Outreach Campaign', 'included' => true],
+                    ['text' => '1 Highlight Edit', 'included' => true],
+                    ['text' => '1 Custom Graphic', 'included' => true],
+                    ['text' => 'No My Journey subscription required', 'included' => true],
+                ],
+                'note' => 'Jumpstart is a one-time service entitlement. It does not replace Free or My Journey.',
+            ],
+            [
                 'key' => 'amplify',
                 'name' => 'AMPLIFY',
-                'price' => $money($amplifyDue),
+                'price' => '$500',
                 'suffix' => 'one time',
-                'setup' => $hasMyJourney
-                    ? ($money($amplifySetup) . ' one-time Amplify package')
-                    : ($money($amplifySetup) . ' setup + My Journey at ' . $money($amplifyRecurring) . '/mo' . ($amplifyFirstMonth ? ' (first month due today)' : '')),
+                'setup' => 'One-time done-for-you setup package · My Journey membership required',
                 'tagline' => 'A one-time production and recruiting setup package layered on top of My Journey.',
                 'accent' => 'gold',
                 'popular' => true,
                 'badge' => 'Done For You',
-                'button' => $amplifyActive ? 'ACTIVE' : ($hasMyJourney ? 'AMPLIFY MY RECRUITING' : 'GET AMPLIFY'),
+                'button' => $hasMyJourney ? 'AMPLIFY MY RECRUITING' : 'MY JOURNEY REQUIRED',
                 'button_href' => '#',
-                'opens_my_journey_checkout' => false,
-                'opens_amplify_checkout' => ! $amplifyActive,
-                'button_style' => $amplifyActive ? 'disabled' : 'gold',
+                'opens_my_journey_checkout' => ! $hasMyJourney,
+                'opens_amplify_checkout' => $hasMyJourney && ! $amplifyActive,
+                'button_style' => $hasMyJourney ? 'gold' : 'ghost',
                 'button_disabled' => $amplifyActive,
                 'icon' => 'crown',
                 'current' => false,
@@ -260,7 +287,7 @@ class MyJourney extends Page
         return match ($this->getCurrentPlanKey()) {
             'amplify' => 'Amplify includes My Journey plus monthly highlight reels, custom graphics, managed outreach, and hands-on support.',
             'my_journey' => 'Upgrade to Amplify anytime when you want custom graphics, highlight reels, and managed outreach handled for you.',
-            default => 'Free gives you the basics. Upgrade to My Journey or Amplify whenever you are ready to unlock more recruiting tools.',
+            default => 'Free gives you the basics. Upgrade to My Journey, add Jumpstart, or choose Amplify whenever you are ready for more recruiting support.',
         };
     }
 

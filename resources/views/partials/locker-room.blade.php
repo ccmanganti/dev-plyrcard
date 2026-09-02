@@ -61,6 +61,12 @@
     $lrAmplifyStatusUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.amplify.status')
         ? route('billing.amplify.status')
         : null;
+    $lrJumpstartStartUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.jumpstart.start')
+        ? route('billing.jumpstart.start')
+        : null;
+    $lrJumpstartStatusUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('billing.jumpstart.status')
+        ? route('billing.jumpstart.status')
+        : null;
     $lrLoginUrl = \Illuminate\Support\Facades\Route::has('plyrcard.drawer-login')
         ? route('plyrcard.drawer-login')
         : url('/admin/login');
@@ -632,6 +638,8 @@
      data-my-journey-status-url="{{ $lrMyJourneyStatusUrl }}"
      data-amplify-start-url="{{ $lrAmplifyStartUrl }}"
      data-amplify-status-url="{{ $lrAmplifyStatusUrl }}"
+        data-jumpstart-start-url="{{ $lrJumpstartStartUrl }}"
+        data-jumpstart-status-url="{{ $lrJumpstartStatusUrl }}"
      data-login-url="{{ $lrLoginUrl }}"
      data-password-reset-url="{{ $lrPasswordResetUrl }}"
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
@@ -1659,21 +1667,30 @@
         if (type === 'amplify') {
             return {start: drawer.dataset.amplifyStartUrl || '', status: drawer.dataset.amplifyStatusUrl || ''};
         }
+        if (type === 'jumpstart') {
+            return {start: drawer.dataset.jumpstartStartUrl || '', status: drawer.dataset.jumpstartStatusUrl || ''};
+        }
         return {start: drawer.dataset.myJourneyStartUrl || '', status: drawer.dataset.myJourneyStatusUrl || ''};
     }
 
     function configureLockerCheckout(type) {
         const isAmplify = type === 'amplify';
-        const plan = (state.plans || []).find(row => row.key === (isAmplify ? 'amplify' : 'my-journey')) || {};
-        q('[data-lr-checkout-eyebrow]').textContent = isAmplify ? 'Amplify' : 'My Journey';
-        q('[data-lr-checkout-heading]').textContent = isAmplify ? 'Upgrade to Amplify' : 'Upgrade to My Journey';
+        const isJumpstart = type === 'jumpstart';
+        const planKey = isAmplify ? 'amplify' : (isJumpstart ? 'jumpstart' : 'my-journey');
+        const plan = (state.plans || []).find(row => row.key === planKey) || {};
+        q('[data-lr-checkout-eyebrow]').textContent = isAmplify ? 'Amplify' : (isJumpstart ? 'Jumpstart' : 'My Journey');
+        q('[data-lr-checkout-heading]').textContent = isAmplify ? 'Upgrade to Amplify' : (isJumpstart ? 'Get Jumpstart' : 'Upgrade to My Journey');
         q('[data-lr-checkout-copy]').textContent = isAmplify
             ? `Complete the ${plan.due_today || plan.price || ''} checkout below. Your Amplify entitlement will update automatically after payment is confirmed.`
-            : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`;
-        q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify is active' : 'My Journey is active';
+            : (isJumpstart
+                ? `Complete the ${plan.price || '$149'} one-time checkout below. Jumpstart does not require a My Journey subscription.`
+                : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`);
+        q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify is active' : (isJumpstart ? 'Jumpstart is active' : 'My Journey is active');
         q('[data-lr-checkout-success-copy]').textContent = isAmplify
             ? 'Your purchase was confirmed. Amplify is now active on your PLYRCARD account.'
-            : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.';
+            : (isJumpstart
+                ? 'Your one-time purchase was confirmed. Jumpstart is now active on your PLYRCARD account.'
+                : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.');
     }
 
     async function pollLockerCheckout() {
@@ -1727,7 +1744,7 @@
 
     async function openLockerCheckout(type, retryAfterBilling = false) {
         if (lockerCheckoutStarting) return;
-        lockerCheckoutType = type === 'amplify' ? 'amplify' : 'my-journey';
+        lockerCheckoutType = ['amplify', 'jumpstart'].includes(type) ? type : 'my-journey';
         configureLockerCheckout(lockerCheckoutType);
         stopLockerCheckoutPolling();
         setView('checkout', true);
@@ -1776,16 +1793,21 @@
     function renderPlans() {
         const box = q('[data-lr-plans]'); if (!box) return;
         const amplifyActive = state?.plan?.amplify_active === true;
+        const jumpstartActive = state?.plan?.jumpstart_active === true;
         box.innerHTML = (state.plans || []).map(plan => {
             const isAmplify = plan.key === 'amplify';
-            const isAmplifyActive = isAmplify && (plan.active_addon === true || amplifyActive);
+            const isJumpstart = plan.key === 'jumpstart';
+            const isAddonActive = (isAmplify && (plan.active_addon === true || amplifyActive))
+                || (isJumpstart && (plan.active_addon === true || jumpstartActive));
             let action = '';
 
-            if (isAmplifyActive) {
-                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary lr-btn-amplify-active" type="button" disabled aria-disabled="true">${esc(plan.action_label || 'Amplify My Recruiting')}</button></div>`;
+            if (isAddonActive) {
+                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary lr-btn-amplify-active" type="button" disabled aria-disabled="true">${esc(plan.action_label || (isJumpstart ? 'Jumpstart Purchased' : 'Amplify My Recruiting'))}</button></div>`;
             } else if (!plan.current) {
                 if (plan.action_kind === 'my_journey_checkout' || plan.key === 'my-journey') {
                     action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="my-journey">${esc(plan.action_label || 'Get My Journey')}</button></div>`;
+                } else if (plan.action_kind === 'jumpstart_checkout' || plan.key === 'jumpstart') {
+                    action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="jumpstart">${esc(plan.action_label || 'Get Jumpstart')}</button></div>`;
                 } else if (plan.action_kind === 'amplify_checkout' || plan.key === 'amplify') {
                     action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="amplify">${esc(plan.action_label || 'Upgrade to Amplify')}</button></div>`;
                 } else if (plan.action_url && plan.action_url !== '#') {
@@ -1793,11 +1815,11 @@
                 }
             }
 
-            const statusPill = isAmplifyActive
+            const statusPill = isAddonActive
                 ? '<span class="lr-active-pill"><i class="fa-solid fa-check"></i> Active</span>'
                 : (plan.current ? '<span class="lr-chip">Current Plan</span>' : '');
 
-            return `<article class="lr-plan-card ${plan.current?'is-current':''} ${isAmplifyActive?'is-amplify-active':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${statusPill}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
+            return `<article class="lr-plan-card ${plan.current?'is-current':''} ${isAddonActive?'is-amplify-active':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${statusPill}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
         }).join('');
     }
 
@@ -2064,7 +2086,8 @@
     });
 
     window.addEventListener('plyrcard:my-journey-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('My Journey is active.'); });
-    window.addEventListener('plyrcard:amplify-upgraded', () => { refreshData(); setView('upgrade', false); showToast('Amplify is active.'); });
+    window.addEventListener('plyrcard:jumpstart-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('Jumpstart is active.'); });
+    window.addEventListener('plyrcard:amplify-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('Amplify is active.'); });
     if (forcePassword) setView('password', false);
     else render();
 })();
