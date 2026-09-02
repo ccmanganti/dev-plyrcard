@@ -114,14 +114,41 @@ class WebsitePublishedEmailService
     protected function hasRole(User $user,string $role): bool { try { return method_exists($user,'hasRole') && $user->hasRole($role); } catch (\Throwable) { return false; } }
     protected function e(string $s): string { return htmlspecialchars($s,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'); }
     protected function email(?string $e): ?string { $e=strtolower(trim(str_replace(["\\r","\\n"],'',(string)$e))); return filter_var($e,FILTER_VALIDATE_EMAIL)?$e:null; }
-    protected function sendHtml(User $user,string $to,string $subject,string $html,string $purpose): array
+    protected function sendHtml(User $user, string $to, string $subject, string $html, string $purpose): array
     {
-        $from=$this->email(PlyrcardMailSender::email()); if(!$from||!function_exists('mail')) return ['success'=>false,'error'=>'Mail transport unavailable.'];
-        $boundary='plyrcard_'.bin2hex(random_bytes(12)); $plain=trim(html_entity_decode(strip_tags($html),ENT_QUOTES|ENT_HTML5,'UTF-8'));
-        $headers=['MIME-Version: 1.0','From: '.PlyrcardMailSender::name().' <'.$from.'>','Reply-To: '.$from,'Content-Type: multipart/alternative; boundary="'.$boundary.'"'];
-        $message='--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n".$plain."\r\n--".$boundary."\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n".$html."\r\n--".$boundary."--\r\n";
-        try { $sent=@mail($to,$subject,$message,implode("\r\n",$headers),'-f'.$from); } catch (\Throwable $e) { $sent=false; Log::error('Website published email failed.',['user_id'=>$user->getKey(),'error'=>$e->getMessage()]); }
-        if(!$sent) Log::warning('Website published email was not accepted by mail transport.',['user_id'=>$user->getKey(),'recipient'=>$to]);
-        return ['success'=>$sent,'recipient'=>$to,'purpose'=>$purpose];
+        $from = $this->email(PlyrcardMailSender::email());
+        if (! $from || ! function_exists('mail')) {
+            return ['success' => false, 'error' => 'Mail transport unavailable.'];
+        }
+
+        // Keep the launch email self-contained in this service and send one HTML
+        // MIME part. This avoids exposing raw multipart boundaries/HTML in Gmail
+        // on shared-host mail transports.
+        $headers = [
+            'MIME-Version: 1.0',
+            'From: ' . PlyrcardMailSender::name() . ' <' . $from . '>',
+            'Reply-To: ' . $from,
+            'Content-Type: text/html; charset=UTF-8',
+            'Content-Transfer-Encoding: 8bit',
+        ];
+
+        try {
+            $sent = @mail($to, $subject, $html, implode("\r\n", $headers), '-f' . $from);
+        } catch (\Throwable $exception) {
+            $sent = false;
+            Log::error('Website published email failed.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        if (! $sent) {
+            Log::warning('Website published email was not accepted by mail transport.', [
+                'user_id' => $user->getKey(),
+                'recipient' => $to,
+            ]);
+        }
+
+        return ['success' => $sent, 'recipient' => $to, 'purpose' => $purpose];
     }
 }

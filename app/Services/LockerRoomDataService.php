@@ -537,6 +537,20 @@ class LockerRoomDataService
                 $school = ($schoolRef !== '' || $schoolName !== '')
                     ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
                     : null;
+
+                // Use the same coach -> school resolution used by Profile Views.
+                // Coach Engagement events often contain only the coach identity,
+                // so resolve the canonical local school before the row is rendered.
+                if (! $school && $contactId !== '') {
+                    $school = $this->resolveSchoolFromCoachReference('coach:' . $contactId);
+                }
+                if (! $school && filled($row['coach_email'] ?? $row['email'] ?? null)) {
+                    $school = $this->resolveSchoolFromCoachReference('coach-email:' . trim((string) ($row['coach_email'] ?? $row['email'])));
+                }
+                if ($school && $schoolName === '') {
+                    $schoolName = trim((string) $school->name);
+                }
+
                 $identity = $contactId !== ''
                     ? 'coach:' . $contactId
                     : 'viewer:' . strtolower($schoolRef . '|' . $coachName . '|' . ($row['coach_email'] ?? $row['email'] ?? ''));
@@ -1247,6 +1261,15 @@ class LockerRoomDataService
                     ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
                     : null;
                 $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
+                if (! $school && $contactId !== '') {
+                    $school = $this->resolveSchoolFromCoachReference('coach:' . $contactId);
+                }
+                if (! $school && filled($row['coach_email'] ?? $row['email'] ?? null)) {
+                    $school = $this->resolveSchoolFromCoachReference('coach-email:' . trim((string) ($row['coach_email'] ?? $row['email'])));
+                }
+                if ($school && $schoolName === '') {
+                    $schoolName = trim((string) $school->name);
+                }
                 $identity = $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $title);
 
                 return [
@@ -1265,6 +1288,15 @@ class LockerRoomDataService
                         'city' => null,
                         'state' => null,
                     ],
+                    'school_open_reference' => $school
+                        ? (string) ($this->schoolPayload($school)['reference'] ?? $school->getKey())
+                        : ($schoolRef !== ''
+                            ? $schoolRef
+                            : ($schoolName !== ''
+                                ? 'school:' . $schoolName
+                                : ($contactId !== ''
+                                    ? 'coach:' . $contactId
+                                    : (filled($row['coach_email'] ?? $row['email'] ?? null) ? 'coach-email:' . trim((string) ($row['coach_email'] ?? $row['email'])) : null)))),
                     'count' => $clicks,
                     'platform_counts' => [
                         'instagram' => $platform === 'instagram' ? $clicks : 0,

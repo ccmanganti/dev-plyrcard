@@ -34,8 +34,28 @@ class AmplifyUpgradeService
         }
 
         $billing = $this->billingProfiles->get($user);
+        $currentPlanKey = $this->currentPlanKey($user, $billing);
+        $isExistingJourneySubscriber = $currentPlanKey === 'my-journey';
 
-        if (! $this->billingProfiles->isComplete($billing)) {
+        // Service extensions must not force an existing My Journey subscriber to
+        // rebuild a full local billing address before checkout. Older/manual
+        // subscribers may predate BillingInformation, while their authoritative
+        // payer/contact/subscription identity already exists in the billing
+        // subaccount. Recover that identity first and reuse it.
+        if ($isExistingJourneySubscriber) {
+            try {
+                if (filled($billing->ghl_subscription_id) || filled($user->ghl_subscriber_contact_id)) {
+                    $billing = $this->billingProfiles->refreshPaymentIdentity($user);
+                    $user->refresh();
+                }
+            } catch (\Throwable $exception) {
+                Log::info('Amplify checkout could not refresh legacy billing identity before start.', [
+                    'user_id' => $user->getKey(),
+                    'billing_id' => $billing->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        } elseif (! $this->billingProfiles->isComplete($billing)) {
             return array_merge([
                 'success' => false,
                 'completed' => false,
@@ -47,9 +67,20 @@ class AmplifyUpgradeService
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
 
         if ($contactId === '') {
-            $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
-            $billing->refresh();
-            $user->refresh();
+            // Existing My Journey users can be re-linked using the account data
+            // already on file even when optional legacy billing address fields are
+            // blank. New enrollments still use the complete billing profile gate.
+            try {
+                $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
+                $billing->refresh();
+                $user->refresh();
+            } catch (\Throwable $exception) {
+                Log::warning('Amplify checkout could not ensure billing contact.', [
+                    'user_id' => $user->getKey(),
+                    'billing_id' => $billing->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
 
         if ($contactId === '') {
@@ -71,7 +102,6 @@ class AmplifyUpgradeService
         }
 
         $plan = $this->planConfig();
-        $currentPlanKey = $this->currentPlanKey($user, $billing);
         $expectedCents = $this->expectedAmountCents($plan, $currentPlanKey);
         $startedAt = now();
         $checkoutId = (string) Str::uuid();

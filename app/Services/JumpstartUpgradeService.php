@@ -34,8 +34,27 @@ class JumpstartUpgradeService
         }
 
         $billing = $this->billingProfiles->get($user);
+        $previousPlanKey = $this->basePlanKey($user, $billing);
+        $isExistingJourneySubscriber = $previousPlanKey === 'my-journey';
 
-        if (! $this->billingProfiles->isComplete($billing)) {
+        // Jumpstart is a service extension of My Journey. Existing subscribers
+        // should reuse their current payer/subscription identity instead of being
+        // blocked by address fields that older/manual accounts may never have
+        // stored locally.
+        if ($isExistingJourneySubscriber) {
+            try {
+                if (filled($billing->ghl_subscription_id) || filled($user->ghl_subscriber_contact_id)) {
+                    $billing = $this->billingProfiles->refreshPaymentIdentity($user);
+                    $user->refresh()->loadMissing('roles');
+                }
+            } catch (\Throwable $exception) {
+                Log::info('Jumpstart checkout could not refresh legacy billing identity before start.', [
+                    'user_id' => $user->getKey(),
+                    'billing_id' => $billing->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        } elseif (! $this->billingProfiles->isComplete($billing)) {
             return array_merge([
                 'success' => false,
                 'completed' => false,
@@ -46,9 +65,17 @@ class JumpstartUpgradeService
 
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
         if ($contactId === '') {
-            $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
-            $billing->refresh();
-            $user->refresh()->loadMissing('roles');
+            try {
+                $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
+                $billing->refresh();
+                $user->refresh()->loadMissing('roles');
+            } catch (\Throwable $exception) {
+                Log::warning('Jumpstart checkout could not ensure billing contact.', [
+                    'user_id' => $user->getKey(),
+                    'billing_id' => $billing->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
 
         if ($contactId === '') {
@@ -70,7 +97,6 @@ class JumpstartUpgradeService
             ];
         }
 
-        $previousPlanKey = $this->basePlanKey($user, $billing);
         $serviceCents = max(1, (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900));
         $journeyCents = max(1, (int) config('plyrcard-registration.plans.my-journey.recurring_amount_cents', 4900));
         $needsJourney = $previousPlanKey !== 'my-journey';
