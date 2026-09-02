@@ -39,7 +39,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'planKey' => $planKey,
             'plan' => $this->planConfig($planKey),
             'isPaidPlan' => $planKey !== 'free',
-            'requiresDomain' => in_array($planKey, ['my-journey', 'amplify'], true),
+            'requiresDomain' => in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true),
             'sportPositions' => $this->sportPositions,
             'states' => $this->states(),
             'ageGroups' => $this->getAgeGroupOptions(),
@@ -222,9 +222,10 @@ class RegistrationController extends PublicPlayerIntakeController
         );
         $plan = $this->planConfig($planKey);
         $isPaid = $planKey !== 'free';
-        // Jumpstart is a paid one-time service, but it does not include a custom
-        // domain by itself. My Journey / Amplify keep the custom-domain flow.
-        $requiresDomain = in_array($planKey, ['my-journey', 'amplify'], true);
+        // My Journey is the subscription layer for My Journey itself and for both
+        // Jumpstart / Amplify service-extension registrations, so all three use
+        // the custom-domain registration flow.
+        $requiresDomain = in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true);
 
         $request->merge([
             'plan_key' => $planKey,
@@ -481,13 +482,13 @@ class RegistrationController extends PublicPlayerIntakeController
                 'billing_postal_code' => $validated['billing_postal_code'] ?? null,
                 'billing_country' => $validated['billing_country'] ?? 'US',
                 'plan_key' => $planKey,
-                'billing_cycle' => $planKey === 'my-journey' || $planKey === 'amplify' ? 'monthly' : null,
+                'billing_cycle' => in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true) ? 'monthly' : null,
                 'currency' => 'USD',
                 'recurring_amount_cents' => $recurring,
                 'setup_fee_cents' => $setup,
                 'initial_amount_cents' => $initialAmount,
                 'payment_status' => $isPaid ? 'pending' : 'not_required',
-                'subscription_status' => $planKey === 'jumpstart' ? 'not_applicable' : ($isPaid ? 'pending' : 'free'),
+                'subscription_status' => $isPaid ? 'pending' : 'free',
                 'payment_provider' => $isPaid ? 'ghl_survey' : null,
                 'payment_type' => $isPaid ? 'card' : null,
                 'requested_domain' => $requiresDomain ? $validated['requested_domain'] : null,
@@ -649,30 +650,31 @@ class RegistrationController extends PublicPlayerIntakeController
 
                 $billing->refresh();
 
-                if (($verification['verified'] ?? false) && $billing->plan_key === 'jumpstart') {
-                    // Jumpstart is a one-time service entitlement. Do not let the
-                    // generic registration verifier replace the player's base tier.
-                    // Restore Free for a new registration and add Jumpstart on top.
+                if (($verification['verified'] ?? false) && in_array($billing->plan_key, ['jumpstart', 'amplify'], true)) {
+                    // Jumpstart and Amplify are service extensions. My Journey is
+                    // the underlying subscription and the service role is added on top.
+                    $serviceRole = $billing->plan_key === 'jumpstart' ? 'Jumpstart' : 'Amplify';
+
                     if (method_exists($user, 'assignRole')) {
-                        if (! $user->hasRole('Free') && ! $user->hasRole('My Journey')) {
-                            $user->assignRole('Free');
+                        if (! $user->hasRole('My Journey')) {
+                            $user->assignRole('My Journey');
                         }
-                        if (! $user->hasRole('Jumpstart')) {
-                            $user->assignRole('Jumpstart');
+                        if (! $user->hasRole($serviceRole)) {
+                            $user->assignRole($serviceRole);
                         }
                     } elseif (method_exists($user, 'syncRoles')) {
                         $roles = method_exists($user, 'getRoleNames') ? $user->getRoleNames()->all() : [];
-                        if (! in_array('Free', $roles, true) && ! in_array('My Journey', $roles, true)) {
-                            $roles[] = 'Free';
-                        }
-                        $roles[] = 'Jumpstart';
+                        $roles[] = 'My Journey';
+                        $roles[] = $serviceRole;
                         $user->syncRoles(array_values(array_unique($roles)));
                     }
 
+                    $journeyRecurring = (int) config('plyrcard-registration.plans.my-journey.recurring_amount_cents', 4900);
                     $billing->forceFill([
-                        'subscription_status' => 'not_applicable',
-                        'billing_cycle' => null,
-                        'recurring_amount_cents' => 0,
+                        'plan_key' => 'my-journey',
+                        'subscription_status' => 'active',
+                        'billing_cycle' => 'monthly',
+                        'recurring_amount_cents' => $journeyRecurring,
                     ])->save();
                 }
             } catch (\Throwable $exception) {
@@ -729,12 +731,12 @@ class RegistrationController extends PublicPlayerIntakeController
         if ($planKey === 'jumpstart') {
             return [
                 'label' => 'Jumpstart',
-                'recurring_amount_cents' => 0,
+                'recurring_amount_cents' => (int) config('plyrcard-registration.plans.my-journey.recurring_amount_cents', 4900),
                 'setup_fee_cents' => (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900),
-                'charge_first_month_upfront' => false,
+                'charge_first_month_upfront' => true,
                 'role_after_registration' => 'Free',
-                'role_after_payment' => 'Jumpstart',
-                'payment_form_url' => (string) config('plyrcard-registration.plans.jumpstart.payment_form_url', 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true'),
+                'role_after_payment' => 'My Journey',
+                'payment_form_url' => (string) config('plyrcard-registration.plans.jumpstart.payment_form_url', 'https://systems.plyrcard.com/widget/survey/KmE9cOWtXltjhFEPw27w?notrack=true'),
             ];
         }
 
@@ -758,12 +760,12 @@ class RegistrationController extends PublicPlayerIntakeController
             ],
             'jumpstart' => [
                 'label' => 'Jumpstart',
-                'recurring_amount_cents' => 0,
+                'recurring_amount_cents' => 4900,
                 'setup_fee_cents' => 14900,
-                'charge_first_month_upfront' => false,
+                'charge_first_month_upfront' => true,
                 'role_after_registration' => 'Free',
-                'role_after_payment' => 'Jumpstart',
-                'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true',
+                'role_after_payment' => 'My Journey',
+                'payment_form_url' => 'https://systems.plyrcard.com/widget/survey/KmE9cOWtXltjhFEPw27w?notrack=true',
             ],
             'amplify' => [
                 'label' => 'Amplify',
@@ -797,7 +799,7 @@ class RegistrationController extends PublicPlayerIntakeController
         if ($baseUrl === '') {
             $baseUrl = match ($planKey) {
                 'my-journey' => 'https://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
-                'jumpstart' => 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true',
+                'jumpstart' => 'https://systems.plyrcard.com/widget/survey/KmE9cOWtXltjhFEPw27w?notrack=true',
                 'amplify' => 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
                 default => '',
             };

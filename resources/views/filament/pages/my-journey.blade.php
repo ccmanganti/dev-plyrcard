@@ -162,7 +162,7 @@
 
         .mj-grid {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 1rem;
             margin-top: 1.25rem;
         }
@@ -632,7 +632,7 @@
             font-size: .9rem;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 760px) {
             .mj-grid {
                 grid-template-columns: 1fr;
             }

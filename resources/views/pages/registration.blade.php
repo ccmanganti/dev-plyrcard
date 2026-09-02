@@ -3,7 +3,7 @@
     $isPaid = $isPaidPlan;
     $isAmplify = $planKey === 'amplify';
     $isJumpstart = $planKey === 'jumpstart';
-    $requiresDomain = $requiresDomain ?? in_array($planKey, ['my-journey', 'amplify'], true);
+    $requiresDomain = $requiresDomain ?? in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true);
     $isMyJourney = $planKey === 'my-journey';
     $planLabel = $plan['label'] ?? 'Free';
     $recurringDollars = number_format(((int) ($plan['recurring_amount_cents'] ?? 0)) / 100, 2);
@@ -66,7 +66,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
           @if($isAmplify)
             <b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b> setup &middot; then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month
           @elseif($isJumpstart)
-            <b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b> one time &middot; no subscription required
+            <b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b> service &middot; then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month
           @else
             <b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b> / month
           @endif
@@ -115,7 +115,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
       <div class="loading-line" id="dload"><i></i><span>Checking domain availability</span></div>
       <div class="results" id="dres"></div>
       <div class="own"><b>Choose the domain you want.</b> Final registration is completed after your order is confirmed.</div>
-      @if($isMyJourney)
+      @if($requiresDomain)
       <div class="domain-review-note"><i aria-hidden="true"></i><span><strong>Domain review required.</strong> Your selected domain will not be publicly visible yet. The PLYRCARD team needs to review and approve it first.</span></div>
       @endif
     </div>
@@ -123,9 +123,9 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
   <div class="msg" id="dmsg" style="margin-top:12px">Choose an available domain request to continue.</div>
   @else
   <div class="eyebrow">Step 01 of 04</div><h1>Start your Jumpstart</h1>
-  <p class="sub">Jumpstart is a $149 one-time recruiting push. No My Journey subscription is required.</p>
+  <p class="sub">Jumpstart adds a $149 recruiting service package to My Journey. Your first $49 My Journey month is included in today's checkout.</p>
   <div class="claim live" style="margin-top:28px"><div class="k">Included with Jumpstart</div><div class="url" style="font-size:clamp(20px,4vw,28px)"><span class="h">One clean recruiting push</span></div><div class="status ok"><span class="pip"></span><span>1 coach outreach campaign, 1 highlight edit, and 1 custom graphic.</span></div></div>
-  <div class="domain-review-note" style="border-color:rgba(74,222,155,.28);background:rgba(74,222,155,.06);color:#9fd9bd"><i style="background:var(--good)" aria-hidden="true"></i><span>Your account keeps the shared PLYRCARD link unless you also have My Journey. You can add My Journey anytime for a custom domain and recruiting workspace.</span></div>
+  <div class="domain-review-note"><i aria-hidden="true"></i><span><strong>My Journey is included.</strong> Choose your personalized domain above. Jumpstart adds the one-time recruiting service package while My Journey continues at the configured monthly rate.</span></div>
   @endif
   <div class="nav step-nav"><button type="button" class="btn pri" data-go="2">Continue</button></div>
 </section>
@@ -154,9 +154,9 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
   <div class="order"><div class="order-h">{{ $planLabel }}</div><ul>
     @if($requiresDomain)<li><span><span id="ord-dom">yourname.com</span> domain request</span><b>Included</b></li>@else<li><span>Shared PLYRCARD profile link</span><b>Included</b></li>@endif
     <li><span>PLYRSITE profile and recruiting tools</span><b>Included</b></li>
-    @if($isJumpstart)<li><span>1 coach outreach campaign</span><b>Included</b></li><li><span>1 highlight edit</span><b>Included</b></li><li><span>1 custom graphic</span><b>Included</b></li><li><span>One-time Jumpstart purchase</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
+    @if($isJumpstart)<li><span>My Journey membership</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}/mo</b></li><li><span>1 coach outreach campaign</span><b>Included</b></li><li><span>1 highlight edit</span><b>Included</b></li><li><span>1 custom graphic</span><b>Included</b></li><li><span>Jumpstart service extension</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
     @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li><li><span>First month</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b></li>@endif
-  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)$500 setup + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @elseif($isJumpstart)One-time purchase. No subscription required. @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
+  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)$500 setup + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @elseif($isJumpstart)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Jumpstart service + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first My Journey month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
   <div class="fields" style="margin-top:24px">
     <div class="divider" id="billingInfoStart"><span>Billing information</span></div>
     <div class="f"><label>Billing name</label><input name="billing_name" id="billingName" type="text" autocomplete="name" placeholder="Name on billing account"><div class="msg">Enter billing name.</div></div>
@@ -189,8 +189,8 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 </section>
 
 <section class="panel" data-step="5">
-  <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1>@if($requiresDomain)<div class="live-dom" id="final-dom">yourname.com</div>@endif @if($isMyJourney)<div class="domain-review-note" style="max-width:520px;margin-left:auto;margin-right:auto;text-align:left"><i aria-hidden="true"></i><span><strong>Pending PLYRCARD team review.</strong> This domain will not be publicly visible yet. It will become available after the team reviews and approves your domain request.</span></div>@endif<div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Continue to payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
-  <div class="next"><h3>What happens next</h3><ol><li><div><b>Complete your payment</b>Your selected paid plan activates after payment is completed.</div></li>@if($isMyJourney)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@elseif($requiresDomain)<li><div><b>Your domain moves forward</b>Your selected domain proceeds to the registration stage.</div></li>@elseif($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your one-time campaign, highlight edit, and graphic can move into production after payment confirmation.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
+  <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1>@if($requiresDomain)<div class="live-dom" id="final-dom">yourname.com</div>@endif @if($requiresDomain)<div class="domain-review-note" style="max-width:520px;margin-left:auto;margin-right:auto;text-align:left"><i aria-hidden="true"></i><span><strong>Pending PLYRCARD team review.</strong> This domain will not be publicly visible yet. It will become available after the team reviews and approves your domain request.</span></div>@endif<div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Continue to payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
+  <div class="next"><h3>What happens next</h3><ol><li><div><b>Complete your payment</b>Your selected paid plan activates after payment is completed.</div></li>@if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
 </section>
 @else
 <section class="panel active" data-step="1">

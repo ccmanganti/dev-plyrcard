@@ -33,15 +33,18 @@ return [
 
         'jumpstart' => [
             'label' => 'Jumpstart',
-            'recurring_amount_cents' => 0,
+            // Jumpstart is a one-time service extension of My Journey. A player
+            // who is not already subscribed starts My Journey in the same checkout.
+            'recurring_amount_cents' => 4900,
             'setup_fee_cents' => 14900,
-            'charge_first_month_upfront' => false,
+            'charge_first_month_upfront' => true,
             'role_after_registration' => 'Free',
-            // RegistrationPaymentVerificationService syncs this role first.
-            // Keep the base tier Free; RegistrationController then adds the
-            // separate Jumpstart entitlement without replacing the base tier.
-            'role_after_payment' => 'Free',
-            'payment_form_url' => env('GHL_JUMPSTART_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true'),
+            'role_after_payment' => 'My Journey',
+            'payment_form_url' => env('GHL_JUMPSTART_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/KmE9cOWtXltjhFEPw27w?notrack=true'),
+            // Existing My Journey members owe only the $149 service fee. Point
+            // this at a dedicated $149 survey if the main survey always charges
+            // $198. It defaults to the supplied survey for backwards compatibility.
+            'my_journey_upgrade_form_url' => env('GHL_JUMPSTART_MY_JOURNEY_UPGRADE_FORM_URL', 'https://systems.plyrcard.com/widget/survey/CXioZTT8ncW1xtwZuLVt?notrack=true'),
         ],
 
         'amplify' => [

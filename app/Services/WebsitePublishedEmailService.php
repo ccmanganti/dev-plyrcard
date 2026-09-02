@@ -23,7 +23,8 @@ class WebsitePublishedEmailService
         $journeyCents = (int) data_get($plans, 'my-journey.recurring_amount_cents', 4900);
         $amplifySetupCents = (int) data_get($plans, 'amplify.setup_fee_cents', 50000);
         $amplifyFirstMonth = (bool) data_get($plans, 'amplify.charge_first_month_upfront', true);
-        $jumpstartCents = (int) config('plyrcard-jumpstart.price_cents', 14900);
+        $jumpstartCents = (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900);
+        $jumpstartEnrollmentCents = $jumpstartCents + $journeyCents;
         $amplifyEnrollmentCents = $amplifySetupCents + ($amplifyFirstMonth ? $journeyCents : 0);
         $manageUrl = rtrim((string) config('app.url', 'https://plyrcard.com'), '/') . '/admin/my-journey';
         $loginUrl = rtrim((string) config('app.url', 'https://plyrcard.com'), '/') . '/admin/login';
@@ -33,7 +34,11 @@ class WebsitePublishedEmailService
             $offers[] = ['name'=>'My Journey','price'=>$this->money($journeyCents) . '/mo','copy'=>'Your recruiting HQ: custom domain, coach database, outreach tools, and engagement tracking.','cta'=>'Start My Journey'];
         }
         if (! $hasJumpstart && ! $hasAmplify) {
-            $offers[] = ['name'=>'Jumpstart','price'=>$this->money($jumpstartCents) . ' one time','copy'=>'One coach outreach campaign, one highlight edit, and one custom graphic. No subscription required.','cta'=>'Get Jumpstart'];
+            $jumpPrice = $hasJourney ? $this->money($jumpstartCents) . ' one time' : $this->money($jumpstartEnrollmentCents) . ' due today';
+            $jumpCopy = $hasJourney
+                ? 'Add the ' . $this->money($jumpstartCents) . ' Jumpstart recruiting service to your active My Journey membership.'
+                : 'Start My Journey and add Jumpstart in one checkout: the service plus your first monthly payment.';
+            $offers[] = ['name'=>'Jumpstart','price'=>$jumpPrice,'copy'=>$jumpCopy,'cta'=>'Get Jumpstart'];
         }
         if (! $hasAmplify) {
             $ampPrice = $hasJourney ? $this->money($amplifySetupCents) . ' one time' : $this->money($amplifyEnrollmentCents) . ' due today';
@@ -49,32 +54,50 @@ class WebsitePublishedEmailService
 
     protected function render(User $user, string $siteUrl, string $loginUrl, string $manageUrl, array $offers, bool $hasAmplify): string
     {
-        $first=$this->e((string)($user->first_name ?: 'Player')); $site=$this->e($siteUrl); $login=$this->e($loginUrl); $manage=$this->e($manageUrl);
-        $offerHtml='';
+        $first = $this->e((string) ($user->first_name ?: 'Player'));
+        $site = $this->e($siteUrl);
+        $login = $this->e($loginUrl);
+        $manage = $this->e($manageUrl);
+
+        $offerHtml = '';
         foreach ($offers as $offer) {
-            $offerHtml .= '<tr><td style="padding:0 0 12px"><table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#15181d;border:1px solid #272d35;border-radius:14px"><tr><td style="padding:20px">'
-                . '<div style="font-size:11px;letter-spacing:1.7px;text-transform:uppercase;color:#FF6347;font-weight:800">' . $this->e($offer['name']) . '</div>'
-                . '<div style="margin-top:6px;font-size:25px;line-height:1.1;font-weight:900;color:#fff">' . $this->e($offer['price']) . '</div>'
-                . '<div style="margin-top:9px;font-size:14px;line-height:1.6;color:#aab0b8">' . $this->e($offer['copy']) . '</div>'
-                . '<div style="margin-top:16px"><a href="'.$manage.'" style="display:inline-block;background:#FF6347;color:#111;text-decoration:none;font-size:13px;font-weight:900;padding:11px 16px;border-radius:9px">'.$this->e($offer['cta']).'</a></div>'
+            $name = $this->e((string) $offer['name']);
+            $price = $this->e((string) $offer['price']);
+            $copy = $this->e((string) $offer['copy']);
+            $cta = $this->e((string) $offer['cta']);
+            $dark = strcasecmp((string) $offer['name'], 'Amplify') === 0;
+            $bg = $dark ? '#000000' : '#ffffff';
+            $text = $dark ? '#ffffff' : '#1e1e1e';
+            $border = $dark ? '#000000' : '#dbdbdb';
+            $buttonBg = $dark ? '#ff6347' : '#000000';
+            $buttonText = $dark ? '#1e1e1e' : '#ffffff';
+
+            $offerHtml .= '<tr><td style="padding:0 24px 16px">'
+                . '<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:'.$bg.';border:2px solid '.$border.';border-radius:10px">'
+                . '<tr><td style="padding:18px;color:'.$text.'">'
+                . '<div style="font-size:25px;font-weight:900;line-height:1.2">'.$name.'</div>'
+                . '<div style="margin-top:8px;font-size:38px;font-weight:900;line-height:1;color:#ff6347">'.$price.'</div>'
+                . '<div style="margin-top:12px;font-size:15px;line-height:1.55;color:'.($dark ? '#ffffff' : '#4a4741').'">'.$copy.'</div>'
+                . '<div style="margin-top:16px"><a href="'.$manage.'" style="display:inline-block;background:'.$buttonBg.';color:'.$buttonText.';text-decoration:none;font-weight:900;padding:11px 18px;border-radius:8px">'.$cta.'</a></div>'
                 . '</td></tr></table></td></tr>';
         }
-        $next = $hasAmplify
-            ? '<div style="margin-top:26px;padding:20px;border:1px solid #244832;background:#10251a;border-radius:14px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:1.6px;color:#58d78f;font-weight:800">YOU ARE FULLY AMPLIFIED</div><div style="margin-top:8px;color:#e9fff2;font-size:15px;line-height:1.6">Your highest done-for-you package is already active. Keep your film, stats, contact information, and schedule current so every coach visit lands on your strongest PLYRCARD.</div></div>'
-            : '<div style="margin:28px 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:1.8px;color:#FF6347;font-weight:800">WHAT\'S NEXT</div><div style="font-size:27px;font-weight:900;line-height:1.15;color:#fff">A live site is step one. Getting it seen is step two.</div><div style="margin:10px 0 18px;color:#aab0b8;font-size:14px;line-height:1.65">Choose the level of recruiting help that fits right now. Your profile stays intact as you add services.</div><table width="100%" cellpadding="0" cellspacing="0" role="presentation">'.$offerHtml.'</table>';
 
-        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#08090b;font-family:Arial,Helvetica,sans-serif;color:#fff">'
-            . '<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#08090b"><tr><td align="center" style="padding:28px 12px"><table width="600" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:600px">'
-            . '<tr><td style="padding:0 20px 18px;font-size:21px;font-weight:900">PLYR<span style="color:#FF6347">CARD</span></td></tr>'
-            . '<tr><td style="background:#101216;border:1px solid #242930;border-radius:18px;padding:34px 28px">'
-            . '<div style="font-size:11px;letter-spacing:1.9px;text-transform:uppercase;color:#58d78f;font-weight:900">YOUR SITE IS LIVE</div>'
-            . '<h1 style="margin:10px 0 0;font-size:36px;line-height:1.05;color:#fff">'.$first.', your PLYRCARD is published.</h1>'
-            . '<p style="margin:14px 0 0;color:#aab0b8;font-size:15px;line-height:1.7">Send it to coaches, put it in your bio, and add it to your email signature. This link is yours.</p>'
-            . '<div style="margin-top:24px;padding:18px;background:#08090b;border:1px solid #272d35;border-radius:12px;word-break:break-all"><div style="font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:#737b86;font-weight:800">Your live site</div><div style="margin-top:7px;font-size:17px;color:#fff;font-weight:800">'.$site.'</div></div>'
-            . '<div style="margin-top:20px"><a href="'.$site.'" style="display:inline-block;background:#FF6347;color:#111;text-decoration:none;font-weight:900;padding:14px 20px;border-radius:10px;margin-right:8px">View My Site</a><a href="'.$login.'" style="display:inline-block;background:#fff;color:#111;text-decoration:none;font-weight:900;padding:14px 20px;border-radius:10px">Log In &amp; Edit</a></div>'
+        $next = $hasAmplify
+            ? '<tr><td style="padding:8px 24px 22px"><div style="border:2px solid #000;border-radius:10px;background:#000;color:#fff;padding:20px"><div style="color:#ff6347;font-size:14px;font-weight:900;letter-spacing:.04em">YOU ARE FULLY AMPLIFIED</div><div style="margin-top:8px;font-size:24px;font-weight:900">Your highest service extension is already active.</div><p style="margin:10px 0 0;line-height:1.55">Keep your film, stats, schedule, and contact information current so every coach visit lands on your strongest PLYRCARD.</p></div></td></tr>'
+            : '<tr><td style="padding:20px 24px 10px"><div style="color:#ff6347;font-size:14px;font-weight:900;letter-spacing:.04em">WHAT\'S NEXT</div><div style="margin-top:8px;font-size:30px;font-weight:900;line-height:1.15">A site coaches never see doesn\'t do much.</div><p style="margin:10px 0 0;color:#4a4741;font-size:15px;font-weight:700;line-height:1.55">The profile is step one. Step two is getting it in front of the right programs, with video and graphics that make them stop scrolling. Choose the level that fits right now.</p></td></tr>'.$offerHtml;
+
+        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+            . '<body style="margin:0;padding:0;background:#f0f1f5;font-family:Arial,Helvetica,sans-serif;color:#1e1e1e">'
+            . '<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f0f1f5"><tr><td align="center">'
+            . '<table width="600" cellpadding="0" cellspacing="0" role="presentation" style="width:100%;max-width:600px;background:#fff">'
+            . '<tr><td style="padding:24px"><a href="https://plyrcard.com" style="text-decoration:none;font-size:22px;font-weight:900;color:#000">PLYR<span style="color:#ff6347">CARD</span></a></td></tr>'
+            . '<tr><td style="padding:0 24px"><div style="background:#ff6347;border-radius:10px;padding:34px 22px;text-align:center"><div style="font-size:14px;font-weight:900;letter-spacing:.08em">YOUR PLYRSITE IS LIVE</div><div style="margin-top:8px;font-size:34px;line-height:1.05;font-weight:900">YOU MADE IT OFFICIAL</div></div></td></tr>'
+            . '<tr><td style="padding:20px 24px 10px"><p style="margin:0;font-size:16px;font-weight:700">Hi '.$first.',</p><p style="margin:12px 0 0;color:#4a4741;font-size:16px;font-weight:700;line-height:1.55">Your PLYRCARD profile is published and live. Send it to coaches, put it in your bio, and add it to your email signature. This link is yours.</p></td></tr>'
+            . '<tr><td style="padding:8px 24px 22px"><table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr><td style="width:48%;vertical-align:top;padding-right:8px"><div style="font-size:25px;font-weight:900">YOUR SITE IS LIVE</div><p style="color:#4a4741;line-height:1.55">Bookmark your account. Stats, video, and contact information can be updated anytime.</p></td><td style="width:52%;vertical-align:top;padding-left:8px"><a href="'.$site.'" style="display:block;background:#ff6347;color:#1e1e1e;text-decoration:none;text-align:center;font-weight:900;padding:12px;border-radius:7px;margin-bottom:10px">VIEW MY SITE</a><a href="'.$login.'" style="display:block;background:#000;color:#fff;text-decoration:none;text-align:center;font-weight:900;padding:12px;border-radius:7px">LOG IN &amp; EDIT</a></td></tr></table></td></tr>'
             . $next
-            . '<div style="margin-top:28px;padding-top:20px;border-top:1px solid #272d35;color:#7e8792;font-size:13px;line-height:1.6">This is your journey. It has to come from you.<br><strong style="color:#FF6347">Authenticity is Key.</strong></div>'
-            . '</td></tr><tr><td align="center" style="padding:20px;color:#59616b;font-size:11px">&copy; 2026 PLYRCARD</td></tr></table></td></tr></table></body></html>';
+            . '<tr><td style="padding:16px 24px 24px"><p style="margin:0;color:#4a4741;font-size:15px;font-weight:700;line-height:1.55">Not sure which one fits? Reply with your grad year, position, and the level you\'re chasing.</p><p style="margin:16px 0 0;font-weight:700">This is your journey. It has to come from you. <span style="color:#ff6347">Authenticity is Key.</span></p></td></tr>'
+            . '<tr><td style="background:#000;padding:20px;text-align:center;color:#fff;font-size:18px;font-weight:900">PLYR<span style="color:#ff6347">CARD</span></td></tr>'
+            . '</table></td></tr></table></body></html>';
     }
 
     protected function money(int $cents): string
@@ -96,8 +119,8 @@ class WebsitePublishedEmailService
         $from=$this->email(PlyrcardMailSender::email()); if(!$from||!function_exists('mail')) return ['success'=>false,'error'=>'Mail transport unavailable.'];
         $boundary='plyrcard_'.bin2hex(random_bytes(12)); $plain=trim(html_entity_decode(strip_tags($html),ENT_QUOTES|ENT_HTML5,'UTF-8'));
         $headers=['MIME-Version: 1.0','From: '.PlyrcardMailSender::name().' <'.$from.'>','Reply-To: '.$from,'Content-Type: multipart/alternative; boundary="'.$boundary.'"'];
-        $message='--'.$boundary."\\r\\nContent-Type: text/plain; charset=UTF-8\\r\\n\\r\\n".$plain."\\r\\n--".$boundary."\\r\\nContent-Type: text/html; charset=UTF-8\\r\\n\\r\\n".$html."\\r\\n--".$boundary.'--';
-        try { $sent=@mail($to,$subject,$message,implode("\\r\\n",$headers),'-f'.$from); } catch (\Throwable $e) { $sent=false; Log::error('Website published email failed.',['user_id'=>$user->getKey(),'error'=>$e->getMessage()]); }
+        $message='--'.$boundary."\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n".$plain."\r\n--".$boundary."\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n".$html."\r\n--".$boundary."--\r\n";
+        try { $sent=@mail($to,$subject,$message,implode("\r\n",$headers),'-f'.$from); } catch (\Throwable $e) { $sent=false; Log::error('Website published email failed.',['user_id'=>$user->getKey(),'error'=>$e->getMessage()]); }
         if(!$sent) Log::warning('Website published email was not accepted by mail transport.',['user_id'=>$user->getKey(),'recipient'=>$to]);
         return ['success'=>$sent,'recipient'=>$to,'purpose'=>$purpose];
     }

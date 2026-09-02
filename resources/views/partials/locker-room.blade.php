@@ -847,7 +847,7 @@
                     <div class="lr-checkout-shell">
                         <div class="lr-checkout-card">
                             <div class="lr-checkout-intro">
-                                <span class="lr-eyebrow" data-lr-checkout-eyebrow>Secure Checkout</span>
+                                <span class="lr-eyebrow" data-lr-checkout-eyebrow>Service Checkout</span>
                                 <h3 data-lr-checkout-heading>Complete your upgrade</h3>
                                 <p data-lr-checkout-copy>Your PLYRCARD billing profile will update automatically after payment is confirmed.</p>
                             </div>
@@ -1061,7 +1061,7 @@
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 
-    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Secure Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
+    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
     const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
 
     function showToast(message, error = false) {
@@ -1683,13 +1683,13 @@
         q('[data-lr-checkout-copy]').textContent = isAmplify
             ? `Complete the ${plan.due_today || plan.price || ''} checkout below. Your Amplify entitlement will update automatically after payment is confirmed.`
             : (isJumpstart
-                ? `Complete the ${plan.price || '$149'} one-time checkout below. Jumpstart does not require a My Journey subscription.`
+                ? `Complete the ${plan.due_today || plan.price || '$149'} checkout below. Jumpstart is a one-time service extension of My Journey.`
                 : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`);
         q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify is active' : (isJumpstart ? 'Jumpstart is active' : 'My Journey is active');
         q('[data-lr-checkout-success-copy]').textContent = isAmplify
-            ? 'Your purchase was confirmed. Amplify is now active on your PLYRCARD account.'
+            ? 'Your Amplify service was confirmed. My Journey remains the subscription layer on your PLYRCARD account.'
             : (isJumpstart
-                ? 'Your one-time purchase was confirmed. Jumpstart is now active on your PLYRCARD account.'
+                ? 'Your Jumpstart service was confirmed. My Journey remains the subscription layer on your PLYRCARD account.'
                 : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.');
     }
 

@@ -74,18 +74,14 @@ class LockerRoomDataService
 
         $planKey = $this->planKey($user, $billing);
         $isFree = $planKey === 'free';
-        $isPremium = in_array($planKey, ['my-journey', 'amplify'], true);
+        $isPremium = $planKey === 'my-journey';
         $workspaceReady = $this->workspaceReady($user);
 
         return [
             'user' => $this->profilePayload($user, $isPremium),
             'plan' => [
                 'key' => $planKey,
-                'label' => match ($planKey) {
-                    'amplify' => 'Amplify',
-                    'my-journey' => 'My Journey',
-                    default => 'Free',
-                },
+                'label' => $planKey === 'my-journey' ? 'My Journey' : 'Free',
                 'is_free' => $isFree,
                 'is_premium' => $isPremium,
                 'workspace_ready' => $workspaceReady,
@@ -989,7 +985,7 @@ class LockerRoomDataService
             ->latest('updated_at')
             ->first();
 
-        return in_array($this->planKey($user, $billing), ['my-journey', 'amplify'], true);
+        return $this->planKey($user, $billing) === 'my-journey';
     }
 
     protected function groupCoachActivityRows(array $events, string $metric): array
@@ -1671,7 +1667,8 @@ class LockerRoomDataService
             : $amplifySetup + ($amplifyFirstMonth ? $amplifyRecurring : 0);
         $amplifyActive = $this->hasRole($user, 'Amplify');
         $jumpstartActive = $this->hasRole($user, 'Jumpstart');
-        $jumpstartCents = (int) config('plyrcard-jumpstart.price_cents', 14900);
+        $jumpstartCents = (int) data_get($configured, 'jumpstart.setup_fee_cents', 14900);
+        $jumpstartDue = $currentPlan === 'my-journey' ? $jumpstartCents : $jumpstartCents + $journeyRecurring;
 
         $money = static function (int $cents): string {
             $amount = $cents / 100;
@@ -1707,10 +1704,14 @@ class LockerRoomDataService
                 'name' => 'Jumpstart',
                 'price' => $money($jumpstartCents),
                 'suffix' => 'one time',
-                'due_today' => $money($jumpstartCents) . ' one-time purchase · no subscription required',
+                'due_today' => $currentPlan === 'my-journey'
+                    ? $money($jumpstartCents) . ' one-time Jumpstart service · My Journey stays active'
+                    : $money($jumpstartDue) . ' due today: ' . $money($jumpstartCents) . ' Jumpstart + ' . $money($journeyRecurring) . ' first My Journey month',
                 'current' => false,
-                'description' => 'One clean recruiting push whether you are on Free or My Journey.',
-                'features' => ['1 Coach Outreach Campaign', '1 Highlight Edit', '1 Custom Graphic', 'No subscription required'],
+                'description' => $currentPlan === 'my-journey'
+                    ? 'A one-time recruiting service extension added to your active My Journey membership.'
+                    : 'Start My Journey and add the one-time Jumpstart recruiting service in one checkout.',
+                'features' => ['Everything in My Journey', '1 Coach Outreach Campaign', '1 Highlight Edit', '1 Custom Graphic'],
                 'action_label' => $jumpstartActive ? 'Jumpstart Purchased' : 'Get Jumpstart',
                 'action_url' => '#',
                 'action_kind' => 'jumpstart_checkout',
@@ -1720,8 +1721,8 @@ class LockerRoomDataService
             [
                 'key' => 'amplify',
                 'name' => 'Amplify',
-                'price' => $money($amplifyDue),
-                'suffix' => $currentPlan === 'my-journey' ? 'one time' : 'due today',
+                'price' => $money($amplifySetup),
+                'suffix' => 'one time',
                 'due_today' => $currentPlan === 'my-journey'
                     ? $money($amplifySetup) . ' one-time Amplify purchase'
                     : ($money($amplifyDue) . ' due today' . ($amplifyFirstMonth
