@@ -336,6 +336,132 @@ class LockerRoomController extends Controller
         ]);
     }
 
+    public function uploadPhotos(Request $request, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+
+        $data = $request->validate([
+            'category' => ['required', Rule::in(['player', 'plyrcard'])],
+            'photos' => ['required', 'array', 'min:1', 'max:30'],
+            'photos.*' => ['required', 'image', 'max:5120'],
+        ]);
+
+        $category = (string) $data['category'];
+        if (! $this->canManagePhotoCategory($user, $category)) {
+            return $this->failure($request, 'Only a PLYRCARD administrator can manage PLYRCARD Images.', 403);
+        }
+
+        $paths = $this->lockerRoomPhotoPaths($user, $category);
+        $max = $category === 'plyrcard' ? 30 : 20;
+        if (($paths->count() + count($data['photos'])) > $max) {
+            return $this->failure($request, "This gallery can contain up to {$max} photos.");
+        }
+
+        $directory = $category === 'plyrcard' ? 'user-player-images/plyrcard' : 'user-player-images/raw';
+        foreach ($data['photos'] as $photo) {
+            $paths->push($photo->store($directory, 'public'));
+        }
+
+        $this->saveLockerRoomPhotoPaths($user, $category, $paths->all());
+
+        return $this->success($request, 'Photos uploaded.', [
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
+    }
+
+    public function replacePhoto(Request $request, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+
+        $data = $request->validate([
+            'category' => ['required', Rule::in(['player', 'plyrcard'])],
+            'index' => ['required', 'integer', 'min:0'],
+            'photo' => ['required', 'image', 'max:5120'],
+        ]);
+
+        $category = (string) $data['category'];
+        if (! $this->canManagePhotoCategory($user, $category)) {
+            return $this->failure($request, 'Only a PLYRCARD administrator can manage PLYRCARD Images.', 403);
+        }
+
+        $paths = $this->lockerRoomPhotoPaths($user, $category);
+        $index = (int) $data['index'];
+        if (! $paths->has($index)) {
+            return $this->failure($request, 'That photo is no longer available.', 404);
+        }
+
+        $oldPath = (string) $paths->get($index);
+        $directory = $category === 'plyrcard' ? 'user-player-images/plyrcard' : 'user-player-images/raw';
+        $newPath = $data['photo']->store($directory, 'public');
+        $paths->put($index, $newPath);
+        $this->saveLockerRoomPhotoPaths($user, $category, $paths->values()->all());
+        $this->deleteLockerRoomManagedPhoto($oldPath, $category);
+
+        return $this->success($request, 'Photo replaced.', [
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
+    }
+
+    public function deletePhoto(Request $request, string $category, int $index, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+        $category = strtolower(trim($category)) === 'plyrcard' ? 'plyrcard' : 'player';
+
+        if (! $this->canManagePhotoCategory($user, $category)) {
+            return $this->failure($request, 'Only a PLYRCARD administrator can manage PLYRCARD Images.', 403);
+        }
+
+        $paths = $this->lockerRoomPhotoPaths($user, $category);
+        if (! $paths->has($index)) {
+            return $this->failure($request, 'That photo is no longer available.', 404);
+        }
+
+        $oldPath = (string) $paths->get($index);
+        $paths->forget($index);
+        $this->saveLockerRoomPhotoPaths($user, $category, $paths->values()->all());
+        $this->deleteLockerRoomManagedPhoto($oldPath, $category);
+
+        return $this->success($request, 'Photo removed.', [
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
+    }
+
+    public function reorderPhotos(Request $request, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $user = Auth::user();
+        abort_unless($user, 403);
+
+        $data = $request->validate([
+            'category' => ['required', Rule::in(['player', 'plyrcard'])],
+            'index' => ['required', 'integer', 'min:0'],
+            'direction' => ['required', Rule::in(['left', 'right'])],
+        ]);
+
+        $category = (string) $data['category'];
+        if (! $this->canManagePhotoCategory($user, $category)) {
+            return $this->failure($request, 'Only a PLYRCARD administrator can manage PLYRCARD Images.', 403);
+        }
+
+        $rows = $this->lockerRoomPhotoPaths($user, $category)->values()->all();
+        $index = (int) $data['index'];
+        $target = $index + ($data['direction'] === 'left' ? -1 : 1);
+        if (! isset($rows[$index], $rows[$target])) {
+            return $this->success($request, 'Photo order unchanged.', [
+                'data' => $dataService->snapshot($user->fresh()),
+            ]);
+        }
+
+        [$rows[$index], $rows[$target]] = [$rows[$target], $rows[$index]];
+        $this->saveLockerRoomPhotoPaths($user, $category, $rows);
+
+        return $this->success($request, 'Photo order updated.', [
+            'data' => $dataService->snapshot($user->fresh()),
+        ]);
+    }
+
     public function storeSchedule(Request $request, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
         $user = Auth::user();
@@ -692,6 +818,60 @@ class LockerRoomController extends Controller
         }
 
         return $this->success($request, 'Request submitted.', ['additional_service_request' => $serviceRequest->fresh()]);
+    }
+
+    protected function lockerRoomPhotoPaths($user, string $category): \Illuminate\Support\Collection
+    {
+        $category = strtolower(trim($category)) === 'plyrcard' ? 'plyrcard' : 'player';
+        $value = $category === 'plyrcard' ? ($user->plyrcard_images ?? []) : ($user->raw_player_images ?? []);
+
+        return collect(is_array($value) ? $value : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    protected function saveLockerRoomPhotoPaths($user, string $category, array $paths): void
+    {
+        $category = strtolower(trim($category)) === 'plyrcard' ? 'plyrcard' : 'player';
+        $column = $category === 'plyrcard' ? 'plyrcard_images' : 'raw_player_images';
+        $user->forceFill([
+            $column => array_values(array_unique(array_filter(array_map('strval', $paths)))),
+        ])->save();
+    }
+
+    protected function canManagePhotoCategory($user, string $category): bool
+    {
+        if ($category !== 'plyrcard') {
+            return true;
+        }
+
+        try {
+            if (method_exists($user, 'isSuperadminOrImpersonating')) {
+                return (bool) $user->isSuperadminOrImpersonating();
+            }
+
+            return method_exists($user, 'hasRole') && (
+                $user->hasRole('superadmin') || $user->hasRole('Superadmin') || $user->hasRole('Super Admin')
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    protected function deleteLockerRoomManagedPhoto(string $path, string $category): void
+    {
+        $path = trim($path);
+        if ($path === '' || str_starts_with($path, 'http://') || str_starts_with($path, 'https://') || str_starts_with($path, '//')) {
+            return;
+        }
+
+        $path = ltrim($path, '/');
+        $prefix = $category === 'plyrcard' ? 'user-player-images/plyrcard/' : 'user-player-images/raw/';
+        if (str_starts_with($path, $prefix)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 
     protected function normalizeGender(?string $gender): ?string

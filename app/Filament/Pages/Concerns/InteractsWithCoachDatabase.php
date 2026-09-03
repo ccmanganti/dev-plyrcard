@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\PhpExecutableFinder;
@@ -133,6 +134,15 @@ trait InteractsWithCoachDatabase
     public bool $templateEditorOpen = false;
     public string $templateSearch = '';
     public int $templateEditorRefreshKey = 0;
+
+    // v10.101: My Photos gallery state. Player uploads remain in raw_player_images;
+    // PLYRCARD-created/curated gallery assets are stored in users.plyrcard_images.
+    public array $playerPhotoUploads = [];
+    public array $plyrcardPhotoUploads = [];
+    public $photoReplacementUpload = null;
+    public bool $photoReplaceOpen = false;
+    public string $photoReplaceCategory = 'player';
+    public ?int $photoReplaceIndex = null;
 
     public ?string $campaignTemplateId = null;
     public ?string $previewTemplateId = null;
@@ -280,7 +290,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','photos','support','schedule','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -443,7 +453,7 @@ trait InteractsWithCoachDatabase
     {
         $allowedSections = [
             'dashboard', 'schools', 'coaches', 'favorites', 'lists',
-            'conversations', 'campaigns', 'compose', 'support',
+            'conversations', 'campaigns', 'compose', 'photos', 'support',
             'schedule', 'settings', 'profile',
         ];
 
@@ -688,7 +698,295 @@ trait InteractsWithCoachDatabase
 
     protected function canFreeRoleAccessCoachDatabaseSection(string $section): bool
     {
-        return in_array($section, ['profile', 'settings'], true);
+        return in_array($section, ['profile', 'photos', 'settings'], true);
+    }
+
+    /**
+     * Sporty My Photos gallery payload used by the Admin/Filament section.
+     * Player Uploaded Images are self-managed. PLYRCARD Images are visible to the
+     * athlete but write operations remain Superadmin-only.
+     */
+    public function getMediaGalleryProperty(): array
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return [
+                'player' => [],
+                'plyrcard' => [],
+                'can_manage_plyrcard' => false,
+                'player_max' => 20,
+                'plyrcard_max' => 30,
+            ];
+        }
+
+        $player = collect(is_array($user->raw_player_images ?? null) ? $user->raw_player_images : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values()
+            ->map(fn (string $path, int $index): array => $this->coachDatabaseMediaRow($path, $index, 'player'))
+            ->all();
+
+        $plyrcard = collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values()
+            ->map(fn (string $path, int $index): array => $this->coachDatabaseMediaRow($path, $index, 'plyrcard'))
+            ->all();
+
+        return [
+            'player' => $player,
+            'plyrcard' => $plyrcard,
+            'can_manage_plyrcard' => $this->canManagePlyrcardGallery($user),
+            'player_max' => 20,
+            'plyrcard_max' => 30,
+        ];
+    }
+
+    public function uploadPlayerPhotos(): void
+    {
+        $user = Auth::user();
+        if (! $user || empty($this->playerPhotoUploads)) {
+            return;
+        }
+
+        $this->validate([
+            'playerPhotoUploads' => ['array', 'max:20'],
+            'playerPhotoUploads.*' => ['image', 'max:5120'],
+        ]);
+
+        $paths = $this->coachDatabaseMediaPaths($user, 'player');
+        if (($paths->count() + count($this->playerPhotoUploads)) > 20) {
+            Notification::make()->title('My Photos')->body('Player Uploaded Images can contain up to 20 photos.')->warning()->send();
+            return;
+        }
+
+        foreach ($this->playerPhotoUploads as $file) {
+            if ($file) {
+                $paths->push($file->store('user-player-images/raw', 'public'));
+            }
+        }
+
+        $this->saveCoachDatabaseMediaPaths($user, 'player', $paths->all());
+        $this->playerPhotoUploads = [];
+
+        Notification::make()->title('My Photos')->body('Player photos uploaded.')->success()->send();
+    }
+
+    public function uploadPlyrcardPhotos(): void
+    {
+        $user = Auth::user();
+        if (! $user || ! $this->canManagePlyrcardGallery($user) || empty($this->plyrcardPhotoUploads)) {
+            return;
+        }
+
+        $this->validate([
+            'plyrcardPhotoUploads' => ['array', 'max:30'],
+            'plyrcardPhotoUploads.*' => ['image', 'max:5120'],
+        ]);
+
+        $paths = $this->coachDatabaseMediaPaths($user, 'plyrcard');
+        if (($paths->count() + count($this->plyrcardPhotoUploads)) > 30) {
+            Notification::make()->title('My Photos')->body('Plyrcard Images can contain up to 30 photos.')->warning()->send();
+            return;
+        }
+
+        foreach ($this->plyrcardPhotoUploads as $file) {
+            if ($file) {
+                $paths->push($file->store('user-player-images/plyrcard', 'public'));
+            }
+        }
+
+        $this->saveCoachDatabaseMediaPaths($user, 'plyrcard', $paths->all());
+        $this->plyrcardPhotoUploads = [];
+
+        Notification::make()->title('My Photos')->body('PLYRCARD photos uploaded.')->success()->send();
+    }
+
+    public function openPhotoReplace(string $category, int $index): void
+    {
+        $user = Auth::user();
+        $category = $this->normalizedMediaCategory($category);
+        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
+            return;
+        }
+
+        $paths = $this->coachDatabaseMediaPaths($user, $category);
+        if (! $paths->has($index)) {
+            return;
+        }
+
+        $this->photoReplacementUpload = null;
+        $this->photoReplaceCategory = $category;
+        $this->photoReplaceIndex = $index;
+        $this->photoReplaceOpen = true;
+    }
+
+    public function closePhotoReplace(): void
+    {
+        $this->photoReplacementUpload = null;
+        $this->photoReplaceIndex = null;
+        $this->photoReplaceOpen = false;
+    }
+
+    public function replaceGalleryPhoto(): void
+    {
+        $user = Auth::user();
+        $category = $this->normalizedMediaCategory($this->photoReplaceCategory);
+        $index = $this->photoReplaceIndex;
+
+        if (! $user || $index === null || ! $this->canManageGalleryCategory($user, $category)) {
+            return;
+        }
+
+        $this->validate(['photoReplacementUpload' => ['required', 'image', 'max:5120']]);
+
+        $paths = $this->coachDatabaseMediaPaths($user, $category);
+        if (! $paths->has($index)) {
+            $this->closePhotoReplace();
+            return;
+        }
+
+        $oldPath = (string) $paths->get($index);
+        $directory = $category === 'plyrcard' ? 'user-player-images/plyrcard' : 'user-player-images/raw';
+        $newPath = $this->photoReplacementUpload->store($directory, 'public');
+        $paths->put($index, $newPath);
+        $this->saveCoachDatabaseMediaPaths($user, $category, $paths->values()->all());
+        $this->deleteManagedGalleryPath($oldPath, $category);
+        $this->closePhotoReplace();
+
+        Notification::make()->title('My Photos')->body('Photo replaced.')->success()->send();
+    }
+
+    public function deleteGalleryPhoto(string $category, int $index): void
+    {
+        $user = Auth::user();
+        $category = $this->normalizedMediaCategory($category);
+        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
+            return;
+        }
+
+        $paths = $this->coachDatabaseMediaPaths($user, $category);
+        if (! $paths->has($index)) {
+            return;
+        }
+
+        $oldPath = (string) $paths->get($index);
+        $paths->forget($index);
+        $this->saveCoachDatabaseMediaPaths($user, $category, $paths->values()->all());
+        $this->deleteManagedGalleryPath($oldPath, $category);
+
+        Notification::make()->title('My Photos')->body('Photo removed.')->success()->send();
+    }
+
+    public function moveGalleryPhoto(string $category, int $index, int $direction): void
+    {
+        $user = Auth::user();
+        $category = $this->normalizedMediaCategory($category);
+        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
+            return;
+        }
+
+        $rows = $this->coachDatabaseMediaPaths($user, $category)->values()->all();
+        $target = $index + ($direction < 0 ? -1 : 1);
+        if (! isset($rows[$index], $rows[$target])) {
+            return;
+        }
+
+        [$rows[$index], $rows[$target]] = [$rows[$target], $rows[$index]];
+        $this->saveCoachDatabaseMediaPaths($user, $category, $rows);
+    }
+
+    protected function normalizedMediaCategory(string $category): string
+    {
+        return strtolower(trim($category)) === 'plyrcard' ? 'plyrcard' : 'player';
+    }
+
+    protected function canManageGalleryCategory($user, string $category): bool
+    {
+        return $category === 'player' || $this->canManagePlyrcardGallery($user);
+    }
+
+    protected function canManagePlyrcardGallery($user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        try {
+            if (method_exists($user, 'isSuperadminOrImpersonating')) {
+                return (bool) $user->isSuperadminOrImpersonating();
+            }
+
+            return method_exists($user, 'hasRole') && (
+                $user->hasRole('superadmin') || $user->hasRole('Superadmin') || $user->hasRole('Super Admin')
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    protected function coachDatabaseMediaPaths($user, string $category): Collection
+    {
+        $category = $this->normalizedMediaCategory($category);
+        $value = $category === 'plyrcard' ? ($user->plyrcard_images ?? []) : ($user->raw_player_images ?? []);
+
+        return collect(is_array($value) ? $value : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    protected function saveCoachDatabaseMediaPaths($user, string $category, array $paths): void
+    {
+        $column = $this->normalizedMediaCategory($category) === 'plyrcard' ? 'plyrcard_images' : 'raw_player_images';
+        $user->forceFill([$column => array_values(array_unique(array_filter(array_map('strval', $paths))))])->save();
+        $user->refresh();
+    }
+
+    protected function coachDatabaseMediaRow(string $path, int $index, string $category): array
+    {
+        return [
+            'index' => $index,
+            'category' => $category,
+            'path' => $path,
+            'url' => $this->coachDatabaseMediaUrl($path),
+            'name' => basename(parse_url($path, PHP_URL_PATH) ?: $path),
+        ];
+    }
+
+    protected function coachDatabaseMediaUrl(?string $path): ?string
+    {
+        $path = trim((string) $path);
+        if ($path === '') {
+            return null;
+        }
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            return $path;
+        }
+        if (Str::startsWith($path, '//')) {
+            return 'https:' . $path;
+        }
+
+        return Storage::disk('public')->url(ltrim($path, '/'));
+    }
+
+    protected function deleteManagedGalleryPath(string $path, string $category): void
+    {
+        $path = trim($path);
+        if ($path === '' || Str::startsWith($path, ['http://', 'https://', '//'])) {
+            return;
+        }
+
+        $prefix = $this->normalizedMediaCategory($category) === 'plyrcard'
+            ? 'user-player-images/plyrcard/'
+            : 'user-player-images/raw/';
+
+        if (Str::startsWith(ltrim($path, '/'), $prefix)) {
+            Storage::disk('public')->delete(ltrim($path, '/'));
+        }
     }
 
     public function openFreePlanGate(string $section = 'dashboard'): void

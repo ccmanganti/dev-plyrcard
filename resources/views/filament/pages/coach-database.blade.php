@@ -26,6 +26,7 @@
                 conversations: 'Inbox',
                 campaigns: 'Campaigns',
                 compose: 'Compose Email',
+                photos: 'My Photos',
                 support: 'Support',
                 schedule: 'Schedule'
             },
@@ -7667,6 +7668,7 @@ discoverSelectedIds: [],
             @endphp
 
             <div class="rc-stats-drawer-backdrop"
+                data-rc-modal-id="profile-views"
                 x-show="dashboardDetail === 'profile-views'"
                 x-cloak
                 x-transition:enter="transition ease-out duration-100"
@@ -7739,19 +7741,34 @@ discoverSelectedIds: [],
                 </div>
 
                 <section class="rc-detail-table-v2">
-                    <header><h2>Who's Viewing You</h2><span>● Synced</span></header>
+                    <header>
+                        <h2>Who's Viewing You</h2>
+                        <span class="rc-detail-sort-shell-v141">
+                            <label for="rc-profile-sort-v141">Sort</label>
+                            <select id="rc-profile-sort-v141" data-rc-detail-sort onchange="window.rcSortDashboardRows && window.rcSortDashboardRows(this)">
+                                <option value="count_desc">Views: High to Low</option>
+                                <option value="count_asc">Views: Low to High</option>
+                                <option value="date_desc">Date: Newest First</option>
+                                <option value="date_asc">Date: Oldest First</option>
+                            </select>
+                            <span>● Synced</span>
+                        </span>
+                    </header>
                     <div class="rc-detail-rows-v2">
                         @forelse($profileViewRows as $profileRow)
                             <button
                                 type="button"
                                 class="rc-detail-row-v2"
+                                data-dashboard-sort-row
+                                data-sort-count="{{ (int) ($profileRow['views'] ?? 0) }}"
+                                data-sort-time="{{ strtotime((string) ($profileRow['time'] ?? '')) ?: 0 }}"
                                 @if(! empty($profileRow['school_id']))
                                     x-on:click.stop="dashboardDetail = ''; $nextTick(() => openGlobalSchool(@js((string) $profileRow['school_id'])))"
                                 @else
                                     disabled
                                 @endif
                             >
-                                <span class="rc-detail-rank-v2">#{{ $profileRow['rank'] }}</span>
+                                <span class="rc-detail-rank-v2" data-sort-rank>#{{ $profileRow['rank'] }}</span>
                                 <span class="rc-detail-avatar-v2">
                                     @if(! empty($profileRow['logo']))
                                         <img src="{{ $profileRow['logo'] }}" alt="{{ $profileRow['title'] }}">
@@ -7775,7 +7792,35 @@ discoverSelectedIds: [],
             </div>
         @endif
 
+        <style id="rc-dashboard-sort-v141">
+            .rc-detail-sort-shell-v141{display:inline-flex;align-items:center;justify-content:flex-end;gap:.45rem;flex-wrap:wrap}
+            .rc-detail-sort-shell-v141 label{font-size:.64rem;font-weight:800;color:var(--rc-muted);text-transform:uppercase;letter-spacing:.06em}
+            .rc-detail-sort-shell-v141 select{height:2rem;border:1px solid var(--rc-border);border-radius:.58rem;background:var(--rc-surface);color:var(--rc-text);padding:0 1.8rem 0 .6rem;font-size:.68rem;font-weight:700;outline:none;cursor:pointer}
+            .rc-detail-sort-shell-v141 select:focus{border-color:#ff6338;box-shadow:0 0 0 2px rgba(255,99,56,.1)}
+            @media(max-width:720px){.rc-detail-table-v2>header{align-items:flex-start!important;gap:.6rem;flex-direction:column}.rc-detail-sort-shell-v141{width:100%;justify-content:flex-start}.rc-detail-sort-shell-v141 select{flex:1;min-width:12rem}}
+        </style>
         <script>
+            window.rcSortDashboardRows = window.rcSortDashboardRows || function (select) {
+                const drawer = select?.closest?.('[data-rc-modal-id]');
+                const container = drawer?.querySelector?.('.rc-detail-rows-v2');
+                if (!drawer || !container) return;
+                const mode = String(select.value || 'count_desc');
+                const rows = Array.from(container.querySelectorAll('[data-dashboard-sort-row]'));
+                rows.sort((a, b) => {
+                    const ac = Number(a.dataset.sortCount || 0), bc = Number(b.dataset.sortCount || 0);
+                    const at = Number(a.dataset.sortTime || 0), bt = Number(b.dataset.sortTime || 0);
+                    if (mode === 'count_asc') return ac - bc;
+                    if (mode === 'date_desc') return bt - at;
+                    if (mode === 'date_asc') return at - bt;
+                    return bc - ac;
+                });
+                rows.forEach((row, index) => {
+                    container.appendChild(row);
+                    const rank = row.querySelector('[data-sort-rank]');
+                    if (rank) rank.textContent = `#${index + 1}`;
+                });
+            };
+
             (function () {
                 window.__rcCoachEngagementFilter = window.__rcCoachEngagementFilter || '';
 
@@ -7982,6 +8027,7 @@ discoverSelectedIds: [],
                                     'x' => 'is-neutral',
                                 },
                                 'clicks' => max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1)),
+                                'time' => $time,
                                 'time_label' => $formatActivityTimeLabel($time),
                             ];
                         })
@@ -8047,8 +8093,15 @@ discoverSelectedIds: [],
                         <section class="rc-detail-table-v2">
                             <header>
                                 <h2 data-engagement-table-title>Who's Clicking</h2>
-                                <span style="display:inline-flex;align-items:center;gap:.55rem">
+                                <span class="rc-detail-sort-shell-v141">
                                     <button type="button" data-engagement-clear hidden onclick="window.rcFilterCoachEngagement(this, '')" class="rc-home-link-v2" style="border:0;background:transparent;cursor:pointer">Show All</button>
+                                    <label for="rc-engagement-sort-v141">Sort</label>
+                                    <select id="rc-engagement-sort-v141" data-rc-detail-sort onchange="window.rcSortDashboardRows && window.rcSortDashboardRows(this)">
+                                        <option value="count_desc">Clicks: High to Low</option>
+                                        <option value="count_asc">Clicks: Low to High</option>
+                                        <option value="date_desc">Date: Newest First</option>
+                                        <option value="date_asc">Date: Oldest First</option>
+                                    </select>
                                     <span>● Synced</span>
                                 </span>
                             </header>
@@ -8063,6 +8116,9 @@ discoverSelectedIds: [],
                                     <button type="button"
                                         class="rc-detail-row-v2 is-engagement"
                                         data-engagement-row
+                                        data-dashboard-sort-row
+                                        data-sort-count="{{ $clickCount }}"
+                                        data-sort-time="{{ strtotime((string) ($engagementRow['time'] ?? '')) ?: 0 }}"
                                         data-platform="{{ $platformKey }}"
                                         @if(! empty($engagementRow['school_id']))
                                             x-on:click.stop="dashboardDetail = ''; $nextTick(() => openGlobalSchool(@js((string) $engagementRow['school_id'])))"
@@ -11175,6 +11231,145 @@ CSS;
             </div>
         @endif
 
+        @if($section === 'photos')
+            @php
+                $mediaGallery = $this->mediaGallery;
+                $playerGallery = collect($mediaGallery['player'] ?? [])->values();
+                $plyrcardGallery = collect($mediaGallery['plyrcard'] ?? [])->values();
+                $canManagePlyrcardGallery = (bool) ($mediaGallery['can_manage_plyrcard'] ?? false);
+                $playerPhotoMax = (int) ($mediaGallery['player_max'] ?? 20);
+                $plyrcardPhotoMax = (int) ($mediaGallery['plyrcard_max'] ?? 30);
+            @endphp
+
+            <style id="rc-my-photos-v141">
+                .rc-media-page-v141{display:grid;gap:1rem}.rc-media-hero-v141{position:relative;overflow:hidden;border-radius:1.25rem;padding:1.35rem 1.4rem;background:linear-gradient(135deg,#111827 0%,#172033 58%,#2b1c18 100%);color:#fff;box-shadow:0 22px 46px rgba(15,23,42,.16)}.rc-media-hero-v141:after{content:"";position:absolute;right:-4rem;top:-5rem;width:15rem;height:15rem;border-radius:999px;background:radial-gradient(circle,rgba(255,99,56,.48),rgba(255,99,56,0) 70%)}.rc-media-hero-v141>*{position:relative;z-index:1}.rc-media-hero-top-v141{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.rc-media-eyebrow-v141{font-size:.68rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase;color:#ff8b6d}.rc-media-hero-v141 h1{margin:.35rem 0 .3rem;font-size:clamp(1.8rem,4vw,2.55rem);line-height:1;font-weight:950;letter-spacing:-.05em}.rc-media-hero-v141 p{margin:0;max-width:48rem;color:#cbd5e1;font-size:.84rem;line-height:1.55}.rc-media-hero-icon-v141{width:3.5rem;height:3.5rem;border:1px solid rgba(255,255,255,.13);border-radius:1rem;background:rgba(255,255,255,.09);display:grid;place-items:center}.rc-media-hero-icon-v141 svg{width:1.6rem;height:1.6rem;color:#ff7451}
+                .rc-media-tabs-v141{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;padding:.35rem;border:1px solid var(--rc-border);border-radius:.95rem;background:var(--rc-surface)}.rc-media-tab-v141{min-height:3rem;border:0;border-radius:.7rem;background:transparent;color:var(--rc-muted);font-size:.78rem;font-weight:850;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem}.rc-media-tab-v141.is-active{background:#111827;color:#fff;box-shadow:0 10px 22px rgba(15,23,42,.14)}.dark .rc-media-tab-v141.is-active{background:#fff;color:#111827}.rc-media-tab-count-v141{display:inline-grid;place-items:center;min-width:1.45rem;height:1.45rem;padding:0 .35rem;border-radius:999px;background:rgba(148,163,184,.15);font-size:.65rem}.rc-media-tab-v141.is-active .rc-media-tab-count-v141{background:rgba(255,255,255,.15)}.dark .rc-media-tab-v141.is-active .rc-media-tab-count-v141{background:rgba(17,24,39,.1)}
+                .rc-media-upload-v141{display:grid;grid-template-columns:3rem minmax(0,1fr) auto;align-items:center;gap:.8rem;border:1px dashed rgba(255,99,56,.45);border-radius:1rem;padding:1rem;background:linear-gradient(180deg,rgba(255,99,56,.055),transparent)}.rc-media-upload-v141.is-readonly{border-style:solid;border-color:var(--rc-border);background:var(--rc-soft)}.rc-media-upload-icon-v141{width:3rem;height:3rem;border-radius:.85rem;background:rgba(255,99,56,.12);color:#ff6338;display:grid;place-items:center}.rc-media-upload-icon-v141 svg{width:1.25rem;height:1.25rem}.rc-media-upload-v141 strong{display:block;color:var(--rc-text);font-size:.84rem}.rc-media-upload-v141 p{margin:.18rem 0 0;color:var(--rc-muted);font-size:.72rem;line-height:1.45}.rc-media-file-v141{position:relative}.rc-media-file-v141 input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+                .rc-media-gallery-v141{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.85rem}.rc-media-card-v141{position:relative;min-width:0;overflow:hidden;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 12px 28px rgba(15,23,42,.055)}.rc-media-thumb-v141{position:relative;display:block;width:100%;aspect-ratio:4/3;border:0;padding:0;background:var(--rc-soft);cursor:zoom-in;overflow:hidden}.rc-media-thumb-v141 img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .2s ease}.rc-media-card-v141:hover .rc-media-thumb-v141 img{transform:scale(1.025)}.rc-media-number-v141{position:absolute;left:.65rem;top:.65rem;min-width:1.75rem;height:1.75rem;padding:0 .45rem;border-radius:999px;background:rgba(17,24,39,.8);color:#fff;display:grid;place-items:center;font-size:.63rem;font-weight:900;backdrop-filter:blur(5px)}.rc-media-card-body-v141{padding:.72rem}.rc-media-name-v141{font-size:.7rem;font-weight:800;color:var(--rc-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rc-media-actions-v141{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.55rem}.rc-media-action-v141{height:1.9rem;min-width:1.9rem;border:1px solid var(--rc-border);border-radius:.55rem;background:var(--rc-surface);color:var(--rc-muted);padding:0 .5rem;display:inline-flex;align-items:center;justify-content:center;gap:.25rem;font-size:.64rem;font-weight:800;cursor:pointer;text-decoration:none}.rc-media-action-v141:hover{color:#ff6338;border-color:rgba(255,99,56,.4);background:rgba(255,99,56,.05)}.rc-media-action-v141.is-danger:hover{color:#b42318;border-color:#fecaca;background:#fff5f5}.rc-media-action-v141[disabled]{opacity:.3;cursor:not-allowed}.rc-media-empty-v141{grid-column:1/-1;min-height:16rem;border:1px dashed var(--rc-border);border-radius:1rem;background:var(--rc-surface);display:grid;place-items:center;text-align:center;padding:2rem;color:var(--rc-muted)}.rc-media-empty-v141 strong{display:block;color:var(--rc-text);font-size:.9rem}.rc-media-empty-v141 span{display:block;margin-top:.3rem;font-size:.75rem}
+                .rc-media-preview-v141{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:1rem;background:rgba(3,7,18,.82);backdrop-filter:blur(7px)}.rc-media-preview-card-v141{position:relative;width:min(60rem,96vw);max-height:90vh;border-radius:1rem;background:#0b1220;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.5)}.rc-media-preview-card-v141 img{display:block;width:100%;max-height:86vh;object-fit:contain}.rc-media-preview-close-v141{position:absolute;right:.75rem;top:.75rem;z-index:2;width:2.25rem;height:2.25rem;border:1px solid rgba(255,255,255,.18);border-radius:.65rem;background:rgba(17,24,39,.78);color:#fff;display:grid;place-items:center;cursor:pointer}.rc-media-replace-v141{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:1rem;background:rgba(15,23,42,.5);backdrop-filter:blur(4px)}.rc-media-replace-card-v141{width:min(28rem,96vw);border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);padding:1rem;box-shadow:0 25px 75px rgba(15,23,42,.25)}.rc-media-replace-card-v141 h3{margin:0;color:var(--rc-text);font-size:1rem}.rc-media-replace-card-v141 p{color:var(--rc-muted);font-size:.75rem}.rc-media-replace-card-v141 input[type=file]{width:100%;padding:.75rem;border:1px dashed var(--rc-border);border-radius:.75rem;background:var(--rc-soft);color:var(--rc-text)}
+                @media(max-width:1180px){.rc-media-gallery-v141{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:820px){.rc-media-gallery-v141{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-media-upload-v141{grid-template-columns:2.7rem minmax(0,1fr)}.rc-media-upload-v141>.rc-media-file-v141,.rc-media-upload-v141>button{grid-column:1/-1;width:100%}}@media(max-width:520px){.rc-media-gallery-v141{gap:.55rem}.rc-media-card-body-v141{padding:.55rem}.rc-media-action-v141 span{display:none}.rc-media-hero-v141{padding:1.1rem}.rc-media-hero-icon-v141{display:none}}
+            </style>
+
+            @include('filament.partials.coach-database-header', [
+                'firstName' => $firstName,
+                'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
+                'showNewEmail' => false,
+            ])
+
+            <div class="rc-media-page-v141" x-data="{tab:'player',previewOpen:false,previewUrl:'',previewName:''}">
+                <section class="rc-media-hero-v141">
+                    <div class="rc-media-hero-top-v141">
+                        <div>
+                            <span class="rc-media-eyebrow-v141">Media Locker</span>
+                            <h1>My Photos</h1>
+                            <p>A sporty, organized home for the images behind your PLYRCARD. Manage your own uploads and keep PLYRCARD-produced assets together in a separate gallery.</p>
+                        </div>
+                        <span class="rc-media-hero-icon-v141"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3M8.5 9.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </div>
+                </section>
+
+                <div class="rc-media-tabs-v141" role="tablist" aria-label="My Photos categories">
+                    <button type="button" class="rc-media-tab-v141" :class="tab==='player' && 'is-active'" x-on:click="tab='player'"><span>Player Uploaded Images</span><span class="rc-media-tab-count-v141">{{ $playerGallery->count() }}</span></button>
+                    <button type="button" class="rc-media-tab-v141" :class="tab==='plyrcard' && 'is-active'" x-on:click="tab='plyrcard'"><span>Plyrcard Images</span><span class="rc-media-tab-count-v141">{{ $plyrcardGallery->count() }}</span></button>
+                </div>
+
+                <div x-show="tab==='player'" x-cloak style="display:grid;gap:1rem">
+                    <div class="rc-media-upload-v141">
+                        <span class="rc-media-upload-icon-v141"><svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        <div><strong>Upload Player Photos</strong><p>Your existing <code>raw_player_images</code> gallery. Up to {{ $playerPhotoMax }} images, 5 MB each.</p></div>
+                        <div class="rc-media-file-v141 rc-btn"><span>Choose Images</span><input type="file" accept="image/*" multiple wire:model="playerPhotoUploads"></div>
+                        @if(! empty($playerPhotoUploads))
+                            <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlayerPhotos" wire:loading.attr="disabled" wire:target="uploadPlayerPhotos,playerPhotoUploads"><span wire:loading.remove wire:target="uploadPlayerPhotos">Upload {{ count($playerPhotoUploads) }} Image{{ count($playerPhotoUploads) === 1 ? '' : 's' }}</span><span wire:loading.flex wire:target="uploadPlayerPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
+                        @endif
+                    </div>
+
+                    <div class="rc-media-gallery-v141">
+                        @forelse($playerGallery as $photo)
+                            @php
+                                $photoIndex = (int) ($photo['index'] ?? $loop->index);
+                            @endphp
+                            <article class="rc-media-card-v141" wire:key="player-media-{{ md5((string) ($photo['path'] ?? $photoIndex)) }}">
+                                <button type="button" class="rc-media-thumb-v141" x-on:click="previewUrl=@js((string) ($photo['url'] ?? ''));previewName=@js((string) ($photo['name'] ?? 'Player photo'));previewOpen=true">
+                                    <img src="{{ $photo['url'] ?? '' }}" alt="{{ $photo['name'] ?? 'Player photo' }}" loading="lazy"><span class="rc-media-number-v141">{{ $photoIndex + 1 }}</span>
+                                </button>
+                                <div class="rc-media-card-body-v141">
+                                    <div class="rc-media-name-v141" title="{{ $photo['name'] ?? '' }}">{{ $photo['name'] ?? 'Player photo' }}</div>
+                                    <div class="rc-media-actions-v141">
+                                        <a class="rc-media-action-v141" href="{{ $photo['url'] ?? '#' }}" target="_blank" rel="noopener" download><span>Download</span>↓</a>
+                                        <button type="button" class="rc-media-action-v141" wire:click="openPhotoReplace('player', {{ $photoIndex }})"><span>Replace</span>↻</button>
+                                        <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('player', {{ $photoIndex }}, -1)" @disabled($photoIndex === 0)>←</button>
+                                        <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('player', {{ $photoIndex }}, 1)" @disabled($photoIndex >= $playerGallery->count() - 1)>→</button>
+                                        <button type="button" class="rc-media-action-v141 is-danger" wire:click="deleteGalleryPhoto('player', {{ $photoIndex }})" wire:confirm="Delete this player photo?">×</button>
+                                    </div>
+                                </div>
+                            </article>
+                        @empty
+                            <div class="rc-media-empty-v141"><div><strong>No player-uploaded images yet.</strong><span>Choose images above to start your gallery.</span></div></div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div x-show="tab==='plyrcard'" x-cloak style="display:grid;gap:1rem">
+                    <div class="rc-media-upload-v141 {{ $canManagePlyrcardGallery ? '' : 'is-readonly' }}">
+                        <span class="rc-media-upload-icon-v141"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+                        <div><strong>{{ $canManagePlyrcardGallery ? 'Upload PLYRCARD Images' : 'PLYRCARD Team Gallery' }}</strong><p>{{ $canManagePlyrcardGallery ? "Superadmin gallery for polished/processed assets. Up to {$plyrcardPhotoMax} images, 5 MB each." : 'These images are visible to the player but managed only by a PLYRCARD Superadmin.' }}</p></div>
+                        @if($canManagePlyrcardGallery)
+                            <div class="rc-media-file-v141 rc-btn"><span>Choose Images</span><input type="file" accept="image/*" multiple wire:model="plyrcardPhotoUploads"></div>
+                            @if(! empty($plyrcardPhotoUploads))
+                                <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlyrcardPhotos" wire:loading.attr="disabled" wire:target="uploadPlyrcardPhotos,plyrcardPhotoUploads"><span wire:loading.remove wire:target="uploadPlyrcardPhotos">Upload {{ count($plyrcardPhotoUploads) }} Image{{ count($plyrcardPhotoUploads) === 1 ? '' : 's' }}</span><span wire:loading.flex wire:target="uploadPlyrcardPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
+                            @endif
+                        @endif
+                    </div>
+
+                    <div class="rc-media-gallery-v141">
+                        @forelse($plyrcardGallery as $photo)
+                            @php
+                                $photoIndex = (int) ($photo['index'] ?? $loop->index);
+                            @endphp
+                            <article class="rc-media-card-v141" wire:key="plyrcard-media-{{ md5((string) ($photo['path'] ?? $photoIndex)) }}">
+                                <button type="button" class="rc-media-thumb-v141" x-on:click="previewUrl=@js((string) ($photo['url'] ?? ''));previewName=@js((string) ($photo['name'] ?? 'PLYRCARD image'));previewOpen=true">
+                                    <img src="{{ $photo['url'] ?? '' }}" alt="{{ $photo['name'] ?? 'PLYRCARD image' }}" loading="lazy"><span class="rc-media-number-v141">{{ $photoIndex + 1 }}</span>
+                                </button>
+                                <div class="rc-media-card-body-v141">
+                                    <div class="rc-media-name-v141" title="{{ $photo['name'] ?? '' }}">{{ $photo['name'] ?? 'PLYRCARD image' }}</div>
+                                    <div class="rc-media-actions-v141">
+                                        <a class="rc-media-action-v141" href="{{ $photo['url'] ?? '#' }}" target="_blank" rel="noopener" download><span>Download</span>↓</a>
+                                        @if($canManagePlyrcardGallery)
+                                            <button type="button" class="rc-media-action-v141" wire:click="openPhotoReplace('plyrcard', {{ $photoIndex }})"><span>Replace</span>↻</button>
+                                            <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('plyrcard', {{ $photoIndex }}, -1)" @disabled($photoIndex === 0)>←</button>
+                                            <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('plyrcard', {{ $photoIndex }}, 1)" @disabled($photoIndex >= $plyrcardGallery->count() - 1)>→</button>
+                                            <button type="button" class="rc-media-action-v141 is-danger" wire:click="deleteGalleryPhoto('plyrcard', {{ $photoIndex }})" wire:confirm="Delete this PLYRCARD image?">×</button>
+                                        @endif
+                                    </div>
+                                </div>
+                            </article>
+                        @empty
+                            <div class="rc-media-empty-v141"><div><strong>No PLYRCARD Images yet.</strong><span>{{ $canManagePlyrcardGallery ? 'Upload polished assets above.' : 'PLYRCARD team images will appear here once added.' }}</span></div></div>
+                        @endforelse
+                    </div>
+                </div>
+
+                <div class="rc-media-preview-v141" x-cloak x-show="previewOpen" x-on:click.self="previewOpen=false" x-on:keydown.escape.window="previewOpen=false">
+                    <div class="rc-media-preview-card-v141"><button type="button" class="rc-media-preview-close-v141" x-on:click="previewOpen=false" aria-label="Close preview">×</button><img x-bind:src="previewUrl" x-bind:alt="previewName"></div>
+                </div>
+            </div>
+
+            @if($photoReplaceOpen)
+                <div class="rc-media-replace-v141" wire:key="media-replace-{{ $photoReplaceCategory }}-{{ $photoReplaceIndex }}">
+                    <div class="rc-media-replace-card-v141">
+                        <h3>Replace Photo</h3>
+                        <p>Select a new image. The gallery position will stay the same.</p>
+                        <input type="file" accept="image/*" wire:model="photoReplacementUpload">
+                        @error('photoReplacementUpload')<div style="color:#b42318;font-size:.72rem;margin-top:.4rem">{{ $message }}</div>@enderror
+                        <div class="rc-toolbar" style="justify-content:flex-end;margin-top:1rem">
+                            <button type="button" class="rc-btn" wire:click="closePhotoReplace">Cancel</button>
+                            <button type="button" class="rc-btn rc-btn-primary" wire:click="replaceGalleryPhoto" wire:loading.attr="disabled" wire:target="replaceGalleryPhoto,photoReplacementUpload"><span wire:loading.remove wire:target="replaceGalleryPhoto">Replace Photo</span><span wire:loading.flex wire:target="replaceGalleryPhoto" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Replacing</span></button>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @endif
+
         @if($section === 'support')
             {{-- v10.87: The Support page is intentionally self-contained. --}}
             <div class="rc-support-page-v1 rc-support-page-clean-v87">
@@ -12171,15 +12366,15 @@ CSS;
                         </div>
                         <div class="rc-templates-actions-v50">
                             <button class="rc-btn" type="button" x-data x-on:click="document.dispatchEvent(new CustomEvent('rc-open-template-preview'))"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                            <button class="rc-btn rc-btn-primary" type="button" wire:click="saveTemplate" wire:loading.attr="disabled" wire:target="saveTemplate"><span wire:loading.remove wire:target="saveTemplate">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
+                            <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent="window.rcSaveCoachDatabaseTemplate && window.rcSaveCoachDatabaseTemplate($wire)" wire:loading.attr="disabled" wire:target="saveTemplate"><span wire:loading.remove wire:target="saveTemplate">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
                         </div>
                     </div>
 
                     <div class="rc-template-editor-layout-v50" wire:key="template-editor-{{ $templateEditorRefreshKey }}" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
                         <section class="rc-template-editor-card-v50">
-                            <div class="rc-template-field-v50"><label>Template Name</label><input placeholder="e.g. Spring Showcase Intro" wire:model.live.debounce.650ms="templateName"></div>
-                            <div class="rc-template-field-v50"><label>Subject Line</label><input x-ref="subject" placeholder="Subject (you can use @{{variables}})" wire:model.live.debounce.650ms="templateSubject"></div>
-                            <div class="rc-template-field-v50"><label>Preview Text</label><input x-ref="preview" placeholder="Short inbox preview text" wire:model.live.debounce.650ms="templatePreviewText"></div>
+                            <div class="rc-template-field-v50"><label>Template Name</label><input data-plyr-template-name placeholder="e.g. Spring Showcase Intro" wire:model.live.debounce.650ms="templateName"></div>
+                            <div class="rc-template-field-v50"><label>Subject Line</label><input data-plyr-template-subject x-ref="subject" placeholder="Subject (you can use @{{variables}})" wire:model.live.debounce.650ms="templateSubject"></div>
+                            <div class="rc-template-field-v50"><label>Preview Text</label><input data-plyr-template-preview x-ref="preview" placeholder="Short inbox preview text" wire:model.live.debounce.650ms="templatePreviewText"></div>
 
                             <div>
                                 <div class="rc-template-field-label">Insert Variable</div>
@@ -12207,6 +12402,7 @@ CSS;
                                 <div x-ref="editor"
                                      wire:ignore
                                      class="rc-template-editor-v50"
+                                     data-plyr-template-editor
                                      contenteditable="true"
                                      data-placeholder="Write your reusable email template..."
                                      data-initial-body="{{ base64_encode($templateBody ?? '') }}"
@@ -14973,11 +15169,11 @@ body.rc-account-preparing .rc-account-impersonation-bar {
                 <button type="button" class="rc-free-plan-gate-close-v129" x-on:click="closeFreeGate()" aria-label="Close">×</button>
                 <span class="rc-free-plan-gate-badge-v129">My Journey</span>
                 <h2 id="rc-free-plan-gate-title-v130"><span x-text="freeGateNames[freeGateSection] || 'This feature'"></span> is a My Journey feature</h2>
-                <p>Your Free plan includes Edit Profile and Settings. Upgrade to My Journey to unlock the recruiting workspace and outreach tools.</p>
+                <p>Your Free plan includes Edit Profile, My Photos, and Settings. Upgrade to My Journey to unlock the recruiting workspace and outreach tools.</p>
             </header>
             <div class="rc-free-plan-gate-body-v129">
                 <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>Discover Schools, Favorites, Lists, Compose Email, Inbox, Schedule, outreach, and analytics are available with My Journey.</span></div>
-                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>You can keep editing your athlete profile and account settings on Free at any time.</span></div>
+                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>You can keep editing your athlete profile, managing My Photos, and changing account settings on Free at any time.</span></div>
             </div>
             <footer class="rc-free-plan-gate-footer-v129">
                 <button type="button" class="rc-free-plan-gate-secondary-v129" x-on:click="closeFreeGate()">Not now</button>
@@ -14986,6 +15182,29 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         </section>
     </div>
 @endif
+
+<script data-navigate-once>
+window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (async function ($wire) {
+    const editor = document.querySelector('[data-plyr-template-editor]');
+    const name = document.querySelector('[data-plyr-template-name]');
+    const subject = document.querySelector('[data-plyr-template-subject]');
+    const preview = document.querySelector('[data-plyr-template-preview]');
+    if (!editor || !$wire) return;
+
+    const clone = editor.cloneNode(true);
+    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
+        node.replaceWith(document.createTextNode(node.textContent || ''));
+    });
+
+    // v10.101: push every debounced editor field into Livewire immediately before
+    // saveTemplate(), eliminating the race where a fast Save click sent stale/empty data.
+    await $wire.set('templateName', String(name?.value || ''), false);
+    await $wire.set('templateSubject', String(subject?.value || ''), false);
+    await $wire.set('templatePreviewText', String(preview?.value || ''), false);
+    await $wire.set('templateBody', String(clone.innerHTML || ''), false);
+    await $wire.call('saveTemplate');
+});
+</script>
 
 <script data-navigate-once>
 (() => {
@@ -15002,6 +15221,7 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         if (/\/(lists)$/.test(path)) return 'lists';
         if (/\/(templates|campaigns)$/.test(path)) return 'campaigns';
         if (/\/(compose-email|compose)$/.test(path)) return 'compose';
+        if (/\/(photos|my-photos)$/.test(path)) return 'photos';
         if (/\/(conversations|inbox)$/.test(path)) return 'conversations';
         if (/\/(schedule|my-schedule)$/.test(path)) return 'schedule';
         if (/\/(settings)$/.test(path)) return 'settings';

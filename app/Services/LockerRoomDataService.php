@@ -90,6 +90,7 @@ class LockerRoomDataService
                 'amplify_active' => $this->hasRole($user, 'Amplify'),
             ],
             'dashboard' => $this->dashboardPayload($user),
+            'photos' => $this->photosPayload($user),
             'schedule' => $this->schedulePayload($user),
             'settings' => $this->settingsPayload($user, $website, $isPremium),
             'billing' => $this->billingPayload($billing, $user, $latestPaymentTransaction),
@@ -242,6 +243,14 @@ class LockerRoomDataService
                 ])
                 ->values()
                 ->all(),
+            'plyrcard_images' => collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
+                ->filter(fn ($path): bool => filled($path))
+                ->map(fn ($path): array => [
+                    'path' => (string) $path,
+                    'url' => $this->storageUrl((string) $path),
+                ])
+                ->values()
+                ->all(),
             'profile_completion' => $this->profileCompletion($user),
             'sport_options' => $this->sportOptions(),
             'position_options' => $this->positionOptions(),
@@ -249,6 +258,51 @@ class LockerRoomDataService
                 'u13' => 'U13', 'u14' => 'U14', 'u15' => 'U15', 'u16' => 'U16',
                 'u17' => 'U17', 'u18' => 'U18', 'u19' => 'U19',
             ]))->values()->mapWithKeys(fn ($label) => [(string) $label => (string) $label])->all(),
+        ];
+    }
+
+    protected function photosPayload(User $user): array
+    {
+        $player = collect(is_array($user->raw_player_images ?? null) ? $user->raw_player_images : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values()
+            ->map(fn (string $path, int $index): array => [
+                'index' => $index,
+                'path' => $path,
+                'url' => $this->storageUrl($path),
+                'name' => basename(parse_url($path, PHP_URL_PATH) ?: $path),
+            ])->all();
+
+        $plyrcard = collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->unique()
+            ->values()
+            ->map(fn (string $path, int $index): array => [
+                'index' => $index,
+                'path' => $path,
+                'url' => $this->storageUrl($path),
+                'name' => basename(parse_url($path, PHP_URL_PATH) ?: $path),
+            ])->all();
+
+        $canManagePlyrcard = false;
+        try {
+            $canManagePlyrcard = method_exists($user, 'isSuperadminOrImpersonating')
+                ? (bool) $user->isSuperadminOrImpersonating()
+                : (method_exists($user, 'hasRole') && ($user->hasRole('superadmin') || $user->hasRole('Superadmin')));
+        } catch (\Throwable) {
+            $canManagePlyrcard = false;
+        }
+
+        return [
+            'player' => $player,
+            'plyrcard' => $plyrcard,
+            'can_manage_player' => true,
+            'can_manage_plyrcard' => $canManagePlyrcard,
+            'player_max' => 20,
+            'plyrcard_max' => 30,
         ];
     }
 

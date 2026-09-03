@@ -14,6 +14,18 @@
     $lrProfileOptionsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.profile.options')
         ? route('locker-room.profile.options')
         : null;
+    $lrPhotosUploadUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.upload')
+        ? route('locker-room.photos.upload')
+        : null;
+    $lrPhotosReplaceUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.replace')
+        ? route('locker-room.photos.replace')
+        : null;
+    $lrPhotosReorderUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.reorder')
+        ? route('locker-room.photos.reorder')
+        : null;
+    $lrPhotosDeleteUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.delete')
+        ? route('locker-room.photos.delete', ['category' => '__CATEGORY__', 'index' => '__INDEX__'])
+        : null;
     $lrDashboardActivityUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.activity')
         ? route('locker-room.dashboard.activity')
         : null;
@@ -616,11 +628,28 @@
     @media(max-width:620px){.lr-school-adminlike-hero{grid-template-columns:52px minmax(0,1fr) auto;gap:10px}.lr-school-adminlike-logo{width:52px;height:52px;border-radius:13px}.lr-school-adminlike-main h3{font-size:18px}.lr-school-score-ring{width:46px;height:46px;border-width:4px}.lr-school-actions{grid-template-columns:1.2fr .9fr 1.05fr;gap:6px}.lr-school-action{font-size:10px;padding:0 6px}.lr-school-tab{font-size:10px}}
 </style>
 
+<style id="lr-photos-v101">
+    .lr-photo-hero{position:relative;overflow:hidden;border-radius:20px;padding:20px;background:linear-gradient(135deg,#111827 0%,#172033 58%,#2a1b18 100%);color:#fff;box-shadow:0 18px 40px rgba(15,23,42,.16)}
+    .lr-photo-hero:after{content:'';position:absolute;width:190px;height:190px;border-radius:50%;right:-55px;top:-75px;background:radial-gradient(circle,rgba(255,92,53,.42),rgba(255,92,53,0) 68%);pointer-events:none}.lr-photo-hero>*{position:relative;z-index:1}
+    .lr-photo-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.lr-photo-hero h3{margin:6px 0 5px;font:700 34px/1 Antonio,Inter,sans-serif;letter-spacing:-.035em}.lr-photo-hero p{margin:0;color:#c7d0dc;font-size:12px;line-height:1.5;max-width:480px}.lr-photo-hero-icon{width:54px;height:54px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);display:grid;place-items:center;color:#ff704d;font-size:20px}
+    .lr-photo-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.lr-photo-tab{min-height:46px;border:0;border-radius:10px;background:transparent;color:#667085;cursor:pointer;font-size:11px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:7px}.lr-photo-tab.is-active{background:#111827;color:#fff;box-shadow:0 8px 18px rgba(15,23,42,.13)}.lr-photo-tab em{font-style:normal;background:#f2f4f7;color:#475467;padding:2px 6px;border-radius:999px;font-size:9px}.lr-photo-tab.is-active em{background:rgba(255,255,255,.13);color:#fff}
+    .lr-photo-upload{border:1px dashed #ffb29f;background:linear-gradient(180deg,#fff8f5,#fff);border-radius:16px;padding:15px;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center}.lr-photo-upload-icon{width:44px;height:44px;border-radius:13px;background:#fff0eb;color:#ff5c35;display:grid;place-items:center;font-size:17px}.lr-photo-upload strong{display:block;font-size:12px;color:#101828}.lr-photo-upload span{display:block;margin-top:3px;color:#667085;font-size:10px;line-height:1.4}.lr-photo-upload.is-readonly{border-style:solid;border-color:#e5e7eb;background:#f8fafc}.lr-photo-upload.is-readonly .lr-photo-upload-icon{background:#eef2f6;color:#667085}
+    .lr-photo-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lr-photo-card{position:relative;min-width:0;border:1px solid #e5e7eb;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.055)}.lr-photo-thumb{position:relative;aspect-ratio:4/3;background:#eef1f5;overflow:hidden;cursor:zoom-in}.lr-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .22s ease}.lr-photo-card:hover .lr-photo-thumb img{transform:scale(1.025)}.lr-photo-index{position:absolute;left:9px;top:9px;display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:rgba(17,24,39,.78);color:#fff;font-size:9px;font-weight:900;backdrop-filter:blur(5px)}.lr-photo-card-body{padding:10px}.lr-photo-card-name{font-size:10px;font-weight:800;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lr-photo-actions{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}.lr-photo-action{height:30px;min-width:30px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#475467;display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 8px;font-size:9px;font-weight:800;cursor:pointer}.lr-photo-action:hover{border-color:#ffb6a2;color:#ef542f;background:#fff7f3}.lr-photo-action.is-danger:hover{border-color:#fecaca;color:#b42318;background:#fff5f5}.lr-photo-action[disabled]{opacity:.35;cursor:not-allowed}
+    .lr-photo-empty{grid-column:1/-1;min-height:190px;border:1px dashed #d0d5dd;border-radius:16px;background:#fff;display:grid;place-items:center;text-align:center;padding:24px;color:#667085}.lr-photo-empty i{display:block;font-size:24px;color:#ff6a43;margin-bottom:8px}.lr-photo-empty strong{display:block;color:#101828;font-size:13px}.lr-photo-empty span{display:block;margin-top:4px;font-size:10px}
+    .lr-photo-preview{position:fixed;inset:0;z-index:2147483650;display:none;place-items:center;background:rgba(7,12,22,.82);padding:20px;backdrop-filter:blur(7px)}.lr-photo-preview.is-open{display:grid}.lr-photo-preview-card{position:relative;width:min(840px,96vw);max-height:88vh;border-radius:18px;background:#0f172a;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.45)}.lr-photo-preview-card img{display:block;width:100%;max-height:82vh;object-fit:contain;background:#0b1220}.lr-photo-preview-close{position:absolute;right:10px;top:10px;z-index:2;width:36px;height:36px;border:1px solid rgba(255,255,255,.18);border-radius:11px;background:rgba(15,23,42,.76);color:#fff;cursor:pointer}.lr-photo-busy{opacity:.55;pointer-events:none}
+    .lr-sort-row{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin:0 0 10px}.lr-sort-row label{font-size:9px;font-weight:800;color:#667085;text-transform:uppercase;letter-spacing:.06em}.lr-sort-select{height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#344054;padding:0 30px 0 10px;font-size:10px;font-weight:750;outline:none}
+    @media(max-width:520px){.lr-photo-gallery{grid-template-columns:1fr 1fr;gap:7px}.lr-photo-upload{grid-template-columns:40px minmax(0,1fr);padding:12px}.lr-photo-upload .lr-btn{grid-column:1/-1;width:100%}.lr-photo-hero h3{font-size:29px}.lr-photo-action span{display:none}.lr-photo-action{padding:0 7px}}
+</style>
+
 <script type="application/json" id="plyrcard-locker-room-initial">@json($lrInitialData)</script>
 <div id="plyrcard-action-drawer" class="lr-drawer" data-state="closed"
      data-url="{{ $lrDataUrl }}"
      data-profile-url="{{ $lrProfileUrl }}"
      data-profile-options-url="{{ $lrProfileOptionsUrl }}"
+     data-photos-upload-url="{{ $lrPhotosUploadUrl }}"
+     data-photos-replace-url="{{ $lrPhotosReplaceUrl }}"
+     data-photos-reorder-url="{{ $lrPhotosReorderUrl }}"
+     data-photos-delete-url="{{ $lrPhotosDeleteUrl }}"
      data-dashboard-activity-url="{{ $lrDashboardActivityUrl }}"
      data-dashboard-school-url="{{ $lrDashboardSchoolUrl }}"
      data-dashboard-school-favorite-url="{{ $lrDashboardSchoolFavoriteUrl }}"
@@ -684,6 +713,7 @@
                         <div class="lr-menu-grid">
                             <button class="lr-menu-card" type="button" data-lr-nav="dashboard" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-chart-line"></i></span><span class="lr-menu-copy"><strong>Dashboard</strong><small>Recruiting stats and progress</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="profile"><span class="lr-menu-icon"><i class="fa-solid fa-user-pen"></i></span><span class="lr-menu-copy"><strong>Profile</strong><small>Quick athlete profile edit</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="photos"><span class="lr-menu-icon"><i class="fa-solid fa-images"></i></span><span class="lr-menu-copy"><strong>My Photos</strong><small>Manage your player gallery</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="schedule" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-calendar-days"></i></span><span class="lr-menu-copy"><strong>Schedule</strong><small>Create, view and edit games</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="settings"><span class="lr-menu-icon"><i class="fa-solid fa-gear"></i></span><span class="lr-menu-copy"><strong>Settings</strong><small>Notifications and PLYRCARD display</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-visit-plyrcard><span class="lr-menu-icon"><i class="fa-solid fa-globe"></i></span><span class="lr-menu-copy"><strong>Visit My PLYRCARD</strong><small>Open your public player page</small></span></button>
@@ -809,6 +839,44 @@
 
                         <button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Quick Profile</button>
                     </form>
+                </section>
+
+                <section class="lr-view" data-lr-view="photos">
+                    <div class="lr-section" data-lr-photos-root>
+                        <div class="lr-photo-hero">
+                            <div class="lr-photo-hero-top">
+                                <div>
+                                    <span class="lr-eyebrow">Media Locker</span>
+                                    <h3>My Photos</h3>
+                                    <p>Keep your player images organized in one place. Player Uploaded Images are yours to manage. PLYRCARD Images are the polished assets uploaded by the PLYRCARD team.</p>
+                                </div>
+                                <span class="lr-photo-hero-icon"><i class="fa-solid fa-images"></i></span>
+                            </div>
+                        </div>
+
+                        <div class="lr-photo-tabs" role="tablist" aria-label="Photo gallery categories">
+                            <button type="button" class="lr-photo-tab is-active" data-lr-photo-tab="player"><i class="fa-solid fa-camera"></i> Player Uploaded <em data-lr-photo-count="player">0</em></button>
+                            <button type="button" class="lr-photo-tab" data-lr-photo-tab="plyrcard"><i class="fa-solid fa-bolt"></i> PLYRCARD Images <em data-lr-photo-count="plyrcard">0</em></button>
+                        </div>
+
+                        <div class="lr-photo-upload" data-lr-photo-upload-panel>
+                            <span class="lr-photo-upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
+                            <div><strong data-lr-photo-upload-title>Upload Player Photos</strong><span data-lr-photo-upload-copy>Add JPG, PNG or WEBP images up to 5 MB each.</span></div>
+                            <button class="lr-btn lr-btn-primary" type="button" data-lr-photo-pick><i class="fa-solid fa-plus"></i> Add Photos</button>
+                            <input type="file" accept="image/*" multiple data-lr-photo-files hidden>
+                        </div>
+
+                        <div class="lr-photo-gallery" data-lr-photo-gallery></div>
+                        <div class="lr-muted" data-lr-photo-status aria-live="polite"></div>
+                    </div>
+
+                    <div class="lr-photo-preview" data-lr-photo-preview aria-hidden="true">
+                        <div class="lr-photo-preview-card">
+                            <button type="button" class="lr-photo-preview-close" data-lr-photo-preview-close aria-label="Close image preview"><i class="fa-solid fa-xmark"></i></button>
+                            <img src="" alt="Photo preview" data-lr-photo-preview-image>
+                        </div>
+                    </div>
+                    <input type="file" accept="image/*" data-lr-photo-replace-input hidden>
                 </section>
 
                 <section class="lr-view" data-lr-view="schedule">
@@ -1045,6 +1113,9 @@
     let dashboardActivityLoading = false;
     let dashboardSchoolLoading = false;
     let dashboardEngagementFilter = '';
+    let dashboardActivitySort = 'count_desc';
+    let photoGalleryCategory = 'player';
+    let photoReplaceTarget = null;
     let supportTicketState = {categories:{}, statuses:{}, tickets:[]};
     let supportTicketsLoaded = false;
     let lockerCheckoutType = null;
@@ -1061,8 +1132,8 @@
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
 
-    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
-    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
+    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
+    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
 
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
@@ -1213,8 +1284,24 @@
             summary = `<div class="lr-activity-summary"><div><span>Total activity</span><strong>${Number(data.total || 0).toLocaleString()}</strong></div><div style="text-align:right"><span>Identified coaches</span><strong>${Number(data.identified_count || rows.length || 0).toLocaleString()}</strong></div></div>`;
         }
 
+        const rowCountForSort = row => metric === 'social_clicks' && dashboardEngagementFilter
+            ? Number((row.platform_counts || {})[dashboardEngagementFilter] || 0)
+            : Number(row.count || row.views || row.clicks || 0);
+        const rowTimeForSort = row => {
+            const raw = row.last_at || row.time || row.occurred_at || row.created_at || '';
+            const time = Date.parse(raw);
+            return Number.isFinite(time) ? time : 0;
+        };
+        rows = [...rows].sort((a,b) => {
+            if (dashboardActivitySort === 'count_asc') return rowCountForSort(a) - rowCountForSort(b);
+            if (dashboardActivitySort === 'date_desc') return rowTimeForSort(b) - rowTimeForSort(a);
+            if (dashboardActivitySort === 'date_asc') return rowTimeForSort(a) - rowTimeForSort(b);
+            return rowCountForSort(b) - rowCountForSort(a);
+        });
+        const sortControl = `<div class="lr-sort-row"><label>Sort</label><select class="lr-sort-select" data-lr-dashboard-sort><option value="count_desc" ${dashboardActivitySort === 'count_desc' ? 'selected' : ''}>${metric === 'social_clicks' ? 'Clicks' : 'Views'}: High to Low</option><option value="count_asc" ${dashboardActivitySort === 'count_asc' ? 'selected' : ''}>${metric === 'social_clicks' ? 'Clicks' : 'Views'}: Low to High</option><option value="date_desc" ${dashboardActivitySort === 'date_desc' ? 'selected' : ''}>Date: Newest First</option><option value="date_asc" ${dashboardActivitySort === 'date_asc' ? 'selected' : ''}>Date: Oldest First</option></select></div>`;
+
         if (!rows.length) {
-            body.innerHTML = summary + note + '<div class="lr-detail-empty">No identified coach rows are available for this view yet.</div>';
+            body.innerHTML = summary + note + sortControl + '<div class="lr-detail-empty">No identified coach rows are available for this view yet.</div>';
             return;
         }
 
@@ -1246,7 +1333,7 @@
                 ${tag}
             </div>`;
         }).join('');
-        body.innerHTML = summary + note + `<div style="font-size:12px;font-weight:850;color:#101828;margin:13px 2px 8px;">${esc(sectionHeading)}</div><div class="lr-activity-list">${html}</div>`;
+        body.innerHTML = summary + note + sortControl + `<div style="font-size:12px;font-weight:850;color:#101828;margin:13px 2px 8px;">${esc(sectionHeading)}</div><div class="lr-activity-list">${html}</div>`;
     }
 
     async function fetchDashboardMetric(metric) {
@@ -1275,6 +1362,7 @@
         if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
         closeDashboardSchool();
         dashboardEngagementFilter = '';
+        dashboardActivitySort = 'count_desc';
         dashboardActivityState = dashboardMetricCache.get(metric) || null;
         dashboardActivityLoading = !dashboardActivityState;
         renderDashboardActivityDetail();
@@ -1415,6 +1503,169 @@
         });
     }
 
+    function photoGalleryData(category = photoGalleryCategory) {
+        const photos = state?.photos || {};
+        const key = category === 'plyrcard' ? 'plyrcard' : 'player';
+        return {
+            key,
+            rows: Array.isArray(photos[key]) ? photos[key] : [],
+            canManage: key === 'player' ? photos.can_manage_player !== false : photos.can_manage_plyrcard === true,
+            max: Number(key === 'player' ? (photos.player_max || 20) : (photos.plyrcard_max || 30)),
+        };
+    }
+
+    function setPhotoStatus(message = '', isError = false) {
+        const el = q('[data-lr-photo-status]');
+        if (!el) return;
+        el.textContent = message || '';
+        el.style.color = isError ? '#b42318' : '#667085';
+    }
+
+    function renderPhotos() {
+        const root = q('[data-lr-photos-root]');
+        const gallery = q('[data-lr-photo-gallery]');
+        if (!root || !gallery || !authenticated) return;
+
+        const data = photoGalleryData();
+        qa('[data-lr-photo-tab]').forEach(tab => tab.classList.toggle('is-active', tab.dataset.lrPhotoTab === data.key));
+        qa('[data-lr-photo-count]').forEach(el => {
+            const rows = Array.isArray(state?.photos?.[el.dataset.lrPhotoCount]) ? state.photos[el.dataset.lrPhotoCount] : [];
+            el.textContent = String(rows.length);
+        });
+
+        const uploadPanel = q('[data-lr-photo-upload-panel]');
+        const uploadTitle = q('[data-lr-photo-upload-title]');
+        const uploadCopy = q('[data-lr-photo-upload-copy]');
+        const pick = q('[data-lr-photo-pick]');
+        if (uploadPanel) uploadPanel.classList.toggle('is-readonly', !data.canManage);
+        if (uploadTitle) uploadTitle.textContent = data.key === 'player' ? 'Upload Player Photos' : (data.canManage ? 'Upload PLYRCARD Images' : 'PLYRCARD Team Gallery');
+        if (uploadCopy) uploadCopy.textContent = data.key === 'player'
+            ? `You can manage up to ${data.max} player-uploaded images.`
+            : (data.canManage ? `Superadmin access: manage up to ${data.max} PLYRCARD Images.` : 'These polished images are uploaded and managed by the PLYRCARD team. You can preview or download them here.');
+        if (pick) {
+            pick.hidden = !data.canManage;
+            pick.innerHTML = `<i class="fa-solid fa-plus"></i> ${data.key === 'player' ? 'Add Photos' : 'Add PLYRCARD Images'}`;
+        }
+
+        if (!data.rows.length) {
+            gallery.innerHTML = `<div class="lr-photo-empty"><div><i class="fa-regular fa-images"></i><strong>${data.key === 'player' ? 'No player photos yet' : 'No PLYRCARD Images yet'}</strong><span>${data.canManage ? 'Use Add Photos to start this gallery.' : 'PLYRCARD team images will appear here when they are added.'}</span></div></div>`;
+            return;
+        }
+
+        gallery.innerHTML = data.rows.map((photo, position) => {
+            const url = photo?.url || '';
+            const name = photo?.name || `Photo ${position + 1}`;
+            const canLeft = data.canManage && position > 0;
+            const canRight = data.canManage && position < data.rows.length - 1;
+            const manage = data.canManage ? `<button type="button" class="lr-photo-action" data-lr-photo-replace="${position}" title="Replace"><i class="fa-solid fa-rotate"></i><span>Replace</span></button><button type="button" class="lr-photo-action" data-lr-photo-move="left" data-index="${position}" ${canLeft ? '' : 'disabled'} title="Move left"><i class="fa-solid fa-arrow-left"></i></button><button type="button" class="lr-photo-action" data-lr-photo-move="right" data-index="${position}" ${canRight ? '' : 'disabled'} title="Move right"><i class="fa-solid fa-arrow-right"></i></button><button type="button" class="lr-photo-action is-danger" data-lr-photo-delete="${position}" title="Delete"><i class="fa-regular fa-trash-can"></i></button>` : '';
+            return `<article class="lr-photo-card"><button type="button" class="lr-photo-thumb" data-lr-photo-preview-open="${esc(url)}" aria-label="Preview ${esc(name)}"><img src="${esc(url)}" alt="${esc(name)}" loading="lazy"><span class="lr-photo-index">${position + 1}</span></button><div class="lr-photo-card-body"><div class="lr-photo-card-name" title="${esc(name)}">${esc(name)}</div><div class="lr-photo-actions"><a class="lr-photo-action" href="${esc(url)}" target="_blank" rel="noopener" download><i class="fa-solid fa-download"></i><span>Download</span></a>${manage}</div></div></article>`;
+        }).join('');
+    }
+
+    async function uploadLockerPhotos(files) {
+        const data = photoGalleryData();
+        if (!data.canManage || !files?.length || !drawer.dataset.photosUploadUrl) return;
+        const root = q('[data-lr-photos-root]');
+        root?.classList.add('lr-photo-busy');
+        setPhotoStatus('Uploading photos…');
+        try {
+            const fd = new FormData();
+            fd.append('category', data.key);
+            Array.from(files).forEach(file => fd.append('photos[]', file));
+            const json = await request(drawer.dataset.photosUploadUrl, {method:'POST', body:fd});
+            if (json.data) state = json.data;
+            render();
+            setPhotoStatus(json.message || 'Photos uploaded.');
+        } catch (error) {
+            setPhotoStatus(error.message || 'Unable to upload photos.', true);
+        } finally {
+            root?.classList.remove('lr-photo-busy');
+            const input = q('[data-lr-photo-files]'); if (input) input.value = '';
+        }
+    }
+
+    async function replaceLockerPhoto(file) {
+        const target = photoReplaceTarget;
+        if (!target || !file || !drawer.dataset.photosReplaceUrl) return;
+        const root = q('[data-lr-photos-root]');
+        root?.classList.add('lr-photo-busy');
+        setPhotoStatus('Replacing photo…');
+        try {
+            const fd = new FormData();
+            fd.append('category', target.category);
+            fd.append('index', String(target.index));
+            fd.append('photo', file);
+            const json = await request(drawer.dataset.photosReplaceUrl, {method:'POST', body:fd});
+            if (json.data) state = json.data;
+            photoReplaceTarget = null;
+            render();
+            setPhotoStatus(json.message || 'Photo replaced.');
+        } catch (error) {
+            setPhotoStatus(error.message || 'Unable to replace photo.', true);
+        } finally {
+            root?.classList.remove('lr-photo-busy');
+            const input = q('[data-lr-photo-replace-input]'); if (input) input.value = '';
+        }
+    }
+
+    function photoDeleteUrl(category, index) {
+        return String(drawer.dataset.photosDeleteUrl || '')
+            .replace('__CATEGORY__', encodeURIComponent(category))
+            .replace('__INDEX__', encodeURIComponent(String(index)));
+    }
+
+    async function deleteLockerPhoto(index) {
+        const data = photoGalleryData();
+        if (!data.canManage || !drawer.dataset.photosDeleteUrl) return;
+        if (!window.confirm('Delete this photo from the gallery?')) return;
+        const root = q('[data-lr-photos-root]');
+        root?.classList.add('lr-photo-busy');
+        setPhotoStatus('Removing photo…');
+        try {
+            const json = await request(photoDeleteUrl(data.key, index), {method:'DELETE'});
+            if (json.data) state = json.data;
+            render();
+            setPhotoStatus(json.message || 'Photo removed.');
+        } catch (error) {
+            setPhotoStatus(error.message || 'Unable to remove photo.', true);
+        } finally {
+            root?.classList.remove('lr-photo-busy');
+        }
+    }
+
+    async function reorderLockerPhoto(index, direction) {
+        const data = photoGalleryData();
+        if (!data.canManage || !drawer.dataset.photosReorderUrl) return;
+        const root = q('[data-lr-photos-root]');
+        root?.classList.add('lr-photo-busy');
+        try {
+            const json = await request(drawer.dataset.photosReorderUrl, {method:'PATCH', body:{category:data.key,index:Number(index),direction}});
+            if (json.data) state = json.data;
+            render();
+        } catch (error) {
+            setPhotoStatus(error.message || 'Unable to reorder photos.', true);
+        } finally {
+            root?.classList.remove('lr-photo-busy');
+        }
+    }
+
+    function openPhotoPreview(url) {
+        const modal = q('[data-lr-photo-preview]');
+        const img = q('[data-lr-photo-preview-image]');
+        if (!modal || !img || !url) return;
+        img.src = url;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden','false');
+    }
+
+    function closePhotoPreview() {
+        const modal = q('[data-lr-photo-preview]');
+        const img = q('[data-lr-photo-preview-image]');
+        modal?.classList.remove('is-open');
+        modal?.setAttribute('aria-hidden','true');
+        if (img) img.src = '';
+    }
+
     function render() {
         if (!authenticated || !state?.user) return;
         q('[data-lr-plan]') && (q('[data-lr-plan]').textContent = state.plan?.label || 'Free');
@@ -1430,7 +1681,7 @@
             ? `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy"><strong>${esc(next.opponent || next.title || 'Game')}</strong><br>${esc(next.date_label || '')}${next.time_label ? ` · ${esc(next.time_label)}` : ''}${next.venue || next.location ? `<br>${esc(next.venue || next.location)}` : ''}</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`
             : `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`;
 
-        renderProfile(); renderSchedule(); renderSettings(); renderPlans(); renderBilling(); renderShare();
+        renderProfile(); renderPhotos(); renderSchedule(); renderSettings(); renderPlans(); renderBilling(); renderShare();
         prefetchDashboardMetrics();
     }
 
@@ -1938,6 +2189,13 @@
         if (event.target.closest('[data-lr-close]')) { event.preventDefault(); closeDrawer(); return; }
         const back = event.target.closest('[data-lr-back]'); if (back) { event.preventDefault(); goBack(); return; }
         const nav = event.target.closest('[data-lr-nav]'); if (nav && drawer.contains(nav)) { event.preventDefault(); setView(nav.dataset.lrNav); return; }
+        const photoTab = event.target.closest('[data-lr-photo-tab]'); if (photoTab && drawer.contains(photoTab)) { event.preventDefault(); photoGalleryCategory = photoTab.dataset.lrPhotoTab === 'plyrcard' ? 'plyrcard' : 'player'; setPhotoStatus(''); renderPhotos(); return; }
+        const photoPick = event.target.closest('[data-lr-photo-pick]'); if (photoPick && drawer.contains(photoPick)) { event.preventDefault(); q('[data-lr-photo-files]')?.click(); return; }
+        const photoPreview = event.target.closest('[data-lr-photo-preview-open]'); if (photoPreview && drawer.contains(photoPreview)) { event.preventDefault(); openPhotoPreview(photoPreview.dataset.lrPhotoPreviewOpen); return; }
+        if (event.target.closest('[data-lr-photo-preview-close]') || event.target === q('[data-lr-photo-preview]')) { event.preventDefault(); closePhotoPreview(); return; }
+        const photoReplace = event.target.closest('[data-lr-photo-replace]'); if (photoReplace && drawer.contains(photoReplace)) { event.preventDefault(); photoReplaceTarget = {category:photoGalleryCategory,index:Number(photoReplace.dataset.lrPhotoReplace)}; q('[data-lr-photo-replace-input]')?.click(); return; }
+        const photoDelete = event.target.closest('[data-lr-photo-delete]'); if (photoDelete && drawer.contains(photoDelete)) { event.preventDefault(); deleteLockerPhoto(Number(photoDelete.dataset.lrPhotoDelete)); return; }
+        const photoMove = event.target.closest('[data-lr-photo-move]'); if (photoMove && drawer.contains(photoMove)) { event.preventDefault(); reorderLockerPhoto(Number(photoMove.dataset.index), photoMove.dataset.lrPhotoMove); return; }
         const metric = event.target.closest('[data-lr-dashboard-metric]'); if (metric && drawer.contains(metric)) { event.preventDefault(); openDashboardMetric(metric.dataset.lrDashboardMetric); return; }
         const engagementFilter = event.target.closest('[data-lr-engagement-filter]'); if (engagementFilter && drawer.contains(engagementFilter)) { event.preventDefault(); dashboardEngagementFilter = dashboardEngagementFilter === engagementFilter.dataset.lrEngagementFilter ? '' : engagementFilter.dataset.lrEngagementFilter; renderDashboardActivityDetail(); return; }
         if (event.target.closest('[data-lr-dashboard-detail-close]')) { event.preventDefault(); closeDashboardActivity(); return; }
@@ -1972,6 +2230,15 @@
         const cancelSchedule = event.target.closest('[data-lr-cancel-schedule]'); if (cancelSchedule) { q('[data-lr-schedule-form]').hidden=true; return; }
         const edit = event.target.closest('[data-lr-edit-schedule]'); if (edit) { const item=(state.schedule?.items||[]).find(x=>String(x.id)===String(edit.dataset.lrEditSchedule)); if(!item)return; const form=q('[data-lr-schedule-form]'); fillForm(form,item); form.querySelector('[name="schedule_id"]').value=item.id; form.querySelector('[name="is_home"]').value=item.is_home?'1':'0'; q('[data-lr-schedule-form-title]').textContent='Edit Schedule'; form.hidden=false; form.scrollIntoView({behavior:'auto',block:'start'}); return; }
         const del = event.target.closest('[data-lr-delete-schedule]'); if (del) { if(!confirm('Remove this schedule item?')) return; request(`${drawer.dataset.scheduleBaseUrl}/${del.dataset.lrDeleteSchedule}`,{method:'DELETE'}).then(json=>{if(json.data)state=json.data; render(); showToast('Schedule removed.');}).catch(err=>showToast(err.message,true)); return; }
+    }, true);
+
+    document.addEventListener('change', event => {
+        const upload = event.target.closest('[data-lr-photo-files]');
+        if (upload && drawer.contains(upload)) { uploadLockerPhotos(upload.files); return; }
+        const replacement = event.target.closest('[data-lr-photo-replace-input]');
+        if (replacement && drawer.contains(replacement)) { replaceLockerPhoto(replacement.files?.[0]); return; }
+        const sort = event.target.closest('[data-lr-dashboard-sort]');
+        if (sort && drawer.contains(sort)) { dashboardActivitySort = sort.value || 'count_desc'; renderDashboardActivityDetail(); return; }
     }, true);
 
     // Fill sensible placeholders for Locker Room fields that do not define one explicitly.
