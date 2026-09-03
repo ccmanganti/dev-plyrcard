@@ -411,7 +411,24 @@ class LockerRoomController extends Controller
         $category = strtolower(trim($category)) === 'plyrcard' ? 'plyrcard' : 'player';
 
         if (! $this->canManagePhotoCategory($user, $category)) {
-            return $this->failure($request, 'Only a PLYRCARD administrator can manage PLYRCARD Images.', 403);
+            return $this->failure($request, 'This photo cannot be changed from this account.', 403);
+        }
+
+        $source = strtolower(trim((string) $request->query('source', $category === 'plyrcard' ? 'additional' : 'player')));
+        $field = trim((string) $request->query('field', ''));
+
+        if ($category === 'plyrcard' && $source === 'field') {
+            $allowedFields = [
+                'plyrcard_image', 'player_image', 'action_image',
+                'national_team_image', 'mobile_hero_image', 'youtube_thumbnail',
+            ];
+            if (! in_array($field, $allowedFields, true)) {
+                return $this->failure($request, 'That photo is no longer available.', 404);
+            }
+            $user->forceFill([$field => null])->save();
+            return $this->success($request, 'Photo removed.', [
+                'data' => $dataService->snapshot($user->fresh()),
+            ]);
         }
 
         $paths = $this->lockerRoomPhotoPaths($user, $category);

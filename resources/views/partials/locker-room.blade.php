@@ -17,12 +17,6 @@
     $lrPhotosUploadUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.upload')
         ? route('locker-room.photos.upload')
         : null;
-    $lrPhotosReplaceUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.replace')
-        ? route('locker-room.photos.replace')
-        : null;
-    $lrPhotosReorderUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.reorder')
-        ? route('locker-room.photos.reorder')
-        : null;
     $lrPhotosDeleteUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.photos.delete')
         ? route('locker-room.photos.delete', ['category' => '__CATEGORY__', 'index' => '__INDEX__'])
         : null;
@@ -628,17 +622,14 @@
     @media(max-width:620px){.lr-school-adminlike-hero{grid-template-columns:52px minmax(0,1fr) auto;gap:10px}.lr-school-adminlike-logo{width:52px;height:52px;border-radius:13px}.lr-school-adminlike-main h3{font-size:18px}.lr-school-score-ring{width:46px;height:46px;border-width:4px}.lr-school-actions{grid-template-columns:1.2fr .9fr 1.05fr;gap:6px}.lr-school-action{font-size:10px;padding:0 6px}.lr-school-tab{font-size:10px}}
 </style>
 
-<style id="lr-photos-v101">
-    .lr-photo-hero{position:relative;overflow:hidden;border-radius:20px;padding:20px;background:linear-gradient(135deg,#111827 0%,#172033 58%,#2a1b18 100%);color:#fff;box-shadow:0 18px 40px rgba(15,23,42,.16)}
-    .lr-photo-hero:after{content:'';position:absolute;width:190px;height:190px;border-radius:50%;right:-55px;top:-75px;background:radial-gradient(circle,rgba(255,92,53,.42),rgba(255,92,53,0) 68%);pointer-events:none}.lr-photo-hero>*{position:relative;z-index:1}
-    .lr-photo-hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.lr-photo-hero h3{margin:6px 0 5px;font:700 34px/1 Antonio,Inter,sans-serif;letter-spacing:-.035em}.lr-photo-hero p{margin:0;color:#c7d0dc;font-size:12px;line-height:1.5;max-width:480px}.lr-photo-hero-icon{width:54px;height:54px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);display:grid;place-items:center;color:#ff704d;font-size:20px}
-    .lr-photo-tabs{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:5px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.lr-photo-tab{min-height:46px;border:0;border-radius:10px;background:transparent;color:#667085;cursor:pointer;font-size:11px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:7px}.lr-photo-tab.is-active{background:#111827;color:#fff;box-shadow:0 8px 18px rgba(15,23,42,.13)}.lr-photo-tab em{font-style:normal;background:#f2f4f7;color:#475467;padding:2px 6px;border-radius:999px;font-size:9px}.lr-photo-tab.is-active em{background:rgba(255,255,255,.13);color:#fff}
-    .lr-photo-upload{border:1px dashed #ffb29f;background:linear-gradient(180deg,#fff8f5,#fff);border-radius:16px;padding:15px;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center}.lr-photo-upload-icon{width:44px;height:44px;border-radius:13px;background:#fff0eb;color:#ff5c35;display:grid;place-items:center;font-size:17px}.lr-photo-upload strong{display:block;font-size:12px;color:#101828}.lr-photo-upload span{display:block;margin-top:3px;color:#667085;font-size:10px;line-height:1.4}.lr-photo-upload.is-readonly{border-style:solid;border-color:#e5e7eb;background:#f8fafc}.lr-photo-upload.is-readonly .lr-photo-upload-icon{background:#eef2f6;color:#667085}
-    .lr-photo-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.lr-photo-card{position:relative;min-width:0;border:1px solid #e5e7eb;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 8px 22px rgba(15,23,42,.055)}.lr-photo-thumb{position:relative;aspect-ratio:4/3;background:#eef1f5;overflow:hidden;cursor:zoom-in}.lr-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .22s ease}.lr-photo-card:hover .lr-photo-thumb img{transform:scale(1.025)}.lr-photo-index{position:absolute;left:9px;top:9px;display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:rgba(17,24,39,.78);color:#fff;font-size:9px;font-weight:900;backdrop-filter:blur(5px)}.lr-photo-card-body{padding:10px}.lr-photo-card-name{font-size:10px;font-weight:800;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lr-photo-actions{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}.lr-photo-action{height:30px;min-width:30px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#475467;display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 8px;font-size:9px;font-weight:800;cursor:pointer}.lr-photo-action:hover{border-color:#ffb6a2;color:#ef542f;background:#fff7f3}.lr-photo-action.is-danger:hover{border-color:#fecaca;color:#b42318;background:#fff5f5}.lr-photo-action[disabled]{opacity:.35;cursor:not-allowed}
-    .lr-photo-empty{grid-column:1/-1;min-height:190px;border:1px dashed #d0d5dd;border-radius:16px;background:#fff;display:grid;place-items:center;text-align:center;padding:24px;color:#667085}.lr-photo-empty i{display:block;font-size:24px;color:#ff6a43;margin-bottom:8px}.lr-photo-empty strong{display:block;color:#101828;font-size:13px}.lr-photo-empty span{display:block;margin-top:4px;font-size:10px}
-    .lr-photo-preview{position:fixed;inset:0;z-index:2147483650;display:none;place-items:center;background:rgba(7,12,22,.82);padding:20px;backdrop-filter:blur(7px)}.lr-photo-preview.is-open{display:grid}.lr-photo-preview-card{position:relative;width:min(840px,96vw);max-height:88vh;border-radius:18px;background:#0f172a;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.45)}.lr-photo-preview-card img{display:block;width:100%;max-height:82vh;object-fit:contain;background:#0b1220}.lr-photo-preview-close{position:absolute;right:10px;top:10px;z-index:2;width:36px;height:36px;border:1px solid rgba(255,255,255,.18);border-radius:11px;background:rgba(15,23,42,.76);color:#fff;cursor:pointer}.lr-photo-busy{opacity:.55;pointer-events:none}
+<style id="lr-photos-v102">
+    .lr-photo-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:2px 0 11px;border-bottom:1px solid #e5e7eb}.lr-photo-hero h3{margin:4px 0 4px;font:700 30px/1 Antonio,Inter,sans-serif;letter-spacing:-.035em;color:#101828}.lr-photo-hero p{margin:0;color:#667085;font-size:11px;line-height:1.5;max-width:480px}.lr-photo-hero-icon{width:42px;height:42px;border-radius:12px;background:#fff0eb;color:#ff5c35;display:grid;place-items:center;font-size:17px;flex:0 0 auto}
+    .lr-photo-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}.lr-photo-tab{min-height:42px;border:0;border-radius:9px;background:transparent;color:#667085;cursor:pointer;font-size:10px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:6px}.lr-photo-tab.is-active{background:#f5f6f8;color:#101828;box-shadow:inset 0 0 0 1px #e5e7eb}.lr-photo-tab em{font-style:normal;background:#eef1f5;color:#475467;padding:2px 6px;border-radius:999px;font-size:8px}
+    .lr-photo-upload{border:1px solid #e5e7eb;background:#fff;border-radius:13px;padding:12px 13px;display:flex;align-items:center;justify-content:space-between;gap:12px}.lr-photo-upload-icon{display:none}.lr-photo-upload strong{display:block;font-size:11px;color:#101828}.lr-photo-upload span{display:block;margin-top:3px;color:#667085;font-size:9px;line-height:1.4}.lr-photo-upload.is-readonly{display:none}
+    .lr-photo-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.lr-photo-card{position:relative;min-width:0;aspect-ratio:4/3;border:1px solid #e5e7eb;border-radius:14px;background:#f2f4f7;overflow:hidden;box-shadow:0 6px 18px rgba(15,23,42,.045)}.lr-photo-card img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .2s ease,filter .2s ease}.lr-photo-card:hover img,.lr-photo-card:focus-within img{transform:scale(1.025);filter:brightness(.82)}.lr-photo-actions{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:flex-end;gap:5px;padding:8px;background:linear-gradient(to top,rgba(8,15,28,.62),rgba(8,15,28,0) 58%);opacity:0;pointer-events:none;transition:opacity .18s ease}.lr-photo-card:hover .lr-photo-actions,.lr-photo-card:focus-within .lr-photo-actions{opacity:1;pointer-events:auto}.lr-photo-action{width:32px;height:32px;border:1px solid rgba(255,255,255,.2);border-radius:9px;background:rgba(17,24,39,.76);color:#fff;display:grid;place-items:center;padding:0;font-size:11px;cursor:pointer;text-decoration:none;backdrop-filter:blur(5px)}.lr-photo-action:hover{background:#111827}.lr-photo-action.is-danger:hover{background:#b42318}.lr-photo-empty{grid-column:1/-1;min-height:170px;border:1px dashed #d0d5dd;border-radius:14px;background:#fff;display:grid;place-items:center;text-align:center;padding:22px;color:#667085}.lr-photo-empty i{display:block;font-size:21px;color:#ff6a43;margin-bottom:8px}.lr-photo-empty strong{display:block;color:#101828;font-size:12px}.lr-photo-empty span{display:block;margin-top:4px;font-size:9px}.lr-photo-busy{opacity:.55;pointer-events:none}
     .lr-sort-row{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin:0 0 10px}.lr-sort-row label{font-size:9px;font-weight:800;color:#667085;text-transform:uppercase;letter-spacing:.06em}.lr-sort-select{height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#344054;padding:0 30px 0 10px;font-size:10px;font-weight:750;outline:none}
-    @media(max-width:520px){.lr-photo-gallery{grid-template-columns:1fr 1fr;gap:7px}.lr-photo-upload{grid-template-columns:40px minmax(0,1fr);padding:12px}.lr-photo-upload .lr-btn{grid-column:1/-1;width:100%}.lr-photo-hero h3{font-size:29px}.lr-photo-action span{display:none}.lr-photo-action{padding:0 7px}}
+    @media(max-width:520px){.lr-photo-gallery{grid-template-columns:1fr 1fr;gap:7px}.lr-photo-upload{align-items:flex-start;flex-direction:column}.lr-photo-upload .lr-btn{width:100%}.lr-photo-hero h3{font-size:27px}.lr-photo-hero-icon{display:none}}
+    @media(hover:none){.lr-photo-card .lr-photo-actions{opacity:1;pointer-events:auto;background:linear-gradient(to top,rgba(8,15,28,.46),rgba(8,15,28,0) 48%)}}
 </style>
 
 <script type="application/json" id="plyrcard-locker-room-initial">@json($lrInitialData)</script>
@@ -647,8 +638,6 @@
      data-profile-url="{{ $lrProfileUrl }}"
      data-profile-options-url="{{ $lrProfileOptionsUrl }}"
      data-photos-upload-url="{{ $lrPhotosUploadUrl }}"
-     data-photos-replace-url="{{ $lrPhotosReplaceUrl }}"
-     data-photos-reorder-url="{{ $lrPhotosReorderUrl }}"
      data-photos-delete-url="{{ $lrPhotosDeleteUrl }}"
      data-dashboard-activity-url="{{ $lrDashboardActivityUrl }}"
      data-dashboard-school-url="{{ $lrDashboardSchoolUrl }}"
@@ -833,8 +822,8 @@
                         </div>
 
                         <div class="lr-profile-pane" data-lr-profile-pane="media">
-                            <div class="lr-form-section"><h4>PLYRCARD Images</h4><div class="lr-media-featured" data-lr-profile-image-preview></div><p class="lr-card-copy" style="margin-top:10px;">Your processed PLYRCARD images are prepared by our team. Upload raw player photos below and we can use them when preparing your card.</p></div>
-                            <div class="lr-form-section"><h4>Raw Player Images</h4><p class="lr-card-copy">Upload up to 20 player photos. New selections preview here before upload, and saved photos remain visible after saving.</p><div class="lr-media-grid" data-lr-raw-images></div><div data-lr-raw-existing-hidden></div><input type="file" name="raw_player_images_new[]" accept="image/*" multiple data-lr-raw-file-input hidden><div class="lr-upload-status" data-lr-raw-status>No images selected.</div></div>
+                            <div class="lr-form-section"><h4>PLYRCARD Photos</h4><div class="lr-media-featured" data-lr-profile-image-preview></div><p class="lr-card-copy" style="margin-top:10px;">Photos prepared for your PLYRCARD appear here. Add your own player photos below anytime.</p></div>
+                            <div class="lr-form-section"><h4>Player Photos</h4><p class="lr-card-copy">Upload up to 20 player photos. New selections appear here before you save them.</p><div class="lr-media-grid" data-lr-raw-images></div><div data-lr-raw-existing-hidden></div><input type="file" name="raw_player_images_new[]" accept="image/*" multiple data-lr-raw-file-input hidden><div class="lr-upload-status" data-lr-raw-status>No images selected.</div></div>
                         </div>
 
                         <button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Quick Profile</button>
@@ -844,39 +833,22 @@
                 <section class="lr-view" data-lr-view="photos">
                     <div class="lr-section" data-lr-photos-root>
                         <div class="lr-photo-hero">
-                            <div class="lr-photo-hero-top">
-                                <div>
-                                    <span class="lr-eyebrow">Media Locker</span>
-                                    <h3>My Photos</h3>
-                                    <p>Keep your player images organized in one place. Player Uploaded Images are yours to manage. PLYRCARD Images are the polished assets uploaded by the PLYRCARD team.</p>
-                                </div>
-                                <span class="lr-photo-hero-icon"><i class="fa-solid fa-images"></i></span>
-                            </div>
+                            <div><span class="lr-eyebrow">Gallery</span><h3>My Photos</h3><p>Your player photos and PLYRCARD-ready images in one place.</p></div>
+                            <span class="lr-photo-hero-icon"><i class="fa-solid fa-images"></i></span>
                         </div>
-
                         <div class="lr-photo-tabs" role="tablist" aria-label="Photo gallery categories">
-                            <button type="button" class="lr-photo-tab is-active" data-lr-photo-tab="player"><i class="fa-solid fa-camera"></i> Player Uploaded <em data-lr-photo-count="player">0</em></button>
-                            <button type="button" class="lr-photo-tab" data-lr-photo-tab="plyrcard"><i class="fa-solid fa-bolt"></i> PLYRCARD Images <em data-lr-photo-count="plyrcard">0</em></button>
+                            <button type="button" class="lr-photo-tab is-active" data-lr-photo-tab="player">Player Photos <em data-lr-photo-count="player">0</em></button>
+                            <button type="button" class="lr-photo-tab" data-lr-photo-tab="plyrcard">PLYRCARD Photos <em data-lr-photo-count="plyrcard">0</em></button>
                         </div>
-
                         <div class="lr-photo-upload" data-lr-photo-upload-panel>
                             <span class="lr-photo-upload-icon"><i class="fa-solid fa-cloud-arrow-up"></i></span>
-                            <div><strong data-lr-photo-upload-title>Upload Player Photos</strong><span data-lr-photo-upload-copy>Add JPG, PNG or WEBP images up to 5 MB each.</span></div>
+                            <div><strong data-lr-photo-upload-title>Add Player Photos</strong><span data-lr-photo-upload-copy>Choose images to add to your gallery.</span></div>
                             <button class="lr-btn lr-btn-primary" type="button" data-lr-photo-pick><i class="fa-solid fa-plus"></i> Add Photos</button>
                             <input type="file" accept="image/*" multiple data-lr-photo-files hidden>
                         </div>
-
                         <div class="lr-photo-gallery" data-lr-photo-gallery></div>
                         <div class="lr-muted" data-lr-photo-status aria-live="polite"></div>
                     </div>
-
-                    <div class="lr-photo-preview" data-lr-photo-preview aria-hidden="true">
-                        <div class="lr-photo-preview-card">
-                            <button type="button" class="lr-photo-preview-close" data-lr-photo-preview-close aria-label="Close image preview"><i class="fa-solid fa-xmark"></i></button>
-                            <img src="" alt="Photo preview" data-lr-photo-preview-image>
-                        </div>
-                    </div>
-                    <input type="file" accept="image/*" data-lr-photo-replace-input hidden>
                 </section>
 
                 <section class="lr-view" data-lr-view="schedule">
@@ -1115,7 +1087,6 @@
     let dashboardEngagementFilter = '';
     let dashboardActivitySort = 'count_desc';
     let photoGalleryCategory = 'player';
-    let photoReplaceTarget = null;
     let supportTicketState = {categories:{}, statuses:{}, tickets:[]};
     let supportTicketsLoaded = false;
     let lockerCheckoutType = null;
@@ -1538,27 +1509,29 @@
         const uploadCopy = q('[data-lr-photo-upload-copy]');
         const pick = q('[data-lr-photo-pick]');
         if (uploadPanel) uploadPanel.classList.toggle('is-readonly', !data.canManage);
-        if (uploadTitle) uploadTitle.textContent = data.key === 'player' ? 'Upload Player Photos' : (data.canManage ? 'Upload PLYRCARD Images' : 'PLYRCARD Team Gallery');
+        if (uploadTitle) uploadTitle.textContent = data.key === 'player' ? 'Add Player Photos' : 'Additional Photos';
         if (uploadCopy) uploadCopy.textContent = data.key === 'player'
-            ? `You can manage up to ${data.max} player-uploaded images.`
-            : (data.canManage ? `Superadmin access: manage up to ${data.max} PLYRCARD Images.` : 'These polished images are uploaded and managed by the PLYRCARD team. You can preview or download them here.');
+            ? 'Choose images to add to your player gallery.'
+            : 'Add more images to the PLYRCARD gallery.';
         if (pick) {
             pick.hidden = !data.canManage;
-            pick.innerHTML = `<i class="fa-solid fa-plus"></i> ${data.key === 'player' ? 'Add Photos' : 'Add PLYRCARD Images'}`;
+            pick.innerHTML = '<i class="fa-solid fa-plus"></i> Add Photos';
         }
 
         if (!data.rows.length) {
-            gallery.innerHTML = `<div class="lr-photo-empty"><div><i class="fa-regular fa-images"></i><strong>${data.key === 'player' ? 'No player photos yet' : 'No PLYRCARD Images yet'}</strong><span>${data.canManage ? 'Use Add Photos to start this gallery.' : 'PLYRCARD team images will appear here when they are added.'}</span></div></div>`;
+            gallery.innerHTML = `<div class="lr-photo-empty"><div><i class="fa-regular fa-images"></i><strong>${data.key === 'player' ? 'No player photos yet' : 'No PLYRCARD photos yet'}</strong><span>${data.canManage ? 'Use Add Photos to start this gallery.' : 'Photos prepared for your PLYRCARD will appear here.'}</span></div></div>`;
             return;
         }
 
         gallery.innerHTML = data.rows.map((photo, position) => {
             const url = photo?.url || '';
-            const name = photo?.name || `Photo ${position + 1}`;
-            const canLeft = data.canManage && position > 0;
-            const canRight = data.canManage && position < data.rows.length - 1;
-            const manage = data.canManage ? `<button type="button" class="lr-photo-action" data-lr-photo-replace="${position}" title="Replace"><i class="fa-solid fa-rotate"></i><span>Replace</span></button><button type="button" class="lr-photo-action" data-lr-photo-move="left" data-index="${position}" ${canLeft ? '' : 'disabled'} title="Move left"><i class="fa-solid fa-arrow-left"></i></button><button type="button" class="lr-photo-action" data-lr-photo-move="right" data-index="${position}" ${canRight ? '' : 'disabled'} title="Move right"><i class="fa-solid fa-arrow-right"></i></button><button type="button" class="lr-photo-action is-danger" data-lr-photo-delete="${position}" title="Delete"><i class="fa-regular fa-trash-can"></i></button>` : '';
-            return `<article class="lr-photo-card"><button type="button" class="lr-photo-thumb" data-lr-photo-preview-open="${esc(url)}" aria-label="Preview ${esc(name)}"><img src="${esc(url)}" alt="${esc(name)}" loading="lazy"><span class="lr-photo-index">${position + 1}</span></button><div class="lr-photo-card-body"><div class="lr-photo-card-name" title="${esc(name)}">${esc(name)}</div><div class="lr-photo-actions"><a class="lr-photo-action" href="${esc(url)}" target="_blank" rel="noopener" download><i class="fa-solid fa-download"></i><span>Download</span></a>${manage}</div></div></article>`;
+            const source = photo?.source || (data.key === 'plyrcard' ? 'additional' : 'player');
+            const field = photo?.field || '';
+            const index = Number.isInteger(Number(photo?.index)) ? Number(photo.index) : position;
+            const remove = data.canManage
+                ? `<button type="button" class="lr-photo-action is-danger" data-lr-photo-delete="${index}" data-lr-photo-source="${esc(source)}" data-lr-photo-field="${esc(field)}" title="Delete" aria-label="Delete photo"><i class="fa-regular fa-trash-can"></i></button>`
+                : '';
+            return `<article class="lr-photo-card"><img src="${esc(url)}" alt="${data.key === 'player' ? 'Player photo' : 'PLYRCARD photo'}" loading="lazy"><div class="lr-photo-actions"><a class="lr-photo-action" href="${esc(url)}" target="_blank" rel="noopener" download title="Download" aria-label="Download photo"><i class="fa-solid fa-download"></i></a>${remove}</div></article>`;
         }).join('');
     }
 
@@ -1584,45 +1557,26 @@
         }
     }
 
-    async function replaceLockerPhoto(file) {
-        const target = photoReplaceTarget;
-        if (!target || !file || !drawer.dataset.photosReplaceUrl) return;
-        const root = q('[data-lr-photos-root]');
-        root?.classList.add('lr-photo-busy');
-        setPhotoStatus('Replacing photo…');
-        try {
-            const fd = new FormData();
-            fd.append('category', target.category);
-            fd.append('index', String(target.index));
-            fd.append('photo', file);
-            const json = await request(drawer.dataset.photosReplaceUrl, {method:'POST', body:fd});
-            if (json.data) state = json.data;
-            photoReplaceTarget = null;
-            render();
-            setPhotoStatus(json.message || 'Photo replaced.');
-        } catch (error) {
-            setPhotoStatus(error.message || 'Unable to replace photo.', true);
-        } finally {
-            root?.classList.remove('lr-photo-busy');
-            const input = q('[data-lr-photo-replace-input]'); if (input) input.value = '';
-        }
-    }
 
-    function photoDeleteUrl(category, index) {
-        return String(drawer.dataset.photosDeleteUrl || '')
+    function photoDeleteUrl(category, index, source = '', field = '') {
+        const base = String(drawer.dataset.photosDeleteUrl || '')
             .replace('__CATEGORY__', encodeURIComponent(category))
             .replace('__INDEX__', encodeURIComponent(String(index)));
+        const url = new URL(base, window.location.origin);
+        if (source) url.searchParams.set('source', source);
+        if (field) url.searchParams.set('field', field);
+        return url.toString();
     }
 
-    async function deleteLockerPhoto(index) {
+    async function deleteLockerPhoto(index, source = '', field = '') {
         const data = photoGalleryData();
         if (!data.canManage || !drawer.dataset.photosDeleteUrl) return;
-        if (!window.confirm('Delete this photo from the gallery?')) return;
+        if (!window.confirm('Delete this photo?')) return;
         const root = q('[data-lr-photos-root]');
         root?.classList.add('lr-photo-busy');
         setPhotoStatus('Removing photo…');
         try {
-            const json = await request(photoDeleteUrl(data.key, index), {method:'DELETE'});
+            const json = await request(photoDeleteUrl(data.key, index, source, field), {method:'DELETE'});
             if (json.data) state = json.data;
             render();
             setPhotoStatus(json.message || 'Photo removed.');
@@ -1633,38 +1587,8 @@
         }
     }
 
-    async function reorderLockerPhoto(index, direction) {
-        const data = photoGalleryData();
-        if (!data.canManage || !drawer.dataset.photosReorderUrl) return;
-        const root = q('[data-lr-photos-root]');
-        root?.classList.add('lr-photo-busy');
-        try {
-            const json = await request(drawer.dataset.photosReorderUrl, {method:'PATCH', body:{category:data.key,index:Number(index),direction}});
-            if (json.data) state = json.data;
-            render();
-        } catch (error) {
-            setPhotoStatus(error.message || 'Unable to reorder photos.', true);
-        } finally {
-            root?.classList.remove('lr-photo-busy');
-        }
-    }
 
-    function openPhotoPreview(url) {
-        const modal = q('[data-lr-photo-preview]');
-        const img = q('[data-lr-photo-preview-image]');
-        if (!modal || !img || !url) return;
-        img.src = url;
-        modal.classList.add('is-open');
-        modal.setAttribute('aria-hidden','false');
-    }
 
-    function closePhotoPreview() {
-        const modal = q('[data-lr-photo-preview]');
-        const img = q('[data-lr-photo-preview-image]');
-        modal?.classList.remove('is-open');
-        modal?.setAttribute('aria-hidden','true');
-        if (img) img.src = '';
-    }
 
     function render() {
         if (!authenticated || !state?.user) return;
@@ -2191,11 +2115,7 @@
         const nav = event.target.closest('[data-lr-nav]'); if (nav && drawer.contains(nav)) { event.preventDefault(); setView(nav.dataset.lrNav); return; }
         const photoTab = event.target.closest('[data-lr-photo-tab]'); if (photoTab && drawer.contains(photoTab)) { event.preventDefault(); photoGalleryCategory = photoTab.dataset.lrPhotoTab === 'plyrcard' ? 'plyrcard' : 'player'; setPhotoStatus(''); renderPhotos(); return; }
         const photoPick = event.target.closest('[data-lr-photo-pick]'); if (photoPick && drawer.contains(photoPick)) { event.preventDefault(); q('[data-lr-photo-files]')?.click(); return; }
-        const photoPreview = event.target.closest('[data-lr-photo-preview-open]'); if (photoPreview && drawer.contains(photoPreview)) { event.preventDefault(); openPhotoPreview(photoPreview.dataset.lrPhotoPreviewOpen); return; }
-        if (event.target.closest('[data-lr-photo-preview-close]') || event.target === q('[data-lr-photo-preview]')) { event.preventDefault(); closePhotoPreview(); return; }
-        const photoReplace = event.target.closest('[data-lr-photo-replace]'); if (photoReplace && drawer.contains(photoReplace)) { event.preventDefault(); photoReplaceTarget = {category:photoGalleryCategory,index:Number(photoReplace.dataset.lrPhotoReplace)}; q('[data-lr-photo-replace-input]')?.click(); return; }
-        const photoDelete = event.target.closest('[data-lr-photo-delete]'); if (photoDelete && drawer.contains(photoDelete)) { event.preventDefault(); deleteLockerPhoto(Number(photoDelete.dataset.lrPhotoDelete)); return; }
-        const photoMove = event.target.closest('[data-lr-photo-move]'); if (photoMove && drawer.contains(photoMove)) { event.preventDefault(); reorderLockerPhoto(Number(photoMove.dataset.index), photoMove.dataset.lrPhotoMove); return; }
+        const photoDelete = event.target.closest('[data-lr-photo-delete]'); if (photoDelete && drawer.contains(photoDelete)) { event.preventDefault(); deleteLockerPhoto(Number(photoDelete.dataset.lrPhotoDelete), photoDelete.dataset.lrPhotoSource || '', photoDelete.dataset.lrPhotoField || ''); return; }
         const metric = event.target.closest('[data-lr-dashboard-metric]'); if (metric && drawer.contains(metric)) { event.preventDefault(); openDashboardMetric(metric.dataset.lrDashboardMetric); return; }
         const engagementFilter = event.target.closest('[data-lr-engagement-filter]'); if (engagementFilter && drawer.contains(engagementFilter)) { event.preventDefault(); dashboardEngagementFilter = dashboardEngagementFilter === engagementFilter.dataset.lrEngagementFilter ? '' : engagementFilter.dataset.lrEngagementFilter; renderDashboardActivityDetail(); return; }
         if (event.target.closest('[data-lr-dashboard-detail-close]')) { event.preventDefault(); closeDashboardActivity(); return; }
@@ -2235,8 +2155,6 @@
     document.addEventListener('change', event => {
         const upload = event.target.closest('[data-lr-photo-files]');
         if (upload && drawer.contains(upload)) { uploadLockerPhotos(upload.files); return; }
-        const replacement = event.target.closest('[data-lr-photo-replace-input]');
-        if (replacement && drawer.contains(replacement)) { replaceLockerPhoto(replacement.files?.[0]); return; }
         const sort = event.target.closest('[data-lr-dashboard-sort]');
         if (sort && drawer.contains(sort)) { dashboardActivitySort = sort.value || 'count_desc'; renderDashboardActivityDetail(); return; }
     }, true);

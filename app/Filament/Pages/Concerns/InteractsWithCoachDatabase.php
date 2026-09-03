@@ -702,9 +702,10 @@ trait InteractsWithCoachDatabase
     }
 
     /**
-     * Sporty My Photos gallery payload used by the Admin/Filament section.
-     * Player Uploaded Images are self-managed. PLYRCARD Images are visible to the
-     * athlete but write operations remain Superadmin-only.
+     * My Photos gallery payload used by the Admin/Filament section.
+     * Player Photos come from raw_player_images. PLYRCARD Photos combines the
+     * image fields already used by the public website with additional images
+     * stored in plyrcard_images.
      */
     public function getMediaGalleryProperty(): array
     {
@@ -724,15 +725,50 @@ trait InteractsWithCoachDatabase
             ->filter()
             ->unique()
             ->values()
-            ->map(fn (string $path, int $index): array => $this->coachDatabaseMediaRow($path, $index, 'player'))
+            ->map(fn (string $path, int $index): array => array_merge(
+                $this->coachDatabaseMediaRow($path, $index, 'player'),
+                ['source' => 'player', 'field' => null]
+            ))
             ->all();
 
-        $plyrcard = collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
-            ->map(fn ($path): string => trim((string) $path))
+        $websiteFields = [
+            'plyrcard_image',
+            'player_image',
+            'action_image',
+            'national_team_image',
+            'mobile_hero_image',
+            'youtube_thumbnail',
+        ];
+
+        $plyrcard = collect($websiteFields)
+            ->map(function (string $field) use ($user): ?array {
+                $path = trim((string) ($user->{$field} ?? ''));
+                if ($path === '') return null;
+
+                return [
+                    'index' => 0,
+                    'category' => 'plyrcard',
+                    'source' => 'field',
+                    'field' => $field,
+                    'path' => $path,
+                    'url' => $this->coachDatabaseMediaUrl($path),
+                    'name' => 'PLYRCARD photo',
+                ];
+            })
             ->filter()
-            ->unique()
+            ->concat(
+                collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
+                    ->map(fn ($path): string => trim((string) $path))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->map(fn (string $path, int $index): array => array_merge(
+                        $this->coachDatabaseMediaRow($path, $index, 'plyrcard'),
+                        ['source' => 'additional', 'field' => null]
+                    ))
+            )
+            ->unique('url')
             ->values()
-            ->map(fn (string $path, int $index): array => $this->coachDatabaseMediaRow($path, $index, 'plyrcard'))
             ->all();
 
         return [
@@ -857,6 +893,42 @@ trait InteractsWithCoachDatabase
         $this->closePhotoReplace();
 
         Notification::make()->title('My Photos')->body('Photo replaced.')->success()->send();
+    }
+
+    public function deleteMediaPhoto(string $category, string $source, int $index = 0, ?string $field = null): void
+    {
+        $user = Auth::user();
+        $category = $this->normalizedMediaCategory($category);
+        $source = strtolower(trim($source));
+
+        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
+            return;
+        }
+
+        if ($category === 'plyrcard' && $source === 'field') {
+            $allowedFields = [
+                'plyrcard_image', 'player_image', 'action_image',
+                'national_team_image', 'mobile_hero_image', 'youtube_thumbnail',
+            ];
+            $field = trim((string) $field);
+            if (! in_array($field, $allowedFields, true)) return;
+
+            $user->forceFill([$field => null])->save();
+            $user->refresh();
+            Notification::make()->title('My Photos')->body('Photo removed.')->success()->send();
+            return;
+        }
+
+        $storageCategory = $category === 'plyrcard' ? 'plyrcard' : 'player';
+        $paths = $this->coachDatabaseMediaPaths($user, $storageCategory);
+        if (! $paths->has($index)) return;
+
+        $oldPath = (string) $paths->get($index);
+        $paths->forget($index);
+        $this->saveCoachDatabaseMediaPaths($user, $storageCategory, $paths->values()->all());
+        $this->deleteManagedGalleryPath($oldPath, $storageCategory);
+
+        Notification::make()->title('My Photos')->body('Photo removed.')->success()->send();
     }
 
     public function deleteGalleryPhoto(string $category, int $index): void

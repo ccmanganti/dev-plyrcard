@@ -265,27 +265,49 @@ class LockerRoomDataService
     {
         $player = collect(is_array($user->raw_player_images ?? null) ? $user->raw_player_images : [])
             ->map(fn ($path): string => trim((string) $path))
-            ->filter()
-            ->unique()
-            ->values()
+            ->filter()->unique()->values()
             ->map(fn (string $path, int $index): array => [
                 'index' => $index,
+                'source' => 'player',
+                'field' => null,
                 'path' => $path,
                 'url' => $this->storageUrl($path),
-                'name' => basename(parse_url($path, PHP_URL_PATH) ?: $path),
+                'name' => 'Player photo',
             ])->all();
 
-        $plyrcard = collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
-            ->map(fn ($path): string => trim((string) $path))
+        $websiteFields = [
+            'plyrcard_image', 'player_image', 'action_image',
+            'national_team_image', 'mobile_hero_image', 'youtube_thumbnail',
+        ];
+
+        $plyrcard = collect($websiteFields)
+            ->map(function (string $field) use ($user): ?array {
+                $path = trim((string) ($user->{$field} ?? ''));
+                if ($path === '') return null;
+                return [
+                    'index' => 0,
+                    'source' => 'field',
+                    'field' => $field,
+                    'path' => $path,
+                    'url' => $this->storageUrl($path),
+                    'name' => 'PLYRCARD photo',
+                ];
+            })
             ->filter()
-            ->unique()
-            ->values()
-            ->map(fn (string $path, int $index): array => [
-                'index' => $index,
-                'path' => $path,
-                'url' => $this->storageUrl($path),
-                'name' => basename(parse_url($path, PHP_URL_PATH) ?: $path),
-            ])->all();
+            ->concat(
+                collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
+                    ->map(fn ($path): string => trim((string) $path))
+                    ->filter()->unique()->values()
+                    ->map(fn (string $path, int $index): array => [
+                        'index' => $index,
+                        'source' => 'additional',
+                        'field' => null,
+                        'path' => $path,
+                        'url' => $this->storageUrl($path),
+                        'name' => 'PLYRCARD photo',
+                    ])
+            )
+            ->unique('url')->values()->all();
 
         $canManagePlyrcard = false;
         try {

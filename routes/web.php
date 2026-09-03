@@ -487,12 +487,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/locker-room/photos', [LockerRoomController::class, 'uploadPhotos'])
         ->name('locker-room.photos.upload');
 
-    Route::post('/locker-room/photos/replace', [LockerRoomController::class, 'replacePhoto'])
-        ->name('locker-room.photos.replace');
-
-    Route::patch('/locker-room/photos/reorder', [LockerRoomController::class, 'reorderPhotos'])
-        ->name('locker-room.photos.reorder');
-
     Route::delete('/locker-room/photos/{category}/{index}', [LockerRoomController::class, 'deletePhoto'])
         ->where('category', 'player|plyrcard')
         ->whereNumber('index')
