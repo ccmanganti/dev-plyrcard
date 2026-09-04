@@ -37,6 +37,10 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            // v10.103.3: keep the Filament shell mounted between Admin pages and
+            // prefetch destinations while the pointer is moving toward a sidebar item.
+            // Recruiting Center itself switches locally; this covers Users, Websites, etc.
+            ->spa(hasPrefetching: true)
             ->homeUrl(function (): string {
                 $user = auth()->user();
 

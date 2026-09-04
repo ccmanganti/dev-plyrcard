@@ -26,6 +26,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\Renderless;
 use App\Models\CoachDatabaseEmailTemplate;
 
 trait InteractsWithCoachDatabase
@@ -388,16 +389,26 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
+        // v10.103.3: preload the lightweight local/cached data used by the client-mounted
+        // Recruiting Center panels. Navigation itself is browser-only; these calls make
+        // the destination panels useful immediately without waiting on a click-time render.
+        if (empty($this->templates)) {
+            $this->loadTemplates();
+        }
+
+        $this->loadNotificationSettings();
+        $this->hydrateCachedInboxConversations();
+
+        if (! $this->selectedConversationId && ! empty($this->conversations)) {
+            $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+        }
+
+        if ($this->selectedConversationId && empty($this->messages)) {
+            $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
+        }
+
         if ($this->section === 'conversations') {
-            $this->hydrateCachedInboxConversations();
-
-            if (! $this->selectedConversationId && ! empty($this->conversations)) {
-                $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
-            }
-
-            if ($this->selectedConversationId) {
-                $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
-            }
+            // The cached rows were already warmed above. Keep only section-specific flags here.
 
             $this->isLoadingConversations = false;
             $this->isLoadingConversationMessages = false;
@@ -462,6 +473,7 @@ trait InteractsWithCoachDatabase
      * Sidebar navigation dispatches this method instead of loading another Filament
      * page. Only the state required by the destination section is initialized.
      */
+    #[Renderless]
     public function switchRecruitingSection(string $section): void
     {
         $allowedSections = [
