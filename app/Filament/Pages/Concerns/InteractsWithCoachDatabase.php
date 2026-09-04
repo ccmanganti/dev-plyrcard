@@ -71,6 +71,7 @@ trait InteractsWithCoachDatabase
     public ?string $error = null;
 
     public string $section = 'dashboard';
+    public bool $browserSchoolCatalogSeeded = false;
     public int $dashboardVisitVersion = 0;
     public bool $isFetchingDashboardEmailsSent = false;
     public ?string $dashboardEmailFetchError = null;
@@ -379,11 +380,11 @@ trait InteractsWithCoachDatabase
             $this->loadDashboardActivity();
         }
 
-        // These sections need the player's local lists for the global school drawer,
-        // Compose list targeting, or the My Lists page itself. Do one local load only.
-        if (in_array($this->section, ['schools', 'favorites', 'lists', 'compose', 'conversations'], true)) {
-            // v10.77: Inbox Add to List must have the player's local lists and counts
-            // on the first render instead of waiting for a later Livewire refresh.
+        // v10.103.2: warm the lightweight local list summaries on the first page load.
+        // Recruiting Center navigation stays inside one mounted Livewire component, so
+        // keeping this small dataset in public state avoids a database read when the user
+        // clicks Discover Schools, Favorites, My Lists, Compose, or Inbox.
+        if (empty($this->lists)) {
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
@@ -440,6 +441,18 @@ trait InteractsWithCoachDatabase
 
         if ($this->section === 'schedule') {
             $this->showScheduleForm = false;
+        }
+    }
+
+    /**
+     * v10.103.2: the initial HTML seeds the canonical local school catalog into a
+     * browser-side cache. After that first response, Livewire does not need to resend
+     * the same large Alpine JSON payload on every Recruiting Center click.
+     */
+    public function dehydrate(): void
+    {
+        if ($this->allowed && ! $this->locked && ! $this->isFreePlanAccount) {
+            $this->browserSchoolCatalogSeeded = true;
         }
     }
 
@@ -2807,6 +2820,9 @@ trait InteractsWithCoachDatabase
 
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
+            $this->discoverClientSchoolsMemo = null;
+            $this->forgetInstantDiscoverCatalogCache($user);
+            $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
         }
 
@@ -2950,6 +2966,7 @@ trait InteractsWithCoachDatabase
 
         $this->allSchoolsMemo = null;
         $this->discoverClientSchoolsMemo = null;
+        $this->forgetInstantDiscoverCatalogCache($user);
         $this->favoriteSchoolsMemo = null;
         $this->filteredSchoolsQueryMemo = [];
 
@@ -2991,6 +3008,9 @@ trait InteractsWithCoachDatabase
         $result = app(LocalRecruitingDatabaseService::class)->setFavorite($user, $schoolId, $favorite);
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
+            $this->discoverClientSchoolsMemo = null;
+            $this->forgetInstantDiscoverCatalogCache($user);
+            $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
         }
 
@@ -3020,6 +3040,7 @@ trait InteractsWithCoachDatabase
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
             $this->discoverClientSchoolsMemo = null;
+            $this->forgetInstantDiscoverCatalogCache($user);
             $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
@@ -13269,6 +13290,19 @@ HTML;
      * membership and cached GHL statistics already overlaid by allSchools(). The browser
      * can therefore search/filter/open drawers without another Livewire round trip.
      */
+    protected function instantDiscoverCatalogCacheKey($user): string
+    {
+        return 'recruiting:instant-school-catalog:v1032:' . (int) $user->getKey();
+    }
+
+    protected function forgetInstantDiscoverCatalogCache($user = null): void
+    {
+        $user ??= Auth::user();
+        if ($user) {
+            Cache::forget($this->instantDiscoverCatalogCacheKey($user));
+        }
+    }
+
     public function getDiscoverClientSchoolsProperty(): array
     {
         if (is_array($this->discoverClientSchoolsMemo)) {
@@ -13280,13 +13314,17 @@ HTML;
             return $this->discoverClientSchoolsMemo = [];
         }
 
-        // v129: this browser interaction catalog is intentionally LOCAL-only.
-        // Dashboard cards can pass their already-loaded GHL stats into the global
-        // drawer as the source row. Discover/Favorites/My Lists do not need to read
-        // or group the legacy multi-megabyte snapshot just to render local schools.
-        return $this->discoverClientSchoolsMemo = array_values(
-            app(LocalRecruitingDatabaseService::class)->schoolRows($user)
+        // v10.103.2: schoolRows() is local-only but still builds the full Discover
+        // catalog. Cache that normalized result briefly between Livewire requests so
+        // changing Recruiting Center sections does not rebuild the same 100+ schools.
+        // Membership mutations explicitly invalidate this cache below.
+        $rows = Cache::remember(
+            $this->instantDiscoverCatalogCacheKey($user),
+            now()->addSeconds(60),
+            fn (): array => array_values(app(LocalRecruitingDatabaseService::class)->schoolRows($user)),
         );
+
+        return $this->discoverClientSchoolsMemo = is_array($rows) ? array_values($rows) : [];
     }
 
     public function getSelectedCoachProperty(): ?array
