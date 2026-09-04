@@ -4914,6 +4914,111 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
 
 
+    /**
+     * v10.103.7: Return the canonical local details for one school drawer.
+     *
+     * Discover Schools keeps its browser catalog intentionally lightweight so the
+     * Recruiting Center can switch sections instantly. The full coaching staff is
+     * therefore loaded only for the school the player actually opens. This method is
+     * renderless so it cannot morph/reset the already-open Alpine drawer.
+     */
+    #[Renderless]
+    public function schoolDrawerDataForClient(string $schoolId): array
+    {
+        $schoolId = trim($schoolId);
+        $user = Auth::user();
+
+        if (! $user || ! $this->allowed || $this->locked || $schoolId === '') {
+            return ['success' => false, 'school' => null];
+        }
+
+        try {
+            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+
+            if (! is_array($school)) {
+                return ['success' => false, 'school' => null];
+            }
+
+            $resolvedSchoolId = (int) ($school['id'] ?? $school['school_id'] ?? 0);
+
+            $coaches = collect($school['coaches'] ?? [])
+                ->filter(fn ($row): bool => is_array($row))
+                ->map(function (array $row): array {
+                    $name = trim((string) ($row['name'] ?? $row['display_name'] ?? ''));
+                    if ($name === '') {
+                        $name = trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')));
+                    }
+
+                    return [
+                        'id' => $row['id'] ?? null,
+                        'contact_id' => $row['contact_id'] ?? $row['ghl_contact_id'] ?? null,
+                        'name' => $name !== '' ? $name : 'Coach',
+                        'first_name' => $row['first_name'] ?? null,
+                        'last_name' => $row['last_name'] ?? null,
+                        'email' => $row['email'] ?? null,
+                        'phone' => $row['phone'] ?? null,
+                        'title' => $row['title'] ?? $row['position'] ?? null,
+                    ];
+                })
+                ->values()
+                ->all();
+
+            // Defensive fallback for installations where schoolRow() is intentionally
+            // lightweight. This remains a single indexed local-school query and never
+            // touches GHL or rebuilds the complete coach catalog.
+            if ($coaches === []
+                && $resolvedSchoolId > 0
+                && Schema::hasTable('coaches')
+                && Schema::hasColumn('coaches', 'school_id')) {
+                $query = DB::table('coaches')->where('school_id', $resolvedSchoolId);
+                if (Schema::hasColumn('coaches', 'deleted_at')) {
+                    $query->whereNull('deleted_at');
+                }
+
+                $coaches = $query->get()
+                    ->map(function ($record): array {
+                        $row = (array) $record;
+                        $name = trim((string) ($row['display_name'] ?? ''));
+                        if ($name === '') {
+                            $name = trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')));
+                        }
+
+                        return [
+                            'id' => $row['id'] ?? null,
+                            'contact_id' => $row['ghl_contact_id'] ?? $row['contact_id'] ?? null,
+                            'name' => $name !== '' ? $name : 'Coach',
+                            'first_name' => $row['first_name'] ?? null,
+                            'last_name' => $row['last_name'] ?? null,
+                            'email' => $row['email'] ?? null,
+                            'phone' => $row['phone'] ?? null,
+                            'title' => $row['title'] ?? $row['position'] ?? null,
+                        ];
+                    })
+                    ->sortBy(fn (array $row): string => strtolower((string) ($row['name'] ?? '')))
+                    ->values()
+                    ->all();
+            }
+
+            $school['coaches'] = $coaches;
+            $school['coach_count'] = max(
+                (int) ($school['coach_count'] ?? 0),
+                (int) ($school['coaches_count'] ?? 0),
+                count($coaches),
+            );
+            $school['coaches_count'] = $school['coach_count'];
+
+            return ['success' => true, 'school' => $school];
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to load school drawer coaching staff.', [
+                'user_id' => $user->getKey(),
+                'school_id' => $schoolId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return ['success' => false, 'school' => null];
+        }
+    }
+
     public function schoolCommunicationHistoryForClient(string $schoolId): array
     {
         $schoolId = trim($schoolId);

@@ -69,6 +69,9 @@ discoverSelectedIds: [],
             discoverNewBulkListName: '',
             discoverNewDrawerListName: '',
             discoverCreatingList: false,
+            discoverSchoolCoachesLoading: false,
+            discoverSchoolCoachesLoadedFor: '',
+            rcCatalogUserKey: @js($rcCatalogUserKey),
             optimisticSchool: null,
             schoolDrawerOpen: false,
             globalSchoolCatalog: (() => {
@@ -91,6 +94,9 @@ discoverSelectedIds: [],
                 this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
+                this.discoverSchoolCoachesLoading = false;
+                this.discoverSchoolCoachesLoadedFor = '';
+                document.documentElement.removeAttribute('data-rc-inbox-loading');
 
                 // Direct /conversations loads do not receive a client navigation event,
                 // so refresh Inbox once after Alpine is mounted. This root init runs once
@@ -130,6 +136,72 @@ discoverSelectedIds: [],
                 if (row) {
                     if (Object.prototype.hasOwnProperty.call(detail, 'is_favorite')) row.is_favorite = !!detail.is_favorite;
                     if (Array.isArray(detail.list_keys)) row.list_keys = [...detail.list_keys];
+                }
+            },
+            async hydrateDiscoverSchoolDetails(schoolId) {
+                const id = String(schoolId || '').trim();
+                if (!id) return;
+
+                const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                if (currentId !== id) return;
+
+                const userKey = String(this.rcCatalogUserKey || 'guest');
+                window.__plyrRcSchoolDrawerDetailsByUser = window.__plyrRcSchoolDrawerDetailsByUser || {};
+                window.__plyrRcSchoolDrawerDetailsByUser[userKey] = window.__plyrRcSchoolDrawerDetailsByUser[userKey] || {};
+                const bucket = window.__plyrRcSchoolDrawerDetailsByUser[userKey];
+                const cached = bucket[id];
+
+                const applyDetails = (detail) => {
+                    if (!detail || typeof detail !== 'object') return false;
+                    const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (stillOpenId !== id) return false;
+
+                    const coaches = Array.isArray(detail.coaches) ? detail.coaches : [];
+                    this.optimisticSchool = {
+                        ...this.optimisticSchool,
+                        ...detail,
+                        id: detail.id ?? this.optimisticSchool?.id ?? id,
+                        school_id: detail.school_id ?? detail.id ?? this.optimisticSchool?.school_id ?? id,
+                        coaches,
+                        coach_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? 0),
+                    };
+
+                    const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
+                        .find(item => String(item?.id ?? item?.school_id ?? '').trim() === id);
+                    if (row) {
+                        Object.assign(row, detail);
+                        row.coaches = coaches;
+                        row.coach_count = Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? 0);
+                        row.coaches_count = row.coach_count;
+                    }
+
+                    return true;
+                };
+
+                if (cached && applyDetails(cached)) {
+                    this.discoverSchoolCoachesLoading = false;
+                    this.discoverSchoolCoachesLoadedFor = id;
+                    return;
+                }
+
+                this.discoverSchoolCoachesLoading = true;
+                this.discoverSchoolCoachesLoadedFor = '';
+
+                try {
+                    const result = await this.$wire.call('schoolDrawerDataForClient', id);
+                    const detail = result?.school;
+                    if (result?.success !== false && detail && typeof detail === 'object') {
+                        bucket[id] = detail;
+                        applyDetails(detail);
+                    }
+                } catch (error) {
+                    console.error('Unable to load coaching staff for school drawer.', error);
+                } finally {
+                    const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (stillOpenId === id) {
+                        this.discoverSchoolCoachesLoading = false;
+                        this.discoverSchoolCoachesLoadedFor = id;
+                    }
                 }
             },
             openGlobalSchool(reference) {
@@ -176,6 +248,8 @@ discoverSelectedIds: [],
 
                 this.optimisticSchool = merged;
                 this.schoolDrawerOpen = true;
+                this.discoverSchoolCoachesLoading = true;
+                this.discoverSchoolCoachesLoadedFor = '';
                 // Keep the legacy global empty so Livewire/browser state cannot reopen it.
                 window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
@@ -184,6 +258,7 @@ discoverSelectedIds: [],
                 this.discoverSchoolCommsLoadedFor = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
+                this.$nextTick(() => this.hydrateDiscoverSchoolDetails(String(merged.id ?? merged.school_id ?? '')));
             },
             async loadDiscoverCommunications(force = false) {
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
@@ -299,6 +374,8 @@ discoverSelectedIds: [],
                 this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
+                this.discoverSchoolCoachesLoading = false;
+                this.discoverSchoolCoachesLoadedFor = '';
                 this.optimisticSchool = null;
                 // v110: explicit close event is also consumed by any nested Discover
                 // controller, so a stale Alpine subtree cannot immediately repaint it.
@@ -9761,6 +9838,40 @@ discoverSelectedIds: [],
 
 
 
+            <style id="rc-inbox-immediate-loader-v1037">
+                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before {
+                    content: '';
+                    position: absolute;
+                    inset: 4.2rem 0 0;
+                    z-index: 70;
+                    background: rgba(255,255,255,.88);
+                    pointer-events: none;
+                }
+                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after {
+                    content: '';
+                    position: absolute;
+                    left: 50%;
+                    top: calc(50% + 1.6rem);
+                    width: 1.55rem;
+                    height: 1.55rem;
+                    margin: -.775rem 0 0 -.775rem;
+                    z-index: 71;
+                    border: 3px solid rgba(255,99,56,.2);
+                    border-top-color: #ff6338;
+                    border-radius: 999px;
+                    animation: rcInboxImmediateSpinV1037 .58s linear infinite;
+                    pointer-events: none;
+                }
+                .dark html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before,
+                html.dark[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before {
+                    background: rgba(17,24,39,.9);
+                }
+                @keyframes rcInboxImmediateSpinV1037 { to { transform: rotate(360deg); } }
+                @media (prefers-reduced-motion: reduce) {
+                    html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after { animation-duration: 1.2s; }
+                }
+            </style>
+
             <style>
                 .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
                 .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#f59e0b;background:rgba(245,158,11,.12)}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
@@ -10456,12 +10567,23 @@ CSS;
                                     if (! id || id === String(this.selectedConversationId || '')) return;
 
                                     window.__rcInboxPendingConversationId = id;
+                                    document.documentElement.setAttribute('data-rc-inbox-loading', id);
                                     this.selectedConversationId = id;
-                                    this.$wire.selectConversation(id).then(() => {
-                                        if (window.__rcInboxPendingConversationId === id || this.selectedConversationId === id) {
-                                            this.$wire.refreshConversationMessagesForClient(id);
-                                        }
-                                    });
+
+                                    Promise.resolve(this.$wire.selectConversation(id))
+                                        .then(() => {
+                                            if (window.__rcInboxPendingConversationId === id || this.selectedConversationId === id) {
+                                                // The same single client loader remains visible during the fresh
+                                                // message request, so there is no delayed/second animation.
+                                                return this.$wire.refreshConversationMessagesForClient(id);
+                                            }
+                                            return null;
+                                        })
+                                        .finally(() => {
+                                            if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                                document.documentElement.removeAttribute('data-rc-inbox-loading');
+                                            }
+                                        });
                                 },
                             }"
                             x-init="init()"
@@ -10537,7 +10659,6 @@ CSS;
                                     <div class="rc-inbox-empty-v56">
                                         <div>
                                             @if($isLoadingConversationMessages)
-                                                <span class="rc-spinner-mini" aria-hidden="true"></span>
                                                 <strong>Loading conversation…</strong>
                                             @else
                                                 <strong>No messages yet.</strong>
@@ -12669,7 +12790,11 @@ CSS;
                                 </template>
                             </div>
                         </template>
-                        <div class="rc-empty" x-show="!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0">
+                        <div class="rc-loading-inline" style="padding:1rem .35rem" x-show="discoverSchoolCoachesLoading && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
+                            <span class="rc-spinner-mini" aria-hidden="true"></span>
+                            <span>Loading coaching staff…</span>
+                        </div>
+                        <div class="rc-empty" x-show="!discoverSchoolCoachesLoading && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
                             <strong>No local coaches found.</strong>
                         </div>
                     </div>
@@ -15255,8 +15380,7 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
 
     const setPageChrome = (section) => {
         const label = sectionLabels[section] || 'Dashboard';
-        const heading = document.querySelector('.fi-header-heading');
-        if (heading) heading.textContent = label;
+        document.body.classList.add('rc-recruiting-center-page');
         if (document.title) document.title = `${label} - PlyrCard`;
     };
 
@@ -15273,21 +15397,31 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
 
             // Remove both Filament's route-derived state and our previous optimistic state.
             // Otherwise the route that originally mounted the page remains highlighted.
+            if (item) item.dataset.rcSection = candidate;
+            button.dataset.rcSection = candidate;
+            anchor.dataset.rcSection = candidate;
+
             item?.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active');
-            button.classList.remove('fi-active', 'plyr-sidebar-item-active', 'rc-fast-active');
+            item?.removeAttribute('data-rc-active');
+            button.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active', 'rc-fast-active');
             button.removeAttribute('data-plyr-active');
+            button.removeAttribute('data-rc-active');
             button.removeAttribute('aria-current');
-            anchor.classList.remove('plyr-sidebar-item-active', 'rc-fast-active');
+            anchor.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active', 'rc-fast-active');
             anchor.removeAttribute('data-plyr-active');
+            anchor.removeAttribute('data-rc-active');
             anchor.removeAttribute('aria-current');
 
             if (active) {
                 item?.classList.add('plyr-sidebar-item-active');
+                item?.setAttribute('data-rc-active', 'true');
                 button.classList.add('rc-fast-active');
                 button.setAttribute('data-plyr-active', 'true');
+                button.setAttribute('data-rc-active', 'true');
                 button.setAttribute('aria-current', 'page');
                 anchor.classList.add('rc-fast-active');
                 anchor.setAttribute('data-plyr-active', 'true');
+                anchor.setAttribute('data-rc-active', 'true');
                 anchor.setAttribute('aria-current', 'page');
             }
         });
@@ -15301,7 +15435,16 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
 
         const alreadyActive = root.dataset.rcCurrentSection === section;
         root.dataset.rcCurrentSection = section;
+        if (section !== 'conversations') {
+            document.documentElement.removeAttribute('data-rc-inbox-loading');
+        }
         setSidebarActive(section);
+        window.requestAnimationFrame(() => {
+            if ((currentRoot()?.dataset?.rcCurrentSection || '') === section) setSidebarActive(section);
+        });
+        window.setTimeout(() => {
+            if ((currentRoot()?.dataset?.rcCurrentSection || '') === section) setSidebarActive(section);
+        }, 120);
         // v10.103.3: swap the already-mounted panel synchronously. No request,
         // loading state, or DOM morph sits between the click and the destination.
         window.dispatchEvent(new CustomEvent('rc-client-section', { detail: { section } }));
@@ -15345,43 +15488,110 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         switchSection(section, null, true);
     });
 
-    document.addEventListener('livewire:init', () => {
-        if (window.Livewire?.on) {
-            Livewire.on('rc-section-switched', ({ section } = {}) => {
-                if (!section) return;
+    const syncCurrentChrome = () => {
+        const root = currentRoot();
+        if (!root) {
+            document.body.classList.remove('rc-recruiting-center-page');
+            document.documentElement.removeAttribute('data-rc-inbox-loading');
+            return;
+        }
 
-                // Ignore a late acknowledgement from a previously clicked section.
-                // The browser's current section is authoritative for navigation chrome.
-                const current = currentRoot()?.dataset?.rcCurrentSection || '';
-                if (current !== section) return;
+        const section = root.dataset.rcCurrentSection || pathToSection(window.location.pathname) || 'dashboard';
+        setSidebarActive(section);
+    };
 
-                pendingSection = null;
-                clearTimeout(pendingTimer);
-                pendingTimer = null;
-                setSidebarActive(section);
-            });
-            Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
-                if (section === 'conversations') {
-                    window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
-                }
+    const bindPersistentLivewireHooks = () => {
+        if (!window.Livewire || window.__plyrRcPersistentNavLivewireHooksBound) return;
+        window.__plyrRcPersistentNavLivewireHooksBound = true;
+
+        Livewire.on('rc-section-switched', ({ section } = {}) => {
+            if (!section) return;
+
+            // Ignore a late acknowledgement from a previously clicked section.
+            // The browser's current section is authoritative for navigation chrome.
+            const current = currentRoot()?.dataset?.rcCurrentSection || '';
+            if (current !== section) return;
+
+            pendingSection = null;
+            clearTimeout(pendingTimer);
+            pendingTimer = null;
+            setSidebarActive(section);
+        });
+
+        Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
+            if (section === 'conversations') {
+                window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
+            }
+        });
+
+        if (Livewire.hook) {
+            Livewire.hook('morph.updated', () => {
+                window.requestAnimationFrame(syncCurrentChrome);
             });
         }
-    }, { once: true });
+    };
+
+    if (window.Livewire) bindPersistentLivewireHooks();
+    else document.addEventListener('livewire:init', bindPersistentLivewireHooks, { once: true });
+
+    document.addEventListener('livewire:navigated', () => {
+        window.requestAnimationFrame(syncCurrentChrome);
+    });
 
     const initial = pathToSection(window.location.pathname);
-    if (initial) setSidebarActive(initial);
+    if (initial) {
+        const root = currentRoot();
+        if (root) root.dataset.rcCurrentSection = initial;
+        setSidebarActive(initial);
+    }
 })();
 </script>
 
 <style data-navigate-once>
 .rc-client-panel-v1033{min-width:0;}
-.fi-sidebar a.rc-fast-active,
-.fi-sidebar a.rc-fast-active:hover {
-    background: rgba(255, 99, 56, .14) !important;
-    color: #ff6338 !important;
+
+/* Recruiting Center owns its visible section title; suppress Filament's route title only here. */
+body.rc-recruiting-center-page .fi-page > .fi-header,
+body.rc-recruiting-center-page .fi-main > .fi-header,
+body.rc-recruiting-center-page .fi-header.fi-page-header,
+body.rc-recruiting-center-page .fi-main .fi-header:has(.fi-header-heading),
+body:has(.rc-livewire-root) .fi-page > .fi-header,
+body:has(.rc-livewire-root) .fi-main > .fi-header,
+body:has(.rc-livewire-root) .fi-main .fi-header:has(.fi-header-heading) {
+    display:none !important;
 }
-.fi-sidebar a.rc-fast-active svg {
+
+/* Neutralize Filament's original route highlight for every Recruiting Center item. */
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]),
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) > .fi-sidebar-item-button,
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-button {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-label {
+    color:#111827 !important;
+}
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) svg {
+    color:#94a3b8 !important;
+}
+.dark body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-label,
+html.dark body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-label {
+    color:#e5e7eb !important;
+}
+
+/* Exactly one browser-selected Recruiting Center item gets the full active treatment. */
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"],
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] > .fi-sidebar-item-button,
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] .fi-sidebar-item-button,
+body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active {
+    background: rgba(255,99,56,.14) !important;
     color: #ff6338 !important;
+    border-radius:.75rem !important;
+}
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] .fi-sidebar-item-label,
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] svg,
+body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
+    color:#ff6338 !important;
 }
 </style>
 
