@@ -5,6 +5,7 @@
         : [];
 @endphp
 
+<div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
     <style>
         /* v10.66: fail closed. If Alpine/Livewire JS is delayed or errors, the
@@ -15599,3 +15600,4 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
     }
 </style>
 </x-filament-panels::page>
+</div>
