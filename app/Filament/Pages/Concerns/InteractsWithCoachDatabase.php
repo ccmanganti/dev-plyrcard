@@ -389,34 +389,17 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        // v10.103.5: preload only small, non-interactive Recruiting Center data.
-        // Inbox is deliberately excluded. Its conversation/thread state must remain live
-        // so selecting a different coach can always re-render the selected conversation.
+        // v10.103.8: preload only lightweight local/cached Recruiting Center data.
+        // The Inbox list is read from Laravel cache on the initial page render even when
+        // another Recruiting Center section is active. This keeps the hidden Inbox panel
+        // ready to display immediately without waiting for HighLevel when the user clicks it.
         if (empty($this->templates)) {
             $this->loadTemplates();
         }
 
+        $this->primeInboxFromCacheForNavigation();
+
         $this->loadNotificationSettings();
-
-        // A direct /conversations page load may show the last known inbox immediately,
-        // but a live refresh is started by the Inbox panel after first paint. Other
-        // Recruiting Center routes do not preload or freeze Inbox state anymore.
-        if ($this->section === 'conversations') {
-            $this->hydrateCachedInboxConversations();
-
-            if (! $this->selectedConversationId && ! empty($this->conversations)) {
-                $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
-            }
-
-            if ($this->selectedConversationId && empty($this->messages)) {
-                $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
-            }
-
-            $this->isLoadingConversations = false;
-            $this->isLoadingConversationMessages = false;
-            $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = null;
-        }
 
         if (in_array($this->section, ['campaigns', 'compose'], true)) {
             $this->loadTemplates();
@@ -470,9 +453,9 @@ trait InteractsWithCoachDatabase
     }
 
     /**
-     * v10.103.5: Inbox is intentionally NOT renderless/cached navigation state.
-     * The panel still becomes visible instantly in Alpine, then this normal Livewire
-     * request refreshes the conversation list and keeps thread selection interactive.
+     * v10.103.8: entering Inbox must never block on HighLevel. The hidden Inbox panel is
+     * already rendered from the most recent Laravel cache. A live GHL refresh is explicit
+     * via the Inbox refresh button, so normal Recruiting Center navigation remains instant.
      */
     public function enterInboxSection(): void
     {
@@ -500,36 +483,32 @@ trait InteractsWithCoachDatabase
         $this->composeTemplateMenuOpen = false;
         $this->composeChooseCoachesOpen = false;
         $this->composeSchoolPickerOpen = false;
-
         $this->section = 'conversations';
 
         if (empty($this->lists)) {
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        // Fetch the current Inbox as part of this normal render. loadConversations()
-        // may use its long-standing cache only as a failure fallback; the rendered result
-        // comes from the live GHL request whenever that request succeeds.
-        $this->inboxInitialLoadCompleted = true;
-        $this->loadConversations();
+        $hasCachedInbox = $this->primeInboxFromCacheForNavigation();
+        $this->inboxInitialLoadCompleted = $hasCachedInbox;
 
-        // If a previously selected thread disappeared from the refreshed Inbox, select
-        // the first current row instead of leaving the message pane bound to a stale ID.
-        $ids = collect($this->conversations ?? [])
-            ->filter(fn ($row): bool => is_array($row) && filled($row['id'] ?? null))
-            ->map(fn (array $row): string => (string) $row['id']);
-
-        if ($this->selectedConversationId && ! $ids->contains((string) $this->selectedConversationId)) {
-            $this->selectedConversationId = (string) ($ids->first() ?? '');
-            $this->messageLastId = null;
-            $this->hasMoreMessages = false;
-            $this->messages = [];
-
-            if ($this->selectedConversationId !== '') {
-                $this->loadConversationMessages(true);
+        // When cached rows already rendered with the persistent Recruiting Center shell,
+        // there is nothing to morph. Keep this request renderless so it cannot flash or
+        // repaint the Inbox after the browser already switched sections.
+        if ($hasCachedInbox) {
+            if (method_exists($this, 'skipRender')) {
+                $this->skipRender();
             }
+
+            $this->dispatch('rc-section-switched', section: 'conversations');
+            return;
         }
 
+        // First-ever Inbox visit has no cache to display. Only in that case perform one
+        // live fetch so the user is not left with an empty Inbox forever. Subsequent
+        // visits use cache immediately and the Refresh button remains the live update path.
+        $this->inboxInitialLoadCompleted = true;
+        $this->loadConversations();
         $this->dispatch('rc-section-switched', section: 'conversations');
     }
 
@@ -1266,22 +1245,9 @@ trait InteractsWithCoachDatabase
 
         try {
             if ($this->section === 'conversations') {
-                $this->hydrateCachedInboxConversations();
-
-                $this->isLoadingConversations = false;
-                $this->isLoadingConversationMessages = false;
-                $this->isRefreshingRemoteData = false;
-                $this->activeUiOperation = null;
-
-                if (! $this->inboxInitialLoadCompleted) {
-                    $this->inboxInitialLoadCompleted = true;
-                    $this->loadConversations();
-                }
-
-                $this->isLoadingConversations = false;
-                $this->isLoadingConversationMessages = false;
-                $this->isRefreshingRemoteData = false;
-                $this->activeUiOperation = null;
+                // v10.103.8: deferred boot is cache-only. Never make the page wait on a
+                // HighLevel conversation request simply because Inbox became visible.
+                $this->primeInboxFromCacheForNavigation();
             }
         } finally {
             $this->isBootingRemoteSection = false;
@@ -3561,6 +3527,53 @@ trait InteractsWithCoachDatabase
                 ->values()
                 ->all();
         }
+    }
+
+    /**
+     * Prime the Inbox from Laravel cache only. This helper never calls HighLevel.
+     * It is safe to run during the initial Recruiting Center render because the cached
+     * conversation list is small and it keeps client-side section switching immediate.
+     */
+    protected function primeInboxFromCacheForNavigation(): bool
+    {
+        $this->hydrateCachedInboxConversations();
+
+        $ids = collect($this->conversations ?? [])
+            ->filter(fn ($row): bool => is_array($row) && filled($row['id'] ?? null))
+            ->map(fn (array $row): string => (string) $row['id'])
+            ->values();
+
+        if ($ids->isEmpty()) {
+            $this->selectedConversationId = null;
+            $this->messages = [];
+            $this->messageLastId = null;
+            $this->hasMoreMessages = false;
+            $this->isLoadingConversations = false;
+            $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
+
+            return false;
+        }
+
+        $selected = trim((string) ($this->selectedConversationId ?? ''));
+        if ($selected === '' || ! $ids->contains($selected)) {
+            $this->selectedConversationId = (string) $ids->first();
+            $this->messages = [];
+            $this->messageLastId = null;
+            $this->hasMoreMessages = false;
+        }
+
+        if ($this->selectedConversationId && empty($this->messages)) {
+            $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
+        }
+
+        $this->isLoadingConversations = false;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
+
+        return true;
     }
 
     protected function enrichConversationRowsWithLocalDatabase(array $rows): array

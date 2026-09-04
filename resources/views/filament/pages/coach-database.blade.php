@@ -437,7 +437,7 @@ discoverSelectedIds: [],
         x-on:rc-free-plan-gate-close.window="closeFreeGate()"
         x-on:keydown.escape.window="if (freeGateOpen) closeFreeGate()"
         x-on:rc-recruiting-account-ready.window="$nextTick(() => $wire.bootDeferredUiData())"
-        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(async () => { await $wire.bootDeferredUiData(); await $wire.ensureInboxConversationLoaded(); }) }">
+        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(() => $wire.ensureInboxConversationLoaded()) }">
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -15466,6 +15466,22 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         return true;
     };
 
+    // v10.103.8: move the Recruiting Center highlight on pointer-down, not after
+    // Livewire, history, or even the browser click event. This is purely visual feedback;
+    // the click handler below still owns the actual section switch and access checks.
+    document.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+        const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
+        if (!anchor || !currentRoot()) return;
+
+        const section = sectionFromAnchor(anchor);
+        if (!section) return;
+        if (isFreePlan() && freePlanLockedSections.has(section)) return;
+
+        setSidebarActive(section);
+    }, true);
+
     document.addEventListener('click', (event) => {
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
 
@@ -15561,10 +15577,14 @@ body:has(.rc-livewire-root) .fi-main .fi-header:has(.fi-header-heading) {
     display:none !important;
 }
 
-/* Neutralize Filament's original route highlight for every Recruiting Center item. */
+/* Neutralize Filament's original route highlight for every Recruiting Center item.
+   The route class may remain on the page that originally mounted the persistent shell,
+   so the browser-owned data-rc-active flag is the only visual source of truth. */
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]),
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) > .fi-sidebar-item-button,
-body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-button {
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-button,
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-icon,
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-icon {
     background: transparent !important;
     box-shadow: none !important;
 }
@@ -15580,13 +15600,17 @@ html.dark body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-se
 }
 
 /* Exactly one browser-selected Recruiting Center item gets the full active treatment. */
-body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"],
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] > .fi-sidebar-item-button,
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] .fi-sidebar-item-button,
 body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active {
     background: rgba(255,99,56,.14) !important;
     color: #ff6338 !important;
     border-radius:.75rem !important;
+    box-shadow:none !important;
+}
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] {
+    background:transparent !important;
+    box-shadow:none !important;
 }
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] .fi-sidebar-item-label,
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] svg,
