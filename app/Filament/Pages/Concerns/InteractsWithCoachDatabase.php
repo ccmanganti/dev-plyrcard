@@ -5405,16 +5405,34 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // Keep selection fast: swap to cached thread data when available and only
-        // show one compact loading state when this conversation has never been cached.
+        // v10.103.9: selecting a thread and obtaining its messages is one Livewire
+        // request. The previous two-request chain rendered an empty thread after the
+        // selection response, then fetched the messages in a second request. That is
+        // what caused "No messages" to flash for a few seconds before the real thread
+        // appeared.
+        $hadUnread = collect($this->conversations ?? [])->contains(function ($row) use ($conversationId): bool {
+            return is_array($row)
+                && (string) ($row['id'] ?? '') === $conversationId
+                && (int) ($row['unread_count'] ?? 0) > 0;
+        });
+
         $this->selectedConversationId = $conversationId;
         $this->messageLastId = null;
         $this->hasMoreMessages = false;
         $this->messages = [];
+
+        $cachedEnvelope = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
         $hasCachedMessages = $this->hydrateCachedConversationMessages($conversationId);
-        $this->isLoadingConversationMessages = ! $hasCachedMessages;
-        $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
+        $cacheIsFresh = false;
+
+        if ($hasCachedMessages && is_array($cachedEnvelope) && filled($cachedEnvelope['cached_at'] ?? null)) {
+            try {
+                $cacheIsFresh = \Illuminate\Support\Carbon::parse((string) $cachedEnvelope['cached_at'])
+                    ->greaterThanOrEqualTo(now()->subSeconds(90));
+            } catch (\Throwable) {
+                $cacheIsFresh = false;
+            }
+        }
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
@@ -5424,6 +5442,37 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return $row;
         })->values()->all();
         $this->cacheInboxConversations($this->conversations);
+
+        // A very recent cached thread can be returned immediately. Otherwise fetch
+        // the latest message page now, inside this same request. When an older cache
+        // exists, keep it in memory while the refresh runs so no empty state is ever
+        // produced by the server.
+        if (! $cacheIsFresh) {
+            $this->isLoadingConversationMessages = ! $hasCachedMessages;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
+            $this->loadConversationMessages(true, preserveVisibleMessages: $hasCachedMessages);
+        } else {
+            $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
+        }
+
+        // Marking a conversation read in HighLevel is not required before the thread
+        // can be shown. Send that network request only after Laravel has returned the
+        // Livewire response so it cannot add another second or two to opening a thread.
+        if ($hadUnread && ($user = Auth::user())) {
+            app()->terminating(function () use ($user, $conversationId): void {
+                try {
+                    app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+                } catch (\Throwable $exception) {
+                    Log::debug('Conversation opened locally but the deferred GHL read-state update failed.', [
+                        'conversation_id' => $conversationId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            });
+        }
     }
 
     public function refreshConversationMessagesForClient(string $conversationId): void

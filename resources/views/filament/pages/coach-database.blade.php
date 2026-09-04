@@ -9847,6 +9847,9 @@ discoverSelectedIds: [],
                     background: rgba(255,255,255,.88);
                     pointer-events: none;
                 }
+                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82 .rc-inbox-empty-v56 {
+                    visibility: hidden !important;
+                }
                 html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after {
                     content: '';
                     position: absolute;
@@ -10570,15 +10573,10 @@ CSS;
                                     document.documentElement.setAttribute('data-rc-inbox-loading', id);
                                     this.selectedConversationId = id;
 
+                                    // v10.103.9: one request only. selectConversation() now selects the
+                                    // coach and returns the latest/cached messages in the same response.
+                                    // Do not render an empty selection first and then launch another request.
                                     Promise.resolve(this.$wire.selectConversation(id))
-                                        .then(() => {
-                                            if (window.__rcInboxPendingConversationId === id || this.selectedConversationId === id) {
-                                                // The same single client loader remains visible during the fresh
-                                                // message request, so there is no delayed/second animation.
-                                                return this.$wire.refreshConversationMessagesForClient(id);
-                                            }
-                                            return null;
-                                        })
                                         .finally(() => {
                                             if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
                                                 document.documentElement.removeAttribute('data-rc-inbox-loading');
