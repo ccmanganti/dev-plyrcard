@@ -10453,7 +10453,7 @@ CSS;
                                 },
                                 selectConversation(conversationId) {
                                     const id = String(conversationId || '');
-                                    if (! id) return;
+                                    if (! id || id === String(this.selectedConversationId || '')) return;
 
                                     window.__rcInboxPendingConversationId = id;
                                     this.selectedConversationId = id;
@@ -10510,24 +10510,6 @@ CSS;
                     </aside>
 
                     <main class="rc-inbox-mid-v56 rc-inbox-mid-loading-host-v82">
-                        <div
-                            wire:loading.flex
-                            wire:target="selectConversation"
-                            class="rc-inbox-inline-conversation-loader-v82"
-                            aria-live="polite"
-                            aria-label="Loading conversation"
-                        >
-                            <div class="rc-inbox-inline-loader-head-v82">
-                                <span class="rc-inbox-inline-loader-avatar-v82"></span>
-                                <span class="rc-inbox-inline-loader-copy-v82">
-                                    <span></span>
-                                    <span></span>
-                                </span>
-                            </div>
-                            <div class="rc-inbox-inline-loader-message-v82 is-short"></div>
-                            <div class="rc-inbox-inline-loader-message-v82"></div>
-                            <div class="rc-inbox-inline-loader-message-v82 is-medium"></div>
-                        </div>
                         @if($selectedConversation)
                             <div class="rc-inbox-mid-head-v56">
                                 <div class="rc-inbox-coach-title-v56">
@@ -10554,8 +10536,12 @@ CSS;
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56">
                                         <div>
-                                            <span class="rc-spinner-mini" aria-hidden="true"></span>
-                                            <strong>Loading conversation…</strong>
+                                            @if($isLoadingConversationMessages)
+                                                <span class="rc-spinner-mini" aria-hidden="true"></span>
+                                                <strong>Loading conversation…</strong>
+                                            @else
+                                                <strong>No messages yet.</strong>
+                                            @endif
                                         </div>
                                     </div>
                                 @else

@@ -5287,13 +5287,16 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // Keep the selection request local and fast. The browser owns the selected
-        // highlight immediately; this request only swaps in any cached thread data.
+        // Keep selection fast: swap to cached thread data when available and only
+        // show one compact loading state when this conversation has never been cached.
         $this->selectedConversationId = $conversationId;
         $this->messageLastId = null;
         $this->hasMoreMessages = false;
         $this->messages = [];
-        $this->hydrateCachedConversationMessages($conversationId);
+        $hasCachedMessages = $this->hydrateCachedConversationMessages($conversationId);
+        $this->isLoadingConversationMessages = ! $hasCachedMessages;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
@@ -5312,7 +5315,9 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        $this->loadConversationMessages(true);
+        // If cached messages are already visible, keep them on screen while the
+        // newest page refreshes. This avoids a second loading animation/flicker.
+        $this->loadConversationMessages(true, preserveVisibleMessages: ! empty($this->messages));
 
         if ($user = Auth::user()) {
             try {
@@ -5394,7 +5399,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->loadConversationMessages(false);
     }
 
-    public function loadConversationMessages(bool $fresh = false): void
+    public function loadConversationMessages(bool $fresh = false, bool $preserveVisibleMessages = false): void
     {
         $user = Auth::user();
 
@@ -5406,6 +5411,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         $conversationId = (string) $this->selectedConversationId;
+        $keepVisibleMessages = $fresh && $preserveVisibleMessages && ! empty($this->messages);
 
         if ($fresh) {
             Cache::forget($this->deferredUiCacheKey('messages', $conversationId));
@@ -5413,9 +5419,11 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId));
             Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId));
 
-            $this->messages = [];
-            $this->messageLastId = null;
-            $this->hasMoreMessages = false;
+            if (! $keepVisibleMessages) {
+                $this->messages = [];
+                $this->messageLastId = null;
+                $this->hasMoreMessages = false;
+            }
         } else {
             $this->hydrateCachedConversationMessages($conversationId);
 
@@ -5424,10 +5432,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             }
         }
 
-        $requestedCursor = $this->messageLastId;
-        $this->isLoadingConversationMessages = true;
+        // A fresh refresh always asks for the newest page. When cached messages are
+        // already visible, refresh silently instead of replacing them with a loader.
+        $requestedCursor = $fresh ? null : $this->messageLastId;
+        $this->isLoadingConversationMessages = ! $keepVisibleMessages;
         $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = $fresh ? 'Loading messages' : 'Loading older messages';
+        $this->activeUiOperation = $keepVisibleMessages
+            ? null
+            : ($fresh ? 'Loading messages' : 'Loading older messages');
 
         try {
             $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
@@ -5506,12 +5518,9 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 'cached_at' => now()->toIso8601String(),
             ], now()->addMinutes(10));
 
-            // Keep the existing detached enrichment for the initial page only.
-            // Loading older pages must not launch a second sync that overwrites the
-            // accumulated paginated rows with the newest page again.
-            if ($fresh) {
-                $this->startDeferredUiSync('messages', $conversationId, true);
-            }
+            // v10.103.6: do not launch a second detached message sync after a
+            // successful direct Inbox fetch. That duplicate refresh caused another
+            // loading cycle immediately after the conversation had already loaded.
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversation messages for inbox.', [
                 'user_id' => $user->id,
