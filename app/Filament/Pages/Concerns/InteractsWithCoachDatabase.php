@@ -20,13 +20,11 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
 use Livewire\WithFileUploads;
-use Livewire\Attributes\Renderless;
 use App\Models\CoachDatabaseEmailTemplate;
 
 trait InteractsWithCoachDatabase
@@ -72,7 +70,6 @@ trait InteractsWithCoachDatabase
     public ?string $error = null;
 
     public string $section = 'dashboard';
-    public bool $browserSchoolCatalogSeeded = false;
     public int $dashboardVisitVersion = 0;
     public bool $isFetchingDashboardEmailsSent = false;
     public ?string $dashboardEmailFetchError = null;
@@ -136,15 +133,6 @@ trait InteractsWithCoachDatabase
     public bool $templateEditorOpen = false;
     public string $templateSearch = '';
     public int $templateEditorRefreshKey = 0;
-
-    // v10.101: My Photos gallery state. Player uploads remain in raw_player_images;
-    // PLYRCARD-created/curated gallery assets are stored in users.plyrcard_images.
-    public array $playerPhotoUploads = [];
-    public array $plyrcardPhotoUploads = [];
-    public $photoReplacementUpload = null;
-    public bool $photoReplaceOpen = false;
-    public string $photoReplaceCategory = 'player';
-    public ?int $photoReplaceIndex = null;
 
     public ?string $campaignTemplateId = null;
     public ?string $previewTemplateId = null;
@@ -292,7 +280,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','photos','support','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -381,34 +369,24 @@ trait InteractsWithCoachDatabase
             $this->loadDashboardActivity();
         }
 
-        // v10.103.2: warm the lightweight local list summaries on the first page load.
-        // Recruiting Center navigation stays inside one mounted Livewire component, so
-        // keeping this small dataset in public state avoids a database read when the user
-        // clicks Discover Schools, Favorites, My Lists, Compose, or Inbox.
-        if (empty($this->lists)) {
+        // These sections need the player's local lists for the global school drawer,
+        // Compose list targeting, or the My Lists page itself. Do one local load only.
+        if (in_array($this->section, ['schools', 'favorites', 'lists', 'compose', 'conversations'], true)) {
+            // v10.77: Inbox Add to List must have the player's local lists and counts
+            // on the first render instead of waiting for a later Livewire refresh.
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        // v10.103.3: preload the lightweight local/cached data used by the client-mounted
-        // Recruiting Center panels. Navigation itself is browser-only; these calls make
-        // the destination panels useful immediately without waiting on a click-time render.
-        if (empty($this->templates)) {
-            $this->loadTemplates();
-        }
-
-        $this->loadNotificationSettings();
-        $this->hydrateCachedInboxConversations();
-
-        if (! $this->selectedConversationId && ! empty($this->conversations)) {
-            $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
-        }
-
-        if ($this->selectedConversationId && empty($this->messages)) {
-            $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
-        }
-
         if ($this->section === 'conversations') {
-            // The cached rows were already warmed above. Keep only section-specific flags here.
+            $this->hydrateCachedInboxConversations();
+
+            if (! $this->selectedConversationId && ! empty($this->conversations)) {
+                $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+            }
+
+            if ($this->selectedConversationId) {
+                $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
+            }
 
             $this->isLoadingConversations = false;
             $this->isLoadingConversationMessages = false;
@@ -456,29 +434,16 @@ trait InteractsWithCoachDatabase
     }
 
     /**
-     * v10.103.2: the initial HTML seeds the canonical local school catalog into a
-     * browser-side cache. After that first response, Livewire does not need to resend
-     * the same large Alpine JSON payload on every Recruiting Center click.
-     */
-    public function dehydrate(): void
-    {
-        if ($this->allowed && ! $this->locked && ! $this->isFreePlanAccount) {
-            $this->browserSchoolCatalogSeeded = true;
-        }
-    }
-
-    /**
      * v128: Switch Recruiting Center tabs inside the already-mounted Livewire page.
      *
      * Sidebar navigation dispatches this method instead of loading another Filament
      * page. Only the state required by the destination section is initialized.
      */
-    #[Renderless]
     public function switchRecruitingSection(string $section): void
     {
         $allowedSections = [
             'dashboard', 'schools', 'coaches', 'favorites', 'lists',
-            'conversations', 'campaigns', 'compose', 'photos', 'support',
+            'conversations', 'campaigns', 'compose', 'support',
             'schedule', 'settings', 'profile',
         ];
 
@@ -723,367 +688,7 @@ trait InteractsWithCoachDatabase
 
     protected function canFreeRoleAccessCoachDatabaseSection(string $section): bool
     {
-        return in_array($section, ['profile', 'photos', 'settings'], true);
-    }
-
-    /**
-     * My Photos gallery payload used by the Admin/Filament section.
-     * Player Photos come from raw_player_images. PLYRCARD Photos combines the
-     * image fields already used by the public website with additional images
-     * stored in plyrcard_images.
-     */
-    public function getMediaGalleryProperty(): array
-    {
-        $user = Auth::user();
-        if (! $user) {
-            return [
-                'player' => [],
-                'plyrcard' => [],
-                'can_manage_plyrcard' => false,
-                'player_max' => 20,
-                'plyrcard_max' => 30,
-            ];
-        }
-
-        $player = collect(is_array($user->raw_player_images ?? null) ? $user->raw_player_images : [])
-            ->map(fn ($path): string => trim((string) $path))
-            ->filter()
-            ->unique()
-            ->values()
-            ->map(fn (string $path, int $index): array => array_merge(
-                $this->coachDatabaseMediaRow($path, $index, 'player'),
-                ['source' => 'player', 'field' => null]
-            ))
-            ->all();
-
-        $websiteFields = [
-            'plyrcard_image',
-            'player_image',
-            'action_image',
-            'national_team_image',
-            'mobile_hero_image',
-            'youtube_thumbnail',
-        ];
-
-        $plyrcard = collect($websiteFields)
-            ->map(function (string $field) use ($user): ?array {
-                $path = trim((string) ($user->{$field} ?? ''));
-                if ($path === '') return null;
-
-                return [
-                    'index' => 0,
-                    'category' => 'plyrcard',
-                    'source' => 'field',
-                    'field' => $field,
-                    'path' => $path,
-                    'url' => $this->coachDatabaseMediaUrl($path),
-                    'name' => 'PLYRCARD photo',
-                ];
-            })
-            ->filter()
-            ->concat(
-                collect(is_array($user->plyrcard_images ?? null) ? $user->plyrcard_images : [])
-                    ->map(fn ($path): string => trim((string) $path))
-                    ->filter()
-                    ->unique()
-                    ->values()
-                    ->map(fn (string $path, int $index): array => array_merge(
-                        $this->coachDatabaseMediaRow($path, $index, 'plyrcard'),
-                        ['source' => 'additional', 'field' => null]
-                    ))
-            )
-            ->unique('url')
-            ->values()
-            ->all();
-
-        return [
-            'player' => $player,
-            'plyrcard' => $plyrcard,
-            'can_manage_plyrcard' => $this->canManagePlyrcardGallery($user),
-            'player_max' => 20,
-            'plyrcard_max' => 30,
-        ];
-    }
-
-    public function uploadPlayerPhotos(): void
-    {
-        $user = Auth::user();
-        if (! $user || empty($this->playerPhotoUploads)) {
-            return;
-        }
-
-        $this->validate([
-            'playerPhotoUploads' => ['array', 'max:20'],
-            'playerPhotoUploads.*' => ['image', 'max:5120'],
-        ]);
-
-        $paths = $this->coachDatabaseMediaPaths($user, 'player');
-        if (($paths->count() + count($this->playerPhotoUploads)) > 20) {
-            Notification::make()->title('My Photos')->body('Player Uploaded Images can contain up to 20 photos.')->warning()->send();
-            return;
-        }
-
-        foreach ($this->playerPhotoUploads as $file) {
-            if ($file) {
-                $paths->push($file->store('user-player-images/raw', 'public'));
-            }
-        }
-
-        $this->saveCoachDatabaseMediaPaths($user, 'player', $paths->all());
-        $this->playerPhotoUploads = [];
-
-        Notification::make()->title('My Photos')->body('Player photos uploaded.')->success()->send();
-    }
-
-    public function uploadPlyrcardPhotos(): void
-    {
-        $user = Auth::user();
-        if (! $user || ! $this->canManagePlyrcardGallery($user) || empty($this->plyrcardPhotoUploads)) {
-            return;
-        }
-
-        $this->validate([
-            'plyrcardPhotoUploads' => ['array', 'max:30'],
-            'plyrcardPhotoUploads.*' => ['image', 'max:5120'],
-        ]);
-
-        $paths = $this->coachDatabaseMediaPaths($user, 'plyrcard');
-        if (($paths->count() + count($this->plyrcardPhotoUploads)) > 30) {
-            Notification::make()->title('My Photos')->body('Plyrcard Images can contain up to 30 photos.')->warning()->send();
-            return;
-        }
-
-        foreach ($this->plyrcardPhotoUploads as $file) {
-            if ($file) {
-                $paths->push($file->store('user-player-images/plyrcard', 'public'));
-            }
-        }
-
-        $this->saveCoachDatabaseMediaPaths($user, 'plyrcard', $paths->all());
-        $this->plyrcardPhotoUploads = [];
-
-        Notification::make()->title('My Photos')->body('PLYRCARD photos uploaded.')->success()->send();
-    }
-
-    public function openPhotoReplace(string $category, int $index): void
-    {
-        $user = Auth::user();
-        $category = $this->normalizedMediaCategory($category);
-        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
-            return;
-        }
-
-        $paths = $this->coachDatabaseMediaPaths($user, $category);
-        if (! $paths->has($index)) {
-            return;
-        }
-
-        $this->photoReplacementUpload = null;
-        $this->photoReplaceCategory = $category;
-        $this->photoReplaceIndex = $index;
-        $this->photoReplaceOpen = true;
-    }
-
-    public function closePhotoReplace(): void
-    {
-        $this->photoReplacementUpload = null;
-        $this->photoReplaceIndex = null;
-        $this->photoReplaceOpen = false;
-    }
-
-    public function replaceGalleryPhoto(): void
-    {
-        $user = Auth::user();
-        $category = $this->normalizedMediaCategory($this->photoReplaceCategory);
-        $index = $this->photoReplaceIndex;
-
-        if (! $user || $index === null || ! $this->canManageGalleryCategory($user, $category)) {
-            return;
-        }
-
-        $this->validate(['photoReplacementUpload' => ['required', 'image', 'max:5120']]);
-
-        $paths = $this->coachDatabaseMediaPaths($user, $category);
-        if (! $paths->has($index)) {
-            $this->closePhotoReplace();
-            return;
-        }
-
-        $oldPath = (string) $paths->get($index);
-        $directory = $category === 'plyrcard' ? 'user-player-images/plyrcard' : 'user-player-images/raw';
-        $newPath = $this->photoReplacementUpload->store($directory, 'public');
-        $paths->put($index, $newPath);
-        $this->saveCoachDatabaseMediaPaths($user, $category, $paths->values()->all());
-        $this->deleteManagedGalleryPath($oldPath, $category);
-        $this->closePhotoReplace();
-
-        Notification::make()->title('My Photos')->body('Photo replaced.')->success()->send();
-    }
-
-    public function deleteMediaPhoto(string $category, string $source, int $index = 0, ?string $field = null): void
-    {
-        $user = Auth::user();
-        $category = $this->normalizedMediaCategory($category);
-        $source = strtolower(trim($source));
-
-        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
-            return;
-        }
-
-        if ($category === 'plyrcard' && $source === 'field') {
-            $allowedFields = [
-                'plyrcard_image', 'player_image', 'action_image',
-                'national_team_image', 'mobile_hero_image', 'youtube_thumbnail',
-            ];
-            $field = trim((string) $field);
-            if (! in_array($field, $allowedFields, true)) return;
-
-            $user->forceFill([$field => null])->save();
-            $user->refresh();
-            Notification::make()->title('My Photos')->body('Photo removed.')->success()->send();
-            return;
-        }
-
-        $storageCategory = $category === 'plyrcard' ? 'plyrcard' : 'player';
-        $paths = $this->coachDatabaseMediaPaths($user, $storageCategory);
-        if (! $paths->has($index)) return;
-
-        $oldPath = (string) $paths->get($index);
-        $paths->forget($index);
-        $this->saveCoachDatabaseMediaPaths($user, $storageCategory, $paths->values()->all());
-        $this->deleteManagedGalleryPath($oldPath, $storageCategory);
-
-        Notification::make()->title('My Photos')->body('Photo removed.')->success()->send();
-    }
-
-    public function deleteGalleryPhoto(string $category, int $index): void
-    {
-        $user = Auth::user();
-        $category = $this->normalizedMediaCategory($category);
-        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
-            return;
-        }
-
-        $paths = $this->coachDatabaseMediaPaths($user, $category);
-        if (! $paths->has($index)) {
-            return;
-        }
-
-        $oldPath = (string) $paths->get($index);
-        $paths->forget($index);
-        $this->saveCoachDatabaseMediaPaths($user, $category, $paths->values()->all());
-        $this->deleteManagedGalleryPath($oldPath, $category);
-
-        Notification::make()->title('My Photos')->body('Photo removed.')->success()->send();
-    }
-
-    public function moveGalleryPhoto(string $category, int $index, int $direction): void
-    {
-        $user = Auth::user();
-        $category = $this->normalizedMediaCategory($category);
-        if (! $user || ! $this->canManageGalleryCategory($user, $category)) {
-            return;
-        }
-
-        $rows = $this->coachDatabaseMediaPaths($user, $category)->values()->all();
-        $target = $index + ($direction < 0 ? -1 : 1);
-        if (! isset($rows[$index], $rows[$target])) {
-            return;
-        }
-
-        [$rows[$index], $rows[$target]] = [$rows[$target], $rows[$index]];
-        $this->saveCoachDatabaseMediaPaths($user, $category, $rows);
-    }
-
-    protected function normalizedMediaCategory(string $category): string
-    {
-        return strtolower(trim($category)) === 'plyrcard' ? 'plyrcard' : 'player';
-    }
-
-    protected function canManageGalleryCategory($user, string $category): bool
-    {
-        return $category === 'player' || $this->canManagePlyrcardGallery($user);
-    }
-
-    protected function canManagePlyrcardGallery($user): bool
-    {
-        if (! $user) {
-            return false;
-        }
-
-        try {
-            if (method_exists($user, 'isSuperadminOrImpersonating')) {
-                return (bool) $user->isSuperadminOrImpersonating();
-            }
-
-            return method_exists($user, 'hasRole') && (
-                $user->hasRole('superadmin') || $user->hasRole('Superadmin') || $user->hasRole('Super Admin')
-            );
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    protected function coachDatabaseMediaPaths($user, string $category): Collection
-    {
-        $category = $this->normalizedMediaCategory($category);
-        $value = $category === 'plyrcard' ? ($user->plyrcard_images ?? []) : ($user->raw_player_images ?? []);
-
-        return collect(is_array($value) ? $value : [])
-            ->map(fn ($path): string => trim((string) $path))
-            ->filter()
-            ->unique()
-            ->values();
-    }
-
-    protected function saveCoachDatabaseMediaPaths($user, string $category, array $paths): void
-    {
-        $column = $this->normalizedMediaCategory($category) === 'plyrcard' ? 'plyrcard_images' : 'raw_player_images';
-        $user->forceFill([$column => array_values(array_unique(array_filter(array_map('strval', $paths))))])->save();
-        $user->refresh();
-    }
-
-    protected function coachDatabaseMediaRow(string $path, int $index, string $category): array
-    {
-        return [
-            'index' => $index,
-            'category' => $category,
-            'path' => $path,
-            'url' => $this->coachDatabaseMediaUrl($path),
-            'name' => basename(parse_url($path, PHP_URL_PATH) ?: $path),
-        ];
-    }
-
-    protected function coachDatabaseMediaUrl(?string $path): ?string
-    {
-        $path = trim((string) $path);
-        if ($path === '') {
-            return null;
-        }
-        if (Str::startsWith($path, ['http://', 'https://'])) {
-            return $path;
-        }
-        if (Str::startsWith($path, '//')) {
-            return 'https:' . $path;
-        }
-
-        return Storage::disk('public')->url(ltrim($path, '/'));
-    }
-
-    protected function deleteManagedGalleryPath(string $path, string $category): void
-    {
-        $path = trim($path);
-        if ($path === '' || Str::startsWith($path, ['http://', 'https://', '//'])) {
-            return;
-        }
-
-        $prefix = $this->normalizedMediaCategory($category) === 'plyrcard'
-            ? 'user-player-images/plyrcard/'
-            : 'user-player-images/raw/';
-
-        if (Str::startsWith(ltrim($path, '/'), $prefix)) {
-            Storage::disk('public')->delete(ltrim($path, '/'));
-        }
+        return in_array($section, ['profile', 'settings'], true);
     }
 
     public function openFreePlanGate(string $section = 'dashboard'): void
@@ -2832,9 +2437,6 @@ trait InteractsWithCoachDatabase
 
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
-            $this->discoverClientSchoolsMemo = null;
-            $this->forgetInstantDiscoverCatalogCache($user);
-            $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
         }
 
@@ -2978,7 +2580,6 @@ trait InteractsWithCoachDatabase
 
         $this->allSchoolsMemo = null;
         $this->discoverClientSchoolsMemo = null;
-        $this->forgetInstantDiscoverCatalogCache($user);
         $this->favoriteSchoolsMemo = null;
         $this->filteredSchoolsQueryMemo = [];
 
@@ -3020,9 +2621,6 @@ trait InteractsWithCoachDatabase
         $result = app(LocalRecruitingDatabaseService::class)->setFavorite($user, $schoolId, $favorite);
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
-            $this->discoverClientSchoolsMemo = null;
-            $this->forgetInstantDiscoverCatalogCache($user);
-            $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
         }
 
@@ -3052,7 +2650,6 @@ trait InteractsWithCoachDatabase
         if ($result['success'] ?? false) {
             $this->allSchoolsMemo = null;
             $this->discoverClientSchoolsMemo = null;
-            $this->forgetInstantDiscoverCatalogCache($user);
             $this->favoriteSchoolsMemo = null;
             $this->filteredSchoolsQueryMemo = [];
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
@@ -13302,19 +12899,6 @@ HTML;
      * membership and cached GHL statistics already overlaid by allSchools(). The browser
      * can therefore search/filter/open drawers without another Livewire round trip.
      */
-    protected function instantDiscoverCatalogCacheKey($user): string
-    {
-        return 'recruiting:instant-school-catalog:v1032:' . (int) $user->getKey();
-    }
-
-    protected function forgetInstantDiscoverCatalogCache($user = null): void
-    {
-        $user ??= Auth::user();
-        if ($user) {
-            Cache::forget($this->instantDiscoverCatalogCacheKey($user));
-        }
-    }
-
     public function getDiscoverClientSchoolsProperty(): array
     {
         if (is_array($this->discoverClientSchoolsMemo)) {
@@ -13326,17 +12910,13 @@ HTML;
             return $this->discoverClientSchoolsMemo = [];
         }
 
-        // v10.103.2: schoolRows() is local-only but still builds the full Discover
-        // catalog. Cache that normalized result briefly between Livewire requests so
-        // changing Recruiting Center sections does not rebuild the same 100+ schools.
-        // Membership mutations explicitly invalidate this cache below.
-        $rows = Cache::remember(
-            $this->instantDiscoverCatalogCacheKey($user),
-            now()->addSeconds(60),
-            fn (): array => array_values(app(LocalRecruitingDatabaseService::class)->schoolRows($user)),
+        // v129: this browser interaction catalog is intentionally LOCAL-only.
+        // Dashboard cards can pass their already-loaded GHL stats into the global
+        // drawer as the source row. Discover/Favorites/My Lists do not need to read
+        // or group the legacy multi-megabyte snapshot just to render local schools.
+        return $this->discoverClientSchoolsMemo = array_values(
+            app(LocalRecruitingDatabaseService::class)->schoolRows($user)
         );
-
-        return $this->discoverClientSchoolsMemo = is_array($rows) ? array_values($rows) : [];
     }
 
     public function getSelectedCoachProperty(): ?array
