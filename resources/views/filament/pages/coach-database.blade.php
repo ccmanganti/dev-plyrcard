@@ -5,7 +5,6 @@
         : [];
 @endphp
 
-<div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
     <style>
         /* v10.66: fail closed. If Alpine/Livewire JS is delayed or errors, the
@@ -11238,31 +11237,17 @@ CSS;
                 $playerGallery = collect($mediaGallery['player'] ?? [])->values();
                 $plyrcardGallery = collect($mediaGallery['plyrcard'] ?? [])->values();
                 $canManagePlyrcardGallery = (bool) ($mediaGallery['can_manage_plyrcard'] ?? false);
+                $playerPhotoMax = (int) ($mediaGallery['player_max'] ?? 20);
+                $plyrcardPhotoMax = (int) ($mediaGallery['plyrcard_max'] ?? 30);
             @endphp
 
-            <style id="rc-my-photos-v102">
-                .rc-photos-v102{display:grid;gap:1rem;color:var(--rc-text)}
-                .rc-photos-head-v102{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;padding:.2rem 0 .35rem;border-bottom:1px solid var(--rc-border)}
-                .rc-photos-head-v102 h1{margin:0;font-size:1.55rem;line-height:1.05;font-weight:900;letter-spacing:-.04em;color:var(--rc-text)}
-                .rc-photos-head-v102 p{margin:.35rem 0 0;max-width:42rem;color:var(--rc-muted);font-size:.78rem;line-height:1.5}
-                .rc-photos-mark-v102{width:2.65rem;height:2.65rem;border-radius:.8rem;background:rgba(255,99,56,.11);color:#ff6338;display:grid;place-items:center;flex:0 0 auto}.rc-photos-mark-v102 svg{width:1.25rem;height:1.25rem}
-                .rc-photos-tabs-v102{display:inline-grid;grid-template-columns:1fr 1fr;gap:.3rem;padding:.28rem;border:1px solid var(--rc-border);border-radius:.8rem;background:var(--rc-surface);width:min(31rem,100%)}
-                .rc-photos-tab-v102{min-height:2.65rem;border:0;border-radius:.58rem;background:transparent;color:var(--rc-muted);font-size:.74rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.45rem}.rc-photos-tab-v102.is-active{background:var(--rc-soft);color:var(--rc-text);box-shadow:inset 0 0 0 1px var(--rc-border)}
-                .rc-photos-count-v102{display:inline-grid;place-items:center;min-width:1.35rem;height:1.35rem;padding:0 .3rem;border-radius:999px;background:rgba(148,163,184,.13);font-size:.61rem}
-                .rc-photos-upload-v102{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.8rem .9rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface)}
-                .rc-photos-upload-copy-v102{min-width:0}.rc-photos-upload-copy-v102 strong{display:block;color:var(--rc-text);font-size:.78rem}.rc-photos-upload-copy-v102 span{display:block;margin-top:.2rem;color:var(--rc-muted);font-size:.68rem;line-height:1.4}
-                .rc-photos-file-v102{position:relative;flex:0 0 auto}.rc-photos-file-v102 input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
-                .rc-photos-grid-v102{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}
-                .rc-photo-card-v102{position:relative;min-width:0;aspect-ratio:4/3;overflow:hidden;border:1px solid var(--rc-border);border-radius:.9rem;background:var(--rc-soft);box-shadow:0 8px 20px rgba(15,23,42,.045)}
-                .dark .rc-photo-card-v102{box-shadow:none}
-                .rc-photo-card-v102 img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .22s ease,filter .22s ease}.rc-photo-card-v102:hover img,.rc-photo-card-v102:focus-within img{transform:scale(1.025);filter:brightness(.82)}
-                .rc-photo-overlay-v102{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:flex-end;gap:.4rem;padding:.65rem;background:linear-gradient(to top,rgba(8,15,28,.62),rgba(8,15,28,0) 58%);opacity:0;pointer-events:none;transition:opacity .18s ease}.rc-photo-card-v102:hover .rc-photo-overlay-v102,.rc-photo-card-v102:focus-within .rc-photo-overlay-v102{opacity:1;pointer-events:auto}
-                .rc-photo-action-v102{width:2.15rem;height:2.15rem;border:1px solid rgba(255,255,255,.2);border-radius:.62rem;background:rgba(17,24,39,.76);color:#fff;display:grid;place-items:center;cursor:pointer;text-decoration:none;backdrop-filter:blur(5px);transition:transform .14s ease,background .14s ease}.rc-photo-action-v102:hover{transform:translateY(-1px);background:#111827}.rc-photo-action-v102.is-delete:hover{background:#b42318}.rc-photo-action-v102 svg{width:1rem;height:1rem}
-                .rc-photos-empty-v102{grid-column:1/-1;min-height:14rem;border:1px dashed var(--rc-border);border-radius:.9rem;background:var(--rc-surface);display:grid;place-items:center;padding:2rem;text-align:center}.rc-photos-empty-v102 strong{display:block;color:var(--rc-text);font-size:.84rem}.rc-photos-empty-v102 span{display:block;margin-top:.3rem;color:var(--rc-muted);font-size:.7rem}
-                @media(max-width:1180px){.rc-photos-grid-v102{grid-template-columns:repeat(3,minmax(0,1fr))}}
-                @media(max-width:760px){.rc-photos-grid-v102{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-photos-upload-v102{align-items:flex-start;flex-direction:column}.rc-photos-file-v102,.rc-photos-file-v102 .rc-btn{width:100%}}
-                @media(max-width:520px){.rc-photos-grid-v102{gap:.5rem}.rc-photos-head-v102{align-items:flex-start}.rc-photos-head-v102 h1{font-size:1.3rem}.rc-photo-action-v102{width:2rem;height:2rem}}
-                @media(hover:none){.rc-photo-card-v102 .rc-photo-overlay-v102{opacity:1;pointer-events:auto;background:linear-gradient(to top,rgba(8,15,28,.48),rgba(8,15,28,0) 48%)}}
+            <style id="rc-my-photos-v141">
+                .rc-media-page-v141{display:grid;gap:1rem}.rc-media-hero-v141{position:relative;overflow:hidden;border-radius:1.25rem;padding:1.35rem 1.4rem;background:linear-gradient(135deg,#111827 0%,#172033 58%,#2b1c18 100%);color:#fff;box-shadow:0 22px 46px rgba(15,23,42,.16)}.rc-media-hero-v141:after{content:"";position:absolute;right:-4rem;top:-5rem;width:15rem;height:15rem;border-radius:999px;background:radial-gradient(circle,rgba(255,99,56,.48),rgba(255,99,56,0) 70%)}.rc-media-hero-v141>*{position:relative;z-index:1}.rc-media-hero-top-v141{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.rc-media-eyebrow-v141{font-size:.68rem;font-weight:900;letter-spacing:.13em;text-transform:uppercase;color:#ff8b6d}.rc-media-hero-v141 h1{margin:.35rem 0 .3rem;font-size:clamp(1.8rem,4vw,2.55rem);line-height:1;font-weight:950;letter-spacing:-.05em}.rc-media-hero-v141 p{margin:0;max-width:48rem;color:#cbd5e1;font-size:.84rem;line-height:1.55}.rc-media-hero-icon-v141{width:3.5rem;height:3.5rem;border:1px solid rgba(255,255,255,.13);border-radius:1rem;background:rgba(255,255,255,.09);display:grid;place-items:center}.rc-media-hero-icon-v141 svg{width:1.6rem;height:1.6rem;color:#ff7451}
+                .rc-media-tabs-v141{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;padding:.35rem;border:1px solid var(--rc-border);border-radius:.95rem;background:var(--rc-surface)}.rc-media-tab-v141{min-height:3rem;border:0;border-radius:.7rem;background:transparent;color:var(--rc-muted);font-size:.78rem;font-weight:850;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem}.rc-media-tab-v141.is-active{background:#111827;color:#fff;box-shadow:0 10px 22px rgba(15,23,42,.14)}.dark .rc-media-tab-v141.is-active{background:#fff;color:#111827}.rc-media-tab-count-v141{display:inline-grid;place-items:center;min-width:1.45rem;height:1.45rem;padding:0 .35rem;border-radius:999px;background:rgba(148,163,184,.15);font-size:.65rem}.rc-media-tab-v141.is-active .rc-media-tab-count-v141{background:rgba(255,255,255,.15)}.dark .rc-media-tab-v141.is-active .rc-media-tab-count-v141{background:rgba(17,24,39,.1)}
+                .rc-media-upload-v141{display:grid;grid-template-columns:3rem minmax(0,1fr) auto;align-items:center;gap:.8rem;border:1px dashed rgba(255,99,56,.45);border-radius:1rem;padding:1rem;background:linear-gradient(180deg,rgba(255,99,56,.055),transparent)}.rc-media-upload-v141.is-readonly{border-style:solid;border-color:var(--rc-border);background:var(--rc-soft)}.rc-media-upload-icon-v141{width:3rem;height:3rem;border-radius:.85rem;background:rgba(255,99,56,.12);color:#ff6338;display:grid;place-items:center}.rc-media-upload-icon-v141 svg{width:1.25rem;height:1.25rem}.rc-media-upload-v141 strong{display:block;color:var(--rc-text);font-size:.84rem}.rc-media-upload-v141 p{margin:.18rem 0 0;color:var(--rc-muted);font-size:.72rem;line-height:1.45}.rc-media-file-v141{position:relative}.rc-media-file-v141 input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+                .rc-media-gallery-v141{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.85rem}.rc-media-card-v141{position:relative;min-width:0;overflow:hidden;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);box-shadow:0 12px 28px rgba(15,23,42,.055)}.rc-media-thumb-v141{position:relative;display:block;width:100%;aspect-ratio:4/3;border:0;padding:0;background:var(--rc-soft);cursor:zoom-in;overflow:hidden}.rc-media-thumb-v141 img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .2s ease}.rc-media-card-v141:hover .rc-media-thumb-v141 img{transform:scale(1.025)}.rc-media-number-v141{position:absolute;left:.65rem;top:.65rem;min-width:1.75rem;height:1.75rem;padding:0 .45rem;border-radius:999px;background:rgba(17,24,39,.8);color:#fff;display:grid;place-items:center;font-size:.63rem;font-weight:900;backdrop-filter:blur(5px)}.rc-media-card-body-v141{padding:.72rem}.rc-media-name-v141{font-size:.7rem;font-weight:800;color:var(--rc-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rc-media-actions-v141{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-top:.55rem}.rc-media-action-v141{height:1.9rem;min-width:1.9rem;border:1px solid var(--rc-border);border-radius:.55rem;background:var(--rc-surface);color:var(--rc-muted);padding:0 .5rem;display:inline-flex;align-items:center;justify-content:center;gap:.25rem;font-size:.64rem;font-weight:800;cursor:pointer;text-decoration:none}.rc-media-action-v141:hover{color:#ff6338;border-color:rgba(255,99,56,.4);background:rgba(255,99,56,.05)}.rc-media-action-v141.is-danger:hover{color:#b42318;border-color:#fecaca;background:#fff5f5}.rc-media-action-v141[disabled]{opacity:.3;cursor:not-allowed}.rc-media-empty-v141{grid-column:1/-1;min-height:16rem;border:1px dashed var(--rc-border);border-radius:1rem;background:var(--rc-surface);display:grid;place-items:center;text-align:center;padding:2rem;color:var(--rc-muted)}.rc-media-empty-v141 strong{display:block;color:var(--rc-text);font-size:.9rem}.rc-media-empty-v141 span{display:block;margin-top:.3rem;font-size:.75rem}
+                .rc-media-preview-v141{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:1rem;background:rgba(3,7,18,.82);backdrop-filter:blur(7px)}.rc-media-preview-card-v141{position:relative;width:min(60rem,96vw);max-height:90vh;border-radius:1rem;background:#0b1220;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.5)}.rc-media-preview-card-v141 img{display:block;width:100%;max-height:86vh;object-fit:contain}.rc-media-preview-close-v141{position:absolute;right:.75rem;top:.75rem;z-index:2;width:2.25rem;height:2.25rem;border:1px solid rgba(255,255,255,.18);border-radius:.65rem;background:rgba(17,24,39,.78);color:#fff;display:grid;place-items:center;cursor:pointer}.rc-media-replace-v141{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:1rem;background:rgba(15,23,42,.5);backdrop-filter:blur(4px)}.rc-media-replace-card-v141{width:min(28rem,96vw);border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);padding:1rem;box-shadow:0 25px 75px rgba(15,23,42,.25)}.rc-media-replace-card-v141 h3{margin:0;color:var(--rc-text);font-size:1rem}.rc-media-replace-card-v141 p{color:var(--rc-muted);font-size:.75rem}.rc-media-replace-card-v141 input[type=file]{width:100%;padding:.75rem;border:1px dashed var(--rc-border);border-radius:.75rem;background:var(--rc-soft);color:var(--rc-text)}
+                @media(max-width:1180px){.rc-media-gallery-v141{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:820px){.rc-media-gallery-v141{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-media-upload-v141{grid-template-columns:2.7rem minmax(0,1fr)}.rc-media-upload-v141>.rc-media-file-v141,.rc-media-upload-v141>button{grid-column:1/-1;width:100%}}@media(max-width:520px){.rc-media-gallery-v141{gap:.55rem}.rc-media-card-body-v141{padding:.55rem}.rc-media-action-v141 span{display:none}.rc-media-hero-v141{padding:1.1rem}.rc-media-hero-icon-v141{display:none}}
             </style>
 
             @include('filament.partials.coach-database-header', [
@@ -11271,80 +11256,118 @@ CSS;
                 'showNewEmail' => false,
             ])
 
-            <div class="rc-photos-v102" x-data="{tab:'player'}">
-                <div class="rc-photos-head-v102">
-                    <div>
-                        <h1>My Photos</h1>
-                        <p>Keep your player photos and PLYRCARD-ready images together in one clean gallery.</p>
-                    </div>
-                    <span class="rc-photos-mark-v102" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 16 3.2-3.5 2.6 2.5 2.3-2.6L18 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="8.5" r="1.4" fill="currentColor"/></svg></span>
-                </div>
-
-                <div class="rc-photos-tabs-v102" role="tablist" aria-label="Photo categories">
-                    <button type="button" class="rc-photos-tab-v102" :class="tab==='player' && 'is-active'" x-on:click="tab='player'">Player Photos <span class="rc-photos-count-v102">{{ $playerGallery->count() }}</span></button>
-                    <button type="button" class="rc-photos-tab-v102" :class="tab==='plyrcard' && 'is-active'" x-on:click="tab='plyrcard'">PLYRCARD Photos <span class="rc-photos-count-v102">{{ $plyrcardGallery->count() }}</span></button>
-                </div>
-
-                <div x-show="tab==='player'" style="display:grid;gap:1rem">
-                    <div class="rc-photos-upload-v102">
-                        <div class="rc-photos-upload-copy-v102"><strong>Add Player Photos</strong><span>Upload images you want available in your player gallery.</span></div>
-                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
-                            <div class="rc-photos-file-v102 rc-btn"><span>Choose Photos</span><input type="file" accept="image/*" multiple wire:model="playerPhotoUploads"></div>
-                            @if(! empty($playerPhotoUploads))
-                                <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlayerPhotos" wire:loading.attr="disabled" wire:target="uploadPlayerPhotos,playerPhotoUploads"><span wire:loading.remove wire:target="uploadPlayerPhotos">Upload</span><span wire:loading.flex wire:target="uploadPlayerPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
-                            @endif
+            <div class="rc-media-page-v141" x-data="{tab:'player',previewOpen:false,previewUrl:'',previewName:''}">
+                <section class="rc-media-hero-v141">
+                    <div class="rc-media-hero-top-v141">
+                        <div>
+                            <span class="rc-media-eyebrow-v141">Media Locker</span>
+                            <h1>My Photos</h1>
+                            <p>A sporty, organized home for the images behind your PLYRCARD. Manage your own uploads and keep PLYRCARD-produced assets together in a separate gallery.</p>
                         </div>
+                        <span class="rc-media-hero-icon-v141"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4zM7 15l3-3 2 2 2-2 3 3M8.5 9.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
                     </div>
-                    <div class="rc-photos-grid-v102">
+                </section>
+
+                <div class="rc-media-tabs-v141" role="tablist" aria-label="My Photos categories">
+                    <button type="button" class="rc-media-tab-v141" :class="tab==='player' && 'is-active'" x-on:click="tab='player'"><span>Player Uploaded Images</span><span class="rc-media-tab-count-v141">{{ $playerGallery->count() }}</span></button>
+                    <button type="button" class="rc-media-tab-v141" :class="tab==='plyrcard' && 'is-active'" x-on:click="tab='plyrcard'"><span>Plyrcard Images</span><span class="rc-media-tab-count-v141">{{ $plyrcardGallery->count() }}</span></button>
+                </div>
+
+                <div x-show="tab==='player'" x-cloak style="display:grid;gap:1rem">
+                    <div class="rc-media-upload-v141">
+                        <span class="rc-media-upload-icon-v141"><svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                        <div><strong>Upload Player Photos</strong><p>Your existing <code>raw_player_images</code> gallery. Up to {{ $playerPhotoMax }} images, 5 MB each.</p></div>
+                        <div class="rc-media-file-v141 rc-btn"><span>Choose Images</span><input type="file" accept="image/*" multiple wire:model="playerPhotoUploads"></div>
+                        @if(! empty($playerPhotoUploads))
+                            <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlayerPhotos" wire:loading.attr="disabled" wire:target="uploadPlayerPhotos,playerPhotoUploads"><span wire:loading.remove wire:target="uploadPlayerPhotos">Upload {{ count($playerPhotoUploads) }} Image{{ count($playerPhotoUploads) === 1 ? '' : 's' }}</span><span wire:loading.flex wire:target="uploadPlayerPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
+                        @endif
+                    </div>
+
+                    <div class="rc-media-gallery-v141">
                         @forelse($playerGallery as $photo)
-                            @php $photoIndex = (int) ($photo['index'] ?? $loop->index); @endphp
-                            <article class="rc-photo-card-v102" wire:key="player-photo-{{ md5((string) ($photo['path'] ?? $photoIndex)) }}">
-                                <img src="{{ $photo['url'] ?? '' }}" alt="Player photo" loading="lazy">
-                                <div class="rc-photo-overlay-v102">
-                                    <a class="rc-photo-action-v102" href="{{ $photo['url'] ?? '#' }}" target="_blank" rel="noopener" download aria-label="Download photo" title="Download"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-                                    <button type="button" class="rc-photo-action-v102 is-delete" wire:click="deleteMediaPhoto('player','player',{{ $photoIndex }})" wire:confirm="Delete this photo?" aria-label="Delete photo" title="Delete"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                            @php
+                                $photoIndex = (int) ($photo['index'] ?? $loop->index);
+                            @endphp
+                            <article class="rc-media-card-v141" wire:key="player-media-{{ md5((string) ($photo['path'] ?? $photoIndex)) }}">
+                                <button type="button" class="rc-media-thumb-v141" x-on:click="previewUrl=@js((string) ($photo['url'] ?? ''));previewName=@js((string) ($photo['name'] ?? 'Player photo'));previewOpen=true">
+                                    <img src="{{ $photo['url'] ?? '' }}" alt="{{ $photo['name'] ?? 'Player photo' }}" loading="lazy"><span class="rc-media-number-v141">{{ $photoIndex + 1 }}</span>
+                                </button>
+                                <div class="rc-media-card-body-v141">
+                                    <div class="rc-media-name-v141" title="{{ $photo['name'] ?? '' }}">{{ $photo['name'] ?? 'Player photo' }}</div>
+                                    <div class="rc-media-actions-v141">
+                                        <a class="rc-media-action-v141" href="{{ $photo['url'] ?? '#' }}" target="_blank" rel="noopener" download><span>Download</span>↓</a>
+                                        <button type="button" class="rc-media-action-v141" wire:click="openPhotoReplace('player', {{ $photoIndex }})"><span>Replace</span>↻</button>
+                                        <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('player', {{ $photoIndex }}, -1)" @disabled($photoIndex === 0)>←</button>
+                                        <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('player', {{ $photoIndex }}, 1)" @disabled($photoIndex >= $playerGallery->count() - 1)>→</button>
+                                        <button type="button" class="rc-media-action-v141 is-danger" wire:click="deleteGalleryPhoto('player', {{ $photoIndex }})" wire:confirm="Delete this player photo?">×</button>
+                                    </div>
                                 </div>
                             </article>
                         @empty
-                            <div class="rc-photos-empty-v102"><div><strong>No player photos yet.</strong><span>Choose photos above to start your gallery.</span></div></div>
+                            <div class="rc-media-empty-v141"><div><strong>No player-uploaded images yet.</strong><span>Choose images above to start your gallery.</span></div></div>
                         @endforelse
                     </div>
                 </div>
 
                 <div x-show="tab==='plyrcard'" x-cloak style="display:grid;gap:1rem">
-                    @if($canManagePlyrcardGallery)
-                        <div class="rc-photos-upload-v102">
-                            <div class="rc-photos-upload-copy-v102"><strong>Additional Photos</strong><span>Add more images to the PLYRCARD gallery.</span></div>
-                            <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
-                                <div class="rc-photos-file-v102 rc-btn"><span>Choose Photos</span><input type="file" accept="image/*" multiple wire:model="plyrcardPhotoUploads"></div>
-                                @if(! empty($plyrcardPhotoUploads))
-                                    <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlyrcardPhotos" wire:loading.attr="disabled" wire:target="uploadPlyrcardPhotos,plyrcardPhotoUploads"><span wire:loading.remove wire:target="uploadPlyrcardPhotos">Upload</span><span wire:loading.flex wire:target="uploadPlyrcardPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
-                                @endif
-                            </div>
-                        </div>
-                    @endif
-                    <div class="rc-photos-grid-v102">
+                    <div class="rc-media-upload-v141 {{ $canManagePlyrcardGallery ? '' : 'is-readonly' }}">
+                        <span class="rc-media-upload-icon-v141"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2 5 13h6l-1 9 8-12h-6l1-8Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+                        <div><strong>{{ $canManagePlyrcardGallery ? 'Upload PLYRCARD Images' : 'PLYRCARD Team Gallery' }}</strong><p>{{ $canManagePlyrcardGallery ? "Superadmin gallery for polished/processed assets. Up to {$plyrcardPhotoMax} images, 5 MB each." : 'These images are visible to the player but managed only by a PLYRCARD Superadmin.' }}</p></div>
+                        @if($canManagePlyrcardGallery)
+                            <div class="rc-media-file-v141 rc-btn"><span>Choose Images</span><input type="file" accept="image/*" multiple wire:model="plyrcardPhotoUploads"></div>
+                            @if(! empty($plyrcardPhotoUploads))
+                                <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlyrcardPhotos" wire:loading.attr="disabled" wire:target="uploadPlyrcardPhotos,plyrcardPhotoUploads"><span wire:loading.remove wire:target="uploadPlyrcardPhotos">Upload {{ count($plyrcardPhotoUploads) }} Image{{ count($plyrcardPhotoUploads) === 1 ? '' : 's' }}</span><span wire:loading.flex wire:target="uploadPlyrcardPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
+                            @endif
+                        @endif
+                    </div>
+
+                    <div class="rc-media-gallery-v141">
                         @forelse($plyrcardGallery as $photo)
                             @php
-                                $photoIndex = (int) ($photo['index'] ?? 0);
-                                $photoSource = (string) ($photo['source'] ?? 'additional');
-                                $photoField = (string) ($photo['field'] ?? '');
+                                $photoIndex = (int) ($photo['index'] ?? $loop->index);
                             @endphp
-                            <article class="rc-photo-card-v102" wire:key="plyrcard-photo-{{ md5((string) (($photo['url'] ?? '') . '|' . $photoSource . '|' . $photoField . '|' . $photoIndex)) }}">
-                                <img src="{{ $photo['url'] ?? '' }}" alt="PLYRCARD photo" loading="lazy">
-                                <div class="rc-photo-overlay-v102">
-                                    <a class="rc-photo-action-v102" href="{{ $photo['url'] ?? '#' }}" target="_blank" rel="noopener" download aria-label="Download photo" title="Download"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-                                    @if($canManagePlyrcardGallery)
-                                        <button type="button" class="rc-photo-action-v102 is-delete" wire:click='deleteMediaPhoto("plyrcard", @js($photoSource), {{ $photoIndex }}, @js($photoField))' wire:confirm="Delete this photo?" aria-label="Delete photo" title="Delete"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4h6v3m-8 0 1 13h8l1-13M10 11v5m4-5v5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-                                    @endif
+                            <article class="rc-media-card-v141" wire:key="plyrcard-media-{{ md5((string) ($photo['path'] ?? $photoIndex)) }}">
+                                <button type="button" class="rc-media-thumb-v141" x-on:click="previewUrl=@js((string) ($photo['url'] ?? ''));previewName=@js((string) ($photo['name'] ?? 'PLYRCARD image'));previewOpen=true">
+                                    <img src="{{ $photo['url'] ?? '' }}" alt="{{ $photo['name'] ?? 'PLYRCARD image' }}" loading="lazy"><span class="rc-media-number-v141">{{ $photoIndex + 1 }}</span>
+                                </button>
+                                <div class="rc-media-card-body-v141">
+                                    <div class="rc-media-name-v141" title="{{ $photo['name'] ?? '' }}">{{ $photo['name'] ?? 'PLYRCARD image' }}</div>
+                                    <div class="rc-media-actions-v141">
+                                        <a class="rc-media-action-v141" href="{{ $photo['url'] ?? '#' }}" target="_blank" rel="noopener" download><span>Download</span>↓</a>
+                                        @if($canManagePlyrcardGallery)
+                                            <button type="button" class="rc-media-action-v141" wire:click="openPhotoReplace('plyrcard', {{ $photoIndex }})"><span>Replace</span>↻</button>
+                                            <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('plyrcard', {{ $photoIndex }}, -1)" @disabled($photoIndex === 0)>←</button>
+                                            <button type="button" class="rc-media-action-v141" wire:click="moveGalleryPhoto('plyrcard', {{ $photoIndex }}, 1)" @disabled($photoIndex >= $plyrcardGallery->count() - 1)>→</button>
+                                            <button type="button" class="rc-media-action-v141 is-danger" wire:click="deleteGalleryPhoto('plyrcard', {{ $photoIndex }})" wire:confirm="Delete this PLYRCARD image?">×</button>
+                                        @endif
+                                    </div>
                                 </div>
                             </article>
                         @empty
-                            <div class="rc-photos-empty-v102"><div><strong>No PLYRCARD photos yet.</strong><span>Photos prepared for your PLYRCARD will appear here.</span></div></div>
+                            <div class="rc-media-empty-v141"><div><strong>No PLYRCARD Images yet.</strong><span>{{ $canManagePlyrcardGallery ? 'Upload polished assets above.' : 'PLYRCARD team images will appear here once added.' }}</span></div></div>
                         @endforelse
                     </div>
                 </div>
+
+                <div class="rc-media-preview-v141" x-cloak x-show="previewOpen" x-on:click.self="previewOpen=false" x-on:keydown.escape.window="previewOpen=false">
+                    <div class="rc-media-preview-card-v141"><button type="button" class="rc-media-preview-close-v141" x-on:click="previewOpen=false" aria-label="Close preview">×</button><img x-bind:src="previewUrl" x-bind:alt="previewName"></div>
+                </div>
             </div>
+
+            @if($photoReplaceOpen)
+                <div class="rc-media-replace-v141" wire:key="media-replace-{{ $photoReplaceCategory }}-{{ $photoReplaceIndex }}">
+                    <div class="rc-media-replace-card-v141">
+                        <h3>Replace Photo</h3>
+                        <p>Select a new image. The gallery position will stay the same.</p>
+                        <input type="file" accept="image/*" wire:model="photoReplacementUpload">
+                        @error('photoReplacementUpload')<div style="color:#b42318;font-size:.72rem;margin-top:.4rem">{{ $message }}</div>@enderror
+                        <div class="rc-toolbar" style="justify-content:flex-end;margin-top:1rem">
+                            <button type="button" class="rc-btn" wire:click="closePhotoReplace">Cancel</button>
+                            <button type="button" class="rc-btn rc-btn-primary" wire:click="replaceGalleryPhoto" wire:loading.attr="disabled" wire:target="replaceGalleryPhoto,photoReplacementUpload"><span wire:loading.remove wire:target="replaceGalleryPhoto">Replace Photo</span><span wire:loading.flex wire:target="replaceGalleryPhoto" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Replacing</span></button>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
 
         @if($section === 'support')
@@ -15219,62 +15242,6 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
     const currentRoot = () => document.querySelector('.rc-livewire-root');
     const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule']);
     const isFreePlan = () => currentRoot()?.dataset?.rcFreePlan === '1';
-    const fastSectionLabels = {
-        dashboard: 'Dashboard', schools: 'Discover Schools', coaches: 'Coach Database',
-        favorites: 'Favorites', lists: 'My Lists', conversations: 'Inbox', campaigns: 'Templates',
-        compose: 'Compose Email', photos: 'My Photos', support: 'Support', schedule: 'My Schedule',
-        settings: 'Settings',
-    };
-    let fastTransitionTimer = null;
-
-    const ensureFastTransition = () => {
-        let overlay = document.querySelector('[data-rc-fast-transition]');
-        if (overlay) return overlay;
-        overlay = document.createElement('div');
-        overlay.className = 'rc-fast-transition-v103';
-        overlay.setAttribute('data-rc-fast-transition', '');
-        overlay.hidden = true;
-        overlay.innerHTML = `
-            <div class="rc-fast-transition-head-v103">
-                <span class="rc-fast-transition-spinner-v103"></span>
-                <strong data-rc-fast-transition-label>Opening...</strong>
-            </div>
-            <div class="rc-fast-transition-grid-v103">
-                <span></span><span></span><span></span>
-            </div>`;
-        document.body.appendChild(overlay);
-        return overlay;
-    };
-
-    const positionFastTransition = (overlay) => {
-        const root = currentRoot();
-        if (!overlay || !root) return;
-        const rect = root.getBoundingClientRect();
-        overlay.style.left = `${Math.max(0, rect.left)}px`;
-        overlay.style.top = `${Math.max(0, rect.top)}px`;
-        overlay.style.width = `${Math.max(0, rect.width)}px`;
-        overlay.style.height = `${Math.max(160, window.innerHeight - Math.max(0, rect.top))}px`;
-    };
-
-    const showFastTransition = (section) => {
-        const overlay = ensureFastTransition();
-        positionFastTransition(overlay);
-        const label = overlay.querySelector('[data-rc-fast-transition-label]');
-        if (label) label.textContent = fastSectionLabels[section] || 'Recruiting Center';
-        overlay.hidden = false;
-        overlay.classList.add('is-visible');
-        clearTimeout(fastTransitionTimer);
-        fastTransitionTimer = setTimeout(() => hideFastTransition(), 8000);
-    };
-
-    const hideFastTransition = () => {
-        const overlay = document.querySelector('[data-rc-fast-transition]');
-        if (!overlay) return;
-        overlay.classList.remove('is-visible');
-        overlay.hidden = true;
-        clearTimeout(fastTransitionTimer);
-        fastTransitionTimer = null;
-    };
 
     const openFreePlanGate = (section) => {
         if (!isFreePlan() || !freePlanLockedSections.has(section)) return false;
@@ -15296,11 +15263,7 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         const root = currentRoot();
         if (!root || !section) return false;
 
-        const alreadyActive = root.dataset.rcCurrentSection === section;
-
-        // v10.103: navigation reacts before any Livewire work. Update the sidebar,
-        // URL and an optimistic content shell synchronously, then let the browser
-        // paint that state before the server section render starts.
+        // Update navigation feedback before the Livewire request even starts.
         root.dataset.rcCurrentSection = section;
         setSidebarActive(section);
 
@@ -15310,17 +15273,7 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
             window.history[historyFn]({ ...(window.history.state || {}), rcSection: section }, '', target.pathname + target.search + target.hash);
         }
 
-        if (alreadyActive) {
-            hideFastTransition();
-            return true;
-        }
-
-        showFastTransition(section);
-        window.requestAnimationFrame(() => {
-            window.requestAnimationFrame(() => {
-                window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
-            });
-        });
+        window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
         return true;
     };
 
@@ -15354,7 +15307,6 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         if (window.Livewire?.on) {
             Livewire.on('rc-section-switched', ({ section } = {}) => {
                 if (section) setSidebarActive(section);
-                hideFastTransition();
             });
             Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
                 if (section === 'conversations') {
@@ -15363,12 +15315,6 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
             });
         }
     }, { once: true });
-
-    window.addEventListener('resize', () => {
-        const overlay = document.querySelector('[data-rc-fast-transition].is-visible');
-        if (overlay) positionFastTransition(overlay);
-    }, { passive: true });
-    document.addEventListener('livewire:navigated', hideFastTransition);
 
     const initial = pathToSection(window.location.pathname);
     if (initial) setSidebarActive(initial);
@@ -15383,61 +15329,6 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
 }
 .fi-sidebar a.rc-fast-active svg {
     color: #ff6338 !important;
-}
-
-/* v10.103: optimistic Recruiting Center transition. It appears immediately on
-   navigation so large local school catalogs never make the sidebar feel stuck. */
-.rc-fast-transition-v103[hidden] { display: none !important; }
-.rc-fast-transition-v103 {
-    position: fixed;
-    z-index: 55;
-    box-sizing: border-box;
-    padding: 1.1rem 1.25rem;
-    overflow: hidden;
-    pointer-events: auto;
-    background: color-mix(in srgb, var(--rc-surface, #fff) 94%, transparent);
-    backdrop-filter: blur(4px);
-    opacity: 0;
-    transition: opacity .1s ease;
-}
-.rc-fast-transition-v103.is-visible { opacity: 1; }
-.rc-fast-transition-head-v103 {
-    display: flex;
-    align-items: center;
-    gap: .65rem;
-    min-height: 2.5rem;
-    color: var(--rc-text, #111827);
-    font-size: .92rem;
-}
-.rc-fast-transition-spinner-v103 {
-    width: 1rem;
-    height: 1rem;
-    flex: 0 0 auto;
-    border: 2px solid rgba(255, 99, 56, .22);
-    border-top-color: #ff6338;
-    border-radius: 999px;
-    animation: rc-fast-spin-v103 .62s linear infinite;
-}
-.rc-fast-transition-grid-v103 {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .85rem;
-    margin-top: .85rem;
-}
-.rc-fast-transition-grid-v103 span {
-    display: block;
-    min-height: 7rem;
-    border: 1px solid var(--rc-border, #e5e7eb);
-    border-radius: 1rem;
-    background: linear-gradient(100deg, var(--rc-soft, #f9fafb) 18%, color-mix(in srgb, var(--rc-surface, #fff) 55%, #e5e7eb) 38%, var(--rc-soft, #f9fafb) 58%);
-    background-size: 220% 100%;
-    animation: rc-fast-shimmer-v103 1.05s ease-in-out infinite;
-}
-@keyframes rc-fast-spin-v103 { to { transform: rotate(360deg); } }
-@keyframes rc-fast-shimmer-v103 { to { background-position-x: -220%; } }
-@media (max-width: 800px) {
-    .rc-fast-transition-grid-v103 { grid-template-columns: 1fr; }
-    .rc-fast-transition-grid-v103 span { min-height: 5rem; }
 }
 </style>
 
@@ -15600,4 +15491,3 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
     }
 </style>
 </x-filament-panels::page>
-</div>
