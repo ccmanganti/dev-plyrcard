@@ -383,24 +383,44 @@ class LockerRoomDataService
         $xClicks = (int) ($engagement['platform_counts']['x'] ?? 0);
         $socialClicks = (int) ($engagement['total'] ?? ($instagramClicks + $youtubeClicks + $xClicks));
 
-        $profileUniqueContacts = $number(
-            $tracking['profile_view_unique_contact_count'] ?? 0,
-            $tracking['unique_profile_view_contacts'] ?? 0,
-            $tracking['unique_profile_views'] ?? 0,
-            $tracking['unique_profile_view_count'] ?? 0,
-            $remoteStats['profile_view_unique_contact_count'] ?? 0,
-            $remoteStats['unique_profile_view_contacts'] ?? 0,
-            $remoteStats['unique_profile_views'] ?? 0,
-            $remoteStats['unique_profile_view_count'] ?? 0
-        );
-        $profileUniqueSchools = $number(
-            $tracking['profile_view_unique_school_count'] ?? 0,
-            $tracking['schools_with_profile_views'] ?? 0,
-            $tracking['schools_with_clicks'] ?? 0,
-            $remoteStats['profile_view_unique_school_count'] ?? 0,
-            $remoteStats['schools_with_profile_views'] ?? 0,
-            $remoteStats['schools_with_clicks'] ?? 0
-        );
+        // v10.103: mirror the Admin Dashboard's exact profile-row source. When
+        // attributed LocalRecruitingTrackingService rows exist, their coach/school
+        // identities are authoritative for the unique-contact and school counts.
+        // This keeps Locker Room and Admin from presenting different drill-down data.
+        $profileRows = [];
+        try {
+            $profileRows = app(LocalRecruitingTrackingService::class)->profileViewRows($user);
+        } catch (\Throwable) {
+            $profileRows = [];
+        }
+        $profileRows = collect(is_array($profileRows) ? $profileRows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+
+        $profileUniqueContacts = $profileRows->isNotEmpty()
+            ? $profileRows->pluck('coach_id')->filter()->unique()->count()
+            : $number(
+                $tracking['profile_view_unique_contact_count'] ?? 0,
+                $tracking['unique_profile_view_contacts'] ?? 0,
+                $tracking['unique_profile_views'] ?? 0,
+                $tracking['unique_profile_view_count'] ?? 0,
+                $remoteStats['profile_view_unique_contact_count'] ?? 0,
+                $remoteStats['unique_profile_view_contacts'] ?? 0,
+                $remoteStats['unique_profile_views'] ?? 0,
+                $remoteStats['unique_profile_view_count'] ?? 0
+            );
+        $profileUniqueSchools = $profileRows->isNotEmpty()
+            ? $profileRows->map(function (array $row): string {
+                return trim((string) ($row['school_key'] ?? $row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? $row['school'] ?? ''));
+            })->filter()->unique()->count()
+            : $number(
+                $tracking['profile_view_unique_school_count'] ?? 0,
+                $tracking['schools_with_profile_views'] ?? 0,
+                $tracking['schools_with_clicks'] ?? 0,
+                $remoteStats['profile_view_unique_school_count'] ?? 0,
+                $remoteStats['schools_with_profile_views'] ?? 0,
+                $remoteStats['schools_with_clicks'] ?? 0
+            );
 
         // Match the Coach Database dashboard's Favorites card.
         // This is a local PLYRCARD relationship, so no external request is needed.
@@ -460,6 +480,113 @@ class LockerRoomDataService
                 'coach_replies' => $number($tracking['coach_replies'] ?? 0, $remoteStats['coach_replies'] ?? 0),
             ],
             'next_schedule' => $upcoming ? $this->scheduleRow($upcoming, $user) : null,
+        ];
+    }
+
+    /**
+     * v10.103: Build Locker Room Profile Views directly from the same
+     * LocalRecruitingTrackingService::profileViewRows() collection used by Admin.
+     * Cached activity remains a fallback only when canonical local rows are absent.
+     */
+    protected function localProfileViewSnapshot(User $user): array
+    {
+        $rawRows = [];
+
+        try {
+            $rawRows = app(LocalRecruitingTrackingService::class)->profileViewRows($user);
+        } catch (\Throwable) {
+            $rawRows = [];
+        }
+
+        $rows = collect(is_array($rawRows) ? $rawRows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->values();
+
+        if ($rows->isEmpty()) {
+            return [
+                'rows' => [],
+                'identified_count' => 0,
+                'schools_reached' => 0,
+                'attributed_total' => 0,
+                'authoritative_rows' => false,
+            ];
+        }
+
+        $schoolCache = [];
+        $formatted = $rows->map(function (array $row) use (&$schoolCache): array {
+            $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
+            $coachEmail = trim((string) ($row['coach_email'] ?? $row['email'] ?? ''));
+            $coachName = trim((string) ($row['coach_name'] ?? $row['title'] ?? $row['name'] ?? 'Known coach contact')) ?: 'Known coach contact';
+            $schoolRef = trim((string) ($row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? $row['school_key'] ?? ''));
+            $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? ''));
+            $cacheKey = strtolower($schoolRef !== '' ? $schoolRef : ('school:' . $schoolName));
+            $school = null;
+
+            if ($cacheKey !== '' && array_key_exists($cacheKey, $schoolCache)) {
+                $school = $schoolCache[$cacheKey];
+            } elseif ($schoolRef !== '' || $schoolName !== '') {
+                $school = $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName);
+                if ($cacheKey !== '') $schoolCache[$cacheKey] = $school;
+            }
+
+            if (! $school && $contactId !== '') {
+                $coachKey = 'coach:' . $contactId;
+                if (array_key_exists($coachKey, $schoolCache)) {
+                    $school = $schoolCache[$coachKey];
+                } else {
+                    $school = $this->resolveSchoolFromCoachReference($coachKey);
+                    $schoolCache[$coachKey] = $school;
+                }
+            }
+            if (! $school && $coachEmail !== '') {
+                $coachKey = 'coach-email:' . strtolower($coachEmail);
+                if (array_key_exists($coachKey, $schoolCache)) {
+                    $school = $schoolCache[$coachKey];
+                } else {
+                    $school = $this->resolveSchoolFromCoachReference($coachKey);
+                    $schoolCache[$coachKey] = $school;
+                }
+            }
+
+            $schoolPayload = $school ? $this->schoolPayload($school) : [
+                'id' => null,
+                'reference' => $schoolRef !== '' ? $schoolRef : ($schoolName !== '' ? 'school:' . $schoolName : null),
+                'name' => $schoolName,
+                'logo_url' => $row['logo'] ?? $row['school_logo_url'] ?? $row['business_logo_url'] ?? null,
+                'conference' => null,
+                'division' => null,
+                'city' => null,
+                'state' => null,
+            ];
+
+            $views = max(1, (int) ($row['views'] ?? $row['count'] ?? 1));
+            $time = $row['time'] ?? $row['last_at'] ?? $row['occurred_at'] ?? $row['created_at'] ?? null;
+
+            return [
+                'identity_key' => $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $coachName . '|' . $coachEmail),
+                'contact_id' => $contactId ?: null,
+                'coach_name' => $coachName,
+                'coach_email' => $coachEmail !== '' ? $coachEmail : null,
+                'coach_title' => $row['coach_title'] ?? null,
+                'school' => $schoolPayload,
+                'school_open_reference' => $schoolPayload['reference'] ?? ($contactId !== '' ? 'coach:' . $contactId : ($coachEmail !== '' ? 'coach-email:' . $coachEmail : null)),
+                'count' => $views,
+                'views' => $views,
+                'platform_counts' => [],
+                'last_at' => $time,
+                'last_at_label' => $row['time_label'] ?? $this->activityTimeLabel($time),
+                'last_subject' => null,
+            ];
+        })->sortByDesc(fn (array $row): int => (int) ($row['count'] ?? 0))->take(100)->values();
+
+        return [
+            'rows' => $formatted->all(),
+            'identified_count' => $rows->pluck('coach_id')->filter()->unique()->count(),
+            'schools_reached' => $rows->map(function (array $row): string {
+                return trim((string) ($row['school_key'] ?? $row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? $row['school'] ?? ''));
+            })->filter()->unique()->count(),
+            'attributed_total' => (int) $rows->sum(fn (array $row): int => max(1, (int) ($row['views'] ?? $row['count'] ?? 1))),
+            'authoritative_rows' => true,
         ];
     }
 
@@ -729,6 +856,22 @@ class LockerRoomDataService
         }
 
         if ($metric === 'profile_views') {
+            // v10.103: canonical local rows win, exactly as they do in the Admin
+            // Profile Views drawer. This fixes stale cached per-coach counts in Locker Room.
+            $profile = $this->localProfileViewSnapshot($user);
+            if (! empty($profile['rows']) || (bool) ($profile['authoritative_rows'] ?? false)) {
+                return [
+                    'metric' => $metric,
+                    'label' => $definitions[$metric]['label'],
+                    'icon' => $definitions[$metric]['icon'],
+                    'total' => $total,
+                    'identified_count' => (int) data_get($dashboard, 'stats.profile_unique_contacts', $profile['identified_count'] ?? count($profile['rows'] ?? [])),
+                    'schools_reached' => (int) data_get($dashboard, 'stats.profile_unique_schools', $profile['schools_reached'] ?? 0),
+                    'rows' => $profile['rows'] ?? [],
+                    'note' => 'Direct or anonymous visits are included in the total but are not shown as identified coaches.',
+                ];
+            }
+
             $cachedRows = $this->cachedProfileViewRows($user);
             if ($cachedRows !== []) {
                 return [

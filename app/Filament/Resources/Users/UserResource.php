@@ -12,6 +12,7 @@ use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
 use App\Models\User;
+use App\Services\WebsitePublishedEmailService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -2239,9 +2240,23 @@ class UserResource extends Resource
                     $website = $record->websites()->first();
 
                     if ($website) {
+                        $wasPublished = (bool) $website->is_published;
+                        $shouldPublish = (bool) ($data['website_is_published'] ?? false);
+
                         $website->update([
-                            'is_published' => (bool) ($data['website_is_published'] ?? false),
+                            'is_published' => $shouldPublish,
                         ]);
+
+                        // v10.103: mirror WebsiteResource exactly. Publishing from
+                        // Edit Access must trigger the same one-time site-live email.
+                        // Re-saving an already published website does not resend it.
+                        if ($shouldPublish && ! $wasPublished) {
+                            try {
+                                app(WebsitePublishedEmailService::class)->send($record, $website);
+                            } catch (\Throwable $exception) {
+                                report($exception);
+                            }
+                        }
                     }
                 })
                 ->successNotificationTitle('User access updated.'),

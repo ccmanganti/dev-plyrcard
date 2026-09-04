@@ -155,38 +155,57 @@
     .lr-stat-open { margin-left:auto; color:#98a2b3; font-size:10px; }
     .lr-dashboard-detail { position:absolute; inset:76px 0 0; z-index:18; display:none; grid-template-rows:auto 1fr; background:#f7f8fa; border-top:1px solid #e5e7eb; }
     .lr-dashboard-detail.is-open { display:grid; }
-    .lr-dashboard-detail-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; background:#fff; border-bottom:1px solid #e5e7eb; }
+    .lr-dashboard-detail-head { display:flex; align-items:center; gap:12px; padding:14px 18px; background:#fff; border-bottom:1px solid #e5e7eb; }
     .lr-dashboard-detail-head-main { min-width:0; display:flex; align-items:center; gap:10px; }
     .lr-dashboard-detail-head h3 { margin:0; color:#111827; font-size:15px; font-weight:850; }
     .lr-dashboard-detail-head p { margin:3px 0 0; color:#667085; font-size:11px; }
     .lr-dashboard-detail-body { overflow:auto; padding:16px 18px 26px; }
-    .lr-activity-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px 14px; margin-bottom:11px; }
-    .lr-activity-summary strong { font-size:20px; color:#111827; }
+    .lr-activity-summary { display:flex; align-items:center; justify-content:space-between; gap:12px; border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:14px 16px; margin-bottom:12px; }
+    .lr-activity-summary strong { font-size:22px; color:#111827; }
     .lr-activity-summary span { color:#667085; font-size:11px; }
     .lr-detail-kpis { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
-    .lr-detail-kpi { border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:13px; min-width:0; }
-    .lr-detail-kpi small { display:block; color:#667085; font-size:10px; font-weight:700; }
-    .lr-detail-kpi strong { display:block; margin-top:4px; color:#111827; font-size:23px; line-height:1; letter-spacing:-.04em; }
-    .lr-detail-kpi em { display:block; margin-top:5px; color:#98a2b3; font-size:9px; font-style:normal; line-height:1.3; }
+    .lr-detail-kpi { position:relative; overflow:hidden; border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:15px; min-width:0; box-shadow:0 7px 22px rgba(15,23,42,.035); }
+    .lr-detail-kpi::before { content:''; position:absolute; inset:0 auto 0 0; width:3px; background:#ff6338; opacity:.78; }
+    .lr-detail-kpi.is-secondary::before { background:#667085; }
+    .lr-detail-kpi.is-tertiary::before { background:#2563eb; }
+    .lr-detail-kpi small { display:block; color:#667085; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.045em; }
+    .lr-detail-kpi strong { display:block; margin-top:6px; color:#111827; font-size:27px; line-height:1; letter-spacing:-.045em; }
+    .lr-detail-kpi em { display:block; margin-top:7px; color:#98a2b3; font-size:9px; font-style:normal; line-height:1.35; }
     .lr-engagement-filters { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:12px; }
-    .lr-engagement-filter { border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px; text-align:center; cursor:pointer; transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease; }
-    .lr-engagement-filter:hover { transform:translateY(-1px); border-color:#ffc3b1; }
+    .lr-engagement-filter { min-height:102px; border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:13px; text-align:left; cursor:pointer; transition:border-color .12s ease,box-shadow .12s ease,transform .12s ease; display:grid; grid-template-columns:38px minmax(0,1fr); align-items:center; gap:10px; }
+    .lr-engagement-filter:hover { transform:translateY(-1px); border-color:#ffc3b1; box-shadow:0 9px 22px rgba(15,23,42,.05); }
     .lr-engagement-filter.is-active { border-color:#ff6338; box-shadow:0 0 0 2px rgba(255,99,56,.1); }
-    .lr-engagement-filter span { display:block; color:#667085; font-size:10px; font-weight:750; }
-    .lr-engagement-filter strong { display:block; margin-top:5px; color:#111827; font-size:24px; line-height:1; }
+    .lr-engagement-filter .lr-engagement-filter-copy { min-width:0; }
+    .lr-engagement-filter .lr-engagement-filter-copy span { display:block; color:#667085; font-size:10px; font-weight:800; }
+    .lr-engagement-filter strong { display:block; margin-top:5px; color:#111827; font-size:25px; line-height:1; }
+    .lr-platform-filter-icon { width:38px!important; height:38px!important; border-radius:11px!important; display:grid!important; place-items:center!important; font-size:17px!important; color:#fff!important; }
+    .lr-platform-filter-icon.is-instagram { background:radial-gradient(circle at 30% 107%,#fdf497 0 5%,#fdf497 5% 9%,#fd5949 45%,#d6249f 60%,#285AEB 90%)!important; }
+    .lr-platform-filter-icon.is-youtube { background:#ff0000!important; }
+    .lr-platform-filter-icon.is-x { background:#0b0b0b!important; }
     .lr-skeleton { position:relative; overflow:hidden; background:#edf0f4!important; color:transparent!important; border-color:#edf0f4!important; }
     .lr-skeleton::after { content:''; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,rgba(255,255,255,.72),transparent); animation:lrShimmer 1s infinite; }
     @keyframes lrShimmer { to { transform:translateX(100%); } }
     .lr-activity-list { display:grid; gap:9px; }
-    .lr-activity-row { width:100%; border:1px solid #e5e7eb; background:#fff; border-radius:14px; padding:12px; display:grid; grid-template-columns:38px minmax(0,1fr) auto; gap:10px; align-items:center; text-align:left; color:#111827; }
+    .lr-activity-row { width:100%; border:1px solid #e5e7eb; background:#fff; border-radius:16px; padding:12px 13px; display:grid; grid-template-columns:48px minmax(0,1fr) 74px; gap:12px; align-items:center; text-align:left; color:#111827; }
     .lr-activity-row.is-clickable, button.lr-activity-row { cursor:pointer; transition:border-color .14s ease, transform .14s ease, box-shadow .14s ease; }
-    .lr-activity-row.is-clickable:hover, button.lr-activity-row:hover { border-color:#ffc3b1; transform:translateY(-1px); box-shadow:0 8px 18px rgba(15,23,42,.055); }
-    .lr-activity-avatar { width:38px; height:38px; border-radius:11px; background:#fff1ec; color:#ff5c35; display:grid; place-items:center; font-size:12px; font-weight:900; }
+    .lr-activity-row.is-clickable:hover, button.lr-activity-row:hover { border-color:#ffc3b1; transform:translateY(-1px); box-shadow:0 9px 22px rgba(15,23,42,.06); }
+    .lr-activity-school-logo { width:48px; height:48px; border-radius:13px; border:1px solid #e5e7eb; background:#fff; display:grid; place-items:center; overflow:hidden; flex:0 0 auto; }
+    .lr-activity-school-logo img { width:100%; height:100%; object-fit:contain; padding:5px; }
+    .lr-activity-school-fallback { width:100%; height:100%; display:grid; place-items:center; background:#fff1ec; color:#ff5c35; font-size:11px; font-weight:900; }
     .lr-activity-copy { min-width:0; }
-    .lr-activity-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
-    .lr-activity-copy small { display:block; margin-top:3px; color:#667085; font-size:10px; line-height:1.35; }
-    .lr-school-link { border:0; background:#f8fafc; color:#344054; border-radius:9px; padding:7px 9px; font-size:10px; font-weight:800; cursor:pointer; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .lr-school-link:hover { background:#fff1ec; color:#e94c28; }
+    .lr-activity-copy strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:#101828; }
+    .lr-activity-copy small { display:block; margin-top:4px; color:#667085; font-size:10px; line-height:1.45; }
+    .lr-activity-school-name { color:#344054; font-weight:750; }
+    .lr-activity-meta { color:#98a2b3; }
+    .lr-activity-count { min-width:68px; min-height:58px; border-radius:13px; background:#fff3ee; color:#f0522b; display:grid; align-content:center; justify-items:center; padding:6px 8px; line-height:1; }
+    .lr-activity-count strong { font-size:23px; font-weight:900; letter-spacing:-.04em; }
+    .lr-activity-count span { margin-top:4px; font-size:8px; font-weight:850; text-transform:uppercase; letter-spacing:.05em; }
+    .lr-platform-stack { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+    .lr-platform-pill { display:inline-flex!important; align-items:center!important; gap:5px!important; padding:3px 7px 3px 4px!important; border-radius:999px!important; background:#f8fafc!important; border:1px solid #edf0f3!important; color:#667085!important; font-size:9px!important; font-weight:800!important; }
+    .lr-platform-pill .lr-platform-mark { width:18px; height:18px; border-radius:6px; display:grid; place-items:center; color:#fff; font-size:9px; }
+    .lr-platform-pill.is-instagram .lr-platform-mark { background:radial-gradient(circle at 30% 107%,#fdf497 0 5%,#fdf497 5% 9%,#fd5949 45%,#d6249f 60%,#285AEB 90%); }
+    .lr-platform-pill.is-youtube .lr-platform-mark { background:#ff0000; }
+    .lr-platform-pill.is-x .lr-platform-mark { background:#0b0b0b; }
     .lr-school-hero { display:grid; grid-template-columns:54px minmax(0,1fr); gap:12px; align-items:center; border:1px solid #e5e7eb; background:#fff; border-radius:15px; padding:14px; }
     .lr-school-logo { width:54px; height:54px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; object-fit:contain; padding:5px; }
     .lr-school-logo-fallback { width:54px; height:54px; border-radius:12px; background:#fff1ec; color:#ff5c35; display:grid; place-items:center; font-weight:900; }
@@ -615,10 +634,10 @@
     .lr-activity-list{gap:8px}.lr-activity-row{border-radius:13px;padding:10px;box-shadow:none}.lr-activity-avatar{width:36px;height:36px}.lr-dashboard-detail-head{position:sticky;top:0;z-index:2}
     .lr-inline-success-v59{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border:1px solid #a7f3d0;border-radius:12px;background:#ecfdf5;color:#065f46;font-size:11px;line-height:1.5}.lr-inline-success-v59[hidden]{display:none!important}.lr-inline-success-v59 i{margin-top:2px}
     .lr-btn.is-busy{pointer-events:none;opacity:.72}.lr-btn.is-busy:before{content:'';width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:lr-v59-spin .7s linear infinite}@keyframes lr-v59-spin{to{transform:rotate(360deg)}}
-    @media(max-width:520px){.lr-dashboard-detail-body{padding:11px 10px 20px}.lr-detail-kpis,.lr-engagement-filters{gap:6px!important}.lr-detail-kpi,.lr-engagement-filter{min-height:78px;padding:8px!important}.lr-detail-kpi strong,.lr-engagement-filter strong{font-size:18px!important}.lr-detail-kpi em{display:none}.lr-activity-row{grid-template-columns:34px minmax(0,1fr) auto;padding:9px;gap:8px}.lr-school-link{max-width:92px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+    @media(max-width:520px){.lr-dashboard-detail-body{padding:11px 10px 20px}.lr-detail-kpis,.lr-engagement-filters{gap:6px!important}.lr-detail-kpi{min-height:82px;padding:10px!important}.lr-detail-kpi strong{font-size:21px!important}.lr-detail-kpi em{display:none}.lr-engagement-filter{min-height:82px!important;padding:9px!important;grid-template-columns:32px minmax(0,1fr)!important;gap:7px!important}.lr-platform-filter-icon{width:32px!important;height:32px!important}.lr-engagement-filter strong{font-size:19px!important}.lr-activity-row{grid-template-columns:42px minmax(0,1fr) 60px;padding:9px;gap:8px}.lr-activity-school-logo{width:42px;height:42px;border-radius:11px}.lr-activity-count{min-width:56px;min-height:52px}.lr-activity-count strong{font-size:20px}.lr-activity-copy strong{white-space:normal;line-height:1.25}}
 
     /* v10.61: Locker Room school drawer mirrors the Admin school slider while staying compact. */
-    .lr-school-adminlike-hero{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:14px;align-items:start;padding:4px 0 16px}.lr-school-adminlike-logo{width:62px;height:62px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;display:grid;place-items:center;overflow:hidden;font-weight:850}.lr-school-adminlike-logo img{width:100%;height:100%;object-fit:contain}.lr-school-adminlike-main{min-width:0}.lr-school-adminlike-main .lr-school-division{display:inline-flex;padding:4px 8px;border-radius:8px;background:#fff0eb;color:#ff5c35;font-size:10px;font-weight:850}.lr-school-adminlike-main h3{margin:7px 0 3px;font-size:22px;line-height:1.06;color:#111827}.lr-school-adminlike-main p{margin:0;color:#7c8798;font-size:12px}.lr-school-scorebox{display:grid;justify-items:center;gap:3px}.lr-school-score-ring{width:54px;height:54px;border:5px solid #ff5c35;border-radius:999px;display:grid;place-items:center;font-weight:900;font-size:14px}.lr-school-scorebox small{color:#ff5c35;font-size:9px;font-weight:900}.lr-school-actions{display:grid;grid-template-columns:1.2fr 1fr 1.15fr;gap:8px;margin-bottom:14px}.lr-school-action{min-height:42px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;color:#111827;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}.lr-school-action.is-primary{background:#ff5c35;border-color:#ff5c35;color:#fff}.lr-school-action.is-active{border-color:#ffb7a2;background:#fff3ee;color:#f05b34}.lr-school-list-wrap{position:relative}.lr-school-list-menu{position:absolute;z-index:20;top:calc(100% + 6px);right:0;width:min(240px,72vw);max-height:260px;overflow:auto;padding:8px;border:1px solid #e5e7eb;border-radius:13px;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.15)}.lr-school-list-menu[hidden]{display:none}.lr-school-list-menu h5{margin:2px 5px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#98a2b3}.lr-school-list-option{width:100%;border:0;background:transparent;border-radius:9px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font-size:12px;font-weight:750;cursor:pointer}.lr-school-list-option:hover{background:#f8fafc}.lr-school-list-option.is-active{background:#fff3ee;color:#f05b34}.lr-school-tabs{grid-template-columns:repeat(3,minmax(0,1fr));background:#f7f8fa;padding:4px;border:1px solid #e5e7eb;border-radius:14px}.lr-school-tab{min-height:44px;border-radius:10px}.lr-school-tab.is-active{background:#fff;box-shadow:0 5px 14px rgba(15,23,42,.06)}.lr-school-coach{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:13px;background:#fff}.lr-school-coach-avatar{width:42px;height:42px;border-radius:12px;background:#f2f4f7;display:grid;place-items:center;font-size:11px;font-weight:850}.lr-school-coach-copy{min-width:0}.lr-school-coach-copy strong{display:block}.lr-school-coach-copy span,.lr-school-coach-copy a{display:block;margin-top:2px;color:#667085;font-size:11px;text-decoration:none;overflow:hidden;text-overflow:ellipsis}.lr-school-mailbtn{width:34px;height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;display:grid;place-items:center;color:#ff5c35;text-decoration:none}.lr-school-comms{display:grid;gap:8px}.lr-school-comm{background:#fff}.lr-school-backlabel{font-size:11px;color:#667085;margin-bottom:10px}.lr-school-busy{opacity:.6;pointer-events:none}.lr-school-list-wrap>.lr-school-action{width:100%;padding-inline:10px;white-space:nowrap}.lr-school-list-wrap>.lr-school-action i:last-child{font-size:9px;margin-left:1px}.lr-platform-stack{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}.lr-platform-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 6px;border-radius:999px;background:#f8fafc;border:1px solid #edf0f3;color:#667085;font-size:9px;font-weight:800}.lr-platform-pill i{font-size:11px}.lr-platform-pill.is-instagram i{color:#d62976}.lr-platform-pill.is-youtube i{color:#ff0000}.lr-platform-pill.is-x i{color:#111}.lr-engagement-filter .lr-platform-filter-icon{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:#f5f6f8;font-size:15px}.lr-engagement-filter[data-lr-engagement-filter=instagram] .lr-platform-filter-icon{color:#d62976;background:#fff0f7}.lr-engagement-filter[data-lr-engagement-filter=youtube] .lr-platform-filter-icon{color:#ff0000;background:#fff0f0}.lr-engagement-filter[data-lr-engagement-filter=x] .lr-platform-filter-icon{color:#111;background:#f1f2f4}
+    .lr-school-adminlike-hero{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:14px;align-items:start;padding:4px 0 16px}.lr-school-adminlike-logo{width:62px;height:62px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;display:grid;place-items:center;overflow:hidden;font-weight:850}.lr-school-adminlike-logo img{width:100%;height:100%;object-fit:contain}.lr-school-adminlike-main{min-width:0}.lr-school-adminlike-main .lr-school-division{display:inline-flex;padding:4px 8px;border-radius:8px;background:#fff0eb;color:#ff5c35;font-size:10px;font-weight:850}.lr-school-adminlike-main h3{margin:7px 0 3px;font-size:22px;line-height:1.06;color:#111827}.lr-school-adminlike-main p{margin:0;color:#7c8798;font-size:12px}.lr-school-scorebox{display:grid;justify-items:center;gap:3px}.lr-school-score-ring{width:54px;height:54px;border:5px solid #ff5c35;border-radius:999px;display:grid;place-items:center;font-weight:900;font-size:14px}.lr-school-scorebox small{color:#ff5c35;font-size:9px;font-weight:900}.lr-school-actions{display:grid;grid-template-columns:1.2fr 1fr 1.15fr;gap:8px;margin-bottom:14px}.lr-school-action{min-height:42px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;color:#111827;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}.lr-school-action.is-primary{background:#ff5c35;border-color:#ff5c35;color:#fff}.lr-school-action.is-active{border-color:#ffb7a2;background:#fff3ee;color:#f05b34}.lr-school-list-wrap{position:relative}.lr-school-list-menu{position:absolute;z-index:20;top:calc(100% + 6px);right:0;width:min(240px,72vw);max-height:260px;overflow:auto;padding:8px;border:1px solid #e5e7eb;border-radius:13px;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.15)}.lr-school-list-menu[hidden]{display:none}.lr-school-list-menu h5{margin:2px 5px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#98a2b3}.lr-school-list-option{width:100%;border:0;background:transparent;border-radius:9px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font-size:12px;font-weight:750;cursor:pointer}.lr-school-list-option:hover{background:#f8fafc}.lr-school-list-option.is-active{background:#fff3ee;color:#f05b34}.lr-school-tabs{grid-template-columns:repeat(3,minmax(0,1fr));background:#f7f8fa;padding:4px;border:1px solid #e5e7eb;border-radius:14px}.lr-school-tab{min-height:44px;border-radius:10px}.lr-school-tab.is-active{background:#fff;box-shadow:0 5px 14px rgba(15,23,42,.06)}.lr-school-coach{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:13px;background:#fff}.lr-school-coach-avatar{width:42px;height:42px;border-radius:12px;background:#f2f4f7;display:grid;place-items:center;font-size:11px;font-weight:850}.lr-school-coach-copy{min-width:0}.lr-school-coach-copy strong{display:block}.lr-school-coach-copy span,.lr-school-coach-copy a{display:block;margin-top:2px;color:#667085;font-size:11px;text-decoration:none;overflow:hidden;text-overflow:ellipsis}.lr-school-mailbtn{width:34px;height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;display:grid;place-items:center;color:#ff5c35;text-decoration:none}.lr-school-comms{display:grid;gap:8px}.lr-school-comm{background:#fff}.lr-school-backlabel{font-size:11px;color:#667085;margin-bottom:10px}.lr-school-busy{opacity:.6;pointer-events:none}.lr-school-list-wrap>.lr-school-action{width:100%;padding-inline:10px;white-space:nowrap}.lr-school-list-wrap>.lr-school-action i:last-child{font-size:9px;margin-left:1px}
     @media(max-width:620px){.lr-school-adminlike-hero{grid-template-columns:52px minmax(0,1fr) auto;gap:10px}.lr-school-adminlike-logo{width:52px;height:52px;border-radius:13px}.lr-school-adminlike-main h3{font-size:18px}.lr-school-score-ring{width:46px;height:46px;border-width:4px}.lr-school-actions{grid-template-columns:1.2fr .9fr 1.05fr;gap:6px}.lr-school-action{font-size:10px;padding:0 6px}.lr-school-tab{font-size:10px}}
 </style>
 
@@ -630,6 +649,37 @@
     .lr-sort-row{display:flex;align-items:center;justify-content:flex-end;gap:7px;margin:0 0 10px}.lr-sort-row label{font-size:9px;font-weight:800;color:#667085;text-transform:uppercase;letter-spacing:.06em}.lr-sort-select{height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;color:#344054;padding:0 30px 0 10px;font-size:10px;font-weight:750;outline:none}
     @media(max-width:520px){.lr-photo-gallery{grid-template-columns:1fr 1fr;gap:7px}.lr-photo-upload{align-items:flex-start;flex-direction:column}.lr-photo-upload .lr-btn{width:100%}.lr-photo-hero h3{font-size:27px}.lr-photo-hero-icon{display:none}}
     @media(hover:none){.lr-photo-card .lr-photo-actions{opacity:1;pointer-events:auto;background:linear-gradient(to top,rgba(8,15,28,.46),rgba(8,15,28,0) 48%)}}
+</style>
+
+<style id="lr-analytics-v103">
+    /* v10.103 analytics polish: these rules intentionally come after the legacy parity block. */
+    #plyrcard-action-drawer .lr-detail-kpi{position:relative!important;overflow:hidden!important;border-radius:16px!important;padding:15px!important;box-shadow:0 7px 22px rgba(15,23,42,.035)!important}
+    #plyrcard-action-drawer .lr-detail-kpi::before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:#ff6338;opacity:.8}
+    #plyrcard-action-drawer .lr-detail-kpi.is-secondary::before{background:#667085}
+    #plyrcard-action-drawer .lr-detail-kpi.is-tertiary::before{background:#2563eb}
+    #plyrcard-action-drawer .lr-detail-kpi small{font-size:10px!important;font-weight:800!important;text-transform:uppercase!important;letter-spacing:.045em!important}
+    #plyrcard-action-drawer .lr-detail-kpi strong{font-size:27px!important;margin-top:6px!important}
+    #plyrcard-action-drawer .lr-engagement-filter{min-height:102px!important;padding:13px!important;display:grid!important;grid-template-columns:38px minmax(0,1fr)!important;align-items:center!important;gap:10px!important;text-align:left!important;border-radius:16px!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon{width:38px!important;height:38px!important;border-radius:11px!important;display:grid!important;place-items:center!important;color:#fff!important;font-size:17px!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon i{color:#fff!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon.is-instagram{background:radial-gradient(circle at 30% 107%,#fdf497 0 5%,#fdf497 5% 9%,#fd5949 45%,#d6249f 60%,#285AEB 90%)!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon.is-youtube{background:#ff0000!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon.is-x{background:#0b0b0b!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-engagement-filter-copy span{color:#667085!important;font-size:10px!important;font-weight:800!important}
+    #plyrcard-action-drawer .lr-engagement-filter .lr-engagement-filter-copy strong{font-size:25px!important;color:#101828!important}
+    #plyrcard-action-drawer .lr-activity-row{grid-template-columns:48px minmax(0,1fr) 74px!important;gap:12px!important;padding:12px 13px!important;border-radius:16px!important}
+    #plyrcard-action-drawer .lr-activity-school-logo{width:48px;height:48px;border-radius:13px;border:1px solid #e5e7eb;background:#fff;display:grid;place-items:center;overflow:hidden}
+    #plyrcard-action-drawer .lr-activity-school-logo img{width:100%;height:100%;object-fit:contain;padding:5px}
+    #plyrcard-action-drawer .lr-activity-count{min-width:68px;min-height:58px;border-radius:13px;background:#fff3ee;color:#f0522b;display:grid;align-content:center;justify-items:center;padding:6px 8px}
+    #plyrcard-action-drawer .lr-activity-count strong{font-size:23px!important;font-weight:900!important;letter-spacing:-.04em!important;color:#f0522b!important}
+    #plyrcard-action-drawer .lr-activity-count span{margin-top:4px;color:#f0522b!important;font-size:8px!important;font-weight:850!important;text-transform:uppercase!important;letter-spacing:.05em!important}
+    #plyrcard-action-drawer .lr-platform-pill{display:inline-flex!important;align-items:center!important;gap:5px!important;padding:3px 7px 3px 4px!important}
+    #plyrcard-action-drawer .lr-platform-pill .lr-platform-mark{width:18px;height:18px;border-radius:6px;display:grid;place-items:center;color:#fff!important;font-size:9px!important}
+    #plyrcard-action-drawer .lr-platform-pill .lr-platform-mark i{color:#fff!important}
+    #plyrcard-action-drawer .lr-platform-pill.is-instagram .lr-platform-mark{background:radial-gradient(circle at 30% 107%,#fdf497 0 5%,#fdf497 5% 9%,#fd5949 45%,#d6249f 60%,#285AEB 90%)}
+    #plyrcard-action-drawer .lr-platform-pill.is-youtube .lr-platform-mark{background:#ff0000}
+    #plyrcard-action-drawer .lr-platform-pill.is-x .lr-platform-mark{background:#0b0b0b}
+    @media(max-width:520px){#plyrcard-action-drawer .lr-engagement-filter{min-height:82px!important;padding:9px!important;grid-template-columns:32px minmax(0,1fr)!important;gap:7px!important}#plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon{width:32px!important;height:32px!important}#plyrcard-action-drawer .lr-activity-row{grid-template-columns:42px minmax(0,1fr) 60px!important;padding:9px!important;gap:8px!important}#plyrcard-action-drawer .lr-activity-school-logo{width:42px;height:42px;border-radius:11px}#plyrcard-action-drawer .lr-activity-count{min-width:56px;min-height:52px}#plyrcard-action-drawer .lr-activity-count strong{font-size:20px!important}}
 </style>
 
 <script type="application/json" id="plyrcard-locker-room-initial">@json($lrInitialData)</script>
@@ -1033,10 +1083,8 @@
         <aside class="lr-dashboard-detail" data-lr-dashboard-activity-panel aria-label="Dashboard activity detail">
             <div class="lr-dashboard-detail-head">
                 <div class="lr-dashboard-detail-head-main">
-                    <button type="button" class="lr-back" data-lr-dashboard-detail-close aria-label="Back to dashboard"><i class="fa-solid fa-chevron-left"></i></button>
                     <div><h3 data-lr-dashboard-detail-title>Recruiting Activity</h3><p data-lr-dashboard-detail-subtitle>Coaches connected to this activity.</p></div>
                 </div>
-                <button type="button" class="lr-close" data-lr-dashboard-detail-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="lr-dashboard-detail-body" data-lr-dashboard-detail-body><div class="lr-detail-empty">Choose a dashboard stat to view its activity.</div></div>
         </aside>
@@ -1044,10 +1092,8 @@
         <aside class="lr-dashboard-detail" data-lr-dashboard-school-panel aria-label="School detail">
             <div class="lr-dashboard-detail-head">
                 <div class="lr-dashboard-detail-head-main">
-                    <button type="button" class="lr-back" data-lr-dashboard-school-close aria-label="Back to activity"><i class="fa-solid fa-chevron-left"></i></button>
                     <div><h3>School Details</h3><p>Coaching staff, roster information, and communications.</p></div>
                 </div>
-                <button type="button" class="lr-close" data-lr-dashboard-school-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="lr-dashboard-detail-body" data-lr-dashboard-school-body><div class="lr-detail-empty">Select a school from a coach activity row.</div></div>
         </aside>
@@ -1236,9 +1282,9 @@
         let summary = '';
         if (metric === 'profile_views') {
             summary = `<div class="lr-detail-kpis">
-                <div class="lr-detail-kpi"><small>Total Views</small><strong>${Number(data.total || 0).toLocaleString()}</strong><em>Player website/profile views</em></div>
-                <div class="lr-detail-kpi"><small>Unique Contacts</small><strong>${Number(data.identified_count || 0).toLocaleString()}</strong><em>Distinct coaches who viewed your profile</em></div>
-                <div class="lr-detail-kpi"><small>Schools Reached</small><strong>${Number(data.schools_reached || 0).toLocaleString()}</strong><em>Schools represented by those viewers</em></div>
+                <div class="lr-detail-kpi"><small>Total Views</small><strong>${Number(data.total || 0).toLocaleString()}</strong><em>All tracked player profile activity</em></div>
+                <div class="lr-detail-kpi is-secondary"><small>Coaches</small><strong>${Number(data.identified_count || 0).toLocaleString()}</strong><em>Identified coach contacts</em></div>
+                <div class="lr-detail-kpi is-tertiary"><small>Schools</small><strong>${Number(data.schools_reached || 0).toLocaleString()}</strong><em>Schools represented by those coaches</em></div>
             </div>`;
         } else if (metric === 'social_clicks') {
             const pc = data.platform_counts || {};
@@ -1247,7 +1293,7 @@
                 ['instagram','Instagram','fa-brands fa-instagram'],
                 ['youtube','YouTube','fa-brands fa-youtube'],
             ];
-            summary = `<div class="lr-engagement-filters">${filters.map(([key,label,icon]) => `<button type="button" class="lr-engagement-filter${dashboardEngagementFilter === key ? ' is-active' : ''}" data-lr-engagement-filter="${key}"><span class="lr-platform-filter-icon"><i class="${icon}"></i></span><span>${label}</span><strong>${Number(pc[key] || 0).toLocaleString()}</strong></button>`).join('')}</div>`;
+            summary = `<div class="lr-engagement-filters">${filters.map(([key,label,icon]) => `<button type="button" class="lr-engagement-filter${dashboardEngagementFilter === key ? ' is-active' : ''}" data-lr-engagement-filter="${key}"><span class="lr-platform-filter-icon is-${key}"><i class="${icon}"></i></span><span class="lr-engagement-filter-copy"><span>${label}</span><strong>${Number(pc[key] || 0).toLocaleString()}</strong></span></button>`).join('')}</div>`;
             if (dashboardEngagementFilter) {
                 rows = rows.filter(row => Number((row.platform_counts || {})[dashboardEngagementFilter] || 0) > 0);
             }
@@ -1279,29 +1325,32 @@
         const sectionHeading = metric === 'profile_views' ? "Who's Viewing You" : (metric === 'social_clicks' ? "Who's Clicking" : 'Activity');
         const html = rows.map(row => {
             const school = row.school || {};
-            // Prefer the server-resolved coach -> school reference. This keeps the
-            // coach name/row clickable even when older tracking events did not save
-            // a local school id.
             const reference = row.school_open_reference || school.reference || school.id || school.name || '';
-            const schoolName = school.name || '';
+            const schoolName = String(school.name || '').trim();
+            const schoolLogoUrl = String(school.logo_url || school.logo || '').trim();
+            const coachName = String(row.coach_name || 'Coach').trim() || 'Coach';
+            const schoolInitials = lrInitials(schoolName || coachName || 'PC');
+            const schoolLogo = schoolLogoUrl
+                ? `<span class="lr-activity-school-logo"><img src="${esc(schoolLogoUrl)}" alt="${esc(schoolName || 'School')} logo" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';"><span class="lr-activity-school-fallback" style="display:none">${esc(schoolInitials)}</span></span>`
+                : `<span class="lr-activity-school-logo"><span class="lr-activity-school-fallback">${esc(schoolInitials)}</span></span>`;
             const platformEntries = Object.entries(row.platform_counts || {}).filter(([,count]) => Number(count) > 0);
             const platformIcon = platform => platform === 'instagram' ? 'fa-brands fa-instagram' : (platform === 'youtube' ? 'fa-brands fa-youtube' : 'fa-brands fa-x-twitter');
             const platformLabel = platform => platform === 'x' ? 'X' : platform.charAt(0).toUpperCase()+platform.slice(1);
             const platformPills = metric === 'social_clicks' && platformEntries.length
-                ? `<span class="lr-platform-stack">${platformEntries.map(([platform,count]) => `<span class="lr-platform-pill is-${esc(platform)}"><i class="${platformIcon(platform)}"></i>${esc(platformLabel(platform))} ${Number(count).toLocaleString()}</span>`).join('')}</span>`
+                ? `<span class="lr-platform-stack">${platformEntries.map(([platform,count]) => `<span class="lr-platform-pill is-${esc(platform)}"><span class="lr-platform-mark"><i class="${platformIcon(platform)}"></i></span>${esc(platformLabel(platform))} ${Number(count).toLocaleString()}</span>`).join('')}</span>`
                 : '';
-            const platforms = metric === 'social_clicks' ? '' : platformEntries.map(([platform,count]) => `${platformLabel(platform)} ${count}`).join(' · ');
             const count = metric === 'social_clicks' && dashboardEngagementFilter
                 ? Number((row.platform_counts || {})[dashboardEngagementFilter] || 0)
-                : Number(row.count || 0);
-            const subtitleText = [row.coach_email, row.last_at_label, platforms].filter(Boolean).join(' · ');
-            const tag = reference
-                ? `<button type="button" class="lr-school-link" data-lr-dashboard-school="${esc(reference)}">${esc(schoolName || 'View School')} <i class="fa-solid fa-chevron-right"></i></button>`
-                : `<span style="color:#98a2b3;font-size:10px;">${count.toLocaleString()} ${metric === 'social_clicks' ? 'click' : 'view'}${count === 1 ? '' : 's'}</span>`;
+                : Number(row.count || row.views || row.clicks || 0);
+            const countLabel = metric === 'social_clicks' ? (count === 1 ? 'click' : 'clicks') : (count === 1 ? 'view' : 'views');
+            const titleText = metric === 'profile_views'
+                ? `${coachName} viewed your profile`
+                : `${coachName} engaged with your profile`;
+            const meta = [row.coach_email, row.last_at_label].filter(Boolean).join(' · ');
             return `<div class="lr-activity-row${reference ? ' is-clickable' : ''}" ${reference ? `data-lr-dashboard-school="${esc(reference)}" role="button" tabindex="0"` : ''}>
-                <span class="lr-activity-avatar">${esc(lrInitials(row.coach_name))}</span>
-                <span class="lr-activity-copy"><strong>${esc(row.coach_name || 'Coach')}</strong><small>${esc(schoolName || 'School not matched')}${subtitleText ? `<br>${esc(subtitleText)}` : ''}${platformPills}<br><b>${count.toLocaleString()}</b> ${metric === 'social_clicks' ? 'click' : 'tracked view'}${count === 1 ? '' : 's'}</small></span>
-                ${tag}
+                ${schoolLogo}
+                <span class="lr-activity-copy"><strong>${esc(titleText)}</strong><small>${schoolName ? `<span class="lr-activity-school-name">${esc(schoolName)}</span>` : '<span class="lr-activity-school-name">School not available</span>'}${meta ? `<br><span class="lr-activity-meta">${esc(meta)}</span>` : ''}${platformPills}</small></span>
+                <span class="lr-activity-count"><strong>${count.toLocaleString()}</strong><span>${countLabel}</span></span>
             </div>`;
         }).join('');
         body.innerHTML = summary + note + sortControl + `<div style="font-size:12px;font-weight:850;color:#101828;margin:13px 2px 8px;">${esc(sectionHeading)}</div><div class="lr-activity-list">${html}</div>`;
@@ -2111,7 +2160,14 @@
     document.addEventListener('click', event => {
         const open = event.target.closest('[data-plyrcard-open-drawer],[data-plyrcard-toggle-drawer]'); if (open) { event.preventDefault(); if (open.matches('[data-plyrcard-toggle-drawer]') && drawer.classList.contains('is-open')) closeDrawer(); else openDrawer(); return; }
         if (event.target.closest('[data-lr-close]')) { event.preventDefault(); closeDrawer(); return; }
-        const back = event.target.closest('[data-lr-back]'); if (back) { event.preventDefault(); goBack(); return; }
+        const back = event.target.closest('[data-lr-back]');
+        if (back) {
+            event.preventDefault();
+            if (q('[data-lr-dashboard-school-panel]')?.classList.contains('is-open')) { closeDashboardSchool(); return; }
+            if (q('[data-lr-dashboard-activity-panel]')?.classList.contains('is-open')) { closeDashboardActivity(); return; }
+            goBack();
+            return;
+        }
         const nav = event.target.closest('[data-lr-nav]'); if (nav && drawer.contains(nav)) { event.preventDefault(); setView(nav.dataset.lrNav); return; }
         const photoTab = event.target.closest('[data-lr-photo-tab]'); if (photoTab && drawer.contains(photoTab)) { event.preventDefault(); photoGalleryCategory = photoTab.dataset.lrPhotoTab === 'plyrcard' ? 'plyrcard' : 'player'; setPhotoStatus(''); renderPhotos(); return; }
         const photoPick = event.target.closest('[data-lr-photo-pick]'); if (photoPick && drawer.contains(photoPick)) { event.preventDefault(); q('[data-lr-photo-files]')?.click(); return; }

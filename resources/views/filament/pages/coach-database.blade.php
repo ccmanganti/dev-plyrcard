@@ -15218,6 +15218,62 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
     const currentRoot = () => document.querySelector('.rc-livewire-root');
     const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule']);
     const isFreePlan = () => currentRoot()?.dataset?.rcFreePlan === '1';
+    const fastSectionLabels = {
+        dashboard: 'Dashboard', schools: 'Discover Schools', coaches: 'Coach Database',
+        favorites: 'Favorites', lists: 'My Lists', conversations: 'Inbox', campaigns: 'Templates',
+        compose: 'Compose Email', photos: 'My Photos', support: 'Support', schedule: 'My Schedule',
+        settings: 'Settings',
+    };
+    let fastTransitionTimer = null;
+
+    const ensureFastTransition = () => {
+        let overlay = document.querySelector('[data-rc-fast-transition]');
+        if (overlay) return overlay;
+        overlay = document.createElement('div');
+        overlay.className = 'rc-fast-transition-v103';
+        overlay.setAttribute('data-rc-fast-transition', '');
+        overlay.hidden = true;
+        overlay.innerHTML = `
+            <div class="rc-fast-transition-head-v103">
+                <span class="rc-fast-transition-spinner-v103"></span>
+                <strong data-rc-fast-transition-label>Opening...</strong>
+            </div>
+            <div class="rc-fast-transition-grid-v103">
+                <span></span><span></span><span></span>
+            </div>`;
+        document.body.appendChild(overlay);
+        return overlay;
+    };
+
+    const positionFastTransition = (overlay) => {
+        const root = currentRoot();
+        if (!overlay || !root) return;
+        const rect = root.getBoundingClientRect();
+        overlay.style.left = `${Math.max(0, rect.left)}px`;
+        overlay.style.top = `${Math.max(0, rect.top)}px`;
+        overlay.style.width = `${Math.max(0, rect.width)}px`;
+        overlay.style.height = `${Math.max(160, window.innerHeight - Math.max(0, rect.top))}px`;
+    };
+
+    const showFastTransition = (section) => {
+        const overlay = ensureFastTransition();
+        positionFastTransition(overlay);
+        const label = overlay.querySelector('[data-rc-fast-transition-label]');
+        if (label) label.textContent = fastSectionLabels[section] || 'Recruiting Center';
+        overlay.hidden = false;
+        overlay.classList.add('is-visible');
+        clearTimeout(fastTransitionTimer);
+        fastTransitionTimer = setTimeout(() => hideFastTransition(), 8000);
+    };
+
+    const hideFastTransition = () => {
+        const overlay = document.querySelector('[data-rc-fast-transition]');
+        if (!overlay) return;
+        overlay.classList.remove('is-visible');
+        overlay.hidden = true;
+        clearTimeout(fastTransitionTimer);
+        fastTransitionTimer = null;
+    };
 
     const openFreePlanGate = (section) => {
         if (!isFreePlan() || !freePlanLockedSections.has(section)) return false;
@@ -15239,7 +15295,11 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         const root = currentRoot();
         if (!root || !section) return false;
 
-        // Update navigation feedback before the Livewire request even starts.
+        const alreadyActive = root.dataset.rcCurrentSection === section;
+
+        // v10.103: navigation reacts before any Livewire work. Update the sidebar,
+        // URL and an optimistic content shell synchronously, then let the browser
+        // paint that state before the server section render starts.
         root.dataset.rcCurrentSection = section;
         setSidebarActive(section);
 
@@ -15249,7 +15309,17 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
             window.history[historyFn]({ ...(window.history.state || {}), rcSection: section }, '', target.pathname + target.search + target.hash);
         }
 
-        window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
+        if (alreadyActive) {
+            hideFastTransition();
+            return true;
+        }
+
+        showFastTransition(section);
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
+            });
+        });
         return true;
     };
 
@@ -15283,6 +15353,7 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         if (window.Livewire?.on) {
             Livewire.on('rc-section-switched', ({ section } = {}) => {
                 if (section) setSidebarActive(section);
+                hideFastTransition();
             });
             Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
                 if (section === 'conversations') {
@@ -15291,6 +15362,12 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
             });
         }
     }, { once: true });
+
+    window.addEventListener('resize', () => {
+        const overlay = document.querySelector('[data-rc-fast-transition].is-visible');
+        if (overlay) positionFastTransition(overlay);
+    }, { passive: true });
+    document.addEventListener('livewire:navigated', hideFastTransition);
 
     const initial = pathToSection(window.location.pathname);
     if (initial) setSidebarActive(initial);
@@ -15305,6 +15382,61 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
 }
 .fi-sidebar a.rc-fast-active svg {
     color: #ff6338 !important;
+}
+
+/* v10.103: optimistic Recruiting Center transition. It appears immediately on
+   navigation so large local school catalogs never make the sidebar feel stuck. */
+.rc-fast-transition-v103[hidden] { display: none !important; }
+.rc-fast-transition-v103 {
+    position: fixed;
+    z-index: 55;
+    box-sizing: border-box;
+    padding: 1.1rem 1.25rem;
+    overflow: hidden;
+    pointer-events: auto;
+    background: color-mix(in srgb, var(--rc-surface, #fff) 94%, transparent);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity .1s ease;
+}
+.rc-fast-transition-v103.is-visible { opacity: 1; }
+.rc-fast-transition-head-v103 {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    min-height: 2.5rem;
+    color: var(--rc-text, #111827);
+    font-size: .92rem;
+}
+.rc-fast-transition-spinner-v103 {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 2px solid rgba(255, 99, 56, .22);
+    border-top-color: #ff6338;
+    border-radius: 999px;
+    animation: rc-fast-spin-v103 .62s linear infinite;
+}
+.rc-fast-transition-grid-v103 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .85rem;
+    margin-top: .85rem;
+}
+.rc-fast-transition-grid-v103 span {
+    display: block;
+    min-height: 7rem;
+    border: 1px solid var(--rc-border, #e5e7eb);
+    border-radius: 1rem;
+    background: linear-gradient(100deg, var(--rc-soft, #f9fafb) 18%, color-mix(in srgb, var(--rc-surface, #fff) 55%, #e5e7eb) 38%, var(--rc-soft, #f9fafb) 58%);
+    background-size: 220% 100%;
+    animation: rc-fast-shimmer-v103 1.05s ease-in-out infinite;
+}
+@keyframes rc-fast-spin-v103 { to { transform: rotate(360deg); } }
+@keyframes rc-fast-shimmer-v103 { to { background-position-x: -220%; } }
+@media (max-width: 800px) {
+    .rc-fast-transition-grid-v103 { grid-template-columns: 1fr; }
+    .rc-fast-transition-grid-v103 span { min-height: 5rem; }
 }
 </style>
 
