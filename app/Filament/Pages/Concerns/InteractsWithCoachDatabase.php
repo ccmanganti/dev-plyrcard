@@ -5055,6 +5055,42 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
     }
 
+    /**
+     * Return only the current CES for one Admin school drawer.
+     *
+     * This is intentionally separate from schoolDrawerDataForClient(): the Admin
+     * drawer is optimistic/browser-cached, so its score must have an independent
+     * renderless refresh path that cannot be lost behind an older cached detail row.
+     */
+    #[Renderless]
+    public function schoolEngagementScoreForClient(string $schoolId): int
+    {
+        $schoolId = trim($schoolId);
+        $user = Auth::user();
+
+        if (! $user || ! $this->allowed || $this->locked || $schoolId === '') {
+            return 0;
+        }
+
+        try {
+            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+
+            if (! is_array($school)) {
+                return 0;
+            }
+
+            return app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $school);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to calculate Admin school engagement score.', [
+                'user_id' => $user->getKey(),
+                'school_id' => $schoolId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return 0;
+        }
+    }
+
     public function schoolCommunicationHistoryForClient(string $schoolId): array
     {
         $schoolId = trim($schoolId);

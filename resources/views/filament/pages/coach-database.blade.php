@@ -87,6 +87,7 @@ discoverSelectedIds: [],
             discoverCreatingList: false,
             discoverSchoolCoachesLoading: false,
             discoverSchoolCoachesLoadedFor: '',
+            discoverSchoolScoreRequest: '',
             rcCatalogUserKey: @js($rcCatalogUserKey),
             optimisticSchool: null,
             schoolDrawerOpen: false,
@@ -152,6 +153,36 @@ discoverSelectedIds: [],
                 if (row) {
                     if (Object.prototype.hasOwnProperty.call(detail, 'is_favorite')) row.is_favorite = !!detail.is_favorite;
                     if (Array.isArray(detail.list_keys)) row.list_keys = [...detail.list_keys];
+                }
+            },
+            async refreshDiscoverSchoolScore(schoolId) {
+                const id = String(schoolId || '').trim();
+                if (!id) return;
+
+                const requestToken = id + ':' + Date.now() + ':' + Math.random();
+                this.discoverSchoolScoreRequest = requestToken;
+
+                try {
+                    const score = await this.$wire.call('schoolEngagementScoreForClient', id);
+                    if (this.discoverSchoolScoreRequest !== requestToken) return;
+
+                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (currentId !== id || !this.optimisticSchool) return;
+
+                    const numericScore = Math.max(0, Math.min(100, Number(score ?? 0)));
+                    this.optimisticSchool = { ...this.optimisticSchool, engagement_score: numericScore };
+
+                    const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
+                        .find(item => String(item?.id ?? item?.school_id ?? '').trim() === id);
+                    if (row) row.engagement_score = numericScore;
+
+                    const userKey = String(this.rcCatalogUserKey || 'guest');
+                    const bucket = window.__plyrRcSchoolDrawerDetailsByUser?.[userKey];
+                    if (bucket?.[id]) {
+                        bucket[id] = { ...bucket[id], engagement_score: numericScore };
+                    }
+                } catch (error) {
+                    console.error('Unable to refresh school engagement score.', error);
                 }
             },
             async hydrateDiscoverSchoolDetails(schoolId) {
@@ -273,7 +304,14 @@ discoverSelectedIds: [],
                 this.discoverSchoolCommsLoadedFor = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
-                this.$nextTick(() => this.hydrateDiscoverSchoolDetails(String(merged.id ?? merged.school_id ?? '')));
+                this.$nextTick(() => {
+                    const id = String(merged.id ?? merged.school_id ?? '');
+                    // Refresh CES independently from the roster/detail cache. Locker Room
+                    // already receives the server score directly; Admin needs this explicit
+                    // renderless score channel because its drawer opens from browser state.
+                    this.refreshDiscoverSchoolScore(id);
+                    this.hydrateDiscoverSchoolDetails(id);
+                });
             },
             async loadDiscoverCommunications(force = false) {
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
@@ -391,6 +429,7 @@ discoverSelectedIds: [],
                 this.discoverDrawerTab = 'coaches';
                 this.discoverSchoolCoachesLoading = false;
                 this.discoverSchoolCoachesLoadedFor = '';
+                this.discoverSchoolScoreRequest = '';
                 this.optimisticSchool = null;
                 // v110: explicit close event is also consumed by any nested Discover
                 // controller, so a stale Alpine subtree cannot immediately repaint it.
