@@ -1057,38 +1057,26 @@ class CoachDatabaseService
             ->filter(fn ($coach): bool => is_array($coach))
             ->values()
             ->map(function (array $coach, int $index): array {
-                $coachReplies = max(
+                // CES V1 treats the first coach reply as the 30-point dialogue
+                // signal. Subsequent coach replies are additional thread turns; do not
+                // multiply every reply by 30 and then count it again as a thread turn.
+                $replyCount = max(
                     0,
                     (int) ($coach['coach_reply_count'] ?? 0),
                     (bool) ($coach['replied'] ?? false) ? 1 : 0,
                 );
+                $coachReplies = $replyCount > 0 ? 1 : 0;
 
-                $uniqueSiteClicks = max(
-                    0,
-                    (int) ($coach['unique_site_clicks'] ?? 0),
-                    (int) ($coach['website_click_count'] ?? 0),
-                    (int) ($coach['view_profile_website'] ?? 0),
-                );
-
-                $filmClicks = max(
-                    0,
-                    (int) ($coach['film_clicks'] ?? 0),
-                    (int) ($coach['youtube_click_count'] ?? 0),
-                    (int) ($coach['view_profile_youtube'] ?? 0),
-                    (int) ($coach['highlight_view_count'] ?? 0),
-                    (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0,
-                );
-
-                $threadDepth = max(
-                    0,
-                    (int) ($coach['thread_depth'] ?? 0),
-                    $coachReplies,
-                );
+                // Only use the dedicated CES counters. Broad website/profile/YouTube
+                // aggregate fields can contain repeated views, imported totals, or
+                // school-level rollups and were causing nearly every coach to saturate.
+                $uniqueSiteClicks = max(0, (int) ($coach['unique_site_clicks'] ?? 0));
+                $filmClicks = max(0, (int) ($coach['film_clicks'] ?? 0));
 
                 $additionalThreadTurns = max(
                     0,
                     (int) ($coach['additional_thread_turns'] ?? 0),
-                    max(0, $threadDepth - 1),
+                    max(0, $replyCount - 1),
                 );
 
                 $score = min(100,
@@ -1299,79 +1287,10 @@ class CoachDatabaseService
             }
         }
 
-        // Use the exact local tracking service that already powers Admin/Locker Room
-        // Profile Views and Coach Engagement. This guarantees CES sees the same clicks
-        // the user already sees elsewhere instead of depending on a stale remote cache.
-        try {
-            $tracking = app(LocalRecruitingTrackingService::class);
-            $profileRows = collect($tracking->profileViewRows($user, 5000))
-                ->filter(fn ($row): bool => is_array($row))
-                ->filter($rowBelongsToSchool)
-                ->values();
-
-            $engagementRows = collect($tracking->coachEngagementRows($user, 5000))
-                ->filter(fn ($row): bool => is_array($row))
-                ->filter($rowBelongsToSchool)
-                ->values();
-        } catch (\Throwable) {
-            $profileRows = collect();
-            $engagementRows = collect();
-        }
-
-        $findOrAddCoach = function (array $trackingRow) use (&$roster): ?int {
-            $candidate = $this->normalizeCesCoachRow([
-                'id' => $trackingRow['coach_id'] ?? null,
-                'contact_id' => $trackingRow['coach_contact_id'] ?? $trackingRow['coach_id'] ?? null,
-                'ghl_contact_id' => $trackingRow['coach_contact_id'] ?? null,
-                'email' => $trackingRow['coach_email'] ?? null,
-                'name' => $trackingRow['coach_name'] ?? $trackingRow['title'] ?? null,
-                'title' => $trackingRow['coach_title'] ?? null,
-            ]);
-
-            if (! $this->cesCoachHasIdentity($candidate)) {
-                return null;
-            }
-
-            $matchIndex = $roster->search(fn (array $existing): bool => $this->cesCoachRowsMatch($existing, $candidate));
-            if ($matchIndex !== false) {
-                return (int) $matchIndex;
-            }
-
-            $roster->push($candidate);
-            return $roster->count() - 1;
-        };
-
-        foreach ($profileRows as $row) {
-            $index = $findOrAddCoach($row);
-            if ($index === null) {
-                continue;
-            }
-
-            $coach = $roster->get($index);
-            $coach['unique_site_clicks'] = max(
-                (int) ($coach['unique_site_clicks'] ?? 0),
-                (int) ($row['views'] ?? 0),
-            );
-            $roster->put($index, $coach);
-        }
-
-        foreach ($engagementRows as $row) {
-            if (strtolower(trim((string) ($row['platform_key'] ?? ''))) !== 'youtube') {
-                continue;
-            }
-
-            $index = $findOrAddCoach($row);
-            if ($index === null) {
-                continue;
-            }
-
-            $coach = $roster->get($index);
-            $coach['film_clicks'] = max(
-                (int) ($coach['film_clicks'] ?? 0),
-                (int) ($row['clicks'] ?? 0),
-            );
-            $roster->put($index, $coach);
-        }
+        // Enrich the complete school roster from the event-level local tracking table.
+        // CES asks for UNIQUE site clicks, not the raw profile-view total. Deduplicate
+        // repeated opens/refreshes by message/link identity before applying the weights.
+        $roster = $this->enrichCesRosterFromLocalTrackingEvents($user, $roster);
 
         $roster = $roster
             ->filter(fn ($row): bool => is_array($row) && $this->cesCoachHasIdentity($row))
@@ -1379,6 +1298,130 @@ class CoachDatabaseService
             ->values();
 
         return $this->schoolEngagementScore($roster);
+    }
+
+    /**
+     * Merge event-level local tracking into the CES roster without using broad
+     * dashboard aggregates. Site and film clicks are deduplicated per tracked link
+     * identity so repeated refreshes/scanner-style duplicate requests do not turn
+     * every school into a 100.
+     */
+    protected function enrichCesRosterFromLocalTrackingEvents(User $user, Collection $roster): Collection
+    {
+        if ($roster->isEmpty() || ! Schema::hasTable('coach_database_tracking_events')) {
+            return $roster;
+        }
+
+        $identityToIndexes = [];
+        foreach ($roster as $index => $coach) {
+            if (! is_array($coach)) {
+                continue;
+            }
+
+            foreach ($this->cesCoachIdentifiers($coach) as $identifier) {
+                $identityToIndexes[$identifier] ??= [];
+                $identityToIndexes[$identifier][] = (int) $index;
+            }
+        }
+
+        if ($identityToIndexes === []) {
+            return $roster;
+        }
+
+        try {
+            $rows = DB::table('coach_database_tracking_events')
+                ->where('athlete_user_id', $user->getKey())
+                ->whereIn('event_type', ['profile_view', 'link_click'])
+                ->whereNotNull('coach_contact_id')
+                ->where('coach_contact_id', '<>', '')
+                ->whereIn(DB::raw('LOWER(coach_contact_id)'), array_keys($identityToIndexes))
+                ->get([
+                    'id',
+                    'coach_contact_id',
+                    'event_type',
+                    'platform',
+                    'message_uuid',
+                    'campaign_uuid',
+                    'visitor_hash',
+                    'destination_url',
+                ]);
+        } catch (\Throwable) {
+            return $roster;
+        }
+
+        $siteKeys = [];
+        $filmKeys = [];
+
+        foreach ($rows as $event) {
+            $identifier = strtolower(trim((string) ($event->coach_contact_id ?? '')));
+            $indexes = $identityToIndexes[$identifier] ?? [];
+            if ($indexes === []) {
+                continue;
+            }
+
+            $eventType = strtolower(trim((string) ($event->event_type ?? '')));
+            $platform = strtolower(trim((string) ($event->platform ?? '')));
+            $platform = match ($platform) {
+                'yt' => 'youtube',
+                default => $platform,
+            };
+
+            if ($eventType === 'profile_view') {
+                $key = $this->cesTrackedEventUniqueKey($event, 'site');
+                foreach ($indexes as $index) {
+                    $siteKeys[$index][$key] = true;
+                }
+                continue;
+            }
+
+            if ($eventType === 'link_click' && $platform === 'youtube') {
+                $key = $this->cesTrackedEventUniqueKey($event, 'film');
+                foreach ($indexes as $index) {
+                    $filmKeys[$index][$key] = true;
+                }
+            }
+        }
+
+        foreach ($roster as $index => $coach) {
+            if (! is_array($coach)) {
+                continue;
+            }
+
+            // When the local event table is available it is the source of truth for
+            // click-based CES. Do not max() against imported/GHL aggregate counters:
+            // those may be school-wide or repeated totals and were the source of the
+            // all-100 saturation regression.
+            $coach['unique_site_clicks'] = count($siteKeys[$index] ?? []);
+            $coach['film_clicks'] = count($filmKeys[$index] ?? []);
+
+            $roster->put($index, $coach);
+        }
+
+        return $roster;
+    }
+
+    protected function cesTrackedEventUniqueKey(object $event, string $kind): string
+    {
+        $messageUuid = strtolower(trim((string) ($event->message_uuid ?? '')));
+        $campaignUuid = strtolower(trim((string) ($event->campaign_uuid ?? '')));
+        $visitorHash = strtolower(trim((string) ($event->visitor_hash ?? '')));
+        $destination = strtolower(trim((string) ($event->destination_url ?? '')));
+
+        // A message/link pair is the strongest available unique-click identity and
+        // prevents repeated hits of the same tracked URL from counting repeatedly.
+        if ($messageUuid !== '') {
+            return $kind . '|message:' . $messageUuid . '|url:' . $destination;
+        }
+
+        if ($campaignUuid !== '') {
+            return $kind . '|campaign:' . $campaignUuid . '|url:' . $destination;
+        }
+
+        if ($visitorHash !== '') {
+            return $kind . '|visitor:' . $visitorHash . '|url:' . $destination;
+        }
+
+        return $kind . '|event:' . (string) ($event->id ?? uniqid('', true));
     }
 
     protected function normalizeCesCoachRow(array $coach): array
