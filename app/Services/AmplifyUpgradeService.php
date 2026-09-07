@@ -37,11 +37,11 @@ class AmplifyUpgradeService
         $currentPlanKey = $this->currentPlanKey($user, $billing);
         $isExistingJourneySubscriber = $currentPlanKey === 'my-journey';
 
-        // Service extensions must not force an existing My Journey subscriber to
-        // rebuild a full local billing address before checkout. Older/manual
-        // subscribers may predate BillingInformation, while their authoritative
-        // payer/contact/subscription identity already exists in the billing
-        // subaccount. Recover that identity first and reuse it.
+        // Existing My Journey subscribers keep the legacy recovery path because
+        // their $500 service-only checkout must stay attached to the subscription/contact
+        // already paying for My Journey. Free players use the $549 hosted enrollment form,
+        // which collects billing/payment details and starts My Journey in the same form;
+        // therefore a complete local billing address must never block that form from opening.
         if ($isExistingJourneySubscriber) {
             try {
                 if (filled($billing->ghl_subscription_id) || filled($user->ghl_subscriber_contact_id)) {
@@ -55,21 +55,16 @@ class AmplifyUpgradeService
                     'error' => $exception->getMessage(),
                 ]);
             }
-        } elseif (! $this->billingProfiles->isComplete($billing)) {
-            return array_merge([
-                'success' => false,
-                'completed' => false,
-                'reason' => 'billing_profile_required',
-                'message' => 'Complete your billing information to continue with secure checkout.',
-            ], $this->billingProfiles->requirementPayload($user, $billing));
+        } else {
+            $billing = $this->primeFreeEnrollmentIdentity($user, $billing);
         }
 
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
 
         if ($contactId === '') {
-            // Existing My Journey users can be re-linked using the account data
-            // already on file even when optional legacy billing address fields are
-            // blank. New enrollments still use the complete billing profile gate.
+            // Create/reuse the dedicated payer contact before opening either hosted
+            // checkout. Free enrollment only needs the player identity here; the hosted
+            // $549 form collects the billing address and payment details itself.
             try {
                 $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
                 $billing->refresh();
@@ -84,12 +79,23 @@ class AmplifyUpgradeService
         }
 
         if ($contactId === '') {
-            return array_merge([
+            if ($isExistingJourneySubscriber) {
+                return array_merge([
+                    'success' => false,
+                    'completed' => false,
+                    'reason' => 'billing_contact_unavailable',
+                    'message' => 'Your existing My Journey billing contact could not be connected yet. Please review your billing information and try again.',
+                ], $this->billingProfiles->requirementPayload($user, $billing));
+            }
+
+            // Do not send a Free player to the local billing-address recovery screen.
+            // The hosted $549 Amplify form is the enrollment/billing/payment form.
+            return [
                 'success' => false,
                 'completed' => false,
-                'reason' => 'billing_contact_unavailable',
-                'message' => 'Your billing information was saved, but the billing contact could not be connected yet. Please review it and try again.',
-            ], $this->billingProfiles->requirementPayload($user, $billing));
+                'reason' => 'checkout_contact_unavailable',
+                'message' => 'Secure checkout could not be connected to your PLYRCARD account. Please try again shortly.',
+            ];
         }
 
         $credentials = $this->billingAccount->credentials($billing);
@@ -378,6 +384,34 @@ class AmplifyUpgradeService
             'subscription_status' => $billing->subscription_status ?: 'active',
             'message' => 'Purchase confirmed. PLYRCARD will verify your Amplify purchase and you will receive a message soon.',
         ];
+    }
+
+    protected function primeFreeEnrollmentIdentity(User $user, BillingInformation $billing): BillingInformation
+    {
+        $updates = [];
+
+        if (blank($billing->billing_name)) {
+            $updates['billing_name'] = trim((string) $user->first_name . ' ' . (string) $user->last_name);
+        }
+        if (blank($billing->billing_email)) {
+            $updates['billing_email'] = $user->email ?: $user->personal_email;
+        }
+        if (blank($billing->billing_phone) && filled($user->phone)) {
+            $updates['billing_phone'] = $user->phone;
+        }
+        if (blank($billing->billing_country)) {
+            $updates['billing_country'] = $user->country ?: 'US';
+        }
+        if (blank($billing->ghl_location_id) && filled(config('ghl.location_id'))) {
+            $updates['ghl_location_id'] = config('ghl.location_id');
+        }
+
+        if ($updates !== []) {
+            $billing->forceFill($updates)->save();
+            $billing->refresh();
+        }
+
+        return $billing;
     }
 
     protected function checkoutUrl(User $user, BillingInformation $billing, string $contactId, string $checkoutId, string $currentPlanKey): string

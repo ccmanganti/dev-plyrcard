@@ -37,10 +37,11 @@ class JumpstartUpgradeService
         $previousPlanKey = $this->basePlanKey($user, $billing);
         $isExistingJourneySubscriber = $previousPlanKey === 'my-journey';
 
-        // Jumpstart is a service extension of My Journey. Existing subscribers
-        // should reuse their current payer/subscription identity instead of being
-        // blocked by address fields that older/manual accounts may never have
-        // stored locally.
+        // Existing My Journey subscribers keep the legacy recovery path because
+        // their $149 checkout must stay attached to the subscription/contact that is
+        // already paying for My Journey. Free players are different: the $198 hosted
+        // Jumpstart form itself collects the billing/payment details and starts My Journey,
+        // so a complete local billing address must never block the form from opening.
         if ($isExistingJourneySubscriber) {
             try {
                 if (filled($billing->ghl_subscription_id) || filled($user->ghl_subscriber_contact_id)) {
@@ -54,13 +55,8 @@ class JumpstartUpgradeService
                     'error' => $exception->getMessage(),
                 ]);
             }
-        } elseif (! $this->billingProfiles->isComplete($billing)) {
-            return array_merge([
-                'success' => false,
-                'completed' => false,
-                'reason' => 'billing_profile_required',
-                'message' => 'Complete your billing information to continue with checkout.',
-            ], $this->billingProfiles->requirementPayload($user, $billing));
+        } else {
+            $billing = $this->primeFreeEnrollmentIdentity($user, $billing);
         }
 
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
@@ -79,12 +75,24 @@ class JumpstartUpgradeService
         }
 
         if ($contactId === '') {
-            return array_merge([
+            if ($isExistingJourneySubscriber) {
+                return array_merge([
+                    'success' => false,
+                    'completed' => false,
+                    'reason' => 'billing_contact_unavailable',
+                    'message' => 'Your existing My Journey billing contact could not be connected yet. Please review your billing information and try again.',
+                ], $this->billingProfiles->requirementPayload($user, $billing));
+            }
+
+            // Do not fall back to the local billing-address recovery form for Free
+            // enrollment. The hosted $198 form is the billing/payment form. If the
+            // payer contact cannot be prepared, surface a retryable checkout error.
+            return [
                 'success' => false,
                 'completed' => false,
-                'reason' => 'billing_contact_unavailable',
-                'message' => 'Your billing information was saved, but the billing contact could not be connected yet. Please review it and try again.',
-            ], $this->billingProfiles->requirementPayload($user, $billing));
+                'reason' => 'checkout_contact_unavailable',
+                'message' => 'Secure checkout could not be connected to your PLYRCARD account. Please try again shortly.',
+            ];
         }
 
         $credentials = $this->billingAccount->credentials($billing);
@@ -284,6 +292,22 @@ class JumpstartUpgradeService
         }
 
         $user->refresh();
+
+        // The Free -> Jumpstart checkout includes the first My Journey subscription
+        // payment. Re-read the subscriber account after roles are assigned so Laravel
+        // stores the authoritative GHL subscription/customer/payment-method state and
+        // can track future subscription status changes from the same payer contact.
+        try {
+            $this->billingAccount->syncSubscriberAccount($user, $billing, true);
+            $billing->refresh();
+        } catch (\Throwable $e) {
+            Log::warning('Jumpstart completed but subscriber billing identity refresh was delayed.', [
+                'user_id' => $user->getKey(),
+                'billing_id' => $billing->getKey(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         try {
             $this->alerts->sendUpgradeCompleted($user->fresh('roles'), 'jumpstart', $expectedCents, [
                 'previous_plan' => (string) ($checkout['previous_plan_key'] ?? 'free'),
@@ -309,6 +333,34 @@ class JumpstartUpgradeService
             'jumpstart_active' => true,
             'message' => 'Jumpstart purchase confirmed. My Journey is active and your Jumpstart service is ready.',
         ];
+    }
+
+    protected function primeFreeEnrollmentIdentity(User $user, BillingInformation $billing): BillingInformation
+    {
+        $updates = [];
+
+        if (blank($billing->billing_name)) {
+            $updates['billing_name'] = trim((string) $user->first_name . ' ' . (string) $user->last_name);
+        }
+        if (blank($billing->billing_email)) {
+            $updates['billing_email'] = $user->email ?: $user->personal_email;
+        }
+        if (blank($billing->billing_phone) && filled($user->phone)) {
+            $updates['billing_phone'] = $user->phone;
+        }
+        if (blank($billing->billing_country)) {
+            $updates['billing_country'] = $user->country ?: 'US';
+        }
+        if (blank($billing->ghl_location_id) && filled(config('ghl.location_id'))) {
+            $updates['ghl_location_id'] = config('ghl.location_id');
+        }
+
+        if ($updates !== []) {
+            $billing->forceFill($updates)->save();
+            $billing->refresh();
+        }
+
+        return $billing;
     }
 
     protected function checkoutUrl(User $user, BillingInformation $billing, string $contactId, string $checkoutId, bool $needsJourney): string

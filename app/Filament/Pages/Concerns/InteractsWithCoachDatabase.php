@@ -492,9 +492,31 @@ trait InteractsWithCoachDatabase
         $hasCachedInbox = $this->primeInboxFromCacheForNavigation();
         $this->inboxInitialLoadCompleted = $hasCachedInbox;
 
-        // When cached rows already rendered with the persistent Recruiting Center shell,
-        // there is nothing to morph. Keep this request renderless so it cannot flash or
-        // repaint the Inbox after the browser already switched sections.
+        // v10.103.10: the Inbox list may be cached while the default selected thread has
+        // never had its messages cached. In that case the old fast path skipped rendering
+        // and returned with a selected coach but an empty message pane. Treat the default
+        // selection exactly like a manual conversation click: hydrate its cached messages
+        // first, then fetch the latest page in this same Inbox-entry request only when the
+        // thread cache is empty.
+        if ($hasCachedInbox && $this->selectedConversationId && empty($this->messages)) {
+            $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
+
+            if (empty($this->messages)) {
+                $this->isLoadingConversationMessages = true;
+                $this->isRefreshingRemoteData = false;
+                $this->activeUiOperation = 'Loading messages';
+                $this->loadConversationMessages(true);
+
+                // Do not skip this render. The response contains the default thread that
+                // was missing from the already-mounted Inbox panel.
+                $this->dispatch('rc-section-switched', section: 'conversations');
+                return;
+            }
+        }
+
+        // When both the cached Inbox rows and the selected thread are already available,
+        // there is nothing to morph. Keep this request renderless so revisiting Inbox stays
+        // instant and does not repaint the panel.
         if ($hasCachedInbox) {
             if (method_exists($this, 'skipRender')) {
                 $this->skipRender();
@@ -504,9 +526,9 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // First-ever Inbox visit has no cache to display. Only in that case perform one
-        // live fetch so the user is not left with an empty Inbox forever. Subsequent
-        // visits use cache immediately and the Refresh button remains the live update path.
+        // First-ever Inbox visit has no conversation cache to display. Fetch the Inbox once;
+        // loadConversations() already selects the first row and loads that row's messages
+        // when no cached thread exists.
         $this->inboxInitialLoadCompleted = true;
         $this->loadConversations();
         $this->dispatch('rc-section-switched', section: 'conversations');
