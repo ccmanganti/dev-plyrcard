@@ -55,7 +55,7 @@
                 // messages yet. enterInboxSection() will now fetch that default thread in
                 // the same request when its message cache is missing.
                 const hasRenderedMessages = !!document.querySelector(
-                    '[data-rc-client-section="conversations"] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
+                    '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
                 );
 
                 if (!hasRenderedMessages) {
