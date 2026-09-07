@@ -49,6 +49,22 @@
             closeFreeGate() {
                 this.freeGateOpen = false;
             },
+            openInboxSection() {
+                // v10.103.10: Inbox already paints its cached/default selection locally.
+                // Only cover the message pane when that selected thread has no rendered
+                // messages yet. enterInboxSection() will now fetch that default thread in
+                // the same request when its message cache is missing.
+                const hasRenderedMessages = !!document.querySelector(
+                    '[data-rc-client-section="conversations"] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
+                );
+
+                if (!hasRenderedMessages) {
+                    document.documentElement.setAttribute('data-rc-inbox-loading', 'default');
+                }
+
+                return Promise.resolve(this.$wire.enterInboxSection())
+                    .finally(() => document.documentElement.removeAttribute('data-rc-inbox-loading'));
+            },
 discoverSelectedIds: [],
             discoverSearch: '',
             discoverDivision: '',
@@ -102,7 +118,7 @@ discoverSelectedIds: [],
                 // so refresh Inbox once after Alpine is mounted. This root init runs once
                 // per Livewire page component and cannot recurse when Inbox re-renders.
                 if (this.activeSection === 'conversations') {
-                    this.$nextTick(() => this.$wire.enterInboxSection());
+                    this.$nextTick(() => this.openInboxSection());
                 }
             },
             normalizeGlobalSchoolName(value) {
@@ -432,7 +448,7 @@ discoverSelectedIds: [],
             }
         }"
         x-on:rc-client-section.window="activeSection = String($event.detail?.section || activeSection)"
-        x-on:rc-fast-section.window="(($event.detail?.section || '') === 'conversations') ? $wire.enterInboxSection() : $wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
+        x-on:rc-fast-section.window="(($event.detail?.section || '') === 'conversations') ? openInboxSection() : $wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
         x-on:rc-free-plan-gate.window="openFreeGate($event.detail?.section || 'dashboard')"
         x-on:rc-free-plan-gate-close.window="closeFreeGate()"
         x-on:keydown.escape.window="if (freeGateOpen) closeFreeGate()"
@@ -13103,8 +13119,13 @@ CSS;
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
-                    this.selectionHandler = () => this.captureSelection();
-                    document.addEventListener('selectionchange', this.selectionHandler);
+                    const captureSelection = typeof this.captureSelection === 'function'
+                        ? this.captureSelection.bind(this)
+                        : null;
+                    this.selectionHandler = captureSelection;
+                    if (this.selectionHandler) {
+                        document.addEventListener('selectionchange', this.selectionHandler);
+                    }
                     this.$nextTick(() => {
                         this.bootEditor();
                         setTimeout(() => this.bootEditor(true), 80);

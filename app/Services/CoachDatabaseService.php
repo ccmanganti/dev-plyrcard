@@ -7,6 +7,8 @@ use App\Models\School;
 use App\Models\Coach;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class CoachDatabaseService
@@ -1037,17 +1039,57 @@ class CoachDatabaseService
                 ->contains(fn (string $tag): bool => str_contains($tag, 'saved school'));
     }
 
-    /** PLYRCARD CES V1 per-coach formula + school rollup. */
+    /**
+     * PLYRCARD CES V1 per-coach formula rolled up to one school score.
+     *
+     * CES_v1 = min(100,
+     *     6  * unique_site_clicks
+     *   + 10 * film_clicks
+     *   + 30 * coach_replies
+     *   + 10 * additional_thread_turns
+     * )
+     *
+     * SCHOOL = min(100, max_coach_score + 0.20 * sum(other weighted coach scores))
+     */
     protected function schoolEngagementScore(Collection $schoolCoaches): int
     {
         $scores = $schoolCoaches
             ->filter(fn ($coach): bool => is_array($coach))
-            ->map(function (array $coach): array {
-                $coachReplies = max((int) ($coach['coach_reply_count'] ?? 0), (bool) ($coach['replied'] ?? false) ? 1 : 0);
-                $uniqueSiteClicks = max((int) ($coach['unique_site_clicks'] ?? 0), (int) ($coach['website_click_count'] ?? 0), (int) ($coach['view_profile_website'] ?? 0));
-                $filmClicks = max((int) ($coach['film_clicks'] ?? 0), (int) ($coach['youtube_click_count'] ?? 0), (int) ($coach['view_profile_youtube'] ?? 0), (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0);
-                $threadDepth = max((int) ($coach['thread_depth'] ?? 0), $coachReplies);
-                $additionalThreadTurns = max((int) ($coach['additional_thread_turns'] ?? 0), max(0, $threadDepth - 1));
+            ->values()
+            ->map(function (array $coach, int $index): array {
+                $coachReplies = max(
+                    0,
+                    (int) ($coach['coach_reply_count'] ?? 0),
+                    (bool) ($coach['replied'] ?? false) ? 1 : 0,
+                );
+
+                $uniqueSiteClicks = max(
+                    0,
+                    (int) ($coach['unique_site_clicks'] ?? 0),
+                    (int) ($coach['website_click_count'] ?? 0),
+                    (int) ($coach['view_profile_website'] ?? 0),
+                );
+
+                $filmClicks = max(
+                    0,
+                    (int) ($coach['film_clicks'] ?? 0),
+                    (int) ($coach['youtube_click_count'] ?? 0),
+                    (int) ($coach['view_profile_youtube'] ?? 0),
+                    (int) ($coach['highlight_view_count'] ?? 0),
+                    (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0,
+                );
+
+                $threadDepth = max(
+                    0,
+                    (int) ($coach['thread_depth'] ?? 0),
+                    $coachReplies,
+                );
+
+                $additionalThreadTurns = max(
+                    0,
+                    (int) ($coach['additional_thread_turns'] ?? 0),
+                    max(0, $threadDepth - 1),
+                );
 
                 $score = min(100,
                     (6 * $uniqueSiteClicks)
@@ -1059,55 +1101,386 @@ class CoachDatabaseService
                 $title = strtolower(trim((string) ($coach['title'] ?? $coach['position'] ?? '')));
 
                 return [
+                    'index' => $index,
                     'score' => max(0, (int) $score),
+                    // The spec gives assistant coaches a 0.7 multiplier inside
+                    // the secondary-coach sum. Head coaches/recruiting coordinators
+                    // and other roles remain 1.0.
                     'secondary_weight' => str_contains($title, 'assistant') ? 0.7 : 1.0,
                 ];
-            })
-            ->filter(fn (array $row): bool => (int) ($row['score'] ?? 0) > 0)
-            ->values();
+            });
 
-        if ($scores->isEmpty()) return 0;
+        if ($scores->isEmpty()) {
+            return 0;
+        }
 
-        $strongestIndex = 0;
-        $strongestScore = -1;
-        foreach ($scores as $index => $row) {
-            if ((int) $row['score'] > $strongestScore) {
-                $strongestScore = (int) $row['score'];
-                $strongestIndex = $index;
+        $strongest = $scores->sortByDesc('score')->first();
+        $strongestIndex = (int) ($strongest['index'] ?? 0);
+        $strongestScore = (int) ($strongest['score'] ?? 0);
+
+        $otherWeightedScores = $scores->sum(function (array $row) use ($strongestIndex): float {
+            if ((int) ($row['index'] ?? -1) === $strongestIndex) {
+                return 0.0;
+            }
+
+            return (int) ($row['score'] ?? 0) * (float) ($row['secondary_weight'] ?? 1.0);
+        });
+
+        return min(100, max(0, (int) round(
+            $strongestScore + (0.20 * $otherWeightedScores)
+        )));
+    }
+
+    /**
+     * Calculate one school's CES from the COMPLETE coach roster for that school.
+     *
+     * The canonical local roster decides which coaches belong to the school. We then
+     * enrich each coach with:
+     *  - cached GHL/CSV reply + thread counters when available; and
+     *  - local tracking events for site/profile and film/YouTube activity.
+     *
+     * This intentionally does not rely on the recruiting snapshot alone. The local
+     * event table is the source that already powers the Admin/Locker Room activity
+     * drawers, so a stale or empty remote snapshot cannot force an active school to 0.
+     */
+    public function schoolEngagementScoreForUser(User $user, array $school): int
+    {
+        $canonicalSchool = $school;
+        $schoolReference = collect([
+            $school['id'] ?? null,
+            $school['school_id'] ?? null,
+        ])->map(fn ($value): string => trim((string) $value))
+            ->first(fn (string $value): bool => $value !== '');
+
+        // Always prefer the canonical local school row because it contains the full
+        // local coaching staff, not the lightweight preview used by some UI payloads.
+        if (filled($schoolReference)) {
+            try {
+                $localSchool = app(LocalRecruitingDatabaseService::class)
+                    ->schoolRow($user, (string) $schoolReference);
+
+                if (is_array($localSchool)) {
+                    $canonicalSchool = array_replace($school, $localSchool);
+                }
+            } catch (\Throwable) {
+                // Fall through to the roster already supplied by the caller.
             }
         }
 
-        $others = $scores->sum(fn (array $row, int $index): float => $index === $strongestIndex
-            ? 0.0
-            : ((int) ($row['score'] ?? 0) * (float) ($row['secondary_weight'] ?? 1.0)));
+        $targetName = $this->normalizeSchoolKey((string) (
+            $canonicalSchool['name']
+            ?? $canonicalSchool['school']
+            ?? $canonicalSchool['school_name']
+            ?? $canonicalSchool['company_name']
+            ?? $school['name']
+            ?? ''
+        ));
 
-        return min(100, max(0, (int) round($strongestScore + (0.20 * $others))));
-    }
-
-    /** Shared cache-only score for both Admin and Locker Room school drawers. */
-    public function schoolEngagementScoreForUser(User $user, array $school): int
-    {
-        $snapshot = $this->cachedRecruitingSnapshotForUser($user);
-        if (! is_array($snapshot)) return 0;
-
-        $targetIds = collect([$school['id'] ?? null, $school['school_id'] ?? null, $school['business_id'] ?? null, $school['company_id'] ?? null, $school['ghl_business_id'] ?? null])
-            ->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique()->values();
-        $targetName = $this->normalizeSchoolKey((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
-
-        $coaches = collect($snapshot['coaches'] ?? [])
-            ->filter(fn ($coach): bool => is_array($coach))
-            ->map(fn (array $coach): array => $this->slimCoach($coach))
-            ->filter(function (array $coach) use ($targetIds, $targetName): bool {
-                $coachIds = collect([$coach['school_id'] ?? null, $coach['business_id'] ?? null, $coach['company_id'] ?? null, $coach['ghl_business_id'] ?? null])
-                    ->map(fn ($value): string => strtolower(trim((string) $value)))->filter();
-                if ($targetIds->isNotEmpty() && $coachIds->intersect($targetIds)->isNotEmpty()) return true;
-                if ($targetName === '') return false;
-                return $this->normalizeSchoolKey((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? '')) === $targetName;
-            })
-            ->unique(fn (array $coach): string => $this->coachUniqueKey($coach))
+        $targetBusinessIds = collect([
+            $canonicalSchool['business_id'] ?? null,
+            $canonicalSchool['company_id'] ?? null,
+            $canonicalSchool['ghl_business_id'] ?? null,
+            $school['business_id'] ?? null,
+            $school['company_id'] ?? null,
+            $school['ghl_business_id'] ?? null,
+        ])->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->unique()
             ->values();
 
-        return $this->schoolEngagementScore($coaches);
+        $roster = collect($canonicalSchool['coaches'] ?? $school['coaches'] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): array => $this->normalizeCesCoachRow($row))
+            ->filter(fn (array $row): bool => $this->cesCoachHasIdentity($row))
+            ->unique(fn (array $row): string => $this->cesCoachIdentityKey($row))
+            ->values();
+
+        // Defensive fallback: if the local service returned a lightweight row without
+        // embedded coaches, collect every local Coach record assigned to this school.
+        $resolvedLocalSchoolId = (int) (
+            $canonicalSchool['id']
+            ?? $canonicalSchool['school_id']
+            ?? $school['id']
+            ?? $school['school_id']
+            ?? 0
+        );
+
+        if ($roster->isEmpty() && $resolvedLocalSchoolId > 0) {
+            try {
+                $roster = Coach::query()
+                    ->where('school_id', $resolvedLocalSchoolId)
+                    ->get()
+                    ->map(function (Coach $coach): array {
+                        return $this->normalizeCesCoachRow([
+                            'id' => $coach->getKey(),
+                            'contact_id' => $coach->ghl_contact_id ?? $coach->contact_id ?? null,
+                            'ghl_contact_id' => $coach->ghl_contact_id ?? null,
+                            'name' => $coach->display_name ?? trim((string) (($coach->first_name ?? '') . ' ' . ($coach->last_name ?? ''))),
+                            'email' => $coach->email ?? null,
+                            'title' => $coach->title ?? $coach->position ?? null,
+                        ]);
+                    })
+                    ->filter(fn (array $row): bool => $this->cesCoachHasIdentity($row))
+                    ->unique(fn (array $row): string => $this->cesCoachIdentityKey($row))
+                    ->values();
+            } catch (\Throwable) {
+                $roster = collect();
+            }
+        }
+
+        $snapshot = $this->cachedRecruitingSnapshotForUser($user);
+        $snapshotCoaches = collect(is_array($snapshot) ? ($snapshot['coaches'] ?? []) : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): array => $this->slimCoach($row))
+            ->filter(function (array $coach) use ($targetName, $targetBusinessIds): bool {
+                $coachBusinessIds = collect([
+                    $coach['business_id'] ?? null,
+                    $coach['company_id'] ?? null,
+                    $coach['ghl_business_id'] ?? null,
+                    $coach['school_id'] ?? null,
+                ])->map(fn ($value): string => strtolower(trim((string) $value)))
+                    ->filter();
+
+                if ($targetBusinessIds->isNotEmpty() && $coachBusinessIds->intersect($targetBusinessIds)->isNotEmpty()) {
+                    return true;
+                }
+
+                if ($targetName === '') {
+                    return false;
+                }
+
+                return $this->normalizeSchoolKey((string) (
+                    $coach['school']
+                    ?? $coach['school_name']
+                    ?? $coach['company_name']
+                    ?? ''
+                )) === $targetName;
+            })
+            ->map(fn (array $row): array => $this->normalizeCesCoachRow($row))
+            ->filter(fn (array $row): bool => $this->cesCoachHasIdentity($row))
+            ->unique(fn (array $row): string => $this->cesCoachIdentityKey($row))
+            ->values();
+
+        // Enrich roster coaches with remote reply/thread counters. If a coach exists in
+        // the Recruiting Center snapshot but not in the local roster yet, include them too
+        // because they are still a known staff member at this same school.
+        foreach ($snapshotCoaches as $remoteCoach) {
+            $matchIndex = $roster->search(fn (array $localCoach): bool => $this->cesCoachRowsMatch($localCoach, $remoteCoach));
+
+            if ($matchIndex !== false) {
+                $roster->put($matchIndex, array_replace($roster->get($matchIndex), $remoteCoach));
+            } else {
+                $roster->push($remoteCoach);
+            }
+        }
+
+        $roster = $roster
+            ->filter(fn ($row): bool => is_array($row) && $this->cesCoachHasIdentity($row))
+            ->unique(fn (array $row): string => $this->cesCoachIdentityKey($row))
+            ->values();
+
+        if ($roster->isEmpty()) {
+            return 0;
+        }
+
+        $identityToRoster = [];
+        foreach ($roster as $index => $coach) {
+            foreach ($this->cesCoachIdentifiers($coach) as $identifier) {
+                $identityToRoster[$identifier] = $index;
+            }
+        }
+
+        $localSiteFingerprints = [];
+        $localFilmClicks = [];
+
+        if (Schema::hasTable('coach_database_tracking_events')) {
+            try {
+                $acceptedCoachIds = array_keys($identityToRoster);
+
+                $events = DB::table('coach_database_tracking_events')
+                    ->where('athlete_user_id', $user->getKey())
+                    ->where(function ($query) use ($acceptedCoachIds, $targetBusinessIds): void {
+                        $hasCondition = false;
+
+                        if ($acceptedCoachIds !== []) {
+                            $query->whereIn(DB::raw('LOWER(coach_contact_id)'), $acceptedCoachIds);
+                            $hasCondition = true;
+                        }
+
+                        if ($targetBusinessIds->isNotEmpty()) {
+                            $method = $hasCondition ? 'orWhereIn' : 'whereIn';
+                            $query->{$method}(DB::raw('LOWER(school_business_id)'), $targetBusinessIds->all());
+                            $hasCondition = true;
+                        }
+
+                        if (! $hasCondition) {
+                            $query->whereRaw('1 = 0');
+                        }
+                    })
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($events as $event) {
+                    $metadata = [];
+                    if (is_string($event->metadata ?? null) && trim((string) $event->metadata) !== '') {
+                        $decoded = json_decode((string) $event->metadata, true);
+                        $metadata = is_array($decoded) ? $decoded : [];
+                    }
+
+                    $eventIdentifiers = collect([
+                        $event->coach_contact_id ?? null,
+                        $metadata['coach_contact_id'] ?? null,
+                        $metadata['coach_email'] ?? null,
+                        $metadata['recipient_email'] ?? null,
+                    ])->map(fn ($value): string => strtolower(trim((string) $value)))
+                        ->filter()
+                        ->unique()
+                        ->values();
+
+                    $rosterIndex = null;
+                    foreach ($eventIdentifiers as $identifier) {
+                        if (array_key_exists($identifier, $identityToRoster)) {
+                            $rosterIndex = $identityToRoster[$identifier];
+                            break;
+                        }
+                    }
+
+                    if ($rosterIndex === null) {
+                        continue;
+                    }
+
+                    $eventType = strtolower(trim((string) ($event->event_type ?? '')));
+                    $platform = strtolower(trim((string) ($event->platform ?? 'website')));
+                    $platform = match ($platform) {
+                        'yt' => 'youtube',
+                        'ig' => 'instagram',
+                        'twitter' => 'x',
+                        default => $platform,
+                    };
+
+                    $isSiteActivity = $platform === 'website'
+                        && in_array($eventType, ['profile_view', 'link_click'], true);
+
+                    if ($isSiteActivity) {
+                        // V1 asks for unique site clicks. Prefer the outbound-message identity,
+                        // then the visitor fingerprint, and finally the event id.
+                        $fingerprint = trim((string) ($event->message_uuid ?? ''));
+                        if ($fingerprint !== '') {
+                            $fingerprint .= '|' . trim((string) ($event->destination_url ?? ''));
+                        } elseif (filled($event->visitor_hash ?? null)) {
+                            $fingerprint = (string) $event->visitor_hash;
+                        } else {
+                            $fingerprint = 'event:' . (string) ($event->id ?? uniqid('', true));
+                        }
+
+                        $localSiteFingerprints[$rosterIndex][$fingerprint] = true;
+                    }
+
+                    if ($eventType === 'link_click' && $platform === 'youtube') {
+                        $localFilmClicks[$rosterIndex] = ($localFilmClicks[$rosterIndex] ?? 0) + 1;
+                    }
+                }
+            } catch (\Throwable) {
+                // Keep cached remote metrics as the fallback if local tracking is unavailable.
+            }
+        }
+
+        $roster = $roster->map(function (array $coach, int $index) use ($localSiteFingerprints, $localFilmClicks): array {
+            $siteClicks = isset($localSiteFingerprints[$index])
+                ? count($localSiteFingerprints[$index])
+                : 0;
+            $filmClicks = (int) ($localFilmClicks[$index] ?? 0);
+
+            $coach['unique_site_clicks'] = max(
+                (int) ($coach['unique_site_clicks'] ?? 0),
+                $siteClicks,
+            );
+            $coach['film_clicks'] = max(
+                (int) ($coach['film_clicks'] ?? 0),
+                $filmClicks,
+            );
+
+            return $coach;
+        });
+
+        return $this->schoolEngagementScore($roster);
+    }
+
+    protected function normalizeCesCoachRow(array $coach): array
+    {
+        $contactId = trim((string) (
+            $coach['contact_id']
+            ?? $coach['ghl_contact_id']
+            ?? $coach['contactId']
+            ?? ''
+        ));
+        $email = strtolower(trim((string) ($coach['email'] ?? $coach['coach_email'] ?? '')));
+
+        // In GHL snapshot rows `id` is normally the contact id. In local rows it may be
+        // the numeric database id, so only treat a non-numeric id as a contact identity.
+        $rowId = trim((string) ($coach['id'] ?? ''));
+        if ($contactId === '' && $rowId !== '' && ! ctype_digit($rowId)) {
+            $contactId = $rowId;
+        }
+
+        return array_replace($coach, [
+            'contact_id' => $contactId !== '' ? $contactId : null,
+            'ghl_contact_id' => $coach['ghl_contact_id'] ?? ($contactId !== '' ? $contactId : null),
+            'email' => $email !== '' ? $email : null,
+            'title' => $coach['title'] ?? $coach['position'] ?? null,
+            'coach_reply_count' => max(0, (int) ($coach['coach_reply_count'] ?? $coach['reply_count'] ?? $coach['replies'] ?? 0)),
+            'unique_site_clicks' => max(0, (int) ($coach['unique_site_clicks'] ?? 0)),
+            'film_clicks' => max(0, (int) ($coach['film_clicks'] ?? 0)),
+            'thread_depth' => max(0, (int) ($coach['thread_depth'] ?? 0)),
+            'additional_thread_turns' => max(0, (int) ($coach['additional_thread_turns'] ?? 0)),
+        ]);
+    }
+
+    protected function cesCoachHasIdentity(array $coach): bool
+    {
+        if ($this->cesCoachIdentifiers($coach) !== []) {
+            return true;
+        }
+
+        return filled($coach['id'] ?? null)
+            || filled($coach['name'] ?? null)
+            || filled($coach['display_name'] ?? null);
+    }
+
+    protected function cesCoachIdentityKey(array $coach): string
+    {
+        if ($identifier = ($this->cesCoachIdentifiers($coach)[0] ?? null)) {
+            return $identifier;
+        }
+
+        if (filled($coach['id'] ?? null)) {
+            return 'local:' . strtolower(trim((string) $coach['id']));
+        }
+
+        $name = strtolower(trim((string) ($coach['name'] ?? $coach['display_name'] ?? 'coach')));
+        return 'name:' . $name;
+    }
+
+    protected function cesCoachIdentifiers(array $coach): array
+    {
+        return collect([
+            $coach['contact_id'] ?? null,
+            $coach['ghl_contact_id'] ?? null,
+            $coach['contactId'] ?? null,
+            $coach['email'] ?? null,
+            $coach['coach_email'] ?? null,
+        ])->map(fn ($value): string => strtolower(trim((string) $value)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function cesCoachRowsMatch(array $left, array $right): bool
+    {
+        return collect($this->cesCoachIdentifiers($left))
+            ->intersect($this->cesCoachIdentifiers($right))
+            ->isNotEmpty();
     }
 
     protected function flattenRecruitingCustomFieldsFromDecodedJson($fields): array
