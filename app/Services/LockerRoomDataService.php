@@ -1065,6 +1065,7 @@ class LockerRoomDataService
         $payload['city'] = $payload['city'] ?? $school->city ?? null;
         $payload['state'] = $payload['state'] ?? $school->state ?? null;
         $payload['coaches'] = $coaches;
+        $payload['engagement_score'] = app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $payload);
 
         return [
             'school' => $payload,

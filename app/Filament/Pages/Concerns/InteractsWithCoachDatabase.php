@@ -5041,6 +5041,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 count($coaches),
             );
             $school['coaches_count'] = $school['coach_count'];
+            $school['engagement_score'] = app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $school);
 
             return ['success' => true, 'school' => $school];
         } catch (\Throwable $exception) {
@@ -13661,6 +13662,8 @@ HTML;
                 }
             }
         }
+
+        $school['engagement_score'] = app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $school);
 
         return $school;
     }

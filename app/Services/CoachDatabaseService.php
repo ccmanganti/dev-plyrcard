@@ -1037,30 +1037,77 @@ class CoachDatabaseService
                 ->contains(fn (string $tag): bool => str_contains($tag, 'saved school'));
     }
 
+    /** PLYRCARD CES V1 per-coach formula + school rollup. */
     protected function schoolEngagementScore(Collection $schoolCoaches): int
     {
-        return $schoolCoaches->sum(function (array $coach): int {
-            return
-                ((int) ($coach['view_profile_total'] ?? 0) * 5)
-                + ((int) ($coach['view_profile_website'] ?? 0) * 3)
-                + ((int) ($coach['view_profile_instagram'] ?? 0) * 3)
-                + ((int) ($coach['view_profile_youtube'] ?? 0) * 4)
-                + ((int) ($coach['view_profile_x'] ?? 0) * 3)
-                + ((int) ($coach['view_profile_email_link'] ?? 0) * 4)
-                + ((int) ($coach['website_click_count'] ?? 0) * 4)
-                + ((int) ($coach['instagram_click_count'] ?? 0) * 4)
-                + ((int) ($coach['youtube_click_count'] ?? 0) * 5)
-                + ((int) ($coach['x_click_count'] ?? 0) * 4)
-                + ((int) ($coach['email_open_count'] ?? 0) * 2)
-                + ((int) ($coach['email_click_count'] ?? 0) * 4)
-                + ((bool) ($coach['viewed_profile'] ?? false) ? 5 : 0)
-                + ((bool) ($coach['viewed_highlights'] ?? false) ? 4 : 0)
-                + ((bool) ($coach['trigger_link_clicked'] ?? false) ? 3 : 0)
-                + ((bool) ($coach['replied'] ?? false) ? 10 : 0)
-                + ((bool) ($coach['engaged'] ?? false) ? 3 : 0)
-                + ((bool) ($coach['is_favorite_coach'] ?? false) ? 2 : 0)
-                + ((bool) ($coach['is_saved_coach'] ?? false) ? 1 : 0);
-        });
+        $scores = $schoolCoaches
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->map(function (array $coach): array {
+                $coachReplies = max((int) ($coach['coach_reply_count'] ?? 0), (bool) ($coach['replied'] ?? false) ? 1 : 0);
+                $uniqueSiteClicks = max((int) ($coach['unique_site_clicks'] ?? 0), (int) ($coach['website_click_count'] ?? 0), (int) ($coach['view_profile_website'] ?? 0));
+                $filmClicks = max((int) ($coach['film_clicks'] ?? 0), (int) ($coach['youtube_click_count'] ?? 0), (int) ($coach['view_profile_youtube'] ?? 0), (bool) ($coach['viewed_highlights'] ?? false) ? 1 : 0);
+                $threadDepth = max((int) ($coach['thread_depth'] ?? 0), $coachReplies);
+                $additionalThreadTurns = max((int) ($coach['additional_thread_turns'] ?? 0), max(0, $threadDepth - 1));
+
+                $score = min(100,
+                    (6 * $uniqueSiteClicks)
+                    + (10 * $filmClicks)
+                    + (30 * $coachReplies)
+                    + (10 * $additionalThreadTurns)
+                );
+
+                $title = strtolower(trim((string) ($coach['title'] ?? $coach['position'] ?? '')));
+
+                return [
+                    'score' => max(0, (int) $score),
+                    'secondary_weight' => str_contains($title, 'assistant') ? 0.7 : 1.0,
+                ];
+            })
+            ->filter(fn (array $row): bool => (int) ($row['score'] ?? 0) > 0)
+            ->values();
+
+        if ($scores->isEmpty()) return 0;
+
+        $strongestIndex = 0;
+        $strongestScore = -1;
+        foreach ($scores as $index => $row) {
+            if ((int) $row['score'] > $strongestScore) {
+                $strongestScore = (int) $row['score'];
+                $strongestIndex = $index;
+            }
+        }
+
+        $others = $scores->sum(fn (array $row, int $index): float => $index === $strongestIndex
+            ? 0.0
+            : ((int) ($row['score'] ?? 0) * (float) ($row['secondary_weight'] ?? 1.0)));
+
+        return min(100, max(0, (int) round($strongestScore + (0.20 * $others))));
+    }
+
+    /** Shared cache-only score for both Admin and Locker Room school drawers. */
+    public function schoolEngagementScoreForUser(User $user, array $school): int
+    {
+        $snapshot = $this->cachedRecruitingSnapshotForUser($user);
+        if (! is_array($snapshot)) return 0;
+
+        $targetIds = collect([$school['id'] ?? null, $school['school_id'] ?? null, $school['business_id'] ?? null, $school['company_id'] ?? null, $school['ghl_business_id'] ?? null])
+            ->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique()->values();
+        $targetName = $this->normalizeSchoolKey((string) ($school['name'] ?? $school['school'] ?? $school['school_name'] ?? $school['company_name'] ?? ''));
+
+        $coaches = collect($snapshot['coaches'] ?? [])
+            ->filter(fn ($coach): bool => is_array($coach))
+            ->map(fn (array $coach): array => $this->slimCoach($coach))
+            ->filter(function (array $coach) use ($targetIds, $targetName): bool {
+                $coachIds = collect([$coach['school_id'] ?? null, $coach['business_id'] ?? null, $coach['company_id'] ?? null, $coach['ghl_business_id'] ?? null])
+                    ->map(fn ($value): string => strtolower(trim((string) $value)))->filter();
+                if ($targetIds->isNotEmpty() && $coachIds->intersect($targetIds)->isNotEmpty()) return true;
+                if ($targetName === '') return false;
+                return $this->normalizeSchoolKey((string) ($coach['school'] ?? $coach['school_name'] ?? $coach['company_name'] ?? '')) === $targetName;
+            })
+            ->unique(fn (array $coach): string => $this->coachUniqueKey($coach))
+            ->values();
+
+        return $this->schoolEngagementScore($coaches);
     }
 
     protected function flattenRecruitingCustomFieldsFromDecodedJson($fields): array
@@ -1416,6 +1463,10 @@ class CoachDatabaseService
             'profile_view_count' => (int) max((int) ($coach['profile_view_count'] ?? 0), $profileTotal),
             'trigger_link_click_count' => (int) max((int) ($coach['trigger_link_click_count'] ?? 0), $emailClickCount, $websiteClickCount, $instagramClickCount, $youtubeClickCount, $xClickCount),
             'coach_reply_count' => $this->recruitingIntFromRow($coach, ['coach_reply_count', 'reply_count', 'replies']),
+            'unique_site_clicks' => $this->recruitingIntFromRow($coach, ['unique_site_clicks', 'site_unique_clicks', 'unique_website_clicks', 'website_unique_clicks']),
+            'film_clicks' => $this->recruitingIntFromRow($coach, ['film_clicks', 'film_click_count', 'highlight_clicks', 'highlight_view_count']),
+            'thread_depth' => $this->recruitingIntFromRow($coach, ['thread_depth', 'conversation_thread_depth', 'reply_thread_depth']),
+            'additional_thread_turns' => $this->recruitingIntFromRow($coach, ['additional_thread_turns', 'additional_reply_turns', 'thread_turns_after_first']),
         ];
     }
 
