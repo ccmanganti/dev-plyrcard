@@ -194,14 +194,13 @@ discoverSelectedIds: [],
                     return true;
                 };
 
-                if (cached && applyDetails(cached)) {
-                    this.discoverSchoolCoachesLoading = false;
-                    this.discoverSchoolCoachesLoadedFor = id;
-                    return;
-                }
-
-                this.discoverSchoolCoachesLoading = true;
-                this.discoverSchoolCoachesLoadedFor = '';
+                // Reuse cached roster/details instantly, but never let that cache become
+                // authoritative for CES. Engagement changes over time, and older browser
+                // snapshots may still contain engagement_score: 0 from before CES existed.
+                // Always refresh this one school from the renderless server method below.
+                const hadCachedDetails = !!(cached && applyDetails(cached));
+                this.discoverSchoolCoachesLoading = !hadCachedDetails;
+                this.discoverSchoolCoachesLoadedFor = hadCachedDetails ? id : '';
 
                 try {
                     const result = await this.$wire.call('schoolDrawerDataForClient', id);
