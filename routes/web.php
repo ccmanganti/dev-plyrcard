@@ -361,10 +361,11 @@ Route::post('/locker-room/login', function (Request $request) {
         ->latest('updated_at')
         ->first();
 
-    // v10.38: after drawer sign-in, return the player to THEIR published PLYRCARD.
-    // If it is still preparing/unpublished, use the main PLYRCARD homepage instead.
-    // Build from APP_URL so a request originating on a custom domain never sends the
-    // user to that custom domain's root by mistake.
+    // v10.107: Locker Room sign-in always lands on the player's published PLYRCARD.
+    // Custom domains continue through the owner bridge so the destination domain gets
+    // its own authenticated owner session. If no published site exists yet, fall back
+    // to the main PLYRCARD homepage. Build from APP_URL so a login originating on a
+    // custom domain can never accidentally redirect to that domain's unrelated root.
     $mainAppUrl = rtrim((string) config('app.url'), '/');
     if ($mainAppUrl === '') {
         $mainAppUrl = rtrim($request->getSchemeAndHttpHost(), '/');
@@ -483,14 +484,6 @@ Route::middleware(['auth'])->group(function () {
 
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
         ->name('locker-room.profile.update');
-
-    Route::post('/locker-room/photos', [LockerRoomController::class, 'uploadPhotos'])
-        ->name('locker-room.photos.upload');
-
-    Route::delete('/locker-room/photos/{category}/{index}', [LockerRoomController::class, 'deletePhoto'])
-        ->where('category', 'player|plyrcard')
-        ->whereNumber('index')
-        ->name('locker-room.photos.delete');
 
     Route::post('/locker-room/schedule', [LockerRoomController::class, 'storeSchedule'])
         ->name('locker-room.schedule.store');

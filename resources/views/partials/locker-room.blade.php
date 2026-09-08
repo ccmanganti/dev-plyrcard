@@ -93,6 +93,20 @@
     $lrFacebookUrl = 'https://www.facebook.com/plyrcard';
     $lrMainShareUrl = rtrim((string) config('app.url', url('/')), '/');
 
+    // v10.107: desktop Locker Room navigation always points back to the main
+    // PLYRCARD Recruiting Center, even when the Locker Room is opened on a
+    // player's custom domain. Keep the CTA itself limited to the main app host.
+    $lrAppBaseUrl = rtrim((string) config('app.url', 'https://plyrcard.com'), '/');
+    if ($lrAppBaseUrl === '') {
+        $lrAppBaseUrl = 'https://plyrcard.com';
+    }
+    $lrRecruitingCenterUrl = $lrAppBaseUrl . '/admin/coach-database';
+    $lrCurrentHost = strtolower((string) request()->getHost());
+    $lrCurrentHost = preg_replace('/^www\./', '', $lrCurrentHost) ?: $lrCurrentHost;
+    $lrAppHost = strtolower((string) parse_url($lrAppBaseUrl, PHP_URL_HOST));
+    $lrAppHost = preg_replace('/^www\./', '', $lrAppHost) ?: $lrAppHost;
+    $lrOnMainPlyrcardHost = $lrCurrentHost !== '' && $lrCurrentHost === $lrAppHost;
+
     // v10.38: authenticated Locker Room is public-player-site only. The navigation
     // partial resolves ownership and passes $plyrShouldRenderPullup. Never allow a
     // direct include to make Locker Room appear inside Filament/Admin.
@@ -572,6 +586,16 @@
     }
     #plyrcard-action-drawer.lr-drawer .lr-home-section-head strong { display:block; color:#111827; font-size:14px; font-weight:850; }
     #plyrcard-action-drawer.lr-drawer .lr-home-section-head span { display:block; margin-top:3px; color:#7b8492; font-size:11px; }
+    #plyrcard-action-drawer.lr-drawer .lr-desktop-recruiting-link {
+        display:none; align-items:center; gap:8px; min-height:36px; padding:8px 12px;
+        border:1px solid #e3e6eb; border-radius:10px; background:#fff; color:#111827;
+        text-decoration:none; font-size:11px; font-weight:850; line-height:1; white-space:nowrap;
+        box-shadow:0 3px 10px rgba(15,23,42,.035); transition:border-color .14s ease, box-shadow .14s ease, transform .14s ease;
+    }
+    #plyrcard-action-drawer.lr-drawer .lr-desktop-recruiting-link i { color:#ff5c35; font-size:11px; }
+    #plyrcard-action-drawer.lr-drawer .lr-desktop-recruiting-link:hover {
+        border-color:#ffb59e; box-shadow:0 7px 16px rgba(15,23,42,.06); transform:translateY(-1px);
+    }
     #plyrcard-action-drawer.lr-drawer .lr-menu-grid {
         width:100% !important;
         grid-template-columns:repeat(2,minmax(0,1fr)) !important;
@@ -596,6 +620,9 @@
     #plyrcard-action-drawer.lr-drawer .lr-menu-copy strong { font-size:14px !important; }
     #plyrcard-action-drawer.lr-drawer .lr-menu-copy small { font-size:11px !important; line-height:1.35 !important; }
 
+    @media (min-width: 901px) {
+        #plyrcard-action-drawer.lr-drawer .lr-desktop-recruiting-link { display:inline-flex; }
+    }
     @media (min-width: 901px) and (max-width: 1250px) {
         #plyrcard-action-drawer.lr-drawer .lr-view { padding:20px !important; }
         #plyrcard-action-drawer.lr-drawer .lr-home-hero { padding:21px !important; }
@@ -712,6 +739,7 @@
      data-password-reset-url="{{ $lrPasswordResetUrl }}"
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
      data-main-share-url="{{ $lrMainShareUrl }}"
+     data-recruiting-center-url="{{ $lrRecruitingCenterUrl }}"
      data-force-password="{{ $lrMustChangePassword ? '1' : '0' }}"
      data-authenticated="{{ $lrLoggedIn ? '1' : '0' }}">
     <button type="button" class="lr-scrim" data-lr-close aria-label="Close Locker Room"></button>
@@ -748,6 +776,12 @@
                         <div class="lr-preparing" data-lr-preparing hidden><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>We are preparing your PLYRCARD.</strong><span>Complete your profile while our team gets your public PLYRCARD and recruiting workspace ready.</span></div></div>
                         <div class="lr-home-section-head">
                             <div><strong>Quick Access</strong><span>Manage your PLYRCARD without leaving this screen.</span></div>
+                            @if($lrLoggedIn && $lrOnMainPlyrcardHost)
+                                <a class="lr-desktop-recruiting-link" href="{{ $lrRecruitingCenterUrl }}">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                                    <span>Go to Recruiting Center</span>
+                                </a>
+                            @endif
                         </div>
                         <div class="lr-menu-grid">
                             <button class="lr-menu-card" type="button" data-lr-nav="dashboard" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-chart-line"></i></span><span class="lr-menu-copy"><strong>Dashboard</strong><small>Recruiting stats and progress</small></span></button>
@@ -1148,6 +1182,7 @@
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value || '';
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+    const isDesktopLockerRoom = () => window.matchMedia ? window.matchMedia('(min-width: 901px)').matches : window.innerWidth > 900;
 
     const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
     const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
@@ -2168,7 +2203,19 @@
             goBack();
             return;
         }
-        const nav = event.target.closest('[data-lr-nav]'); if (nav && drawer.contains(nav)) { event.preventDefault(); setView(nav.dataset.lrNav); return; }
+        const nav = event.target.closest('[data-lr-nav]');
+        if (nav && drawer.contains(nav)) {
+            event.preventDefault();
+            // v10.107: on desktop, Dashboard is the full Recruiting Center in the
+            // main Admin panel. Phones/tablets keep the compact Locker Room dashboard.
+            if (authenticated && nav.dataset.lrNav === 'dashboard' && isDesktopLockerRoom()) {
+                const recruitingUrl = drawer.dataset.recruitingCenterUrl || '/admin/coach-database';
+                window.location.assign(recruitingUrl);
+                return;
+            }
+            setView(nav.dataset.lrNav);
+            return;
+        }
         const photoTab = event.target.closest('[data-lr-photo-tab]'); if (photoTab && drawer.contains(photoTab)) { event.preventDefault(); photoGalleryCategory = photoTab.dataset.lrPhotoTab === 'plyrcard' ? 'plyrcard' : 'player'; setPhotoStatus(''); renderPhotos(); return; }
         const photoPick = event.target.closest('[data-lr-photo-pick]'); if (photoPick && drawer.contains(photoPick)) { event.preventDefault(); q('[data-lr-photo-files]')?.click(); return; }
         const photoDelete = event.target.closest('[data-lr-photo-delete]'); if (photoDelete && drawer.contains(photoDelete)) { event.preventDefault(); deleteLockerPhoto(Number(photoDelete.dataset.lrPhotoDelete), photoDelete.dataset.lrPhotoSource || '', photoDelete.dataset.lrPhotoField || ''); return; }
