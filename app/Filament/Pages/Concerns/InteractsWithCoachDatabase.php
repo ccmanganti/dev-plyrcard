@@ -4968,7 +4968,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         try {
-            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+            $school = $this->canonicalAdminSchoolPayloadForCes($user, $schoolId);
 
             if (! is_array($school)) {
                 return ['success' => false, 'school' => null];
@@ -5056,11 +5056,111 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     }
 
     /**
+     * Resolve an Admin drawer reference to the same canonical local School identity
+     * used by LockerRoomDataService::dashboardSchool(). The browser catalog can carry
+     * either a local school id, a GHL business id, a `school:Name` key, or a name.
+     * CES must always receive the local primary key + complete local roster.
+     */
+    protected function canonicalAdminSchoolPayloadForCes($user, string $reference): ?array
+    {
+        $reference = trim(urldecode($reference));
+        if ($reference === '') {
+            return null;
+        }
+
+        $schoolModel = null;
+
+        if (str_starts_with($reference, 'school:')) {
+            $name = trim(substr($reference, 7));
+            if ($name !== '') {
+                $schoolModel = \App\Models\School::query()
+                    ->whereRaw('LOWER(name) = ?', [strtolower($name)])
+                    ->first();
+            }
+        }
+
+        if (! $schoolModel && ctype_digit($reference)) {
+            $schoolModel = \App\Models\School::query()->find((int) $reference);
+        }
+
+        if (! $schoolModel && Schema::hasTable('schools') && Schema::hasColumn('schools', 'ghl_business_id')) {
+            $schoolModel = \App\Models\School::query()
+                ->where('ghl_business_id', $reference)
+                ->first();
+        }
+
+        if (! $schoolModel && Schema::hasTable('schools')) {
+            $schoolModel = \App\Models\School::query()
+                ->whereRaw('LOWER(name) = ?', [strtolower($reference)])
+                ->first();
+        }
+
+        // Keep the legacy resolver as a final fallback for unusual installations,
+        // but prefer the canonical local School model whenever it can be resolved.
+        if (! $schoolModel) {
+            $fallback = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $reference);
+            return is_array($fallback) ? $fallback : null;
+        }
+
+        $localId = (string) $schoolModel->getKey();
+        $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $localId);
+        $school = is_array($school) ? $school : [];
+
+        $coaches = collect($school['coaches'] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->values()
+            ->all();
+
+        if ($coaches === [] && Schema::hasTable('coaches') && Schema::hasColumn('coaches', 'school_id')) {
+            $query = DB::table('coaches')->where('school_id', $schoolModel->getKey());
+            if (Schema::hasColumn('coaches', 'deleted_at')) {
+                $query->whereNull('deleted_at');
+            }
+
+            $coaches = $query->get()->map(function ($record): array {
+                $row = (array) $record;
+                return [
+                    'id' => $row['id'] ?? null,
+                    'contact_id' => $row['ghl_contact_id'] ?? $row['contact_id'] ?? null,
+                    'ghl_contact_id' => $row['ghl_contact_id'] ?? null,
+                    'name' => trim((string) ($row['display_name'] ?? ''))
+                        ?: trim((string) (($row['first_name'] ?? '') . ' ' . ($row['last_name'] ?? '')))
+                        ?: 'Coach',
+                    'first_name' => $row['first_name'] ?? null,
+                    'last_name' => $row['last_name'] ?? null,
+                    'email' => $row['email'] ?? null,
+                    'phone' => $row['phone'] ?? null,
+                    'title' => $row['title'] ?? $row['position'] ?? null,
+                ];
+            })->values()->all();
+        }
+
+        $school['id'] = $localId;
+        $school['school_id'] = $localId;
+        $school['business_id'] = $school['business_id'] ?? $schoolModel->ghl_business_id ?? null;
+        $school['ghl_business_id'] = $school['ghl_business_id'] ?? $schoolModel->ghl_business_id ?? null;
+        $school['name'] = (string) ($school['name'] ?? $schoolModel->name ?? 'School');
+        $school['logo_url'] = $school['logo_url'] ?? $schoolModel->logo_url ?? null;
+        $school['conference'] = $school['conference'] ?? $schoolModel->conference ?? null;
+        $school['division'] = $school['division'] ?? $schoolModel->division ?? null;
+        $school['city'] = $school['city'] ?? $schoolModel->city ?? null;
+        $school['state'] = $school['state'] ?? $schoolModel->state ?? null;
+        $school['coaches'] = $coaches;
+        $school['coach_count'] = max(
+            (int) ($school['coach_count'] ?? 0),
+            (int) ($school['coaches_count'] ?? 0),
+            count($coaches),
+        );
+        $school['coaches_count'] = $school['coach_count'];
+
+        return $school;
+    }
+
+    /**
      * Return only the current CES for one Admin school drawer.
      *
-     * This is intentionally separate from schoolDrawerDataForClient(): the Admin
-     * drawer is optimistic/browser-cached, so its score must have an independent
-     * renderless refresh path that cannot be lost behind an older cached detail row.
+     * Resolve the browser reference to the canonical local school first so Admin and
+     * Locker Room feed the exact same school id/roster into CoachDatabaseService.
      */
     #[Renderless]
     public function schoolEngagementScoreForClient(string $schoolId): int
@@ -5073,7 +5173,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         try {
-            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+            $school = $this->canonicalAdminSchoolPayloadForCes($user, $schoolId);
 
             if (! is_array($school)) {
                 return 0;

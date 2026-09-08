@@ -88,6 +88,8 @@ discoverSelectedIds: [],
             discoverSchoolCoachesLoading: false,
             discoverSchoolCoachesLoadedFor: '',
             discoverSchoolScoreRequest: '',
+            discoverSchoolScoreLoadedFor: '',
+            discoverSchoolScoreLoading: false,
             rcCatalogUserKey: @js($rcCatalogUserKey),
             optimisticSchool: null,
             schoolDrawerOpen: false,
@@ -161,6 +163,7 @@ discoverSelectedIds: [],
 
                 const requestToken = id + ':' + Date.now() + ':' + Math.random();
                 this.discoverSchoolScoreRequest = requestToken;
+                this.discoverSchoolScoreLoading = true;
 
                 try {
                     const score = await this.$wire.call('schoolEngagementScoreForClient', id);
@@ -170,6 +173,7 @@ discoverSelectedIds: [],
                     if (currentId !== id || !this.optimisticSchool) return;
 
                     const numericScore = Math.max(0, Math.min(100, Number(score ?? 0)));
+                    this.discoverSchoolScoreLoadedFor = id;
                     this.optimisticSchool = { ...this.optimisticSchool, engagement_score: numericScore };
 
                     const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
@@ -183,6 +187,10 @@ discoverSelectedIds: [],
                     }
                 } catch (error) {
                     console.error('Unable to refresh school engagement score.', error);
+                } finally {
+                    if (this.discoverSchoolScoreRequest === requestToken) {
+                        this.discoverSchoolScoreLoading = false;
+                    }
                 }
             },
             async hydrateDiscoverSchoolDetails(schoolId) {
@@ -204,6 +212,10 @@ discoverSelectedIds: [],
                     if (stillOpenId !== id) return false;
 
                     const coaches = Array.isArray(detail.coaches) ? detail.coaches : [];
+                    const scoreIsAuthoritative = this.discoverSchoolScoreLoadedFor === id;
+                    const authoritativeScore = scoreIsAuthoritative
+                        ? Math.max(0, Math.min(100, Number(this.optimisticSchool?.engagement_score ?? 0)))
+                        : null;
                     this.optimisticSchool = {
                         ...this.optimisticSchool,
                         ...detail,
@@ -211,6 +223,7 @@ discoverSelectedIds: [],
                         school_id: detail.school_id ?? detail.id ?? this.optimisticSchool?.school_id ?? id,
                         coaches,
                         coach_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? 0),
+                        ...(scoreIsAuthoritative ? { engagement_score: authoritativeScore } : {}),
                     };
 
                     const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
@@ -220,6 +233,7 @@ discoverSelectedIds: [],
                         row.coaches = coaches;
                         row.coach_count = Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? 0);
                         row.coaches_count = row.coach_count;
+                        if (scoreIsAuthoritative) row.engagement_score = authoritativeScore;
                     }
 
                     return true;
@@ -237,8 +251,12 @@ discoverSelectedIds: [],
                     const result = await this.$wire.call('schoolDrawerDataForClient', id);
                     const detail = result?.school;
                     if (result?.success !== false && detail && typeof detail === 'object') {
-                        bucket[id] = detail;
-                        applyDetails(detail);
+                        const detailForCache = { ...detail };
+                        if (this.discoverSchoolScoreLoadedFor === id) {
+                            detailForCache.engagement_score = Math.max(0, Math.min(100, Number(this.optimisticSchool?.engagement_score ?? 0)));
+                        }
+                        bucket[id] = detailForCache;
+                        applyDetails(detailForCache);
                     }
                 } catch (error) {
                     console.error('Unable to load coaching staff for school drawer.', error);
@@ -296,6 +314,8 @@ discoverSelectedIds: [],
                 this.schoolDrawerOpen = true;
                 this.discoverSchoolCoachesLoading = true;
                 this.discoverSchoolCoachesLoadedFor = '';
+                this.discoverSchoolScoreLoadedFor = '';
+                this.discoverSchoolScoreLoading = true;
                 // Keep the legacy global empty so Livewire/browser state cannot reopen it.
                 window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
@@ -430,6 +450,8 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesLoading = false;
                 this.discoverSchoolCoachesLoadedFor = '';
                 this.discoverSchoolScoreRequest = '';
+                this.discoverSchoolScoreLoadedFor = '';
+                this.discoverSchoolScoreLoading = false;
                 this.optimisticSchool = null;
                 // v110: explicit close event is also consumed by any nested Discover
                 // controller, so a stale Alpine subtree cannot immediately repaint it.
