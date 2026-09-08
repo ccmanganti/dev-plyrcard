@@ -9,10 +9,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class AdminSupportMessenger extends Component
 {
+    #[Locked]
+    public ?int $adminUserId = null;
+
     public string $audienceMode = 'individual';
     public string $userSearch = '';
     public ?int $targetUserId = null;
@@ -20,7 +24,6 @@ class AdminSupportMessenger extends Component
     public bool $bulkConfirmed = false;
 
     public string $concern = 'finish_profile';
-    public string $channel = 'email';
     public string $subject = '';
     public string $message = '';
     public ?string $notice = null;
@@ -31,14 +34,19 @@ class AdminSupportMessenger extends Component
         $admin = auth()->user();
         abort_unless($messenger->isAdmin($admin), 403);
 
+        $this->adminUserId = (int) $admin->getKey();
         $this->loadConcernTemplate($messenger, $this->concern);
         $this->autoSelectUserFromAdminRoute($messenger);
     }
 
-    public function selectAudienceMode(string $mode, AdminSupportMessagingService $messenger): void
+    /**
+     * These selection actions intentionally do not re-run auth()->user().
+     * The component is mounted only for admins and adminUserId is locked into the
+     * signed Livewire snapshot. This avoids false 403s on generic Livewire update
+     * requests while keeping the actual send operation server-authorized.
+     */
+    public function selectAudienceMode(string $mode): void
     {
-        $this->authorizeAdmin($messenger);
-
         if (! in_array($mode, ['all', 'custom', 'individual'], true)) {
             return;
         }
@@ -50,14 +58,22 @@ class AdminSupportMessenger extends Component
         if ($mode !== 'individual') {
             $this->targetUserId = null;
         }
+
+        if ($mode !== 'custom') {
+            $this->customUserIds = [];
+        }
     }
 
     public function selectTargetUser(int $userId, AdminSupportMessagingService $messenger): void
     {
-        $this->authorizeAdmin($messenger);
-
         $target = $this->baseRecipientQuery($messenger)->find($userId);
         if (! $target) {
+            return;
+        }
+
+        if (! $messenger->personalEmailFor($target)) {
+            $this->noticeType = 'warning';
+            $this->notice = 'That user does not have a valid personal email address.';
             return;
         }
 
@@ -78,9 +94,14 @@ class AdminSupportMessenger extends Component
 
     public function toggleCustomUser(int $userId, AdminSupportMessagingService $messenger): void
     {
-        $this->authorizeAdmin($messenger);
+        $target = $this->baseRecipientQuery($messenger)->find($userId);
+        if (! $target) {
+            return;
+        }
 
-        if (! $this->baseRecipientQuery($messenger)->whereKey($userId)->exists()) {
+        if (! $messenger->personalEmailFor($target)) {
+            $this->noticeType = 'warning';
+            $this->notice = 'That user cannot be added because no valid personal email is on file.';
             return;
         }
 
@@ -111,8 +132,6 @@ class AdminSupportMessenger extends Component
 
     public function selectConcern(string $concern, AdminSupportMessagingService $messenger): void
     {
-        $this->authorizeAdmin($messenger);
-
         if (! array_key_exists($concern, $messenger->concerns())) {
             return;
         }
@@ -122,21 +141,8 @@ class AdminSupportMessenger extends Component
         $this->loadConcernTemplate($messenger, $concern);
     }
 
-    public function setChannel(string $channel, AdminSupportMessagingService $messenger): void
-    {
-        $this->authorizeAdmin($messenger);
-
-        if (in_array($channel, ['email', 'sms', 'email_sms'], true)) {
-            $this->channel = $channel;
-            $this->bulkConfirmed = false;
-            $this->notice = null;
-        }
-    }
-
     public function appendVariable(string $key, AdminSupportMessagingService $messenger): void
     {
-        $this->authorizeAdmin($messenger);
-
         if (! array_key_exists($key, $messenger->variableDefinitions())) {
             return;
         }
@@ -147,20 +153,18 @@ class AdminSupportMessenger extends Component
 
     public function resetTemplate(AdminSupportMessagingService $messenger): void
     {
-        $this->authorizeAdmin($messenger);
         $this->loadConcernTemplate($messenger, $this->concern);
         $this->notice = null;
     }
 
     public function send(AdminSupportMessagingService $messenger): void
     {
-        $admin = $this->authorizeAdmin($messenger);
+        $admin = $this->lockedAdmin($messenger);
 
         $this->validate([
             'audienceMode' => ['required', 'in:all,custom,individual'],
             'concern' => ['required', 'string', 'max:80'],
-            'channel' => ['required', 'in:email,sms,email_sms'],
-            'subject' => ['nullable', 'string', 'max:255'],
+            'subject' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string', 'max:5000'],
         ]);
 
@@ -177,20 +181,16 @@ class AdminSupportMessenger extends Component
 
         if (($this->audienceMode !== 'individual' || $recipientCount > 1) && ! $this->bulkConfirmed) {
             $this->noticeType = 'warning';
-            $this->notice = 'Confirm the recipient list before sending this bulk message.';
+            $this->notice = 'Confirm the recipient list before sending this email.';
             return;
         }
 
         $batchId = (string) Str::uuid();
         $summary = [
             'attempted' => 0,
-            'success' => 0,
-            'partial' => 0,
+            'sent' => 0,
             'failed' => 0,
-            'email_sent' => 0,
-            'email_failed' => 0,
-            'sms_sent' => 0,
-            'sms_failed' => 0,
+            'skipped' => 0,
         ];
 
         try {
@@ -205,60 +205,38 @@ class AdminSupportMessenger extends Component
                             admin: $admin,
                             target: $target,
                             concern: $this->concern,
-                            channel: $this->channel,
                             subjectTemplate: $this->subject,
                             messageTemplate: $this->message,
                             audienceMode: $this->audienceMode,
                             batchId: $batchId,
                         );
 
+                        $status = (string) data_get($result, 'email.status', 'failed');
                         if ($result['success'] ?? false) {
-                            $summary['success']++;
-                        } elseif ($result['partial'] ?? false) {
-                            $summary['partial']++;
+                            $summary['sent']++;
+                        } elseif (str_starts_with($status, 'skipped_')) {
+                            $summary['skipped']++;
                         } else {
                             $summary['failed']++;
-                        }
-
-                        if (($result['email']['requested'] ?? false)) {
-                            ($result['email']['success'] ?? false)
-                                ? $summary['email_sent']++
-                                : $summary['email_failed']++;
-                        }
-
-                        if (($result['sms']['requested'] ?? false)) {
-                            ($result['sms']['success'] ?? false)
-                                ? $summary['sms_sent']++
-                                : $summary['sms_failed']++;
                         }
                     } catch (\Throwable $exception) {
                         report($exception);
                         $summary['failed']++;
-
-                        if (in_array($this->channel, ['email', 'email_sms'], true)) {
-                            $summary['email_failed']++;
-                        }
-                        if (in_array($this->channel, ['sms', 'email_sms'], true)) {
-                            $summary['sms_failed']++;
-                        }
                     }
                 }
             });
 
-            $deliveredUsers = $summary['success'] + $summary['partial'];
-            $parts = [
-                "{$deliveredUsers} of {$summary['attempted']} user(s) received at least one requested channel",
-            ];
+            $this->noticeType = $summary['failed'] === 0 ? ($summary['sent'] > 0 ? 'success' : 'warning') : ($summary['sent'] > 0 ? 'warning' : 'error');
+            $this->notice = "{$summary['sent']} email(s) sent";
 
-            if (in_array($this->channel, ['email', 'email_sms'], true)) {
-                $parts[] = "Email {$summary['email_sent']} sent / {$summary['email_failed']} failed or skipped";
+            if ($summary['skipped'] > 0) {
+                $this->notice .= " · {$summary['skipped']} skipped (no valid personal email)";
             }
-            if (in_array($this->channel, ['sms', 'email_sms'], true)) {
-                $parts[] = "SMS {$summary['sms_sent']} sent / {$summary['sms_failed']} failed or skipped";
+            if ($summary['failed'] > 0) {
+                $this->notice .= " · {$summary['failed']} failed";
             }
 
-            $this->noticeType = $summary['failed'] === 0 && $summary['partial'] === 0 ? 'success' : ($deliveredUsers > 0 ? 'warning' : 'error');
-            $this->notice = implode(' · ', $parts) . '.';
+            $this->notice .= '.';
             $this->bulkConfirmed = false;
         } catch (\Throwable $exception) {
             report($exception);
@@ -293,13 +271,11 @@ class AdminSupportMessenger extends Component
                 $builder
                     ->where('first_name', 'like', $like)
                     ->orWhere('last_name', 'like', $like)
-                    ->orWhere('personal_email', 'like', $like)
-                    ->orWhere('email', 'like', $like)
-                    ->orWhere('phone', 'like', $like);
+                    ->orWhere('personal_email', 'like', $like);
             });
         }
 
-        return $query->limit($search !== '' ? 40 : 16)->get();
+        return $query->limit($search !== '' ? 35 : 12)->get();
     }
 
     public function getSelectedCustomUsersProperty(): Collection
@@ -331,14 +307,6 @@ class AdminSupportMessenger extends Component
             ->count();
     }
 
-    public function getPhoneCountProperty(): int
-    {
-        return $this->recipientQuery(app(AdminSupportMessagingService::class))
-            ->whereNotNull('phone')
-            ->where('phone', '!=', '')
-            ->count();
-    }
-
     public function getPreviewUserProperty(): ?User
     {
         if ($this->audienceMode === 'individual') {
@@ -358,7 +326,7 @@ class AdminSupportMessenger extends Component
     public function getVariablesProperty(): array
     {
         $target = $this->previewUser;
-        $admin = auth()->user();
+        $admin = $this->adminUserId ? User::find($this->adminUserId) : null;
 
         if (! $target || ! $admin) {
             return [];
@@ -397,8 +365,9 @@ class AdminSupportMessenger extends Component
 
     public function render(AdminSupportMessagingService $messenger)
     {
-        $this->authorizeAdmin($messenger);
-
+        // Do not perform auth()->user() authorization here. Livewire update requests
+        // for this global Filament render-hook component can run outside the panel's
+        // route middleware stack. Authorization is enforced at mount and again at send.
         return view('livewire.admin-support-messenger', [
             'concerns' => $messenger->concerns(),
             'variableDefinitions' => $messenger->variableDefinitions(),
@@ -412,10 +381,14 @@ class AdminSupportMessenger extends Component
         $this->message = $template['message'];
     }
 
-    protected function authorizeAdmin(AdminSupportMessagingService $messenger): User
+    protected function lockedAdmin(AdminSupportMessagingService $messenger): User
     {
-        $admin = auth()->user();
+        $admin = $this->adminUserId
+            ? User::query()->with('roles')->find($this->adminUserId)
+            : null;
+
         abort_unless($messenger->isAdmin($admin), 403);
+
         return $admin;
     }
 
@@ -432,8 +405,17 @@ class AdminSupportMessenger extends Component
 
     protected function baseRecipientQuery(AdminSupportMessagingService $messenger): Builder
     {
-        $query = User::query()->where('id', '!=', (int) auth()->id());
-        $roles = collect($messenger->adminRoles())->map(fn ($role): string => strtolower(trim($role)))->filter()->unique()->values();
+        $query = User::query();
+
+        if ($this->adminUserId) {
+            $query->where('id', '!=', $this->adminUserId);
+        }
+
+        $roles = collect($messenger->adminRoles())
+            ->map(fn ($role): string => strtolower(trim($role)))
+            ->filter()
+            ->unique()
+            ->values();
 
         if ($roles->isNotEmpty()) {
             $query->whereDoesntHave('roles', function (Builder $roleQuery) use ($roles): void {
