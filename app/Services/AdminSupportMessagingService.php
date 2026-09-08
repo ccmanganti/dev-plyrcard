@@ -5,10 +5,10 @@ namespace App\Services;
 use App\Models\AdminSupportMessage;
 use App\Models\BillingInformation;
 use App\Models\User;
+use App\Models\Website;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -17,7 +17,16 @@ class AdminSupportMessagingService
 {
     public function __construct(
         protected GoHighLevelService $ghl,
+        protected AdminSupportEmailService $emailService,
     ) {
+    }
+
+    public function adminRoles(): array
+    {
+        return array_values(array_filter(array_map(
+            static fn ($role): string => trim((string) $role),
+            (array) config('plyrcard-admin-support.admin_roles', []),
+        )));
     }
 
     public function isAdmin(?User $user): bool
@@ -26,9 +35,13 @@ class AdminSupportMessagingService
             return false;
         }
 
-        foreach ((array) config('plyrcard-admin-support.admin_roles', []) as $role) {
-            if ($role !== '' && $user->hasRole($role)) {
-                return true;
+        foreach ($this->adminRoles() as $role) {
+            try {
+                if ($user->hasRole($role)) {
+                    return true;
+                }
+            } catch (\Throwable) {
+                // Continue checking the remaining aliases.
             }
         }
 
@@ -58,12 +71,23 @@ class AdminSupportMessagingService
         ];
     }
 
+    /**
+     * Admin Support email delivery is intentionally PERSONAL EMAIL ONLY.
+     * users.email is the PLYRCARD/recruiting account address and must never be
+     * used as a fallback by this proactive support feature.
+     */
+    public function personalEmailFor(User $user): ?string
+    {
+        $email = strtolower(trim(str_replace(["\r", "\n"], '', (string) ($user->personal_email ?? ''))));
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+    }
+
     public function variablesFor(User $target, User $admin): array
     {
         try {
-            $target->loadMissing(['roles', 'school']);
+            $target->loadMissing(['roles', 'school', 'activeWebsite']);
         } catch (\Throwable) {
-            // Keep the messenger usable even if an optional relation differs by install.
+            // Optional relations differ across some historical installs.
         }
 
         $firstName = trim((string) ($target->first_name ?? ''));
@@ -74,11 +98,9 @@ class AdminSupportMessagingService
         if ($firstName === '') {
             $firstName = $fullName !== '' ? Str::before($fullName, ' ') : 'there';
         }
-
         if ($fullName === '') {
             $fullName = $firstName;
         }
-
         if ($adminName === '') {
             $adminName = trim((string) ($admin->name ?? '')) ?: 'PLYRCARD Support';
         }
@@ -94,27 +116,32 @@ class AdminSupportMessagingService
         }
 
         $billing = $this->latestBilling($target);
-        $paymentStatus = $this->paymentStatus($billing);
-        $renewalDate = $this->renewalDate($billing);
+        $website = $this->websiteFor($target);
+        $websiteLink = $this->websiteUrl($website);
+        $personalEmail = $this->personalEmailFor($target) ?? '';
 
         return [
             'first_name' => $firstName,
             'full_name' => $fullName,
-            'email' => trim((string) ($target->email ?: $target->personal_email ?? '')),
+            'personal_email' => $personalEmail,
+            // Backwards-compatible template alias. It resolves to personal_email only.
+            'email' => $personalEmail,
             'phone' => trim((string) ($target->phone ?? '')),
             'sport' => trim((string) ($target->sport ?? '')) ?: 'your sport',
-            'school' => trim((string) (data_get($target, 'school.name') ?: $target->school_name ?? '')) ?: 'your school',
+            'school' => trim((string) (data_get($target, 'school.name') ?: ($target->school_name ?? ''))) ?: 'your school',
             'plan' => $this->planLabel($target),
             'profile_completion' => (string) max(0, min(100, $profileCompletion)),
-            'payment_status' => $paymentStatus,
-            'renewal_date' => $renewalDate,
-            'login_link' => url('/admin/login'),
-            'profile_link' => $this->profileUrl(),
-            'photos_link' => url('/admin/coach-database/photos'),
-            'outreach_link' => url('/admin/coach-database'),
-            'billing_link' => url('/admin/billing'),
-            'locker_room_link' => url('/locker-room'),
-            'support_link' => url('/admin/coach-database/support'),
+            'payment_status' => $this->paymentStatus($billing),
+            'renewal_date' => $this->renewalDate($billing),
+            'login_link' => $this->appUrl('/admin/login'),
+            'admin_link' => $this->appUrl('/admin'),
+            'profile_link' => $this->appUrl('/admin/my-profile'),
+            'photos_link' => $this->appUrl('/admin/coach-database/photos'),
+            'outreach_link' => $this->appUrl('/admin/coach-database'),
+            'billing_link' => $this->appUrl('/admin/billing'),
+            'locker_room_link' => $websiteLink !== '' ? $websiteLink : $this->appUrl('/'),
+            'website_link' => $websiteLink,
+            'support_link' => $this->appUrl('/support/tickets'),
             'admin_name' => $adminName,
         ];
     }
@@ -136,9 +163,23 @@ class AdminSupportMessagingService
         string $channel,
         string $subjectTemplate,
         string $messageTemplate,
+        string $audienceMode = 'individual',
+        ?string $batchId = null,
     ): array {
         if (! $this->isAdmin($admin)) {
             throw new RuntimeException('You are not authorized to send admin support messages.');
+        }
+
+        if ($this->isAdmin($target)) {
+            throw new RuntimeException('Admin accounts are excluded from proactive user support sends.');
+        }
+
+        if ((int) $target->getKey() === (int) $admin->getKey()) {
+            throw new RuntimeException('You cannot send an Admin Support message to your own admin account.');
+        }
+
+        if (! in_array($audienceMode, ['all', 'custom', 'individual'], true)) {
+            throw new RuntimeException('Choose All Users, Custom List, or Individual User.');
         }
 
         if (! in_array($channel, ['email', 'sms', 'email_sms'], true)) {
@@ -157,18 +198,10 @@ class AdminSupportMessagingService
             throw new RuntimeException('The message cannot be empty.');
         }
 
-        $recipientEmail = trim((string) ($target->email ?: $target->personal_email ?? ''));
+        $recipientEmail = $this->personalEmailFor($target);
         $recipientPhone = trim((string) ($target->phone ?? ''));
         $sendEmail = in_array($channel, ['email', 'email_sms'], true);
         $sendSms = in_array($channel, ['sms', 'email_sms'], true);
-
-        if ($sendEmail && $recipientEmail === '') {
-            throw new RuntimeException('This user does not have an email address on file.');
-        }
-
-        if ($sendSms && $recipientPhone === '' && ! $sendEmail) {
-            throw new RuntimeException('This user does not have a phone number on file.');
-        }
 
         if ($sendSms && mb_strlen($body) > 1600) {
             throw new RuntimeException('The SMS message is too long. Keep it under 1,600 characters.');
@@ -179,25 +212,53 @@ class AdminSupportMessagingService
             target: $target,
             concern: $concern,
             channel: $channel,
+            audienceMode: $audienceMode,
+            batchId: $batchId,
             subject: $subject,
             subjectTemplate: $subjectTemplate,
             messageTemplate: $messageTemplate,
             body: $body,
             variables: $variables,
-            email: $recipientEmail,
+            email: $recipientEmail ?? '',
             phone: $recipientPhone,
         );
 
-        $emailResult = ['requested' => $sendEmail, 'success' => false, 'status' => $sendEmail ? 'pending' : 'not_requested'];
-        $smsResult = ['requested' => $sendSms, 'success' => false, 'status' => $sendSms ? 'pending' : 'not_requested'];
+        $emailResult = [
+            'requested' => $sendEmail,
+            'success' => false,
+            'status' => $sendEmail ? 'pending' : 'not_requested',
+        ];
+        $smsResult = [
+            'requested' => $sendSms,
+            'success' => false,
+            'status' => $sendSms ? 'pending' : 'not_requested',
+        ];
         $errors = [];
         $providerContactId = null;
         $providerIds = [];
 
         if ($sendEmail) {
-            $emailResult = $this->sendEmail($target, $recipientEmail, $subject, $body);
-            if (! ($emailResult['success'] ?? false)) {
-                $errors[] = 'Email: ' . ($emailResult['error'] ?? 'delivery failed');
+            if (! $recipientEmail) {
+                $emailResult = [
+                    'requested' => true,
+                    'success' => false,
+                    'status' => 'skipped_no_personal_email',
+                    'error' => 'No valid personal_email is on file.',
+                ];
+                $errors[] = 'Email: no valid personal email on file';
+            } else {
+                $emailResult = $this->emailService->send(
+                    user: $target,
+                    recipient: $recipientEmail,
+                    subject: $subject,
+                    body: $body,
+                    variables: $variables,
+                    concern: $concern,
+                );
+
+                if (! ($emailResult['success'] ?? false)) {
+                    $errors[] = 'Email: ' . ($emailResult['error'] ?? 'delivery failed');
+                }
             }
         }
 
@@ -249,38 +310,6 @@ class AdminSupportMessagingService
         ];
     }
 
-    protected function sendEmail(User $target, string $recipient, string $subject, string $body): array
-    {
-        try {
-            $html = $this->emailHtml($target, $body);
-            Mail::html($html, function ($message) use ($recipient, $subject): void {
-                $message->to($recipient)
-                    ->subject($subject !== '' ? $subject : 'A note from PLYRCARD');
-
-                $fromAddress = trim((string) config('mail.from.address'));
-                $fromName = trim((string) config('mail.from.name', 'PLYRCARD'));
-                if ($fromAddress !== '') {
-                    $message->from($fromAddress, $fromName !== '' ? $fromName : 'PLYRCARD');
-                }
-            });
-
-            return ['requested' => true, 'success' => true, 'status' => 'sent'];
-        } catch (\Throwable $exception) {
-            Log::warning('Admin support email failed.', [
-                'user_id' => $target->getKey(),
-                'recipient' => $recipient,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return [
-                'requested' => true,
-                'success' => false,
-                'status' => 'failed',
-                'error' => $exception->getMessage(),
-            ];
-        }
-    }
-
     protected function sendSms(User $target, string $body): array
     {
         $locationId = trim((string) config('ghl.location_id'));
@@ -296,13 +325,13 @@ class AdminSupportMessagingService
         }
 
         try {
-            // Always resolve the athlete/user contact from their own contact details.
-            // Do not use ghl_subscriber_contact_id here; that can represent a parent/payer.
+            // Resolve the athlete/user from their own contact details. Do not use the
+            // subscriber/payer contact. Email supplied to GHL is personal_email only.
             $contactId = $this->ghl->upsertContact(array_filter([
                 'firstName' => trim((string) ($target->first_name ?? '')),
                 'lastName' => trim((string) ($target->last_name ?? '')),
                 'name' => trim((string) (($target->first_name ?? '') . ' ' . ($target->last_name ?? ''))),
-                'email' => $target->email ?: $target->personal_email ?? null,
+                'email' => $this->personalEmailFor($target),
                 'phone' => $target->phone ?? null,
                 'source' => 'PLYRCARD Admin Support',
                 'tags' => ['plyrcard-user', 'admin-support'],
@@ -353,12 +382,12 @@ class AdminSupportMessagingService
                     try {
                         $this->ghl->addContactNote(
                             (string) $contactId,
-                            'Admin support SMS sent to PLYRCARD user #' . $target->getKey() . ".\n\n" . $body,
+                            'One-way Admin Support SMS sent to PLYRCARD user #' . $target->getKey() . ".\n\n" . $body,
                             $locationId,
                             $token,
                         );
                     } catch (\Throwable) {
-                        // The outbound message is authoritative; a note is best-effort only.
+                        // Outbound send is authoritative; note is best-effort.
                     }
 
                     return [
@@ -401,6 +430,8 @@ class AdminSupportMessagingService
         User $target,
         string $concern,
         string $channel,
+        string $audienceMode,
+        ?string $batchId,
         string $subject,
         string $subjectTemplate,
         string $messageTemplate,
@@ -414,7 +445,7 @@ class AdminSupportMessagingService
         }
 
         try {
-            return AdminSupportMessage::query()->create([
+            $attributes = [
                 'admin_user_id' => $admin->getKey(),
                 'user_id' => $target->getKey(),
                 'concern' => $concern,
@@ -428,7 +459,16 @@ class AdminSupportMessagingService
                 'recipient_phone' => $phone !== '' ? $phone : null,
                 'email_status' => in_array($channel, ['email', 'email_sms'], true) ? 'pending' : 'not_requested',
                 'sms_status' => in_array($channel, ['sms', 'email_sms'], true) ? 'pending' : 'not_requested',
-            ]);
+            ];
+
+            if (Schema::hasColumn('admin_support_messages', 'audience_mode')) {
+                $attributes['audience_mode'] = $audienceMode;
+            }
+            if (Schema::hasColumn('admin_support_messages', 'batch_id')) {
+                $attributes['batch_id'] = $batchId;
+            }
+
+            return AdminSupportMessage::query()->create($attributes);
         } catch (\Throwable $exception) {
             Log::warning('Admin support message audit log could not be created.', [
                 'admin_user_id' => $admin->getKey(),
@@ -463,11 +503,9 @@ class AdminSupportMessagingService
         }
 
         $status = trim((string) ($billing->payment_status ?: $billing->subscription_status ?: ''));
-        if ($status === '') {
-            return 'not available';
-        }
-
-        return Str::of($status)->replace(['_', '-'], ' ')->lower()->headline()->toString();
+        return $status !== ''
+            ? Str::of($status)->replace(['_', '-'], ' ')->lower()->headline()->toString()
+            : 'not available';
     }
 
     protected function renewalDate(?BillingInformation $billing): string
@@ -531,50 +569,52 @@ class AdminSupportMessagingService
         return trim((string) ($roles->first() ?? 'Free')) ?: 'Free';
     }
 
-    protected function profileUrl(): string
+    protected function websiteFor(User $target): ?Website
     {
         try {
-            if (class_exists(\App\Filament\Resources\Profiles\ProfileResource::class)) {
-                return \App\Filament\Resources\Profiles\ProfileResource::getUrl('index');
+            if ($target->relationLoaded('activeWebsite') && $target->activeWebsite) {
+                return $target->activeWebsite;
             }
-        } catch (\Throwable) {
-            // Fall through to the stable route fallback.
-        }
 
-        return url('/admin/my-profile');
+            $active = $target->activeWebsite()->first();
+            if ($active) {
+                return $active;
+            }
+
+            return $target->websites()
+                ->orderByDesc('is_published')
+                ->orderByDesc('id')
+                ->first();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
-    protected function emailHtml(User $target, string $body): string
+    protected function websiteUrl(?Website $website): string
     {
-        $escaped = e($body);
-        $escaped = preg_replace_callback(
-            '~https?://[^\s<]+~i',
-            static function (array $match): string {
-                $url = $match[0];
-                return '<a href="' . e($url) . '" style="color:#ff6338;text-decoration:none;font-weight:600">' . e($url) . '</a>';
-            },
-            $escaped,
-        ) ?: $escaped;
+        if (! $website) {
+            return '';
+        }
 
-        $content = nl2br($escaped);
-        $name = e(trim((string) (($target->first_name ?? '') . ' ' . ($target->last_name ?? ''))) ?: 'PLYRCARD athlete');
+        if (filled($website->domain)) {
+            $domain = preg_replace('#^https?://#i', '', trim((string) $website->domain));
+            return $domain ? 'https://' . trim((string) $domain, '/') : '';
+        }
 
-        return <<<HTML
-<!doctype html>
-<html>
-<body style="margin:0;padding:0;background:#0d1117;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#f8fafc">
-    <div style="max-width:640px;margin:0 auto;padding:34px 20px">
-        <div style="border:1px solid #252b36;border-radius:20px;background:#12171e;overflow:hidden">
-            <div style="padding:20px 24px;border-bottom:1px solid #252b36">
-                <div style="font-size:13px;letter-spacing:.13em;text-transform:uppercase;color:#ff6338;font-weight:800">PLYRCARD SUPPORT</div>
-                <div style="margin-top:6px;font-size:13px;color:#8b95a7">Message for {$name}</div>
-            </div>
-            <div style="padding:26px 24px;font-size:16px;line-height:1.65;color:#e5e7eb">{$content}</div>
-        </div>
-        <div style="padding:18px 8px 0;text-align:center;font-size:12px;color:#64748b">PLYRCARD · Own Your Journey</div>
-    </div>
-</body>
-</html>
-HTML;
+        if (filled($website->slug)) {
+            return $this->appUrl('/' . ltrim((string) $website->slug, '/'));
+        }
+
+        return '';
+    }
+
+    protected function appUrl(string $path): string
+    {
+        $base = rtrim((string) config('app.url', 'https://plyrcard.com'), '/');
+        if ($base === '') {
+            $base = 'https://plyrcard.com';
+        }
+
+        return $base . '/' . ltrim($path, '/');
     }
 }
