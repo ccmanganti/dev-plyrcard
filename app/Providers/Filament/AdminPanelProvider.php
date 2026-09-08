@@ -37,6 +37,18 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            // v10.103.3: keep the Filament shell mounted between Admin pages and
+            // prefetch destinations while the pointer is moving toward a sidebar item.
+            // Recruiting Center itself switches locally; this covers Users, Websites, etc.
+            ->spa(hasPrefetching: true)
+            // v10.103.4: once the current request is already inside Recruiting Center,
+            // its sidebar links are client-side tabs. Exclude those destination URLs
+            // from Filament's wire:navigate so the same click cannot also start a
+            // second SPA request/loading bar after the immediate local tab switch.
+            // Outside Recruiting Center, normal Filament SPA + prefetching remains on.
+            ->spaUrlExceptions(fn (): array => request()->is('admin/coach-database*')
+                ? ['*/admin/coach-database*']
+                : [])
             ->homeUrl(function (): string {
                 $user = auth()->user();
 
@@ -2217,6 +2229,24 @@ class AdminPanelProvider extends PanelProvider
                             '@include("filament.hooks.onboarding-script", ["user" => $user])',
                             ['user' => $user],
                         );
+                    }
+
+                    // v10.106: privileged Admin users get the global proactive-support
+                    // messenger. It is deliberately mounted only inside the Admin panel
+                    // and only for platform operator roles; ordinary player accounts never
+                    // receive the component markup or Livewire state.
+                    $canUseAdminSupportMessenger = false;
+                    if ($user && method_exists($user, 'hasRole')) {
+                        foreach (['Superadmin', 'superadmin', 'Super Admin', 'Administrator', 'Admin'] as $role) {
+                            if ($user->hasRole($role)) {
+                                $canUseAdminSupportMessenger = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($canUseAdminSupportMessenger) {
+                        $html .= Blade::render('@livewire("admin-support-messenger")');
                     }
 
                     return $html;
