@@ -1140,10 +1140,19 @@ class CoachDatabaseService
         ])->map(fn ($value): string => trim((string) $value))
             ->first(fn (string $value): bool => $value !== '');
 
-        // Always start from the canonical local school row so the school score is
-        // calculated from every coach assigned to that school, not from a lightweight
-        // drawer preview or a partial remote snapshot.
-        if (filled($schoolReference)) {
+        // Avoid reloading the same school row when the caller already supplied the
+        // complete canonical roster. Admin and Locker Room both do this before calling
+        // CES, so a drawer open no longer pays for the same school/roster query twice.
+        $providedCoaches = collect($school['coaches'] ?? [])->filter(fn ($row): bool => is_array($row));
+        $declaredCoachCount = max(
+            0,
+            (int) ($school['coach_count'] ?? 0),
+            (int) ($school['coaches_count'] ?? 0),
+        );
+        $hasCompleteProvidedRoster = $providedCoaches->isNotEmpty()
+            && ($declaredCoachCount === 0 || $providedCoaches->count() >= $declaredCoachCount);
+
+        if (! $hasCompleteProvidedRoster && filled($schoolReference)) {
             try {
                 $localSchool = app(LocalRecruitingDatabaseService::class)
                     ->schoolRow($user, (string) $schoolReference);
@@ -1301,6 +1310,105 @@ class CoachDatabaseService
     }
 
     /**
+     * Build every local school's CES for one athlete in one pass.
+     *
+     * Admin uses this as a short-lived read model so the school drawer already has
+     * the score in its browser catalog before it is clicked. This replaces the old
+     * per-click double Livewire calculation. Membership still comes exclusively from
+     * the canonical local Coach -> School assignment.
+     */
+    public function schoolEngagementScoreMapForUser(User $user): array
+    {
+        $cacheKey = 'coach-database:ces-school-map:v1:' . (int) $user->getKey();
+
+        return Cache::remember($cacheKey, now()->addSeconds(15), function () use ($user): array {
+            try {
+                $localCoaches = Coach::query()
+                    ->whereNotNull('school_id')
+                    ->get();
+            } catch (\Throwable) {
+                return [];
+            }
+
+            if ($localCoaches->isEmpty()) {
+                return [];
+            }
+
+            $roster = $localCoaches
+                ->map(function (Coach $coach): array {
+                    $row = $this->normalizeCesCoachRow([
+                        'id' => $coach->getKey(),
+                        'contact_id' => $coach->ghl_contact_id ?? $coach->contact_id ?? null,
+                        'ghl_contact_id' => $coach->ghl_contact_id ?? null,
+                        'name' => $coach->display_name ?? trim((string) (($coach->first_name ?? '') . ' ' . ($coach->last_name ?? ''))),
+                        'email' => $coach->email ?? null,
+                        'title' => $coach->title ?? $coach->position ?? null,
+                        '_ces_school_id' => (string) ($coach->school_id ?? ''),
+                    ]);
+
+                    return $row;
+                })
+                ->filter(fn (array $row): bool => trim((string) ($row['_ces_school_id'] ?? '')) !== '' && $this->cesCoachHasIdentity($row))
+                ->values();
+
+            if ($roster->isEmpty()) {
+                return [];
+            }
+
+            // Reply/thread values still come from the already-cached recruiting
+            // snapshot. Build an identity index once instead of scanning it per school.
+            $snapshot = $this->cachedRecruitingSnapshotForUser($user);
+            $remoteByIdentity = [];
+            foreach (collect(is_array($snapshot) ? ($snapshot['coaches'] ?? []) : [])->filter(fn ($row): bool => is_array($row)) as $remoteRow) {
+                $remote = $this->normalizeCesCoachRow($this->slimCoach($remoteRow));
+                foreach ($this->cesCoachIdentifiers($remote) as $identifier) {
+                    $remoteByIdentity[$identifier] ??= $remote;
+                }
+            }
+
+            $roster = $roster->map(function (array $local) use ($remoteByIdentity): array {
+                $remote = null;
+                foreach ($this->cesCoachIdentifiers($local) as $identifier) {
+                    if (isset($remoteByIdentity[$identifier])) {
+                        $remote = $remoteByIdentity[$identifier];
+                        break;
+                    }
+                }
+
+                if (! is_array($remote)) {
+                    return $local;
+                }
+
+                return array_replace($remote, $local, [
+                    'coach_reply_count' => max(
+                        (int) ($local['coach_reply_count'] ?? 0),
+                        (int) ($remote['coach_reply_count'] ?? 0),
+                    ),
+                    'thread_depth' => max(
+                        (int) ($local['thread_depth'] ?? 0),
+                        (int) ($remote['thread_depth'] ?? 0),
+                    ),
+                    'additional_thread_turns' => max(
+                        (int) ($local['additional_thread_turns'] ?? 0),
+                        (int) ($remote['additional_thread_turns'] ?? 0),
+                    ),
+                    '_ces_school_id' => (string) ($local['_ces_school_id'] ?? ''),
+                ]);
+            })->values();
+
+            // One indexed event query enriches all school rosters at once.
+            $roster = $this->enrichCesRosterFromLocalTrackingEvents($user, $roster);
+
+            return $roster
+                ->groupBy(fn (array $coach): string => trim((string) ($coach['_ces_school_id'] ?? '')))
+                ->filter(fn (Collection $coaches, string $schoolId): bool => $schoolId !== '' && $coaches->isNotEmpty())
+                ->map(fn (Collection $coaches): int => $this->schoolEngagementScore($coaches->values()))
+                ->mapWithKeys(fn (int $score, $schoolId): array => [(string) $schoolId => $score])
+                ->all();
+        });
+    }
+
+    /**
      * Merge event-level local tracking into the CES roster without using broad
      * dashboard aggregates. Site and film clicks are deduplicated per tracked link
      * identity so repeated refreshes/scanner-style duplicate requests do not turn
@@ -1328,13 +1436,42 @@ class CoachDatabaseService
             return $roster;
         }
 
+        $queryIdentifiers = $roster
+            ->flatMap(function ($coach): array {
+                if (! is_array($coach)) {
+                    return [];
+                }
+
+                return collect([
+                    $coach['contact_id'] ?? null,
+                    $coach['ghl_contact_id'] ?? null,
+                    $coach['contactId'] ?? null,
+                    $coach['email'] ?? null,
+                    $coach['coach_email'] ?? null,
+                ])->map(fn ($value): string => trim((string) $value))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($queryIdentifiers === []) {
+            return $roster;
+        }
+
         try {
             $rows = DB::table('coach_database_tracking_events')
                 ->where('athlete_user_id', $user->getKey())
                 ->whereIn('event_type', ['profile_view', 'link_click'])
                 ->whereNotNull('coach_contact_id')
                 ->where('coach_contact_id', '<>', '')
-                ->whereIn(DB::raw('LOWER(coach_contact_id)'), array_keys($identityToIndexes))
+                // Do not wrap the indexed column in LOWER(). The old expression can
+                // force a scan of the athlete's tracking history on every drawer open.
+                ->whereIn('coach_contact_id', $queryIdentifiers)
                 ->get([
                     'id',
                     'coach_contact_id',

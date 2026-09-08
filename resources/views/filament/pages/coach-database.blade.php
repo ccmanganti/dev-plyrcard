@@ -206,57 +206,71 @@ discoverSelectedIds: [],
                 const bucket = window.__plyrRcSchoolDrawerDetailsByUser[userKey];
                 const cached = bucket[id];
 
-                const applyDetails = (detail) => {
-                    if (!detail || typeof detail !== 'object') return false;
+                const applyDetails = (detail, allowScore = false) => {
+                    if (!detail || typeof detail !== 'object' || !this.optimisticSchool) return false;
                     const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (stillOpenId !== id) return false;
 
-                    const coaches = Array.isArray(detail.coaches) ? detail.coaches : [];
-                    const scoreIsAuthoritative = this.discoverSchoolScoreLoadedFor === id;
-                    const authoritativeScore = scoreIsAuthoritative
-                        ? Math.max(0, Math.min(100, Number(this.optimisticSchool?.engagement_score ?? 0)))
-                        : null;
+                    // The browser-catalog identity is authoritative for the open drawer.
+                    // Never let a late server response replace id/name and make
+                    // isValidOpenSchool() invalidate/blank the slider.
+                    const current = this.optimisticSchool;
+                    const coaches = Array.isArray(detail.coaches) ? detail.coaches : (Array.isArray(current.coaches) ? current.coaches : []);
+                    const nextScore = allowScore && Object.prototype.hasOwnProperty.call(detail, 'engagement_score')
+                        ? Math.max(0, Math.min(100, Number(detail.engagement_score ?? 0)))
+                        : Math.max(0, Math.min(100, Number(current.engagement_score ?? 0)));
+
                     this.optimisticSchool = {
-                        ...this.optimisticSchool,
-                        ...detail,
-                        id: detail.id ?? this.optimisticSchool?.id ?? id,
-                        school_id: detail.school_id ?? detail.id ?? this.optimisticSchool?.school_id ?? id,
+                        ...current,
+                        logo_url: detail.logo_url || current.logo_url || '',
+                        city: detail.city ?? current.city ?? '',
+                        state: detail.state ?? current.state ?? '',
+                        division: detail.division ?? current.division ?? '',
+                        conference: detail.conference ?? current.conference ?? '',
+                        is_favorite: Object.prototype.hasOwnProperty.call(detail, 'is_favorite') ? !!detail.is_favorite : !!current.is_favorite,
+                        list_keys: Array.isArray(detail.list_keys) ? [...detail.list_keys] : (Array.isArray(current.list_keys) ? [...current.list_keys] : []),
                         coaches,
-                        coach_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? 0),
-                        ...(scoreIsAuthoritative ? { engagement_score: authoritativeScore } : {}),
+                        coach_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? current.coach_count ?? 0),
+                        coaches_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? current.coaches_count ?? 0),
+                        engagement_score: nextScore,
+                        // Explicitly preserve the identity that came from globalSchoolCatalog.
+                        id: current.id,
+                        school_id: current.school_id ?? current.id,
+                        name: current.name,
+                        business_id: current.business_id,
+                        company_id: current.company_id,
+                        ghl_business_id: current.ghl_business_id,
                     };
 
                     const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
                         .find(item => String(item?.id ?? item?.school_id ?? '').trim() === id);
                     if (row) {
-                        Object.assign(row, detail);
                         row.coaches = coaches;
-                        row.coach_count = Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? 0);
-                        row.coaches_count = row.coach_count;
-                        if (scoreIsAuthoritative) row.engagement_score = authoritativeScore;
+                        row.coach_count = this.optimisticSchool.coach_count;
+                        row.coaches_count = this.optimisticSchool.coaches_count;
+                        row.is_favorite = this.optimisticSchool.is_favorite;
+                        row.list_keys = [...this.optimisticSchool.list_keys];
+                        row.engagement_score = nextScore;
+                        if (detail.logo_url) row.logo_url = detail.logo_url;
                     }
 
                     return true;
                 };
 
-                // Reuse cached roster/details instantly, but never let that cache become
-                // authoritative for CES. Engagement changes over time, and older browser
-                // snapshots may still contain engagement_score: 0 from before CES existed.
-                // Always refresh this one school from the renderless server method below.
-                const hadCachedDetails = !!(cached && applyDetails(cached));
+                // Cached roster can paint instantly, but its old score is ignored.
+                const hadCachedDetails = !!(cached && applyDetails(cached, false));
                 this.discoverSchoolCoachesLoading = !hadCachedDetails;
                 this.discoverSchoolCoachesLoadedFor = hadCachedDetails ? id : '';
 
                 try {
+                    // One renderless request only. CES is already in the browser catalog;
+                    // this request exists only to refresh roster/detail data.
                     const result = await this.$wire.call('schoolDrawerDataForClient', id);
                     const detail = result?.school;
                     if (result?.success !== false && detail && typeof detail === 'object') {
                         const detailForCache = { ...detail };
-                        if (this.discoverSchoolScoreLoadedFor === id) {
-                            detailForCache.engagement_score = Math.max(0, Math.min(100, Number(this.optimisticSchool?.engagement_score ?? 0)));
-                        }
                         bucket[id] = detailForCache;
-                        applyDetails(detailForCache);
+                        applyDetails(detailForCache, true);
                     }
                 } catch (error) {
                     console.error('Unable to load coaching staff for school drawer.', error);
@@ -265,6 +279,8 @@ discoverSelectedIds: [],
                     if (stillOpenId === id) {
                         this.discoverSchoolCoachesLoading = false;
                         this.discoverSchoolCoachesLoadedFor = id;
+                        this.discoverSchoolScoreLoading = false;
+                        this.discoverSchoolScoreLoadedFor = id;
                     }
                 }
             },
@@ -326,10 +342,10 @@ discoverSelectedIds: [],
                 this.discoverNewDrawerListName = '';
                 this.$nextTick(() => {
                     const id = String(merged.id ?? merged.school_id ?? '');
-                    // Refresh CES independently from the roster/detail cache. Locker Room
-                    // already receives the server score directly; Admin needs this explicit
-                    // renderless score channel because its drawer opens from browser state.
-                    this.refreshDiscoverSchoolScore(id);
+                    // The score is already present in globalSchoolCatalog, so opening the
+                    // drawer is synchronous. Only roster/detail hydration runs in background.
+                    this.discoverSchoolScoreLoading = false;
+                    this.discoverSchoolScoreLoadedFor = id;
                     this.hydrateDiscoverSchoolDetails(id);
                 });
             },

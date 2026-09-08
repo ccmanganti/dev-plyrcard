@@ -5041,7 +5041,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 count($coaches),
             );
             $school['coaches_count'] = $school['coach_count'];
-            $school['engagement_score'] = app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $school);
+
+            // Use the already-prepared school score map. Do not recalculate CES inside
+            // the roster/detail request; that duplicated the score request and caused
+            // the 5-10 second Admin delay.
+            $scoreMap = app(CoachDatabaseService::class)->schoolEngagementScoreMapForUser($user);
+            $scoreKey = (string) ($school['id'] ?? $school['school_id'] ?? '');
+            $school['engagement_score'] = (int) ($scoreMap[$scoreKey] ?? $school['engagement_score'] ?? 0);
+            $school['lead_score'] = $school['engagement_score'];
 
             return ['success' => true, 'school' => $school];
         } catch (\Throwable $exception) {
@@ -5179,7 +5186,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 return 0;
             }
 
-            return app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $school);
+            $scoreMap = app(CoachDatabaseService::class)->schoolEngagementScoreMapForUser($user);
+            $scoreKey = (string) ($school['id'] ?? $school['school_id'] ?? '');
+
+            return (int) ($scoreMap[$scoreKey] ?? 0);
         } catch (\Throwable $exception) {
             Log::warning('Unable to calculate Admin school engagement score.', [
                 'user_id' => $user->getKey(),
@@ -13720,7 +13730,24 @@ HTML;
             fn (): array => array_values(app(LocalRecruitingDatabaseService::class)->schoolRows($user)),
         );
 
-        return $this->discoverClientSchoolsMemo = is_array($rows) ? array_values($rows) : [];
+        // CES is prepared as one batched local read model before the browser catalog is
+        // emitted. The drawer therefore paints the score on the same frame it opens;
+        // it no longer waits for a per-school Livewire calculation.
+        $scoreMap = app(CoachDatabaseService::class)->schoolEngagementScoreMapForUser($user);
+        $rows = collect(is_array($rows) ? $rows : [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(function (array $row) use ($scoreMap): array {
+                $id = trim((string) ($row['id'] ?? $row['school_id'] ?? ''));
+                if ($id !== '' && array_key_exists($id, $scoreMap)) {
+                    $row['engagement_score'] = (int) $scoreMap[$id];
+                    $row['lead_score'] = (int) $scoreMap[$id];
+                }
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        return $this->discoverClientSchoolsMemo = $rows;
     }
 
     public function getSelectedCoachProperty(): ?array
