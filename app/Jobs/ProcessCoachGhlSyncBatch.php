@@ -6,7 +6,9 @@ use App\Models\Coach;
 use App\Models\CoachGhlSyncRun;
 use App\Models\CoachGhlSyncTarget;
 use App\Models\SchoolGhlSyncTarget;
+use App\Models\User;
 use App\Services\CoachGhlGateway;
+use App\Services\CoachGhlSyncPlanner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -32,7 +34,7 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
         $this->onQueue('default');
     }
 
-    public function handle(CoachGhlGateway $gateway): void
+    public function handle(CoachGhlGateway $gateway, CoachGhlSyncPlanner $planner): void
     {
         $run = CoachGhlSyncRun::query()->find($this->runId);
         if (! $run || in_array($run->status, ['completed', 'completed_with_errors', 'cancelled'], true)) {
@@ -64,6 +66,23 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
             $this->finishRun($run);
             return;
         }
+
+        // Re-resolve the current audience once per batch. The planner already removes
+        // stale targets before a run, but this guard prevents a target from being pushed
+        // if a user's sport/gender/credential changes while the run is in progress.
+        $credentialGroups = $planner->credentialGroups()
+            ->keyBy(fn (array $group): string => $planner->credentialGroupKey(
+                (string) $group['api_key_hash'],
+                (string) $group['location_id'],
+            ));
+
+        $representativeUsers = User::query()
+            ->whereIn(
+                'id',
+                $credentialGroups->pluck('representative_user_id')->map(fn ($id): int => (int) $id)->all(),
+            )
+            ->get()
+            ->keyBy('id');
 
         // Schools are synchronized inline with the first coach that needs them.
         // This avoids a separate preflight pass and lets progress move immediately.
@@ -97,25 +116,51 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
             ])->save();
 
             try {
-                if (! $target->coach) {
+                $groupKey = $planner->credentialGroupKey(
+                    (string) $target->api_key_hash,
+                    (string) $target->location_id,
+                );
+                $group = $credentialGroups->get($groupKey);
+
+                // Missing local records, removed credential groups, blank gender/sport, and
+                // mismatched gender/sport are stale targets now. Exclude them instead of
+                // attempting a remote write or repeatedly surfacing them as sync failures.
+                if (! $target->coach || ! is_array($group) || ! $planner->coachMatchesGroup($target->coach, $group)) {
+                    $target->forceFill([
+                        'status' => 'excluded_audience',
+                        'last_error' => null,
+                        'checked_at' => now(),
+                    ])->save();
+
+                    $consecutiveFailureMessage = null;
+                    $consecutiveFailureCount = 0;
+                    continue;
+                }
+
+                $credentialUser = $representativeUsers->get((int) $group['representative_user_id']);
+                if (! $credentialUser) {
                     throw new \RuntimeException(sprintf(
-                        'Local coach no longer exists. GHL location %s · credential user #%s.',
+                        'Credential account no longer exists. User #%s · GHL location %s.',
+                        (string) ($group['representative_user_id'] ?? 'unknown'),
                         (string) ($target->location_id ?: 'unknown'),
-                        (string) ($target->representative_user_id ?: 'unknown'),
                     ));
                 }
 
-                if (! $target->representativeUser) {
-                    throw new \RuntimeException(sprintf(
-                        'Credential account no longer exists. User #%s · GHL location %s.',
-                        (string) ($target->representative_user_id ?: 'unknown'),
-                        (string) ($target->location_id ?: 'unknown'),
-                    ));
+                // Keep the target's diagnostic metadata current when a shared credential
+                // group changes which PLYRCARD user serves as its representative.
+                if (
+                    (int) $target->representative_user_id !== (int) $group['representative_user_id']
+                    || $target->account_user_ids !== $group['user_ids']
+                ) {
+                    $target->forceFill([
+                        'representative_user_id' => (int) $group['representative_user_id'],
+                        'account_user_ids' => $group['user_ids'],
+                    ])->save();
                 }
 
                 $result = $gateway->syncCoach(
                     $target->coach,
-                    $target->representativeUser,
+                    $credentialUser,
                     (string) $target->location_id,
                     (string) $target->api_key_hash,
                 );

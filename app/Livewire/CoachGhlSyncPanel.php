@@ -86,6 +86,7 @@ class CoachGhlSyncPanel extends Component
                 ->whereNotNull('email')
                 ->where('email', '!=', '')
                 ->get(),
+            reconcileAll: true,
         );
 
         $this->resetInterruptedTargets();
@@ -129,8 +130,10 @@ class CoachGhlSyncPanel extends Component
             ->send();
     }
 
-    public function restartSync(CoachGhlBackgroundLauncher $launcher): void
-    {
+    public function restartSync(
+        CoachGhlSyncPlanner $planner,
+        CoachGhlBackgroundLauncher $launcher,
+    ): void {
         $active = CoachGhlSyncRun::query()
             ->whereIn('status', ['queued', 'running'])
             ->latest('id')
@@ -146,6 +149,16 @@ class CoachGhlSyncPanel extends Component
                 'heartbeat_at' => now(),
             ])->save();
         }
+
+        // Rebuild the complete target set before restarting. This is important after
+        // sport/gender changes because old all-to-all targets must never become pending again.
+        $planner->planForCoaches(
+            Coach::query()
+                ->whereNotNull('email')
+                ->where('email', '!=', '')
+                ->get(),
+            reconcileAll: true,
+        );
 
         $this->resetInterruptedTargets();
         $this->launchNewRun($launcher, true);
@@ -190,8 +203,8 @@ class CoachGhlSyncPanel extends Component
                 ->distinct()
                 ->count('location_id'),
             'message' => $restart
-                ? 'Restarted for automatic browser-assisted processing.'
-                : 'Ready for automatic browser-assisted processing.',
+                ? 'Restarted with sport + gender scoped coach targets.'
+                : 'Ready to sync sport + gender matched coaches to each GHL subaccount.',
             'heartbeat_at' => now(),
         ]);
 
@@ -200,7 +213,7 @@ class CoachGhlSyncPanel extends Component
 
         Notification::make()
             ->title($restart ? 'GHL synchronization restarted' : 'GHL synchronization queued')
-            ->body('Processing starts automatically in small browser-assisted batches. Keep this page open while it runs.')
+            ->body('Only coaches matching the sport + gender audience of each GHL subaccount will be processed.')
             ->success()
             ->send();
     }
