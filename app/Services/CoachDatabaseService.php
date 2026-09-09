@@ -1133,6 +1133,11 @@ class CoachDatabaseService
      */
     public function schoolEngagementScoreForUser(User $user, array $school): int
     {
+        $targetGender = Coach::normalizeGender($user->gender ?? null);
+        if (! $targetGender) {
+            return 0;
+        }
+
         $canonicalSchool = $school;
         $schoolReference = collect([
             $school['id'] ?? null,
@@ -1143,7 +1148,9 @@ class CoachDatabaseService
         // Avoid reloading the same school row when the caller already supplied the
         // complete canonical roster. Admin and Locker Room both do this before calling
         // CES, so a drawer open no longer pays for the same school/roster query twice.
-        $providedCoaches = collect($school['coaches'] ?? [])->filter(fn ($row): bool => is_array($row));
+        $providedCoaches = collect($school['coaches'] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->filter(fn (array $row): bool => Coach::normalizeGender($row['gender'] ?? null) === $targetGender);
         $declaredCoachCount = max(
             0,
             (int) ($school['coach_count'] ?? 0),
@@ -1218,6 +1225,7 @@ class CoachDatabaseService
         $roster = collect($canonicalSchool['coaches'] ?? $school['coaches'] ?? [])
             ->filter(fn ($row): bool => is_array($row))
             ->map(fn (array $row): array => $this->normalizeCesCoachRow($row))
+            ->filter(fn (array $row): bool => Coach::normalizeGender($row['gender'] ?? null) === $targetGender)
             ->filter(fn (array $row): bool => $this->cesCoachHasIdentity($row))
             ->unique(fn (array $row): string => $this->cesCoachIdentityKey($row))
             ->values();
@@ -1236,6 +1244,7 @@ class CoachDatabaseService
             try {
                 $localCoachRows = Coach::query()
                     ->where('school_id', $resolvedLocalSchoolId)
+                    ->where('gender', $targetGender)
                     ->get()
                     ->map(function (Coach $coach): array {
                         return $this->normalizeCesCoachRow([
@@ -1245,6 +1254,7 @@ class CoachDatabaseService
                             'name' => $coach->display_name ?? trim((string) (($coach->first_name ?? '') . ' ' . ($coach->last_name ?? ''))),
                             'email' => $coach->email ?? null,
                             'title' => $coach->title ?? $coach->position ?? null,
+                            'gender' => $coach->gender ?? null,
                         ]);
                     })
                     ->filter(fn (array $row): bool => $this->cesCoachHasIdentity($row))
@@ -1291,8 +1301,6 @@ class CoachDatabaseService
                         (int) ($remoteCoach['additional_thread_turns'] ?? 0),
                     ),
                 ]));
-            } else {
-                $roster->push($remoteCoach);
             }
         }
 
@@ -1319,12 +1327,18 @@ class CoachDatabaseService
      */
     public function schoolEngagementScoreMapForUser(User $user): array
     {
-        $cacheKey = 'coach-database:ces-school-map:v1:' . (int) $user->getKey();
+        $targetGender = Coach::normalizeGender($user->gender ?? null);
+        if (! $targetGender) {
+            return [];
+        }
 
-        return Cache::remember($cacheKey, now()->addSeconds(15), function () use ($user): array {
+        $cacheKey = 'coach-database:ces-school-map:v2:' . (int) $user->getKey() . ':' . $targetGender;
+
+        return Cache::remember($cacheKey, now()->addSeconds(15), function () use ($user, $targetGender): array {
             try {
                 $localCoaches = Coach::query()
                     ->whereNotNull('school_id')
+                    ->where('gender', $targetGender)
                     ->get();
             } catch (\Throwable) {
                 return [];
@@ -1343,6 +1357,7 @@ class CoachDatabaseService
                         'name' => $coach->display_name ?? trim((string) (($coach->first_name ?? '') . ' ' . ($coach->last_name ?? ''))),
                         'email' => $coach->email ?? null,
                         'title' => $coach->title ?? $coach->position ?? null,
+                        'gender' => $coach->gender ?? null,
                         '_ces_school_id' => (string) ($coach->school_id ?? ''),
                     ]);
 
@@ -1583,6 +1598,7 @@ class CoachDatabaseService
             'ghl_contact_id' => $coach['ghl_contact_id'] ?? ($contactId !== '' ? $contactId : null),
             'email' => $email !== '' ? $email : null,
             'title' => $coach['title'] ?? $coach['position'] ?? null,
+            'gender' => Coach::normalizeGender($coach['gender'] ?? null),
             'coach_reply_count' => max(0, (int) ($coach['coach_reply_count'] ?? $coach['reply_count'] ?? $coach['replies'] ?? 0)),
             'unique_site_clicks' => max(0, (int) ($coach['unique_site_clicks'] ?? 0)),
             'film_clicks' => max(0, (int) ($coach['film_clicks'] ?? 0)),

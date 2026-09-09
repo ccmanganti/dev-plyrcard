@@ -5005,7 +5005,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 && $resolvedSchoolId > 0
                 && Schema::hasTable('coaches')
                 && Schema::hasColumn('coaches', 'school_id')) {
-                $query = DB::table('coaches')->where('school_id', $resolvedSchoolId);
+                $gender = \App\Models\Coach::normalizeGender($user->gender ?? null);
+                if (! $gender || ! Schema::hasColumn('coaches', 'gender')) {
+                    return ['success' => false, 'school' => null];
+                }
+
+                $query = DB::table('coaches')
+                    ->where('school_id', $resolvedSchoolId)
+                    ->where('gender', $gender);
                 if (Schema::hasColumn('coaches', 'deleted_at')) {
                     $query->whereNull('deleted_at');
                 }
@@ -5111,7 +5118,12 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $localId = (string) $schoolModel->getKey();
         $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $localId);
-        $school = is_array($school) ? $school : [];
+
+        // Fail closed: if this school has no coaches for the logged-in athlete's
+        // gender, it is not a valid Recruiting Center school for this user.
+        if (! is_array($school)) {
+            return null;
+        }
 
         $coaches = collect($school['coaches'] ?? [])
             ->filter(fn ($row): bool => is_array($row))
@@ -5119,7 +5131,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ->all();
 
         if ($coaches === [] && Schema::hasTable('coaches') && Schema::hasColumn('coaches', 'school_id')) {
-            $query = DB::table('coaches')->where('school_id', $schoolModel->getKey());
+            $gender = \App\Models\Coach::normalizeGender($user->gender ?? null);
+            if (! $gender || ! Schema::hasColumn('coaches', 'gender')) {
+                return null;
+            }
+
+            $query = DB::table('coaches')
+                ->where('school_id', $schoolModel->getKey())
+                ->where('gender', $gender);
             if (Schema::hasColumn('coaches', 'deleted_at')) {
                 $query->whereNull('deleted_at');
             }
@@ -8777,13 +8796,17 @@ protected function templateHtmlForNativeEditor(array $template): string
 
     protected function composeCoachesForSchool(array $school, bool $requireEmail = true): Collection
     {
+        $user = Auth::user();
+        $gender = $user ? \App\Models\Coach::normalizeGender($user->gender ?? null) : null;
         $localSchoolId = (int) ($school['local_id'] ?? $school['school_id'] ?? $school['id'] ?? 0);
-        if ($localSchoolId <= 0) {
+
+        if ($localSchoolId <= 0 || ! $gender) {
             return collect();
         }
 
         return \App\Models\Coach::query()
             ->where('school_id', $localSchoolId)
+            ->where('gender', $gender)
             ->when($requireEmail, fn ($query) => $query->whereNotNull('email')->where('email', '<>', ''))
             ->orderByRaw("CASE WHEN LOWER(title) LIKE '%head%' AND LOWER(title) NOT LIKE '%assistant%' AND LOWER(title) NOT LIKE '%associate%' THEN 0 ELSE 1 END")
             ->orderBy('last_name')
@@ -8798,6 +8821,7 @@ protected function templateHtmlForNativeEditor(array $template): string
                 'last_name' => (string) $coach->last_name,
                 'email' => (string) $coach->email,
                 'title' => (string) ($coach->title ?? ''),
+                'gender' => (string) ($coach->gender ?? ''),
                 'school_id' => $localSchoolId,
                 'school' => (string) ($school['name'] ?? ''),
                 'school_name' => (string) ($school['name'] ?? ''),
@@ -13143,17 +13167,28 @@ HTML;
      */
     public function getComposeClientDatasetProperty(): array
     {
-        // v118: Compose selection is backed only by the canonical local School/Coach
-        // tables. The complete minimal roster is serialized once so school search,
-        // Head Coach Only, All Coaches, Choose Coaches, filtering, and checkboxes are
-        // instant Alpine operations with no Livewire/GHL request per click.
+        $user = Auth::user();
+        $gender = $user ? \App\Models\Coach::normalizeGender($user->gender ?? null) : null;
+
+        if (! $user || ! $gender) {
+            return ['schools' => []];
+        }
+
+        // Compose uses the same canonical local gender boundary as Discover Schools.
+        // A school is included only when it has at least one coach for this athlete's
+        // gender, and only matching-gender coaches are serialized to Alpine.
         $schools = \App\Models\School::query()
             ->select(['id', 'name', 'logo_url', 'city', 'state', 'ghl_business_id'])
-            ->with(['coaches' => function ($query): void {
+            ->whereHas('coaches', fn ($query) => $query
+                ->where('gender', $gender)
+                ->whereNotNull('email')
+                ->where('email', '<>', ''))
+            ->with(['coaches' => function ($query) use ($gender): void {
                 $query
+                    ->where('gender', $gender)
                     ->select([
                         'id', 'school_id', 'first_name', 'last_name', 'display_name',
-                        'email', 'title', 'conference', 'division', 'ghl_contact_id',
+                        'email', 'title', 'gender', 'conference', 'division', 'ghl_contact_id',
                     ])
                     ->whereNotNull('email')
                     ->where('email', '<>', '')
@@ -13174,7 +13209,6 @@ HTML;
                             && ! str_contains($titleKey, 'associate');
 
                         return [
-                            // Local coach ID is authoritative inside Compose UI.
                             'id' => (string) $coach->getKey(),
                             'local_id' => (int) $coach->getKey(),
                             'name' => $name !== '' ? $name : 'Coach',
@@ -13182,17 +13216,14 @@ HTML;
                             'last_name' => (string) ($coach->last_name ?? ''),
                             'email' => strtolower(trim((string) ($coach->email ?? ''))),
                             'title' => $title !== '' ? $title : 'Coach',
+                            'gender' => (string) ($coach->gender ?? ''),
                             'conference' => (string) ($coach->conference ?? ''),
                             'division' => (string) ($coach->division ?? ''),
                             'is_head' => $isHead,
                             'school_id' => (string) $school->getKey(),
                             'school' => (string) $school->name,
                             'search_text' => strtolower(trim(implode(' ', array_filter([
-                                $name,
-                                $coach->first_name,
-                                $coach->last_name,
-                                $coach->email,
-                                $coach->title,
+                                $name, $coach->first_name, $coach->last_name, $coach->email, $coach->title,
                             ])))),
                         ];
                     })
@@ -13202,7 +13233,6 @@ HTML;
                 $division = $coaches->pluck('division')->filter()->countBy()->sortDesc()->keys()->first() ?? '';
 
                 return [
-                    // Local school ID is authoritative inside Compose UI.
                     'id' => (string) $school->getKey(),
                     'local_id' => (int) $school->getKey(),
                     'business_id' => (string) ($school->ghl_business_id ?? ''),
@@ -13215,13 +13245,8 @@ HTML;
                     'coach_count' => $coaches->count(),
                     'coaches' => $coaches->all(),
                     'search_text' => strtolower(trim(implode(' ', array_filter([
-                        $school->name,
-                        $conference,
-                        $division,
-                        $school->city,
-                        $school->state,
-                        $coaches->pluck('name')->implode(' '),
-                        $coaches->pluck('email')->implode(' '),
+                        $school->name, $conference, $division, $school->city, $school->state,
+                        $coaches->pluck('name')->implode(' '), $coaches->pluck('email')->implode(' '),
                     ])))),
                 ];
             })
@@ -13698,7 +13723,8 @@ HTML;
      */
     protected function instantDiscoverCatalogCacheKey($user): string
     {
-        return 'recruiting:instant-school-catalog:v1032:' . (int) $user->getKey();
+        $gender = \App\Models\Coach::normalizeGender($user->gender ?? null) ?: 'unassigned';
+        return 'recruiting:instant-school-catalog:v1033:' . (int) $user->getKey() . ':' . $gender;
     }
 
     protected function forgetInstantDiscoverCatalogCache($user = null): void

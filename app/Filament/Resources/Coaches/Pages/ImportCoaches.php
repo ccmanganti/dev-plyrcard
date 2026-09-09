@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Coaches\Pages;
 
 use App\Filament\Resources\Coaches\CoachResource;
+use App\Models\Coach;
 use App\Services\CoachSpreadsheetService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -21,6 +22,9 @@ class ImportCoaches extends Page
 
     #[Url(as: 'sport')]
     public ?string $selectedSport = null;
+
+    #[Url(as: 'gender')]
+    public ?string $selectedGender = null;
 
     public TemporaryUploadedFile|string|null $upload = null;
     public array $headers = [];
@@ -47,6 +51,7 @@ class ImportCoaches extends Page
             404,
         );
 
+        $this->selectedGender = Coach::normalizeGender($this->selectedGender);
         $this->mapping = array_fill_keys(array_keys(CoachSpreadsheetService::IMPORT_FIELDS), '');
     }
 
@@ -74,15 +79,23 @@ class ImportCoaches extends Page
             return;
         }
 
-        $hasName = filled($this->mapping['first_name'] ?? null)
-            && filled($this->mapping['last_name'] ?? null);
+        $gender = Coach::normalizeGender($this->selectedGender);
+        if (! $gender) {
+            Notification::make()
+                ->title('Select a coach gender')
+                ->body('Choose Male or Female before starting the import. Every imported coach will be assigned to that gender.')
+                ->danger()->send();
+            return;
+        }
+        $this->selectedGender = $gender;
+
+        $hasName = filled($this->mapping['first_name'] ?? null) && filled($this->mapping['last_name'] ?? null);
 
         if (! filled($this->mapping['email'] ?? null) || ! $hasName) {
             Notification::make()
                 ->title('Required mapping is missing')
-                ->body('Map Email, First Name, and Last Name. Sport is automatically supplied by the selected folder.')
-                ->danger()
-                ->send();
+                ->body('Map Email, First Name, and Last Name. Sport and Gender are automatically supplied by the import filters.')
+                ->danger()->send();
             return;
         }
 
@@ -93,6 +106,7 @@ class ImportCoaches extends Page
                 Storage::disk('local')->path($this->storedImportPath),
                 $this->mapping,
                 (string) $this->selectedSport,
+                $gender,
                 auth()->id(),
             );
 
@@ -117,72 +131,46 @@ class ImportCoaches extends Page
 
     public function processNextBatch(CoachSpreadsheetService $service): void
     {
-        if (! $this->importRunning || ! $this->importJobPath) {
-            return;
-        }
+        if (! $this->importRunning || ! $this->importJobPath) return;
 
         try {
-            $result = $service->processImportBatch(
-                $this->importJobPath,
-                $this->importProcessed,
-                $this->importBatchSize,
-            );
-
+            $result = $service->processImportBatch($this->importJobPath, $this->importProcessed, $this->importBatchSize);
             $this->importProcessed += (int) $result['processed'];
             $this->importCreated += (int) $result['created'];
             $this->importUpdated += (int) $result['updated'];
             $this->importFailed += count($result['errors']);
-            $this->lastImportErrors = array_slice(
-                array_merge($this->lastImportErrors, $result['errors']),
-                0,
-                100,
-            );
-
-            if ((bool) $result['done']) {
-                $this->finishImport($service);
-            }
+            $this->lastImportErrors = array_slice(array_merge($this->lastImportErrors, $result['errors']), 0, 100);
+            if ((bool) $result['done']) $this->finishImport($service);
         } catch (Throwable $exception) {
             $this->importRunning = false;
-            Notification::make()
-                ->title('Import paused after ' . number_format($this->importProcessed) . ' rows')
-                ->body($exception->getMessage())
-                ->danger()
-                ->persistent()
-                ->send();
+            Notification::make()->title('Import paused after ' . number_format($this->importProcessed) . ' rows')
+                ->body($exception->getMessage())->danger()->persistent()->send();
         }
     }
 
     public function getImportProgressProperty(): int
     {
-        if ($this->importTotal <= 0) {
-            return 0;
-        }
-
+        if ($this->importTotal <= 0) return 0;
         return min(100, (int) floor(($this->importProcessed / $this->importTotal) * 100));
     }
 
     public function downloadTemplate(string $format, CoachSpreadsheetService $service)
     {
         abort_unless(in_array($format, ['csv', 'xlsx'], true), 404);
-        $path = $service->createTemplate($format, (string) $this->selectedSport);
-
+        $path = $service->createTemplate($format, (string) $this->selectedSport, Coach::normalizeGender($this->selectedGender));
         return response()->download($path)->deleteFileAfterSend(true);
     }
 
     public function resetImport(CoachSpreadsheetService $service): void
     {
         $service->deleteImportJob($this->importJobPath);
-
-        if ($this->storedImportPath) {
-            Storage::disk('local')->delete($this->storedImportPath);
-        }
+        if ($this->storedImportPath) Storage::disk('local')->delete($this->storedImportPath);
 
         $this->reset([
-            'upload', 'headers', 'previewRows', 'totalRows', 'storedImportPath',
-            'lastImportErrors', 'importRunning', 'importProcessed', 'importTotal',
-            'importCreated', 'importUpdated', 'importSkipped', 'importFailed', 'importJobPath',
+            'upload', 'headers', 'previewRows', 'totalRows', 'storedImportPath', 'lastImportErrors',
+            'importRunning', 'importProcessed', 'importTotal', 'importCreated', 'importUpdated',
+            'importSkipped', 'importFailed', 'importJobPath',
         ]);
-
         $this->mapping = array_fill_keys(array_keys(CoachSpreadsheetService::IMPORT_FIELDS), '');
     }
 
@@ -192,17 +180,9 @@ class ImportCoaches extends Page
         $service->deleteImportJob($this->importJobPath);
         $this->importJobPath = null;
 
-        Notification::make()
-            ->title('Coach import completed')
-            ->body(sprintf(
-                '%d created, %d updated, %d blank rows skipped, %d rows failed.',
-                $this->importCreated,
-                $this->importUpdated,
-                $this->importSkipped,
-                $this->importFailed,
-            ))
-            ->success()
-            ->persistent()
-            ->send();
+        Notification::make()->title('Coach import completed')
+            ->body(sprintf('%d created, %d updated, %d blank rows skipped, %d rows failed.',
+                $this->importCreated, $this->importUpdated, $this->importSkipped, $this->importFailed))
+            ->success()->persistent()->send();
     }
 }

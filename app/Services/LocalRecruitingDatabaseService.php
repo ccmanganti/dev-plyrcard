@@ -26,7 +26,7 @@ class LocalRecruitingDatabaseService
     ];
 
     /**
-     * v131 stable local Recruiting Center cache policy.
+     * v132 stable local Recruiting Center cache policy.
      *
      * The canonical School/Coach catalog is shared by all players, while Favorites
      * and My Lists are player-scoped. Mutating methods below explicitly invalidate
@@ -34,12 +34,22 @@ class LocalRecruitingDatabaseService
      */
     protected int $catalogFingerprintMinutes = 10;
 
+    protected function userGender(User $user): ?string
+    {
+        return Coach::normalizeGender($user->gender ?? null);
+    }
+
+    protected function genderCacheKey(?string $gender): string
+    {
+        return Coach::normalizeGender($gender) ?: 'unassigned';
+    }
+
     protected function catalogFingerprint(): string
     {
         // Avoid two MAX(updated_at) queries on every Livewire render. The fingerprint is checked on a modest cadence, while the expensive catalog/player
         // payloads themselves are version-keyed and persistent. User mutations explicitly
         // invalidate their player caches, so normal tab switches do not randomly go cold.
-        return Cache::remember('recruiting:local-catalog-fingerprint:v131', now()->addMinutes($this->catalogFingerprintMinutes), function (): string {
+        return Cache::remember('recruiting:local-catalog-fingerprint:v132', now()->addMinutes($this->catalogFingerprintMinutes), function (): string {
             $schoolVersion = (string) (School::query()->max('updated_at') ?? '0');
             $coachVersion = (string) (Coach::query()->max('updated_at') ?? '0');
 
@@ -47,34 +57,34 @@ class LocalRecruitingDatabaseService
         });
     }
 
-    protected function baseCatalogCacheKey(): string
+    protected function baseCatalogCacheKey(?string $gender = null): string
     {
-        return 'recruiting:local-school-catalog:v131:' . $this->catalogFingerprint();
+        return 'recruiting:local-school-catalog:v132:' . $this->genderCacheKey($gender) . ':' . $this->catalogFingerprint();
     }
 
-    protected function coachCatalogCacheKey(): string
+    protected function coachCatalogCacheKey(?string $gender = null): string
     {
-        return 'recruiting:local-coach-catalog:v131:' . $this->catalogFingerprint();
+        return 'recruiting:local-coach-catalog:v132:' . $this->genderCacheKey($gender) . ':' . $this->catalogFingerprint();
     }
 
     protected function playerSchoolRowsCacheKey(User $user): string
     {
-        return 'recruiting:player-school-rows:v131:' . $user->getKey() . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-school-rows:v132:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
     }
 
     protected function playerListsCacheKey(User $user): string
     {
-        return 'recruiting:player-lists:v131:' . $user->getKey() . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-lists:v132:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
     }
 
     protected function playerFavoritesCacheKey(User $user): string
     {
-        return 'recruiting:player-favorites:v131:' . $user->getKey() . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-favorites:v132:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
     }
 
     protected function defaultListsMarkerKey(User $user): string
     {
-        return 'recruiting:default-lists-ready:v131:' . $user->getKey();
+        return 'recruiting:default-lists-ready:v132:' . $user->getKey();
     }
 
     public function forgetUserCaches(User $user): void
@@ -86,7 +96,7 @@ class LocalRecruitingDatabaseService
 
     public function forgetCatalogCaches(): void
     {
-        Cache::forget('recruiting:local-catalog-fingerprint:v131');
+        Cache::forget('recruiting:local-catalog-fingerprint:v132');
     }
 
     public function ensureDefaultLists(User $user): void
@@ -116,21 +126,22 @@ class LocalRecruitingDatabaseService
     public function lists(User $user): array
     {
         $this->ensureDefaultLists($user);
+        $gender = $this->userGender($user);
 
         return Cache::rememberForever(
             $this->playerListsCacheKey($user),
-            function () use ($user): array {
+            function () use ($user, $gender): array {
                 return MyList::query()
                     ->where('user_id', $user->getKey())
                     ->withCount('schools')
                     ->with(['schools' => fn ($query) => $query
                         ->withCount('coaches')
-                        ->with(['coaches:id,school_id,conference,division'])
+                        ->with(['coaches:id,school_id,conference,division,gender'])
                         ->orderBy('name')])
                     ->orderBy('sort_order')
                     ->orderBy('name')
                     ->get()
-                    ->map(fn (MyList $list): array => $this->listDisplayRow($list))
+                    ->map(fn (MyList $list): array => $this->listDisplayRow($list, $gender))
                     ->all();
             },
         );
@@ -438,7 +449,12 @@ class LocalRecruitingDatabaseService
             return null;
         }
 
-        $query = $this->schoolQuery();
+        $gender = $this->userGender($user);
+        if (! $gender) {
+            return null;
+        }
+
+        $query = $this->schoolQuery($gender);
 
         $query->where(function ($query) use ($schoolId): void {
             if (ctype_digit($schoolId)) {
@@ -481,6 +497,7 @@ class LocalRecruitingDatabaseService
             'phone' => $coach->phone,
             'title' => $coach->title,
             'sport' => $coach->sport,
+            'gender' => $coach->gender,
             'division' => $coach->division,
             'conference' => $coach->conference,
             'school_id' => $school->getKey(),
@@ -504,13 +521,18 @@ class LocalRecruitingDatabaseService
 
     public function schoolRows(User $user): array
     {
+        $gender = $this->userGender($user);
+        if (! $gender) {
+            return [];
+        }
+
         return Cache::rememberForever(
             $this->playerSchoolRowsCacheKey($user),
-            function () use ($user): array {
+            function () use ($user, $gender): array {
                 $baseRows = Cache::rememberForever(
-                    $this->baseCatalogCacheKey(),
-                    function (): array {
-                        return $this->schoolQuery()
+                    $this->baseCatalogCacheKey($gender),
+                    function () use ($gender): array {
+                        return $this->schoolQuery($gender)
                             ->orderBy('schools.name')
                             ->get()
                             ->map(function (School $school): array {
@@ -557,10 +579,16 @@ class LocalRecruitingDatabaseService
 
     public function coachRows(User $user): array
     {
+        $gender = $this->userGender($user);
+        if (! $gender) {
+            return [];
+        }
+
         return Cache::rememberForever(
-            $this->coachCatalogCacheKey(),
-            function (): array {
+            $this->coachCatalogCacheKey($gender),
+            function () use ($gender): array {
                 return Coach::query()
+                    ->where('gender', $gender)
                     ->with('school:id,name,logo_url,ghl_business_id')
                     ->orderBy('school_id')
                     ->orderBy('last_name')
@@ -581,6 +609,7 @@ class LocalRecruitingDatabaseService
                             'phone' => $coach->phone,
                             'title' => $coach->title,
                             'sport' => $coach->sport,
+                            'gender' => $coach->gender,
                             'division' => $coach->division,
                             'conference' => $coach->conference,
                             'school_id' => $school?->getKey(),
@@ -602,12 +631,22 @@ class LocalRecruitingDatabaseService
         );
     }
 
-    protected function schoolQuery()
+    protected function schoolQuery(?string $gender = null)
     {
-        return School::query()
-            ->withCount('coaches')
-            ->with(['coaches' => function ($query): void {
-                $query->select(['id','school_id','display_name','first_name','last_name','email','title','sport','division','conference'])
+        $gender = Coach::normalizeGender($gender);
+        $query = School::query();
+
+        if (! $gender) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query
+            ->whereHas('coaches', fn ($coachQuery) => $coachQuery->where('gender', $gender))
+            ->withCount(['coaches' => fn ($coachQuery) => $coachQuery->where('gender', $gender)])
+            ->with(['coaches' => function ($coachQuery) use ($gender): void {
+                $coachQuery
+                    ->where('gender', $gender)
+                    ->select(['id','school_id','display_name','first_name','last_name','email','title','sport','gender','division','conference'])
                     ->orderByRaw("CASE WHEN LOWER(title) LIKE '%head%' AND LOWER(title) NOT LIKE '%assistant%' AND LOWER(title) NOT LIKE '%associate%' THEN 0 ELSE 1 END")
                     ->orderBy('last_name');
             }]);
@@ -646,6 +685,7 @@ class LocalRecruitingDatabaseService
                 'name' => (string) ($coach->display_name ?: trim($coach->first_name . ' ' . $coach->last_name)),
                 'email' => (string) $coach->email,
                 'title' => (string) ($coach->title ?? ''),
+                'gender' => (string) ($coach->gender ?? ''),
                 'school_id' => $school->getKey(),
                 'school' => $school->name,
             ])->all(),
@@ -661,6 +701,7 @@ class LocalRecruitingDatabaseService
                 'email' => (string) $coach->email,
                 'title' => (string) ($coach->title ?? ''),
                 'sport' => (string) ($coach->sport ?? ''),
+                'gender' => (string) ($coach->gender ?? ''),
                 'division' => (string) ($coach->division ?? ''),
                 'conference' => (string) ($coach->conference ?? ''),
                 'school_id' => $school->getKey(),
@@ -725,8 +766,36 @@ class LocalRecruitingDatabaseService
         return $map;
     }
 
-    protected function listDisplayRow(MyList $list): array
+    protected function listDisplayRow(MyList $list, ?string $gender = null): array
     {
+        $gender = Coach::normalizeGender($gender);
+
+        $schools = $list->schools
+            ->map(function ($school) use ($gender): ?array {
+                if (! $gender) {
+                    return null;
+                }
+
+                $coaches = $school->coaches
+                    ->filter(fn ($coach): bool => Coach::normalizeGender($coach->gender ?? null) === $gender)
+                    ->values();
+
+                if ($coaches->isEmpty()) {
+                    return null;
+                }
+
+                return [
+                    'id' => (string) $school->id,
+                    'name' => (string) $school->name,
+                    'logo_url' => (string) ($school->logo_url ?? ''),
+                    'conference' => (string) ($coaches->pluck('conference')->filter()->first() ?? ''),
+                    'division' => (string) ($coaches->pluck('division')->filter()->first() ?? ''),
+                    'coach_count' => $coaches->count(),
+                ];
+            })
+            ->filter()
+            ->values();
+
         return [
             'id' => $list->getKey(),
             'key' => $this->publicListKey($list->slug),
@@ -736,16 +805,9 @@ class LocalRecruitingDatabaseService
             'tag' => null,
             'custom' => ! $list->is_system,
             'color' => $list->color ?: '#ff6338',
-            'schools_count' => (int) ($list->schools_count ?? $list->schools->count()),
-            'coaches_count' => (int) $list->schools->sum(fn ($school): int => (int) ($school->coaches_count ?? 0)),
-            'schools' => $list->schools->map(fn ($school): array => [
-                'id' => (string) $school->id,
-                'name' => (string) $school->name,
-                'logo_url' => (string) ($school->logo_url ?? ''),
-                'conference' => (string) ($school->coaches->pluck('conference')->filter()->first() ?? ''),
-                'division' => (string) ($school->coaches->pluck('division')->filter()->first() ?? ''),
-                'coach_count' => (int) ($school->coaches_count ?? 0),
-            ])->all(),
+            'schools_count' => $schools->count(),
+            'coaches_count' => (int) $schools->sum(fn (array $school): int => (int) ($school['coach_count'] ?? 0)),
+            'schools' => $schools->all(),
         ];
     }
 

@@ -1013,10 +1013,12 @@ class LockerRoomDataService
         // and local coaching staff aligned between Admin and Locker Room.
         $schoolRow = null;
         $lists = [];
+        $genderScopedSchoolLookupCompleted = false;
         try {
             if (class_exists(\App\Services\LocalRecruitingDatabaseService::class)) {
                 $database = app(\App\Services\LocalRecruitingDatabaseService::class);
                 $schoolRow = $database->schoolRow($user, (string) $school->getKey());
+                $genderScopedSchoolLookupCompleted = true;
                 $lists = collect($database->lists($user))
                     ->filter(fn ($row): bool => is_array($row))
                     ->values()->all();
@@ -1024,6 +1026,13 @@ class LockerRoomDataService
         } catch (\Throwable) {
             $schoolRow = null;
             $lists = [];
+        }
+
+        // The canonical local service is gender-scoped. If it successfully resolved
+        // the request but returned no school, this school has no coaches for the
+        // logged-in athlete's gender and must not open in Locker Room.
+        if ($genderScopedSchoolLookupCompleted && ! is_array($schoolRow)) {
+            return ['school' => null, 'coaches' => [], 'lists' => $lists];
         }
 
         $coaches = collect(is_array($schoolRow) ? ($schoolRow['coaches'] ?? []) : [])
@@ -1036,11 +1045,19 @@ class LockerRoomDataService
                     'email' => $row['email'] ?? null,
                     'phone' => $row['phone'] ?? null,
                     'title' => $row['title'] ?? $row['position'] ?? null,
+                    'gender' => $row['gender'] ?? null,
                 ];
             })->values()->all();
 
         if ($coaches === [] && Schema::hasTable('coaches')) {
-            $query = DB::table('coaches')->where('school_id', $school->getKey());
+            $gender = \App\Models\Coach::normalizeGender($user->gender ?? null);
+            if (! $gender || ! Schema::hasColumn('coaches', 'gender')) {
+                return ['school' => null, 'coaches' => [], 'lists' => $lists];
+            }
+
+            $query = DB::table('coaches')
+                ->where('school_id', $school->getKey())
+                ->where('gender', $gender);
             if (Schema::hasColumn('coaches', 'deleted_at')) $query->whereNull('deleted_at');
             $coaches = $query->get()->map(function ($row): array {
                 $row = (array) $row;
@@ -1051,8 +1068,13 @@ class LockerRoomDataService
                     'email' => $row['email'] ?? null,
                     'phone' => $row['phone'] ?? null,
                     'title' => $row['title'] ?? null,
+                    'gender' => $row['gender'] ?? null,
                 ];
             })->sortBy(fn (array $row): string => strtolower((string) $row['name']))->values()->all();
+        }
+
+        if ($coaches === []) {
+            return ['school' => null, 'coaches' => [], 'lists' => $lists];
         }
 
         $payload = is_array($schoolRow) ? $schoolRow : $this->schoolPayload($school);

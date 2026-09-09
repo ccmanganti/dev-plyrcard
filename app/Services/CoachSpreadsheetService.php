@@ -44,7 +44,7 @@ class CoachSpreadsheetService
 
     public const EXPORT_HEADINGS = [
         'School', 'School Logo URL', 'First Name', 'Last Name', 'Display Name', 'Email', 'Secondary Email',
-        'Phone', 'Title', 'Sport', 'Division', 'Conference', 'Verification Status',
+        'Phone', 'Title', 'Sport', 'Gender', 'Division', 'Conference', 'Verification Status',
         'Confidence Level', 'Audit Notes', 'Coach City', 'Coach State', 'Country',
         'Website URL', 'Active', 'GHL Sync Status', 'Notes', 'Updated At',
     ];
@@ -142,8 +142,13 @@ class CoachSpreadsheetService
      * Later Livewire requests process this file in small batches, avoiding PHP's
      * 30-second request timeout on large imports.
      */
-    public function prepareImport(string $path, array $mapping, string $sport, ?int $createdBy): array
+    public function prepareImport(string $path, array $mapping, string $sport, string $gender, ?int $createdBy): array
     {
+        $gender = Coach::normalizeGender($gender);
+        if (! $gender) {
+            throw new RuntimeException('Select Male or Female before importing coaches.');
+        }
+
         $spreadsheet = $this->reader($path)->load($path);
         $sheet = $spreadsheet->getActiveSheet();
         $headers = [];
@@ -206,6 +211,7 @@ class CoachSpreadsheetService
                 'phone' => $this->nullable($data['phone']),
                 'title' => $this->nullable($data['title']),
                 'sport' => $sport,
+                'gender' => $gender,
                 'division' => $this->nullable($data['division']),
                 'conference' => $this->nullable($data['conference']),
                 'verification_status' => $this->nullable($data['verification_status']),
@@ -366,12 +372,14 @@ class CoachSpreadsheetService
                     ['email'],
                     [
                         'school_id', 'first_name', 'last_name', 'display_name', 'secondary_email',
-                        'phone', 'title', 'sport', 'division', 'conference', 'verification_status',
+                        'phone', 'title', 'sport', 'gender', 'division', 'conference', 'verification_status',
                         'confidence_level', 'audit_notes', 'city', 'state', 'country', 'website_url',
                         'is_active', 'notes', 'source', 'updated_at', 'deleted_at',
                     ],
                 );
             }
+
+            app(LocalRecruitingDatabaseService::class)->forgetCatalogCaches();
         });
 
         $processed = count($batch);
@@ -430,7 +438,7 @@ class CoachSpreadsheetService
         foreach ($rows as $coach) {
             $sheet->fromArray([
                 $coach->school?->name, $coach->school?->logo_url, $coach->first_name, $coach->last_name, $coach->display_name,
-                $coach->email, $coach->secondary_email, $coach->phone, $coach->title, $coach->sport,
+                $coach->email, $coach->secondary_email, $coach->phone, $coach->title, $coach->sport, $coach->gender,
                 $coach->division, $coach->conference, $coach->verification_status, $coach->confidence_level,
                 $coach->audit_notes, $coach->city, $coach->state, $coach->country, $coach->website_url,
                 $coach->is_active ? 'Yes' : 'No', $coach->ghl_sync_status,
@@ -442,7 +450,7 @@ class CoachSpreadsheetService
         return $this->saveSpreadsheet($spreadsheet, $format, 'coaches' . (filled($sport) ? '-' . Str::slug($sport) : ''));
     }
 
-    public function createTemplate(string $format, string $sport): string
+    public function createTemplate(string $format, string $sport, ?string $gender = null): string
     {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
@@ -451,8 +459,11 @@ class CoachSpreadsheetService
         $sheet->fromArray(['Example University', 'https://example.edu/logo.png', 'Jordan', 'Smith', 'jordan@example.edu', 'Example Conference', 'NCAA Division I', 'Head Coach', 'Verified', 'High', 'Delete this sample row.'], null, 'A2');
         $sheet->getCell('L1')->setValue('Sport applied by import');
         $sheet->getCell('L2')->setValue($sport);
+        $sheet->getCell('M1')->setValue('Gender applied by import');
+        $sheet->getCell('M2')->setValue(Coach::normalizeGender($gender) ?: 'Select Male/Female in Admin');
 
-        return $this->saveSpreadsheet($spreadsheet, $format, 'coach-import-template-' . Str::slug($sport));
+        $suffix = Str::slug($sport) . (Coach::normalizeGender($gender) ? '-' . Coach::normalizeGender($gender) : '');
+        return $this->saveSpreadsheet($spreadsheet, $format, 'coach-import-template-' . $suffix);
     }
 
     private function saveSpreadsheet(Spreadsheet $spreadsheet, string $format, string $basename): string
