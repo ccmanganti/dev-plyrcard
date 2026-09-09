@@ -1,8 +1,44 @@
 <div
     class="pas-root"
-    x-data="{ open: false }"
+    x-data="{
+        open: false,
+        messageSelectionStart: null,
+        messageSelectionEnd: null,
+        rememberMessageSelection() {
+            const el = this.$refs.messageBox;
+            if (! el) return;
+            const length = String(el.value || '').length;
+            this.messageSelectionStart = typeof el.selectionStart === 'number' ? el.selectionStart : length;
+            this.messageSelectionEnd = typeof el.selectionEnd === 'number' ? el.selectionEnd : this.messageSelectionStart;
+        },
+        insertMessageVariable(token) {
+            const el = this.$refs.messageBox;
+            if (! el) return;
+
+            const value = String(el.value || '');
+            const hasLiveSelection = document.activeElement === el && typeof el.selectionStart === 'number';
+            const start = hasLiveSelection
+                ? el.selectionStart
+                : Math.max(0, Math.min(Number(this.messageSelectionStart ?? value.length), value.length));
+            const end = hasLiveSelection
+                ? el.selectionEnd
+                : Math.max(start, Math.min(Number(this.messageSelectionEnd ?? start), value.length));
+            const nextValue = value.slice(0, start) + token + value.slice(end);
+            const nextCaret = start + token.length;
+
+            el.value = nextValue;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            this.messageSelectionStart = nextCaret;
+            this.messageSelectionEnd = nextCaret;
+
+            this.$nextTick(() => {
+                el.focus({ preventScroll: true });
+                el.setSelectionRange(nextCaret, nextCaret);
+            });
+        }
+    }"
     x-on:keydown.escape.window="if (open) { open = false; document.body.style.overflow = '' }"
-    wire:key="admin-support-messenger-root-v1062"
+    wire:key="admin-support-messenger-root-v1063"
 >
     <style>
         .pas-root{--pas-accent:#ff6338;--pas-bg:#fff;--pas-surface:#f8fafc;--pas-surface-2:#f1f5f9;--pas-border:#e2e8f0;--pas-text:#111827;--pas-muted:#64748b;--pas-shadow:0 18px 55px rgba(15,23,42,.18);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
@@ -33,7 +69,7 @@
         .pas-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}.pas-chip{display:inline-flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid var(--pas-border);border-radius:999px;background:var(--pas-surface);font-size:10.5px;color:var(--pas-text)}.pas-chip button{border:0;background:transparent;color:var(--pas-muted);cursor:pointer;font-size:14px;line-height:1}
         .pas-details{border-bottom:1px solid var(--pas-border)}.pas-details>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 22px;cursor:pointer;font-size:12.5px;font-weight:750;color:var(--pas-text)}.pas-details>summary::-webkit-details-marker{display:none}.pas-details>summary:after{content:'+';font-size:18px;font-weight:400;color:var(--pas-muted)}.pas-details[open]>summary:after{content:'–'}.pas-details-body{padding:0 22px 17px}.pas-details-sub{font-size:11px;color:var(--pas-muted);font-weight:500}
         .pas-field-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:7px}.pas-reset{border:0;background:transparent;color:var(--pas-accent);font-size:10.5px;font-weight:750;cursor:pointer}.pas-count{margin-top:5px;text-align:right;font-size:10px;color:var(--pas-muted)}
-        .pas-vars{display:flex;flex-wrap:wrap;gap:6px}.pas-var{border:1px solid var(--pas-border);border-radius:8px;background:var(--pas-surface);color:var(--pas-muted);padding:6px 8px;font-size:10.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer}.pas-var:hover{border-color:rgba(255,99,56,.55);color:var(--pas-accent)}
+        .pas-vars-wrap{margin:7px 0 8px}.pas-vars-label{display:block;margin-bottom:6px;font-size:10px;font-weight:750;color:var(--pas-muted)}.pas-vars{display:flex;flex-wrap:wrap;gap:5px}.pas-var{border:1px solid var(--pas-border);border-radius:8px;background:var(--pas-surface);color:var(--pas-muted);padding:5px 7px;font-size:10.5px;font-weight:700;cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease}.pas-var:hover{border-color:rgba(255,99,56,.55);background:rgba(255,99,56,.06);color:var(--pas-accent)}.pas-var:focus-visible{outline:2px solid rgba(255,99,56,.25);outline-offset:1px}
         .pas-preview{padding:12px;border:1px solid var(--pas-border);border-radius:10px;background:var(--pas-surface);font-size:12.5px;line-height:1.65;color:var(--pas-text);white-space:pre-wrap}.pas-preview-subject{display:block;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--pas-border);font-weight:800}
         .pas-history{display:grid;gap:7px}.pas-history-row{padding:10px 11px;border:1px solid var(--pas-border);border-radius:9px;background:var(--pas-surface);font-size:11px;color:var(--pas-muted)}.pas-history-row strong{color:var(--pas-text)}
         .pas-footer{padding:17px 22px 20px}.pas-confirm{display:flex;align-items:flex-start;gap:8px;margin-bottom:11px;font-size:11px;line-height:1.45;color:var(--pas-muted)}.pas-confirm input{margin-top:2px;accent-color:var(--pas-accent)}
@@ -158,21 +194,36 @@
                     <div class="pas-field-row"><label class="pas-label" style="margin:0">Subject</label><button type="button" class="pas-reset" wire:click="resetTemplate">Reset template</button></div>
                     <input type="text" class="pas-input" wire:model.live.debounce.450ms="subject" maxlength="255">
                     <label class="pas-label" style="margin-top:13px">Body</label>
-                    <textarea class="pas-textarea" wire:model.live.debounce.450ms="message" maxlength="5000"></textarea>
+                    <div class="pas-vars-wrap">
+                        <span class="pas-vars-label">Insert value at cursor</span>
+                        <div class="pas-vars" aria-label="Message variables">
+                            @foreach ($variableDefinitions as $key => $label)
+                                <button
+                                    type="button"
+                                    class="pas-var"
+                                    title="Insert {{ '{' . '{' . $key . '}' . '}' }}"
+                                    x-on:pointerdown.prevent="insertMessageVariable('{{ '{' . '{' . $key . '}' . '}' }}')"
+                                    x-on:keydown.enter.prevent="insertMessageVariable('{{ '{' . '{' . $key . '}' . '}' }}')"
+                                    x-on:keydown.space.prevent="insertMessageVariable('{{ '{' . '{' . $key . '}' . '}' }}')"
+                                >{{ $label }}</button>
+                            @endforeach
+                        </div>
+                    </div>
+                    <textarea
+                        class="pas-textarea"
+                        x-ref="messageBox"
+                        x-on:focus="rememberMessageSelection()"
+                        x-on:click="rememberMessageSelection()"
+                        x-on:keyup="rememberMessageSelection()"
+                        x-on:select="rememberMessageSelection()"
+                        x-on:input="rememberMessageSelection()"
+                        wire:model.live.debounce.450ms="message"
+                        maxlength="5000"
+                    ></textarea>
                     <div class="pas-count">{{ mb_strlen($message) }} / 5,000</div>
                 </div>
             </details>
 
-            <details class="pas-details">
-                <summary><span>Variables</span><span class="pas-details-sub">Insert user-specific data</span></summary>
-                <div class="pas-details-body">
-                    <div class="pas-vars">
-                        @foreach ($variableDefinitions as $key => $label)
-                            <button type="button" class="pas-var" title="{{ $label }}" wire:click="appendVariable('{{ $key }}')">{{ '{' . '{' . $key . '}' . '}' }}</button>
-                        @endforeach
-                    </div>
-                </div>
-            </details>
 
             <details class="pas-details">
                 <summary><span>Preview</span><span class="pas-details-sub">Uses the first selected user</span></summary>
