@@ -23,8 +23,11 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
     public int $tries = 3;
     public array $backoff = [10, 30, 90];
 
-    public function __construct(public int $runId)
-    {
+    public function __construct(
+        public int $runId,
+        public int $batchLimit = 100,
+        public bool $dispatchNext = true,
+    ) {
         $this->onConnection('database');
         $this->onQueue('default');
     }
@@ -54,7 +57,7 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
                     ->limit(1)
             )
             ->orderBy('id')
-            ->limit(100)
+            ->limit(max(1, min(100, $this->batchLimit)))
             ->get();
 
         if ($targets->isEmpty()) {
@@ -94,8 +97,20 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
             ])->save();
 
             try {
-                if (! $target->coach || ! $target->representativeUser) {
-                    throw new \RuntimeException('The local coach or credential account no longer exists.');
+                if (! $target->coach) {
+                    throw new \RuntimeException(sprintf(
+                        'Local coach no longer exists. GHL location %s · credential user #%s.',
+                        (string) ($target->location_id ?: 'unknown'),
+                        (string) ($target->representative_user_id ?: 'unknown'),
+                    ));
+                }
+
+                if (! $target->representativeUser) {
+                    throw new \RuntimeException(sprintf(
+                        'Credential account no longer exists. User #%s · GHL location %s.',
+                        (string) ($target->representative_user_id ?: 'unknown'),
+                        (string) ($target->location_id ?: 'unknown'),
+                    ));
                 }
 
                 $result = $gateway->syncCoach(
@@ -166,7 +181,7 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
                     $run->forceFill([
                         'status' => 'paused',
                         'last_error' => $message,
-                        'message' => 'Paused automatically after 5 identical failures. Fix the GHL credential, permission, API version, or payload error, then press Restart.',
+                        'message' => 'Paused automatically after 5 identical failures. Open Backend errors to see the exact PLYRCARD credential account and GHL subaccount, fix it, then press Restart.',
                         'current_location_id' => null,
                         'current_email' => null,
                         'finished_at' => now(),
@@ -201,9 +216,11 @@ class ProcessCoachGhlSyncBatch implements ShouldQueue
         }
 
         $remaining = CoachGhlSyncTarget::query()->whereIn('status', ['pending', 'processing'])->exists();
-        if ($remaining) {
-            self::dispatch($run->id);
-        } else {
+        if ($remaining && $this->dispatchNext) {
+            self::dispatch($run->id)
+                ->onConnection('database')
+                ->onQueue('default');
+        } elseif (! $remaining) {
             $this->finishRun($run->fresh());
         }
     }
