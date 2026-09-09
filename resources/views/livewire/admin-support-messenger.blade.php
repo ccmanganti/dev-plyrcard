@@ -38,6 +38,7 @@
         }
     }"
     x-on:keydown.escape.window="if (open) { open = false; document.body.style.overflow = '' }"
+    x-on:admin-support-open.window="open = true; document.body.style.overflow = 'hidden'"
     wire:key="admin-support-messenger-root-v1063"
 >
     <style>

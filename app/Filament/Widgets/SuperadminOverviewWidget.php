@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Filament\Resources\Users\UserResource;
 use App\Models\AdminSupportMessage;
 use App\Models\CoachDatabaseEmailMessage;
 use App\Models\User;
@@ -60,7 +59,7 @@ class SuperadminOverviewWidget extends Widget
     public function getViewData(): array
     {
         return Cache::remember(
-            'superadmin:overview:v10.109',
+            'superadmin:overview:v10.109.1',
             now()->addSeconds(60),
             fn (): array => $this->buildDashboardData(),
         );
@@ -106,7 +105,7 @@ class SuperadminOverviewWidget extends Widget
                     'flags' => $flags,
                     'top_flag' => $topFlag,
                     'health' => $health,
-                    'user_url' => $this->userUrl($user),
+                    'reminder_concern' => $this->reminderConcernForFlag($topFlag),
                 ];
             })
             ->values();
@@ -270,6 +269,19 @@ class SuperadminOverviewWidget extends Widget
         return $flags;
     }
 
+
+    protected function reminderConcernForFlag(?array $flag): string
+    {
+        return match ((string) ($flag['key'] ?? '')) {
+            'billing' => 'payment_attention',
+            'profile' => 'finish_profile',
+            'photo' => 'send_photo',
+            'film' => 'send_film',
+            'outreach' => 'start_outreach',
+            default => 'custom',
+        };
+    }
+
     protected function isCurrentRecurring(User $user): bool
     {
         $billing = $user->billingInformation;
@@ -377,15 +389,6 @@ class SuperadminOverviewWidget extends Widget
                 ->all();
         } catch (Throwable) {
             return [];
-        }
-    }
-
-    protected function userUrl(User $user): string
-    {
-        try {
-            return UserResource::getUrl('view', ['record' => $user]);
-        } catch (Throwable) {
-            return url('/admin/users/users/' . $user->getKey());
         }
     }
 

@@ -10,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class AdminSupportMessenger extends Component
@@ -45,6 +46,41 @@ class AdminSupportMessenger extends Component
      * signed Livewire snapshot. This avoids false 403s on generic Livewire update
      * requests while keeping the actual send operation server-authorized.
      */
+
+    #[On('open-admin-support-reminder')]
+    public function openReminder(int $userId, string $concern, AdminSupportMessagingService $messenger): void
+    {
+        $target = $this->baseRecipientQuery($messenger)->find($userId);
+
+        if (! $target) {
+            $this->noticeType = 'error';
+            $this->notice = 'That athlete could not be loaded for Admin Support.';
+            $this->dispatch('admin-support-open');
+            return;
+        }
+
+        $concerns = $messenger->concerns();
+        if (! array_key_exists($concern, $concerns)) {
+            $concern = 'custom';
+        }
+
+        $this->audienceMode = 'individual';
+        $this->targetUserId = (int) $target->getKey();
+        $this->customUserIds = [];
+        $this->bulkConfirmed = false;
+        $this->userSearch = '';
+        $this->concern = $concern;
+        $this->notice = null;
+        $this->loadConcernTemplate($messenger, $concern);
+
+        if (! $messenger->personalEmailFor($target)) {
+            $this->noticeType = 'warning';
+            $this->notice = 'This athlete is selected, but no valid personal email is on file yet.';
+        }
+
+        $this->dispatch('admin-support-open');
+    }
+
     public function selectAudienceMode(string $mode): void
     {
         if (! in_array($mode, ['all', 'custom', 'individual'], true)) {
