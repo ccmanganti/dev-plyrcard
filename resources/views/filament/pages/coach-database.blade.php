@@ -219,12 +219,9 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesLoadedFor = '';
                 document.documentElement.removeAttribute('data-rc-inbox-loading');
 
-                // Direct /conversations loads do not receive a client navigation event,
-                // so refresh Inbox once after Alpine is mounted. This root init runs once
-                // per Livewire page component and cannot recurse when Inbox re-renders.
-                if (this.activeSection === 'conversations') {
-                    this.$nextTick(() => this.openInboxSection());
-                }
+                // v10.113.5: do not auto-start Inbox work on direct /conversations.
+                // The server-rendered cached state is enough for first paint, and explicit
+                // refresh/thread-load buttons are used when live GHL data is needed.
             },
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -726,7 +723,7 @@ discoverSelectedIds: [],
         x-on:rc-free-plan-gate-close.window="closeFreeGate()"
         x-on:keydown.escape.window="if (freeGateOpen) closeFreeGate()"
         x-on:rc-recruiting-account-ready.window="$nextTick(() => $wire.bootDeferredUiData())"
-        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { $nextTick(() => $wire.ensureInboxConversationLoaded()) }">
+        x-on:rc-fast-inbox-refresh.window="if (($event.detail?.section || '') === 'conversations') { document.documentElement.removeAttribute('data-rc-inbox-loading') }">
     <style>
         :root {
             --rc-accent: #ff6338;
@@ -10074,41 +10071,11 @@ discoverSelectedIds: [],
 
 
 
-            <style id="rc-inbox-immediate-loader-v1037">
-                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before {
-                    content: '';
-                    position: absolute;
-                    inset: 4.2rem 0 0;
-                    z-index: 70;
-                    background: rgba(255,255,255,.88);
-                    pointer-events: none;
-                }
-                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82 .rc-inbox-empty-v56 {
-                    visibility: hidden !important;
-                }
-                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after {
-                    content: '';
-                    position: absolute;
-                    left: 50%;
-                    top: calc(50% + 1.6rem);
-                    width: 1.55rem;
-                    height: 1.55rem;
-                    margin: -.775rem 0 0 -.775rem;
-                    z-index: 71;
-                    border: 3px solid rgba(255,99,56,.2);
-                    border-top-color: #ff6338;
-                    border-radius: 999px;
-                    animation: rcInboxImmediateSpinV1037 .58s linear infinite;
-                    pointer-events: none;
-                }
-                .dark html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before,
-                html.dark[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before {
-                    background: rgba(17,24,39,.9);
-                }
-                @keyframes rcInboxImmediateSpinV1037 { to { transform: rotate(360deg); } }
-                @media (prefers-reduced-motion: reduce) {
-                    html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after { animation-duration: 1.2s; }
-                }
+            <style id="rc-inbox-immediate-loader-v1038">
+                /* v10.113.5: disable the full-panel Inbox loading overlay. The overlay made
+                   the entire Recruiting Center feel frozen while slow GHL calls were running. */
+                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before,
+                html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after { display:none!important; content:none!important; }
             </style>
 
             <style>
@@ -10150,22 +10117,14 @@ discoverSelectedIds: [],
                 @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
             </style>
 
-            @if($isLoadingConversations || $isLoadingConversationMessages || $isRefreshingRemoteData)
-                <div wire:poll.2s="pollDeferredUiData" style="display:none" aria-hidden="true"></div>
-            @endif
-
-            <div class="rc-section-async-banner {{ $isLoadingConversations ? 'is-visible' : '' }}">
-                Loading conversations in the background. Cached inbox stays usable.
-            </div>
+            {{-- v10.113.5: no Inbox background poll. Inbox should never keep the full
+                 Recruiting Center in a recurring loading/morph cycle. --}}
 
             @php
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $filteredConversationTotal = (int) ($this->filteredConversationTotal ?? $inboxConversations->count());
                 $canLoadMoreInboxConversations = (bool) ($this->canLoadMoreInboxConversations ?? false);
                 $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
-                if (! $selectedConversation && $inboxConversations->isNotEmpty()) {
-                    $selectedConversation = $inboxConversations->first();
-                }
                 $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
                 $selectedEmail = strtolower(trim((string) ($selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '')));
 
@@ -10802,28 +10761,15 @@ CSS;
                                     const id = String(conversationId || '');
                                     if (! id) return;
 
-                                    const selectedChanged = id !== String(this.selectedConversationId || '');
-                                    if (!selectedChanged && window.__rcInboxLoadingConversationId === id) return;
-
                                     window.__rcInboxPendingConversationId = id;
-                                    window.__rcInboxLoadingConversationId = id;
-                                    document.documentElement.setAttribute('data-rc-inbox-loading', id);
+                                    window.__rcInboxLoadingConversationId = '';
+                                    document.documentElement.removeAttribute('data-rc-inbox-loading');
                                     this.selectedConversationId = id;
 
-                                    const clearLoading = () => {
-                                        if (window.__rcInboxLoadingConversationId === id) {
-                                            window.__rcInboxLoadingConversationId = '';
-                                        }
-                                        if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
-                                            document.documentElement.removeAttribute('data-rc-inbox-loading');
-                                        }
-                                    };
-
+                                    // v10.113.5: exactly one lightweight Livewire request on click.
+                                    // No automatic GHL message fetch, no second loader, no background poll.
                                     Promise.resolve(this.$wire.selectConversation(id))
-                                        .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
-                                        .then(() => this.$wire.loadSelectedConversationMessagesForClient(id))
-                                        .finally(clearLoading)
-                                        .catch(clearLoading);
+                                        .finally(() => document.documentElement.removeAttribute('data-rc-inbox-loading'));
                                 },
                             }"
                             x-init="init()"
@@ -10910,10 +10856,15 @@ CSS;
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56">
                                         <div>
-                                            @if($isLoadingConversationMessages)
-                                                <strong>Loading conversation…</strong>
-                                            @else
-                                                <strong>No messages yet.</strong>
+                                            <strong>Messages are not loaded yet.</strong><br>
+                                            <span>Click below to load the latest 10 messages for this conversation.</span>
+                                            @if($selectedConversationId)
+                                                <div style="margin-top:.7rem">
+                                                    <button type="button" class="rc-btn rc-btn-primary" wire:click="loadSelectedConversationMessagesForClient('{{ $selectedConversationId }}', true)" wire:loading.attr="disabled" wire:target="loadSelectedConversationMessagesForClient">
+                                                        <span wire:loading.remove wire:target="loadSelectedConversationMessagesForClient">Load conversation</span>
+                                                        <span wire:loading wire:target="loadSelectedConversationMessagesForClient">Loading 10 messages…</span>
+                                                    </button>
+                                                </div>
                                             @endif
                                         </div>
                                     </div>
@@ -11976,9 +11927,7 @@ CSS;
                 'showNewEmail' => false,
             ])
 
-            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
-                Preparing templates and recipient data. You can keep editing while it refreshes.
-            </div>
+            {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
 
             <style>
                 .rc-compose-page-v45 { display:grid; gap:1rem; }
@@ -12583,9 +12532,7 @@ CSS;
         <section class="rc-client-panel-v1033" data-rc-client-section="campaigns" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header')
 
-            <div class="rc-section-async-banner {{ ($isLoadingTemplates || $isLoadingTemplateDetail) ? 'is-visible' : '' }}">
-                Refreshing templates. Cached and built-in templates remain available.
-            </div>
+            {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
 
             @php
                 $templateQuery = strtolower(trim((string) ($templateSearch ?? '')));

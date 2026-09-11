@@ -393,19 +393,15 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        // v10.103.8: preload only lightweight local/cached Recruiting Center data.
-        // The Inbox list is read from Laravel cache on the initial page render even when
-        // another Recruiting Center section is active. This keeps the hidden Inbox panel
-        // ready to display immediately without waiting for HighLevel when the user clicks it.
-        if (empty($this->templates)) {
-            $this->loadTemplates();
-        }
-
+        // v10.113.5: do not warm Templates or Inbox with remote/extra UI work while
+        // another Recruiting Center section is open. Keeping first paint small is more
+        // important than preloading hidden panels; each section initializes itself only
+        // when the user opens it.
         $this->primeInboxFromCacheForNavigation();
 
         $this->loadNotificationSettings();
 
-        if (in_array($this->section, ['campaigns', 'compose'], true)) {
+        if (in_array($this->section, ['campaigns', 'compose'], true) && empty($this->templates)) {
             $this->loadTemplates();
         }
 
@@ -606,7 +602,7 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        if (in_array($section, ['campaigns', 'compose'], true) && empty($this->templates)) {
+        if ($section === 'campaigns' && empty($this->templates)) {
             $this->loadTemplates();
         }
 
@@ -1256,20 +1252,17 @@ trait InteractsWithCoachDatabase
         $this->isBootingRemoteSection = true;
 
         try {
-            if ($this->section === 'conversations') {
-                // v10.103.8: deferred boot is cache-only. Never make the page wait on a
-                // HighLevel conversation request simply because Inbox became visible.
-                $this->primeInboxFromCacheForNavigation();
-            }
+            // v10.113.5: no automatic Inbox or Template boot work. Hidden/visible SPA
+            // panels should not start background requests that can keep the whole
+            // Recruiting Center in a loading state.
         } finally {
             $this->isBootingRemoteSection = false;
         }
     }
 
     /**
-     * v122: Automatically hydrate/fetch the currently selected Inbox thread.
-     * Cached messages win for instant repeat visits. GHL is only called when
-     * there is no cached message payload for the selected conversation.
+     * v10.113.5: cache-only compatibility hook. Browser/nav events may still call
+     * this, but it must never select a thread or start a GHL request by itself.
      */
     public function ensureInboxConversationLoaded(): void
     {
@@ -1277,19 +1270,11 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        if (! $this->selectedConversationId && ! empty($this->conversations)) {
-            $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
-        }
-
         $conversationId = trim((string) $this->selectedConversationId);
-        if ($conversationId === '') {
-            return;
+        if ($conversationId !== '') {
+            $this->hydrateCachedConversationMessages($conversationId);
         }
 
-        // v10.113.4: this method is cache-only. It is called by page/navigation boot
-        // and should not trigger a remote message fetch by itself. Conversations load
-        // from GHL only when the user selects or manually refreshes a thread.
-        $this->hydrateCachedConversationMessages($conversationId);
         $this->isLoadingConversationMessages = false;
         $this->isRefreshingRemoteData = false;
         $this->activeUiOperation = null;
@@ -1700,18 +1685,15 @@ trait InteractsWithCoachDatabase
         $this->inboxInitialLoadCompleted = true;
         $this->inboxConversationDisplayLimit = 10;
 
-        // Manual refresh should update the actual GHL conversation summaries, but it
-        // should not also block on a selected-thread message request. That second
-        // API call was the most visible source of two-minute Inbox waits.
+        // Manual refresh updates only the GHL conversation summary list. It must not
+        // also refresh the selected thread because that is what made Inbox feel locked
+        // after a refresh or SPA navigation.
         $this->loadConversations(force: true);
 
-        if ($this->selectedConversationId) {
-            $this->refreshConversationMessagesIfStale((string) $this->selectedConversationId, force: true);
-        }
-
         $this->isLoadingConversations = false;
-        $this->isRefreshingRemoteData = $this->isLoadingConversationMessages;
-        $this->activeUiOperation = $this->isLoadingConversationMessages ? 'Loading messages' : null;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
 
@@ -5923,10 +5905,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 && $this->inboxConversationUnreadCount($row) > 0;
         });
 
+        $conversationChanged = (string) $this->selectedConversationId !== $conversationId;
         $this->selectedConversationId = $conversationId;
-        $this->messageLastId = null;
-        $this->hasMoreMessages = false;
-        $this->messages = [];
+
+        if ($conversationChanged) {
+            $this->messageLastId = null;
+            $this->hasMoreMessages = false;
+            $this->messages = [];
+        }
 
         $this->hydrateCachedConversationMessages($conversationId);
 
@@ -5978,7 +5964,11 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
+        // This method is now only called by an explicit user action, so the one
+        // GHL request here is expected and does not run during normal Inbox clicks.
         $this->loadConversationMessages(true, preserveVisibleMessages: true);
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
     protected function inboxMessageCacheIsFresh(string $conversationId, int $seconds = 180): bool
@@ -6015,26 +6005,12 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        $user = Auth::user();
-        if (! $user) {
-            return;
-        }
-
-        $status = Cache::get(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId), []);
-        if ($this->deferredUiStatusIsRunning(is_array($status) ? $status : [], $user, 'messages', $conversationId)) {
-            $this->isLoadingConversationMessages = ! $hasCachedMessages;
-            $this->isRefreshingRemoteData = true;
-            $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
-            return;
-        }
-
-        // Queue the first/latest 10-message page in the background. The selected
-        // conversation should paint from cache immediately; pollDeferredUiData() will
-        // swap in the real GHL payload as soon as the detached command writes it.
-        $this->isLoadingConversationMessages = ! $hasCachedMessages;
-        $this->isRefreshingRemoteData = true;
-        $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
-        $this->startDeferredUiSync('messages', $conversationId, $force);
+        // v10.113.5: no automatic background GHL message sync. This method is called
+        // by navigation/boot hooks, so it must stay cache-only. The user can explicitly
+        // load the selected conversation from the thread panel.
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
     public function refreshConversationMessagesForClient(string $conversationId): void
@@ -6044,7 +6020,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        $this->refreshConversationMessagesIfStale($conversationId, force: true);
+        $this->loadSelectedConversationMessagesForClient($conversationId, force: true);
 
         if ($user = Auth::user()) {
             app()->terminating(function () use ($user, $conversationId): void {
