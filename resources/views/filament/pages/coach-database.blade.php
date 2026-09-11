@@ -92,7 +92,7 @@
             inboxOpenPromise: null,
             inboxOpenLastStartedAt: 0,
             openInboxSection(force = false) {
-                // v10.113.4: opening Inbox is conversation-list only. Do not auto-load
+                // v10.113.7: opening Inbox is cache-only. Do not auto-load
                 // a selected thread on boot/navigation; that caused repeated/double loading
                 // while the onboarding hook and SPA navigation were also firing.
                 const now = Date.now();
@@ -7602,8 +7602,7 @@ discoverSelectedIds: [],
             </style>
 
             <div class="rc-home-dashboard-v2"
-                wire:key="rc-home-dashboard-email-fetch-{{ (int) $dashboardVisitVersion }}"
-                wire:init="fetchDashboardEmailSentCount">
+                wire:key="rc-home-dashboard-email-fetch-{{ (int) $dashboardVisitVersion }}">
                 @include('filament.partials.coach-database-header', [
                     'firstName' => $firstName,
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
@@ -7738,6 +7737,7 @@ discoverSelectedIds: [],
                                                 <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
                                             @else
                                                 {{ $dashboardEmailFetchStatus ?: 'Email activity' }}
+                                                <button type="button" class="rc-link" style="margin-left:.4rem;font-size:.72rem" wire:click="fetchDashboardEmailSentCount" wire:loading.attr="disabled" wire:target="fetchDashboardEmailSentCount">Refresh</button>
                                             @endif
                                         </span>
                                         <span class="rc-email-saved-refresh-indicator-v148" wire:loading.inline-flex wire:target="fetchDashboardEmailSentCount" aria-live="polite">
@@ -7751,6 +7751,7 @@ discoverSelectedIds: [],
                                             <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
                                         @else
                                             <span>{{ $dashboardEmailFetchStatus ?: 'Email activity' }}</span>
+                                            <button type="button" class="rc-link" style="margin-left:.4rem;font-size:.72rem" wire:click="fetchDashboardEmailSentCount" wire:loading.attr="disabled" wire:target="fetchDashboardEmailSentCount">Refresh</button>
                                         @endif
                                     </div>
                                     <div class="rc-home-stat-sub-v2 rc-email-live-fetch-status-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
@@ -10737,11 +10738,9 @@ CSS;
                             </button>
                         </div>
 
-                        @if(empty($inboxConversations))
-                            <div wire:loading.delay.longer.flex wire:target="bootDeferredUiData,loadConversations" class="rc-loading-inline" style="padding:.55rem .95rem">
-                                <span class="rc-spinner-mini"></span> Loading inbox
-                            </div>
-                        @endif
+                        {{-- v10.113.7: no automatic Inbox loader. If optimize:clear wiped
+                             Laravel cache and no persistent snapshot exists yet, keep the UI
+                             clickable and let the user explicitly refresh the newest 10 rows. --}}
 
                         <div
                             class="rc-inbox-list-v56"
@@ -10815,7 +10814,18 @@ CSS;
                                     </span>
                                 </button>
                             @empty
-                                <div class="rc-inbox-empty-v56"><div><strong>No conversations found.</strong><br><span>Try another search or send a new coach email.</span></div></div>
+                                <div class="rc-inbox-empty-v56">
+                                    <div>
+                                        <strong>No cached conversations found.</strong><br>
+                                        <span>If the cache was cleared, refresh once to fetch the newest 10 conversations from HighLevel.</span>
+                                        <div style="margin-top:.7rem">
+                                            <button type="button" class="rc-btn rc-btn-primary" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime">
+                                                <span wire:loading.remove wire:target="refreshConversationsRealtime">Refresh conversations</span>
+                                                <span wire:loading wire:target="refreshConversationsRealtime">Fetching latest 10…</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             @endforelse
 
                             @if($canLoadMoreInboxConversations)

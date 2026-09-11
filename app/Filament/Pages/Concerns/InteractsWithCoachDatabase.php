@@ -489,34 +489,23 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        // v10.113: entering Inbox is deliberately split into a fast paint and an
-        // optional message refresh. The first request never waits on a conversation-message
-        // API call. Cached rows/messages paint immediately; the browser asks for a stale or
-        // missing thread only after that response has reached the screen.
+        // v10.113.7: Inbox entry must be cache-only. No automatic GHL call,
+        // no detached background sync, and no polling loop should start just because
+        // the user opened Inbox. optimize:clear may wipe Laravel cache, so the cache
+        // primer also falls back to a small persistent JSON snapshot under storage/app.
         $hadMessagesBeforePrime = ! empty($this->messages);
         $hasCachedInbox = $this->primeInboxFromCacheForNavigation();
-        $this->inboxInitialLoadCompleted = $hasCachedInbox;
+        $this->inboxInitialLoadCompleted = true;
         $hydratedMessagesDuringPrime = ! $hadMessagesBeforePrime && ! empty($this->messages);
 
-        if ($hasCachedInbox) {
-            // If this request did not hydrate any new visible state, avoid morphing the giant
-            // Recruiting Center tree. The already-mounted cached Inbox can be shown as-is.
-            if (! $hydratedMessagesDuringPrime && method_exists($this, 'skipRender')) {
-                $this->skipRender();
-            }
-
-            $this->dispatch('rc-section-switched', section: 'conversations');
-            return;
+        if ($hasCachedInbox && ! $hydratedMessagesDuringPrime && method_exists($this, 'skipRender')) {
+            $this->skipRender();
         }
 
-        // Cold Inbox: do not block the visible request on HighLevel. Queue the
-        // conversations refresh and let pollDeferredUiData() hydrate the cache once
-        // the background process finishes. This keeps the Inbox responsive even when
-        // the Conversations API is slow or the service worker retries a request.
-        $this->inboxInitialLoadCompleted = true;
-        $this->isLoadingConversations = true;
-        $this->activeUiOperation = 'Loading conversations';
-        $this->startDeferredUiSync('conversations', force: true);
+        $this->isLoadingConversations = false;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
         $this->dispatch('rc-section-switched', section: 'conversations');
     }
 
@@ -1685,9 +1674,9 @@ trait InteractsWithCoachDatabase
         $this->inboxInitialLoadCompleted = true;
         $this->inboxConversationDisplayLimit = 10;
 
-        // Manual refresh updates only the GHL conversation summary list. It must not
-        // also refresh the selected thread because that is what made Inbox feel locked
-        // after a refresh or SPA navigation.
+        // Manual refresh fetches only the newest 10 conversation summaries. It must not
+        // refresh the selected thread or start a recurring polling loop, because that is
+        // what made the whole Recruiting Center feel locked while Inbox was open.
         $this->loadConversations(force: true);
 
         $this->isLoadingConversations = false;
@@ -3485,6 +3474,68 @@ trait InteractsWithCoachDatabase
         return 'recruiting:tag-sync-status:' . $user->id;
     }
 
+    protected function persistentRecruitingUiCachePath(string $type, ?string $reference = null): string
+    {
+        $user = Auth::user();
+        $userId = $user?->getKey() ?: 'guest';
+        $safeType = preg_replace('/[^a-z0-9_-]+/i', '-', trim($type)) ?: 'cache';
+        $safeReference = $reference !== null
+            ? '-' . (preg_replace('/[^a-z0-9_-]+/i', '-', trim($reference)) ?: 'item')
+            : '';
+
+        return 'recruiting-ui-cache/user-' . $userId . '/' . $safeType . $safeReference . '.json';
+    }
+
+    protected function readPersistentRecruitingUiCache(string $type, ?string $reference = null): array
+    {
+        try {
+            $path = $this->persistentRecruitingUiCachePath($type, $reference);
+            if (! Storage::disk('local')->exists($path)) {
+                return [];
+            }
+
+            $decoded = json_decode((string) Storage::disk('local')->get($path), true);
+            return is_array($decoded) ? $decoded : [];
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to read persistent Recruiting Center UI cache.', [
+                'type' => $type,
+                'reference' => $reference,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    protected function writePersistentRecruitingUiCache(string $type, array $payload, ?string $reference = null): void
+    {
+        try {
+            Storage::disk('local')->put(
+                $this->persistentRecruitingUiCachePath($type, $reference),
+                json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            );
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to write persistent Recruiting Center UI cache.', [
+                'type' => $type,
+                'reference' => $reference,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    protected function forgetPersistentRecruitingUiCache(string $type, ?string $reference = null): void
+    {
+        try {
+            Storage::disk('local')->delete($this->persistentRecruitingUiCachePath($type, $reference));
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to delete persistent Recruiting Center UI cache.', [
+                'type' => $type,
+                'reference' => $reference,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
     protected function conversationInboxCacheKey(): string
     {
         $user = Auth::user();
@@ -3498,6 +3549,10 @@ trait InteractsWithCoachDatabase
 
         if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
             $cached = Cache::get($this->deferredUiCacheKey('conversations'), []);
+        }
+
+        if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
+            $cached = $this->readPersistentRecruitingUiCache('conversations');
         }
 
         if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
@@ -3592,12 +3647,16 @@ trait InteractsWithCoachDatabase
             'cached_at' => now()->toIso8601String(),
         ], now()->addHours(2));
 
+        $payload = [
+            'rows' => $rows,
+            'cached_at' => now()->toIso8601String(),
+        ];
+
+        $this->writePersistentRecruitingUiCache('conversations', $payload);
+
         $user = Auth::user();
         if ($user) {
-            Cache::put($this->deferredUiCacheKey('conversations'), [
-                'rows' => $rows,
-                'cached_at' => now()->toIso8601String(),
-            ], now()->addHours(2));
+            Cache::put($this->deferredUiCacheKey('conversations'), $payload, now()->addHours(2));
         }
     }
 
@@ -3607,6 +3666,10 @@ trait InteractsWithCoachDatabase
 
         if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
             $cached = Cache::get($this->deferredUiCacheKey('conversations'), []);
+        }
+
+        if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
+            $cached = $this->readPersistentRecruitingUiCache('conversations');
         }
 
         if (is_array($cached) && is_array($cached['rows'] ?? null)) {
@@ -3859,7 +3922,7 @@ trait InteractsWithCoachDatabase
 
         try {
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
-                'limit' => 50,
+                'limit' => 10,
                 'status' => 'all',
                 'search' => trim($this->conversationSearch),
                 'fetch_all' => false,
@@ -5975,6 +6038,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     {
         $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
         if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
+            $cached = $this->readPersistentRecruitingUiCache('messages', $conversationId);
+        }
+
+        if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
             return false;
         }
 
@@ -6121,6 +6188,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             Cache::forget(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId));
             Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId));
             Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId));
+            $this->forgetPersistentRecruitingUiCache('messages', $conversationId);
 
             if (! $keepVisibleMessages) {
                 $this->messages = [];
@@ -6214,12 +6282,15 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 && $cursorAdvanced
                 && ($fresh || $addedCount > 0);
 
-            Cache::put($this->deferredUiCacheKey('messages', $conversationId), [
+            $messageCachePayload = [
                 'rows' => $this->messages,
                 'last_message_id' => $this->messageLastId,
                 'has_more' => $this->hasMoreMessages,
                 'cached_at' => now()->toIso8601String(),
-            ], now()->addMinutes(10));
+            ];
+
+            Cache::put($this->deferredUiCacheKey('messages', $conversationId), $messageCachePayload, now()->addMinutes(30));
+            $this->writePersistentRecruitingUiCache('messages', $messageCachePayload, $conversationId);
 
             $this->syncConversationAwaitingReplyFromLoadedMessages($conversationId);
 
@@ -6530,6 +6601,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     }
 
     $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
+
+    if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
+        $cached = $this->readPersistentRecruitingUiCache('messages', $conversationId);
+    }
 
     if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
         return false;
@@ -6930,12 +7005,14 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                 ->values()
                 ->all();
 
-            Cache::put($this->deferredUiCacheKey('messages', $conversationId), [
+            $messageCachePayload = [
                 'rows' => $this->messages,
                 'last_message_id' => $this->messageLastId,
                 'has_more' => $this->hasMoreMessages,
                 'cached_at' => now()->toIso8601String(),
-            ], now()->addMinutes(10));
+            ];
+            Cache::put($this->deferredUiCacheKey('messages', $conversationId), $messageCachePayload, now()->addMinutes(30));
+            $this->writePersistentRecruitingUiCache('messages', $messageCachePayload, $conversationId);
 
             // The newest message is now ours, so this thread has been answered. Keep the
             // conversation summary/cache in sync immediately; the Incoming filter should
