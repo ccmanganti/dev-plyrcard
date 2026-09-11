@@ -180,7 +180,6 @@ trait InteractsWithCoachDatabase
     public ?string $messageLastId = null;
     public bool $hasMoreMessages = false;
     public int $messagePageSize = 10;
-    public int $inboxConversationDisplayLimit = 10;
     public bool $isSendingEmail = false;
     public bool $isSyncingTags = false;
     public bool $isRecruitingSyncRunning = false;
@@ -513,14 +512,11 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // Cold Inbox: do not block the visible request on HighLevel. Queue the
-        // conversations refresh and let pollDeferredUiData() hydrate the cache once
-        // the background process finishes. This keeps the Inbox responsive even when
-        // the Conversations API is slow or the service worker retries a request.
+        // Cold Inbox: fetch only the small conversation summary page. loadConversations()
+        // selects/hydrates the first cached thread when available, but no longer performs a
+        // second sequential HighLevel request for its messages.
         $this->inboxInitialLoadCompleted = true;
-        $this->isLoadingConversations = true;
-        $this->activeUiOperation = 'Loading conversations';
-        $this->startDeferredUiSync('conversations', force: true);
+        $this->loadConversations();
         $this->dispatch('rc-section-switched', section: 'conversations');
     }
 
@@ -1286,13 +1282,7 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // v10.113.4: this method is cache-only. It is called by page/navigation boot
-        // and should not trigger a remote message fetch by itself. Conversations load
-        // from GHL only when the user selects or manually refreshes a thread.
-        $this->hydrateCachedConversationMessages($conversationId);
-        $this->isLoadingConversationMessages = false;
-        $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = null;
+        $this->refreshConversationMessagesIfStale($conversationId);
     }
 
     public function pollDeferredUiData(): void
@@ -1698,20 +1688,17 @@ trait InteractsWithCoachDatabase
     public function refreshConversationsRealtime(): void
     {
         $this->inboxInitialLoadCompleted = true;
-        $this->inboxConversationDisplayLimit = 10;
 
-        // Manual refresh should update the actual GHL conversation summaries, but it
-        // should not also block on a selected-thread message request. That second
-        // API call was the most visible source of two-minute Inbox waits.
-        $this->loadConversations(force: true);
+        $this->loadConversations();
 
         if ($this->selectedConversationId) {
-            $this->refreshConversationMessagesIfStale((string) $this->selectedConversationId, force: true);
+            $this->loadConversationMessages(true, preserveVisibleMessages: ! empty($this->messages));
         }
 
         $this->isLoadingConversations = false;
-        $this->isRefreshingRemoteData = $this->isLoadingConversationMessages;
-        $this->activeUiOperation = $this->isLoadingConversationMessages ? 'Loading messages' : null;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
 
@@ -3510,93 +3497,6 @@ trait InteractsWithCoachDatabase
         return 'coach-database:ghl-inbox:' . ($user?->id ?? 'guest');
     }
 
-    protected function inboxConversationCacheIsFresh(int $seconds = 300): bool
-    {
-        $cached = Cache::get($this->conversationInboxCacheKey(), []);
-
-        if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
-            $cached = Cache::get($this->deferredUiCacheKey('conversations'), []);
-        }
-
-        if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
-            return false;
-        }
-
-        try {
-            return \Illuminate\Support\Carbon::parse((string) $cached['cached_at'])
-                ->greaterThanOrEqualTo(now()->subSeconds($seconds));
-        } catch (\Throwable) {
-            return false;
-        }
-    }
-
-    protected function inboxConversationUnreadCount(array $row): int
-    {
-        foreach ([
-            'unread_count',
-            'unreadCount',
-            'unread_messages_count',
-            'unreadMessagesCount',
-            'unread_messages',
-            'unreadMessages',
-            'new_messages_count',
-            'newMessagesCount',
-        ] as $key) {
-            if (array_key_exists($key, $row) && is_numeric($row[$key])) {
-                return max(0, (int) $row[$key]);
-            }
-        }
-
-        foreach (['unread', 'is_unread', 'isUnread', 'has_unread', 'hasUnread'] as $key) {
-            if (array_key_exists($key, $row) && filter_var($row[$key], FILTER_VALIDATE_BOOLEAN)) {
-                return 1;
-            }
-        }
-
-        $status = strtolower(trim((string) ($row['status'] ?? $row['conversation_status'] ?? '')));
-        if (str_contains($status, 'unread') || str_contains($status, 'new message')) {
-            return 1;
-        }
-
-        return 0;
-    }
-
-    /**
-     * Keep every HighLevel unread alias synchronized. GHL summary rows may carry
-     * both unread_count and unreadCount; changing only one field made the Unread
-     * filter appear broken after cache normalization restored the old alias.
-     */
-    protected function withInboxUnreadCount(array $row, int $count): array
-    {
-        $count = max(0, $count);
-
-        foreach ([
-            'unread_count',
-            'unreadCount',
-            'unread_messages_count',
-            'unreadMessagesCount',
-            'unread_messages',
-            'unreadMessages',
-            'new_messages_count',
-            'newMessagesCount',
-        ] as $key) {
-            if (array_key_exists($key, $row) || $key === 'unread_count') {
-                $row[$key] = $count;
-            }
-        }
-
-        foreach (['unread', 'is_unread', 'isUnread', 'has_unread', 'hasUnread'] as $key) {
-            if (array_key_exists($key, $row)) {
-                $row[$key] = $count > 0;
-            }
-        }
-
-        $row['status'] = $count > 0 ? 'Unread' : 'Open';
-        $row['conversation_status'] = $count > 0 ? 'unread' : 'open';
-
-        return $row;
-    }
-
     protected function cacheInboxConversations(array $rows): void
     {
         $rows = collect($rows)
@@ -3608,14 +3508,14 @@ trait InteractsWithCoachDatabase
         Cache::put($this->conversationInboxCacheKey(), [
             'rows' => $rows,
             'cached_at' => now()->toIso8601String(),
-        ], now()->addHours(2));
+        ], now()->addMinutes(30));
 
         $user = Auth::user();
         if ($user) {
             Cache::put($this->deferredUiCacheKey('conversations'), [
                 'rows' => $rows,
                 'cached_at' => now()->toIso8601String(),
-            ], now()->addHours(2));
+            ], now()->addMinutes(30));
         }
     }
 
@@ -3829,7 +3729,7 @@ trait InteractsWithCoachDatabase
                 }
 
                 $row['last_message'] = trim(strip_tags((string) ($row['last_message'] ?? $row['snippet'] ?? '')));
-                $row['unread_count'] = $this->inboxConversationUnreadCount($row);
+                $row['unread_count'] = (int) ($row['unread_count'] ?? 0);
 
                 return $this->normalizeInboxConversationSummary($row);
             })
@@ -3850,7 +3750,7 @@ trait InteractsWithCoachDatabase
             ->all();
     }
 
-    public function loadConversations(bool $force = false): void
+    public function loadConversations(): void
     {
         $user = Auth::user();
 
@@ -3863,13 +3763,6 @@ trait InteractsWithCoachDatabase
 
         $this->clearStaleInboxLoadingState();
         $this->hydrateCachedInboxConversations();
-
-        if (! $force && ! empty($this->conversations) && $this->inboxConversationCacheIsFresh()) {
-            $this->isLoadingConversations = false;
-            $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = null;
-            return;
-        }
 
         $this->isLoadingConversations = true;
         $this->isRefreshingRemoteData = false;
@@ -4246,18 +4139,19 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         // Search the already loaded/cached conversation rows. Remote searching
         // on every keystroke made the whole component wait behind the upstream
         // request and delayed unrelated clicks.
-        $this->resetInboxConversationWindow();
     }
 
     public function updatedConversationSchoolFilter(): void
     {
-        $this->resetInboxConversationWindow();
+        $this->selectedConversationId = null;
+        $this->messages = [];
     }
 
 
     public function updatedConversationStatusFilter(): void
     {
-        $this->resetInboxConversationWindow();
+        $this->selectedConversationId = null;
+        $this->messages = [];
     }
 
     public function updatedCampaignTargetMode(): void
@@ -5785,7 +5679,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     protected function normalizeInboxConversationSummary(array $row): array
     {
-        $row['unread_count'] = $this->inboxConversationUnreadCount($row);
         $direction = $this->inboxConversationDirection($row);
         if ($direction !== 'unknown') {
             $row['last_message_direction'] = $direction;
@@ -5914,13 +5807,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // v10.113.4: keep the click request local/cache-only. Do not start a
-        // detached message sync here; the browser will make exactly one follow-up
-        // request for the selected thread when it actually needs messages.
+        // v10.113: make the selection request local/cache-only. The browser paints the
+        // selected coach and any cached messages first, then asks for a stale/missing page
+        // in a second request. This removes GHL latency from the actual click response.
         $hadUnread = collect($this->conversations ?? [])->contains(function ($row) use ($conversationId): bool {
             return is_array($row)
                 && (string) ($row['id'] ?? '') === $conversationId
-                && $this->inboxConversationUnreadCount($row) > 0;
+                && (int) ($row['unread_count'] ?? 0) > 0;
         });
 
         $this->selectedConversationId = $conversationId;
@@ -5928,17 +5821,17 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->hasMoreMessages = false;
         $this->messages = [];
 
-        $this->hydrateCachedConversationMessages($conversationId);
-
-        $this->isLoadingConversationMessages = false;
+        $hasCachedMessages = $this->hydrateCachedConversationMessages($conversationId);
+        $this->isLoadingConversationMessages = ! $hasCachedMessages;
         $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = null;
+        $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
                 // Read/unread is independent from Needs Reply. Opening an inbound thread
                 // must not make it disappear from the Incoming filter.
-                $row = $this->withInboxUnreadCount($row, 0);
+                $row['unread_count'] = 0;
+                $row['status'] = 'Open';
             }
             return $row;
         })->values()->all();
@@ -5960,27 +5853,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
     }
 
-    /**
-     * Browser-triggered single message load for the selected thread. This replaces the
-     * old select -> background sync -> ensure sequence that caused double loading.
-     */
-    public function loadSelectedConversationMessagesForClient(string $conversationId, bool $force = false): void
-    {
-        $conversationId = trim($conversationId);
-        if ($conversationId === '' || (string) $this->selectedConversationId !== $conversationId) {
-            return;
-        }
-
-        if (! $force && $this->hydrateCachedConversationMessages($conversationId) && $this->inboxMessageCacheIsFresh($conversationId, 300)) {
-            $this->isLoadingConversationMessages = false;
-            $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = null;
-            return;
-        }
-
-        $this->loadConversationMessages(true, preserveVisibleMessages: true);
-    }
-
     protected function inboxMessageCacheIsFresh(string $conversationId, int $seconds = 180): bool
     {
         $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
@@ -5996,7 +5868,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
     }
 
-    public function refreshConversationMessagesIfStale(string $conversationId, bool $force = false): void
+    public function refreshConversationMessagesIfStale(string $conversationId): void
     {
         $conversationId = trim($conversationId);
         if ($conversationId === '' || (string) $this->selectedConversationId !== $conversationId) {
@@ -6008,33 +5880,18 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $hasCachedMessages = $this->hydrateCachedConversationMessages($conversationId);
         }
 
-        if (! $force && $this->inboxMessageCacheIsFresh($conversationId)) {
+        if ($this->inboxMessageCacheIsFresh($conversationId)) {
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
             $this->activeUiOperation = null;
             return;
         }
 
-        $user = Auth::user();
-        if (! $user) {
-            return;
-        }
-
-        $status = Cache::get(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId), []);
-        if ($this->deferredUiStatusIsRunning(is_array($status) ? $status : [], $user, 'messages', $conversationId)) {
-            $this->isLoadingConversationMessages = ! $hasCachedMessages;
-            $this->isRefreshingRemoteData = true;
-            $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
-            return;
-        }
-
-        // Queue the first/latest 10-message page in the background. The selected
-        // conversation should paint from cache immediately; pollDeferredUiData() will
-        // swap in the real GHL payload as soon as the detached command writes it.
-        $this->isLoadingConversationMessages = ! $hasCachedMessages;
-        $this->isRefreshingRemoteData = true;
-        $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
-        $this->startDeferredUiSync('messages', $conversationId, $force);
+        // v10.113.2: do not make the Livewire click request wait on HighLevel.
+        // Queue the one-page TYPE_EMAIL message fetch after the response is sent,
+        // then let the browser poll the Laravel cache. This keeps the selected
+        // thread responsive even when GHL takes a long time to return messages.
+        $this->queueConversationMessagesRefreshAfterResponse($conversationId, force: false, keepVisibleMessages: $hasCachedMessages);
     }
 
     public function refreshConversationMessagesForClient(string $conversationId): void
@@ -6044,20 +5901,157 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        $this->refreshConversationMessagesIfStale($conversationId, force: true);
+        // Manual/client refresh follows the same non-blocking path. Cached messages
+        // stay visible while the fresh ten-message page is fetched after response.
+        $this->queueConversationMessagesRefreshAfterResponse($conversationId, force: true, keepVisibleMessages: ! empty($this->messages));
 
         if ($user = Auth::user()) {
             app()->terminating(function () use ($user, $conversationId): void {
                 try {
                     app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
                 } catch (\Throwable $exception) {
-                    Log::debug('Unable to sync selected conversation read state after queued refresh.', [
+                    Log::debug('Unable to sync selected conversation read state after message refresh.', [
                         'conversation_id' => $conversationId,
                         'error' => $exception->getMessage(),
                     ]);
                 }
             });
         }
+    }
+
+    protected function queueConversationMessagesRefreshAfterResponse(string $conversationId, bool $force = false, bool $keepVisibleMessages = false): void
+    {
+        $user = Auth::user();
+        $conversationId = trim($conversationId);
+
+        if (! $user || $conversationId === '') {
+            return;
+        }
+
+        $lockKey = CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId);
+        $statusKey = CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId);
+
+        if (! $force && Cache::has($lockKey)) {
+            $this->isLoadingConversationMessages = ! $keepVisibleMessages;
+            $this->isRefreshingRemoteData = true;
+            $this->activeUiOperation = $keepVisibleMessages ? null : 'Loading messages';
+            return;
+        }
+
+        Cache::put($lockKey, true, now()->addSeconds(90));
+        Cache::put($statusKey, [
+            'status' => 'queued',
+            'type' => 'messages',
+            'reference' => $conversationId,
+            'user_id' => $user->getKey(),
+            'queued_at' => now()->toIso8601String(),
+            'message' => 'Message refresh queued.',
+        ], now()->addMinutes(10));
+
+        $this->isLoadingConversationMessages = ! $keepVisibleMessages;
+        $this->isRefreshingRemoteData = true;
+        $this->activeUiOperation = $keepVisibleMessages ? null : 'Loading messages';
+
+        app()->terminating(function () use ($user, $conversationId, $lockKey, $statusKey): void {
+            Cache::put($statusKey, [
+                'status' => 'running',
+                'type' => 'messages',
+                'reference' => $conversationId,
+                'user_id' => $user->getKey(),
+                'started_at' => now()->toIso8601String(),
+                'message' => 'Loading latest messages.',
+            ], now()->addMinutes(10));
+
+            try {
+                $result = $this->fetchAndCacheConversationMessagePage($user, $conversationId);
+
+                Cache::put($statusKey, [
+                    'status' => ($result['success'] ?? false) ? 'completed' : 'failed',
+                    'type' => 'messages',
+                    'reference' => $conversationId,
+                    'user_id' => $user->getKey(),
+                    'finished_at' => now()->toIso8601String(),
+                    'message' => ($result['success'] ?? false)
+                        ? 'Messages refreshed.'
+                        : (string) ($result['error'] ?? 'Unable to refresh messages.'),
+                ], now()->addMinutes(10));
+            } catch (\Throwable $exception) {
+                Cache::put($statusKey, [
+                    'status' => 'failed',
+                    'type' => 'messages',
+                    'reference' => $conversationId,
+                    'user_id' => $user->getKey(),
+                    'finished_at' => now()->toIso8601String(),
+                    'message' => 'Unable to refresh messages.',
+                    'error' => $exception->getMessage(),
+                ], now()->addMinutes(10));
+
+                Log::warning('Deferred conversation message refresh failed.', [
+                    'user_id' => $user->getKey(),
+                    'conversation_id' => $conversationId,
+                    'error' => $exception->getMessage(),
+                ]);
+            } finally {
+                Cache::forget($lockKey);
+            }
+        });
+    }
+
+    protected function fetchAndCacheConversationMessagePage($user, string $conversationId): array
+    {
+        $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
+            $user,
+            $conversationId,
+            null,
+            $this->messagePageSize
+        );
+
+        if (! ($result['success'] ?? false)) {
+            return $result;
+        }
+
+        $rows = collect($result['messages'] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
+            ->sortBy(fn (array $row): int => $this->communicationTimestamp(
+                $row['created_at']
+                ?? $row['date']
+                ?? $row['messageDate']
+                ?? $row['dateAdded']
+                ?? $row['createdAt']
+                ?? null
+            ))
+            ->values();
+
+        $cached = Cache::get(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId), []);
+        $existing = collect(is_array($cached['rows'] ?? null) ? $cached['rows'] : [])
+            ->filter(fn ($row): bool => is_array($row));
+
+        $messages = $existing
+            ->merge($rows)
+            ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+            ->sortBy(fn (array $row): int => $this->communicationTimestamp(
+                $row['created_at']
+                ?? $row['date']
+                ?? $row['messageDate']
+                ?? $row['dateAdded']
+                ?? $row['createdAt']
+                ?? null
+            ))
+            ->take(-200)
+            ->values()
+            ->all();
+
+        Cache::put(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId), [
+            'rows' => $messages,
+            'last_message_id' => filled($result['last_message_id'] ?? null)
+                ? (string) $result['last_message_id']
+                : ($cached['last_message_id'] ?? null),
+            'has_more' => (bool) ($result['has_more'] ?? false),
+            'cached_at' => now()->toIso8601String(),
+        ], now()->addMinutes(10));
+
+        return ['success' => true, 'messages' => $messages];
     }
 
     protected function markConversationReadLocally(string $conversationId): void
@@ -6075,7 +6069,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
-                $row = $this->withInboxUnreadCount($row, 0);
+                $row['unread_count'] = 0;
+                $row['status'] = 'Open';
             }
             return $row;
         })->values()->all();
@@ -6107,7 +6102,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId, $newCount) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
-                $row = $this->withInboxUnreadCount($row, $newCount);
+                $row['unread_count'] = $newCount;
+                $row['status'] = $newCount > 0 ? 'Unread' : 'Open';
             }
             return $row;
         })->values()->all();
@@ -9188,9 +9184,52 @@ protected function templateHtmlForNativeEditor(array $template): string
         if (! $user) {
             return null;
         }
-        // v104: favorites/lists resolve against canonical schools.id only. No
-        // CoachDatabaseSchool / GHL-business-backed membership lookup is allowed.
-        return app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+
+        $needle = trim((string) $schoolId);
+        if ($needle === '') {
+            return null;
+        }
+
+        // v10.113.2: Compose can be opened from the school drawer, a direct
+        // ?school= URL, or an older cached browser row. Resolve against the same
+        // local Compose dataset that the browser uses, and accept every stable
+        // school identity we expose there. This prevents a valid drawer school
+        // from landing on Compose with an empty recipient state.
+        $fromComposeDataset = collect($this->composeClientDataset['schools'] ?? [])
+            ->first(function (array $row) use ($needle): bool {
+                $ids = [
+                    $row['id'] ?? null,
+                    $row['local_id'] ?? null,
+                    $row['school_id'] ?? null,
+                    $row['business_id'] ?? null,
+                    $row['company_id'] ?? null,
+                    $row['ghl_business_id'] ?? null,
+                ];
+
+                return collect($ids)
+                    ->map(fn ($value): string => trim((string) $value))
+                    ->filter()
+                    ->contains($needle);
+            });
+
+        if (is_array($fromComposeDataset)) {
+            return $fromComposeDataset;
+        }
+
+        try {
+            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $needle);
+            if (is_array($school)) {
+                return $school;
+            }
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to resolve compose school through local recruiting service.', [
+                'user_id' => $user->getKey(),
+                'school_id' => $needle,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return null;
     }
 
     protected function composeCoachesForSchool(array $school, bool $requireEmail = true): Collection
@@ -12493,18 +12532,8 @@ protected function ensureComposeBodyHasFooter(): void
         $this->showSaveTemplateNamePrompt = false;
     }
 
-    public function saveTemplateFromClient(string $name = '', string $subject = '', string $previewText = '', string $body = ''): void
-    {
-        $this->templateName = trim($name);
-        $this->templateSubject = trim($subject);
-        $this->templatePreviewText = trim($previewText);
-        $this->templateBody = trim($body);
-
-        $this->saveTemplate();
-    }
-
     public function saveTemplate(): void
-    {
+{
     $user = Auth::user();
 
     if (! $user) {
@@ -14265,32 +14294,7 @@ HTML;
         return redirect()->to($this->pageUrl('schedule'));
     }
 
-    public function loadMoreInboxConversations(): void
-    {
-        $this->inboxConversationDisplayLimit = min(200, max(10, $this->inboxConversationDisplayLimit + 10));
-    }
-
-
-    protected function resetInboxConversationWindow(): void
-    {
-        $this->inboxConversationDisplayLimit = 10;
-        $this->selectedConversationId = null;
-        $this->messages = [];
-        $this->messageLastId = null;
-        $this->hasMoreMessages = false;
-    }
-
-    public function getFilteredConversationTotalProperty(): int
-    {
-        return count($this->filteredConversationsWithoutLimit());
-    }
-
-    public function getCanLoadMoreInboxConversationsProperty(): bool
-    {
-        return $this->getFilteredConversationTotalProperty() > max(10, (int) $this->inboxConversationDisplayLimit);
-    }
-
-    protected function filteredConversationsWithoutLimit(): array
+    public function getFilteredConversationsProperty(): array
     {
         $schoolFilter = trim($this->conversationSchoolFilter);
         $statusFilter = strtolower(trim((string) ($this->conversationStatusFilter ?? 'all')));
@@ -14332,14 +14336,6 @@ HTML;
         }
 
         return $base->values()->all();
-    }
-
-    public function getFilteredConversationsProperty(): array
-    {
-        return collect($this->filteredConversationsWithoutLimit())
-            ->take(max(10, (int) $this->inboxConversationDisplayLimit))
-            ->values()
-            ->all();
     }
 
 
