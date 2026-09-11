@@ -2,7 +2,11 @@
     // v10.103.2: send the canonical local school catalog once, then reuse the browser
     // copy for instant Recruiting Center navigation instead of serializing it again
     // in every Livewire response. The cache is keyed by the currently authenticated user.
-    $rcCatalogUserKey = (string) (auth()->id() ?? 'guest');
+    $rcCatalogUser = auth()->user();
+    $rcCatalogGender = $rcCatalogUser
+        ? (\App\Models\Coach::normalizeGender($rcCatalogUser->gender ?? null) ?: 'unassigned')
+        : 'guest';
+    $rcCatalogUserKey = (string) ($rcCatalogUser?->getKey() ?? 'guest') . ':' . $rcCatalogGender;
     $shouldSeedSchoolCatalog = ! ($this->browserSchoolCatalogSeeded ?? false)
         && ($this->allowed ?? false)
         && ! ($this->locked ?? false)
@@ -87,6 +91,9 @@ discoverSelectedIds: [],
             discoverCreatingList: false,
             discoverSchoolCoachesLoading: false,
             discoverSchoolCoachesLoadedFor: '',
+            discoverSchoolCoachesError: '',
+            discoverSchoolDetailRequestSeq: 0,
+            discoverSchoolDetailRequestToken: '',
             discoverSchoolScoreRequest: '',
             discoverSchoolScoreLoadedFor: '',
             discoverSchoolScoreLoading: false,
@@ -193,32 +200,43 @@ discoverSelectedIds: [],
                     }
                 }
             },
-            async hydrateDiscoverSchoolDetails(schoolId) {
+            async hydrateDiscoverSchoolDetails(schoolId, force = false) {
                 const id = String(schoolId || '').trim();
                 if (!id) return;
 
                 const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                if (currentId !== id) return;
+                if (currentId !== id || !this.optimisticSchool) return;
+
+                // Every refresh gets its own token, even for the same school. This prevents
+                // an older request from a close/reopen cycle from applying over the newest one.
+                const requestToken = `${id}:${++this.discoverSchoolDetailRequestSeq}:${Date.now()}`;
+                this.discoverSchoolDetailRequestToken = requestToken;
+                this.discoverSchoolCoachesError = '';
 
                 const userKey = String(this.rcCatalogUserKey || 'guest');
                 window.__plyrRcSchoolDrawerDetailsByUser = window.__plyrRcSchoolDrawerDetailsByUser || {};
                 window.__plyrRcSchoolDrawerDetailsByUser[userKey] = window.__plyrRcSchoolDrawerDetailsByUser[userKey] || {};
                 const bucket = window.__plyrRcSchoolDrawerDetailsByUser[userKey];
-                const cached = bucket[id];
+                const cachedEntry = bucket[id];
+                const cached = cachedEntry?.data && typeof cachedEntry.data === 'object' ? cachedEntry.data : cachedEntry;
+                const cachedAt = Number(cachedEntry?.cachedAt || 0);
+                const cacheFresh = !!cached && (!cachedAt || (Date.now() - cachedAt) < 120000);
 
-                const applyDetails = (detail, allowScore = false) => {
+                const applyDetails = (detail) => {
                     if (!detail || typeof detail !== 'object' || !this.optimisticSchool) return false;
+                    if (this.discoverSchoolDetailRequestToken !== requestToken) return false;
+
                     const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (stillOpenId !== id) return false;
 
-                    // The browser-catalog identity is authoritative for the open drawer.
-                    // Never let a late server response replace id/name and make
-                    // isValidOpenSchool() invalidate/blank the slider.
+                    // Never blank an already-visible roster because a refresh returned an
+                    // incomplete payload. A non-empty incoming roster wins; otherwise keep
+                    // the current browser-local roster intact.
                     const current = this.optimisticSchool;
-                    const coaches = Array.isArray(detail.coaches) ? detail.coaches : (Array.isArray(current.coaches) ? current.coaches : []);
-                    const nextScore = allowScore && Object.prototype.hasOwnProperty.call(detail, 'engagement_score')
-                        ? Math.max(0, Math.min(100, Number(detail.engagement_score ?? 0)))
-                        : Math.max(0, Math.min(100, Number(current.engagement_score ?? 0)));
+                    const incomingCoaches = Array.isArray(detail.coaches) ? detail.coaches.filter(Boolean) : [];
+                    const currentCoaches = Array.isArray(current.coaches) ? current.coaches : [];
+                    const coaches = incomingCoaches.length ? incomingCoaches : currentCoaches;
+                    const nextScore = Math.max(0, Math.min(100, Number(current.engagement_score ?? 0)));
 
                     this.optimisticSchool = {
                         ...current,
@@ -230,10 +248,10 @@ discoverSelectedIds: [],
                         is_favorite: Object.prototype.hasOwnProperty.call(detail, 'is_favorite') ? !!detail.is_favorite : !!current.is_favorite,
                         list_keys: Array.isArray(detail.list_keys) ? [...detail.list_keys] : (Array.isArray(current.list_keys) ? [...current.list_keys] : []),
                         coaches,
-                        coach_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? current.coach_count ?? 0),
-                        coaches_count: Number(detail.coach_count ?? detail.coaches_count ?? coaches.length ?? current.coaches_count ?? 0),
+                        coach_count: coaches.length,
+                        coaches_count: coaches.length,
                         engagement_score: nextScore,
-                        // Explicitly preserve the identity that came from globalSchoolCatalog.
+                        // Browser catalog identity remains authoritative for the open drawer.
                         id: current.id,
                         school_id: current.school_id ?? current.id,
                         name: current.name,
@@ -245,9 +263,9 @@ discoverSelectedIds: [],
                     const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
                         .find(item => String(item?.id ?? item?.school_id ?? '').trim() === id);
                     if (row) {
-                        row.coaches = coaches;
-                        row.coach_count = this.optimisticSchool.coach_count;
-                        row.coaches_count = this.optimisticSchool.coaches_count;
+                        if (coaches.length) row.coaches = coaches;
+                        row.coach_count = coaches.length || Number(row.coach_count || row.coaches_count || 0);
+                        row.coaches_count = row.coach_count;
                         row.is_favorite = this.optimisticSchool.is_favorite;
                         row.list_keys = [...this.optimisticSchool.list_keys];
                         row.engagement_score = nextScore;
@@ -257,33 +275,75 @@ discoverSelectedIds: [],
                     return true;
                 };
 
-                // Cached roster can paint instantly, but its old score is ignored.
-                const hadCachedDetails = !!(cached && applyDetails(cached, false));
-                this.discoverSchoolCoachesLoading = !hadCachedDetails;
-                this.discoverSchoolCoachesLoadedFor = hadCachedDetails ? id : '';
+                // Paint a recent cached roster instantly. We still refresh once in the
+                // background, but the drawer never waits on Livewire when data is available.
+                if (!force && cacheFresh) {
+                    applyDetails(cached);
+                }
+
+                const hasVisibleCoaches = Array.isArray(this.optimisticSchool?.coaches) && this.optimisticSchool.coaches.length > 0;
+                this.discoverSchoolCoachesLoading = !hasVisibleCoaches;
+                this.discoverSchoolCoachesLoadedFor = hasVisibleCoaches ? id : '';
+
+                const slowTimer = window.setTimeout(() => {
+                    const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    const stillEmpty = !Array.isArray(this.optimisticSchool?.coaches) || this.optimisticSchool.coaches.length === 0;
+                    if (this.discoverSchoolDetailRequestToken === requestToken && stillOpenId === id && stillEmpty) {
+                        this.discoverSchoolCoachesError = 'This is taking longer than expected. You can retry without reloading the page.';
+                    }
+                }, 6000);
+
+                let requestSucceeded = false;
+                let authoritativeEmpty = false;
 
                 try {
-                    // One renderless request only. CES is already in the browser catalog;
-                    // this request exists only to refresh roster/detail data.
                     const result = await this.$wire.call('schoolDrawerDataForClient', id);
+                    if (this.discoverSchoolDetailRequestToken !== requestToken) return;
+
+                    const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (stillOpenId !== id) return;
+
                     const detail = result?.school;
-                    if (result?.success !== false && detail && typeof detail === 'object') {
-                        const detailForCache = { ...detail };
-                        bucket[id] = detailForCache;
-                        applyDetails(detailForCache, true);
+                    if (result?.success === false || !detail || typeof detail !== 'object') {
+                        throw new Error('School detail request did not return a valid school.');
+                    }
+
+                    const incomingCoaches = Array.isArray(detail.coaches) ? detail.coaches.filter(Boolean) : [];
+                    authoritativeEmpty = incomingCoaches.length === 0 && Number(detail.coach_count ?? detail.coaches_count ?? 0) === 0;
+                    requestSucceeded = applyDetails(detail);
+
+                    if (requestSucceeded) {
+                        // Cache only a successful server response. Failed/partial responses
+                        // must never poison the browser cache until a full page reload.
+                        bucket[id] = { data: detail, cachedAt: Date.now() };
+                        this.discoverSchoolCoachesError = '';
+                        const nowHasCoaches = Array.isArray(this.optimisticSchool?.coaches) && this.optimisticSchool.coaches.length > 0;
+                        if (nowHasCoaches || authoritativeEmpty) {
+                            this.discoverSchoolCoachesLoadedFor = id;
+                        }
                     }
                 } catch (error) {
                     console.error('Unable to load coaching staff for school drawer.', error);
-                } finally {
                     const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                    if (stillOpenId === id) {
+                    const stillEmpty = !Array.isArray(this.optimisticSchool?.coaches) || this.optimisticSchool.coaches.length === 0;
+                    if (this.discoverSchoolDetailRequestToken === requestToken && stillOpenId === id && stillEmpty) {
+                        this.discoverSchoolCoachesError = 'Couldn’t refresh the coaching staff. Retry without reloading the page.';
+                    }
+                } finally {
+                    window.clearTimeout(slowTimer);
+                    const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (this.discoverSchoolDetailRequestToken === requestToken && stillOpenId === id) {
                         this.discoverSchoolCoachesLoading = false;
-                        this.discoverSchoolCoachesLoadedFor = id;
-                        this.discoverSchoolScoreLoading = false;
-                        this.discoverSchoolScoreLoadedFor = id;
+                        // Do NOT mark a failed request as loaded. That was what converted
+                        // transient failures into a permanent empty drawer until refresh.
+                        if (!requestSucceeded && !authoritativeEmpty) {
+                            const hasCoaches = Array.isArray(this.optimisticSchool?.coaches) && this.optimisticSchool.coaches.length > 0;
+                            this.discoverSchoolCoachesLoadedFor = hasCoaches ? id : '';
+                        }
                     }
                 }
             },
+
             openGlobalSchool(reference) {
                 const source = (reference && typeof reference === 'object') ? reference : { id: reference };
                 const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
@@ -326,10 +386,16 @@ discoverSelectedIds: [],
                 merged.is_favorite = !!local.is_favorite;
                 merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
 
+                // Invalidate any in-flight detail request from a previous open before
+                // exposing this school. This also covers close -> reopen of the same school.
+                this.discoverSchoolDetailRequestToken = '';
+                this.discoverSchoolDetailRequestSeq++;
+                this.discoverSchoolCoachesError = '';
                 this.optimisticSchool = merged;
                 this.schoolDrawerOpen = true;
-                this.discoverSchoolCoachesLoading = true;
-                this.discoverSchoolCoachesLoadedFor = '';
+                const hasCatalogRoster = Array.isArray(merged.coaches) && merged.coaches.length > 0;
+                this.discoverSchoolCoachesLoading = !hasCatalogRoster;
+                this.discoverSchoolCoachesLoadedFor = hasCatalogRoster ? String(merged.id ?? merged.school_id ?? '') : '';
                 this.discoverSchoolScoreLoadedFor = '';
                 this.discoverSchoolScoreLoading = true;
                 // Keep the legacy global empty so Livewire/browser state cannot reopen it.
@@ -463,8 +529,11 @@ discoverSelectedIds: [],
                 this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
+                this.discoverSchoolDetailRequestToken = '';
+                this.discoverSchoolDetailRequestSeq++;
                 this.discoverSchoolCoachesLoading = false;
                 this.discoverSchoolCoachesLoadedFor = '';
+                this.discoverSchoolCoachesError = '';
                 this.discoverSchoolScoreRequest = '';
                 this.discoverSchoolScoreLoadedFor = '';
                 this.discoverSchoolScoreLoading = false;
@@ -12781,6 +12850,7 @@ CSS;
              interaction state. Favorite/list calls only persist the already-applied state in
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
+             wire:ignore
              hidden
              x-cloak
              x-bind:hidden="!isValidOpenSchool()"
@@ -12884,7 +12954,12 @@ CSS;
                             <span class="rc-spinner-mini" aria-hidden="true"></span>
                             <span>Loading coaching staff…</span>
                         </div>
-                        <div class="rc-empty" x-show="!discoverSchoolCoachesLoading && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
+                        <div class="rc-empty rc-school-coaches-error-v112" x-cloak x-show="!discoverSchoolCoachesLoading && discoverSchoolCoachesError && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
+                            <strong>Couldn’t load coaching staff.</strong>
+                            <span x-text="discoverSchoolCoachesError"></span>
+                            <button type="button" class="rc-school-coaches-retry-v112" x-on:click.stop="hydrateDiscoverSchoolDetails(String(optimisticSchool?.id ?? optimisticSchool?.school_id ?? ''), true)">Retry</button>
+                        </div>
+                        <div class="rc-empty" x-show="!discoverSchoolCoachesLoading && !discoverSchoolCoachesError && discoverSchoolCoachesLoadedFor === String(optimisticSchool?.id ?? optimisticSchool?.school_id ?? '') && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
                             <strong>No local coaches found.</strong>
                         </div>
                     </div>
@@ -12968,6 +13043,10 @@ CSS;
             position: relative !important;
             overflow: hidden !important;
         }
+    </style>
+
+    <style id="rc-school-drawer-stability-v112">
+        .rc-school-coaches-error-v112{display:grid;justify-items:start;gap:.45rem;text-align:left}.rc-school-coaches-error-v112 span{font-size:.78rem;line-height:1.45;color:var(--rc-muted)}.rc-school-coaches-retry-v112{display:inline-flex;align-items:center;justify-content:center;min-height:2rem;padding:.42rem .75rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);font-size:.75rem;font-weight:800;cursor:pointer}.rc-school-coaches-retry-v112:hover{border-color:rgba(255,99,56,.45);color:var(--rc-accent)}
     </style>
 
     <style id="rc-school-comms-v123">
@@ -15872,4 +15951,4 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     }
 </style>
 </x-filament-panels::page>
-</div>
+</div>8

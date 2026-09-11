@@ -4968,7 +4968,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         try {
-            $school = $this->canonicalAdminSchoolPayloadForCes($user, $schoolId);
+            // v10.112: Discover/Dashboard/Favorites/My Lists all open the drawer from
+            // the canonical browser catalog, whose id is the local schools.id. Resolve
+            // that one local row directly. The legacy multi-identifier resolver remains
+            // only as a compatibility fallback for old links/events.
+            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+            if (! is_array($school)) {
+                $school = $this->canonicalAdminSchoolPayloadForCes($user, $schoolId);
+            }
 
             if (! is_array($school)) {
                 return ['success' => false, 'school' => null];
@@ -4993,14 +5000,16 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                         'email' => $row['email'] ?? null,
                         'phone' => $row['phone'] ?? null,
                         'title' => $row['title'] ?? $row['position'] ?? null,
+                        'gender' => $row['gender'] ?? null,
+                        'sport' => $row['sport'] ?? null,
                     ];
                 })
+                ->sortBy(fn (array $row): string => strtolower((string) ($row['name'] ?? '')))
                 ->values()
                 ->all();
 
             // Defensive fallback for installations where schoolRow() is intentionally
-            // lightweight. This remains a single indexed local-school query and never
-            // touches GHL or rebuilds the complete coach catalog.
+            // lightweight. Keep this to one indexed, gender-scoped local query only.
             if ($coaches === []
                 && $resolvedSchoolId > 0
                 && Schema::hasTable('coaches')
@@ -5034,6 +5043,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                             'email' => $row['email'] ?? null,
                             'phone' => $row['phone'] ?? null,
                             'title' => $row['title'] ?? $row['position'] ?? null,
+                            'gender' => $row['gender'] ?? null,
+                            'sport' => $row['sport'] ?? null,
                         ];
                     })
                     ->sortBy(fn (array $row): string => strtolower((string) ($row['name'] ?? '')))
@@ -5041,21 +5052,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                     ->all();
             }
 
+            // v10.112: this endpoint is intentionally roster/detail only. CES is already
+            // computed once for the browser school catalog. Rebuilding the all-school CES
+            // map here was the main source of slow/stuck drawer opens.
             $school['coaches'] = $coaches;
-            $school['coach_count'] = max(
-                (int) ($school['coach_count'] ?? 0),
-                (int) ($school['coaches_count'] ?? 0),
-                count($coaches),
-            );
-            $school['coaches_count'] = $school['coach_count'];
-
-            // Use the already-prepared school score map. Do not recalculate CES inside
-            // the roster/detail request; that duplicated the score request and caused
-            // the 5-10 second Admin delay.
-            $scoreMap = app(CoachDatabaseService::class)->schoolEngagementScoreMapForUser($user);
-            $scoreKey = (string) ($school['id'] ?? $school['school_id'] ?? '');
-            $school['engagement_score'] = (int) ($scoreMap[$scoreKey] ?? $school['engagement_score'] ?? 0);
-            $school['lead_score'] = $school['engagement_score'];
+            $school['coach_count'] = count($coaches);
+            $school['coaches_count'] = count($coaches);
+            unset($school['engagement_score'], $school['lead_score']);
 
             return ['success' => true, 'school' => $school];
         } catch (\Throwable $exception) {
