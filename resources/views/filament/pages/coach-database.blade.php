@@ -12930,9 +12930,9 @@ CSS;
 
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
                     <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
-                        <template x-if="Array.isArray(optimisticSchool?.coaches) && optimisticSchool.coaches.length">
+                        <template x-if="(optimisticSchool?.coaches?.length ?? 0) > 0">
                             <div style="display:grid;gap:.7rem">
-                                <template x-for="coach in optimisticSchool.coaches" :key="`discover-drawer-coach-${coach.id}`">
+                                <template x-for="coach in (optimisticSchool?.coaches ?? [])" :key="`discover-drawer-coach-${coach.id}`">
                                     <div class="rc-school-coach-card">
                                         <div class="rc-school-coach-avatar" x-text="String(coach.name || 'C').split(/\s+/).slice(0,2).map(v => v[0] || '').join('').toUpperCase()"></div>
                                         <div class="rc-school-coach-info">
@@ -12950,16 +12950,16 @@ CSS;
                                 </template>
                             </div>
                         </template>
-                        <div class="rc-loading-inline" style="padding:1rem .35rem" x-show="discoverSchoolCoachesLoading && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
+                        <div class="rc-loading-inline" style="padding:1rem .35rem" x-show="discoverSchoolCoachesLoading && ((optimisticSchool?.coaches?.length ?? 0) === 0)">
                             <span class="rc-spinner-mini" aria-hidden="true"></span>
                             <span>Loading coaching staff…</span>
                         </div>
-                        <div class="rc-empty rc-school-coaches-error-v112" x-cloak x-show="!discoverSchoolCoachesLoading && discoverSchoolCoachesError && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
+                        <div class="rc-empty rc-school-coaches-error-v112" x-cloak x-show="!discoverSchoolCoachesLoading && discoverSchoolCoachesError && ((optimisticSchool?.coaches?.length ?? 0) === 0)">
                             <strong>Couldn’t load coaching staff.</strong>
                             <span x-text="discoverSchoolCoachesError"></span>
                             <button type="button" class="rc-school-coaches-retry-v112" x-on:click.stop="hydrateDiscoverSchoolDetails(String(optimisticSchool?.id ?? optimisticSchool?.school_id ?? ''), true)">Retry</button>
                         </div>
-                        <div class="rc-empty" x-show="!discoverSchoolCoachesLoading && !discoverSchoolCoachesError && discoverSchoolCoachesLoadedFor === String(optimisticSchool?.id ?? optimisticSchool?.school_id ?? '') && (!Array.isArray(optimisticSchool?.coaches) || optimisticSchool.coaches.length === 0)">
+                        <div class="rc-empty" x-show="!discoverSchoolCoachesLoading && !discoverSchoolCoachesError && discoverSchoolCoachesLoadedFor === String(optimisticSchool?.id ?? optimisticSchool?.school_id ?? '') && ((optimisticSchool?.coaches?.length ?? 0) === 0)">
                             <strong>No local coaches found.</strong>
                         </div>
                     </div>
@@ -15951,4 +15951,4 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     }
 </style>
 </x-filament-panels::page>
-</div>8
+</div>
