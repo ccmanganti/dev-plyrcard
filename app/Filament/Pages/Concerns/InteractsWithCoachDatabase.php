@@ -12024,12 +12024,17 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         $this->showComposePreview = false;
     }
 
+    #[Renderless]
     public function closeTemplateEditor(): void
     {
         $this->templateEditorOpen = false;
         $this->selectedTemplateId = null;
         $this->previewTemplateId = null;
         $this->templateIsNew = false;
+
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
     }
 
     public function createTemplate(): void
@@ -12270,6 +12275,7 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         $this->activeUiOperation = null;
     }
 
+#[Renderless]
 public function newTemplate(): void
     {
         $this->templateEditorOpen = true;
@@ -12286,9 +12292,10 @@ public function newTemplate(): void
         $this->templateAttachmentUploads = [];
         $this->templateAttachments = [];
 
-        // New templates start blank. Do not preload the footer/signature.
+        // v10.113.6: creating a blank template is a client-first UI action.
+        // Do not force a full Recruiting Center Livewire morph just to reveal
+        // the editor; dispatch the reset and keep the page responsive.
         $this->templateBody = $this->blankTemplateEditorHtml();
-
         $this->templateEditorRefreshKey++;
 
         $this->dispatch(
@@ -12296,6 +12303,11 @@ public function newTemplate(): void
             body: base64_encode($this->templateBody),
             key: $this->templateEditorRefreshKey
         );
+        $this->dispatch('rc-template-editor-client-open', mode: 'new');
+
+        if (method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
     }
 
 
@@ -12469,8 +12481,16 @@ protected function ensureComposeBodyHasFooter(): void
         $this->showSaveTemplateNamePrompt = false;
     }
 
-    public function saveTemplateFromClient(string $name = '', string $subject = '', string $previewText = '', string $body = ''): void
+    public function saveTemplateFromClient(string $name = '', string $subject = '', string $previewText = '', string $body = '', bool $forceNew = false): void
     {
+        if ($forceNew) {
+            $this->selectedTemplateId = null;
+            $this->previewTemplateId = null;
+            $this->campaignTemplateId = null;
+            $this->templateIsNew = true;
+            $this->templateEditorOpen = true;
+        }
+
         $this->templateName = trim($name);
         $this->templateSubject = trim($subject);
         $this->templatePreviewText = trim($previewText);
@@ -12588,6 +12608,8 @@ protected function ensureComposeBodyHasFooter(): void
             ->body('Template saved locally.')
             ->success()
             ->send();
+
+        $this->dispatch('rc-template-saved-client', id: (string) $row['id']);
     } catch (\Throwable $exception) {
         Log::error('Unable to save local email template.', [
             'user_id' => $user->getKey(),
@@ -12626,9 +12648,11 @@ protected function ensureComposeBodyHasFooter(): void
             return;
         }
 
-        $this->loadTemplates();
-
+        // v10.113.6: opening an existing template should not reload the full
+        // template list first. Load only the requested local row, with the
+        // current in-memory list as a fallback.
         $template = $this->loadTemplateDetail($templateId)
+            ?: ($this->templateDetails[$templateId] ?? null)
             ?: collect($this->templates)->firstWhere('id', $templateId);
 
         if (! is_array($template)) {
@@ -12670,6 +12694,7 @@ protected function ensureComposeBodyHasFooter(): void
             body: base64_encode($this->templateBody),
             key: $this->templateEditorRefreshKey
         );
+        $this->dispatch('rc-template-editor-client-open', mode: 'edit');
     }
 
     public function sendCampaign(): void

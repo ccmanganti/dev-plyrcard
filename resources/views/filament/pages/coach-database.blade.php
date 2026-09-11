@@ -12606,15 +12606,41 @@ CSS;
                 @media(max-width:720px){.rc-template-grid-v50{grid-template-columns:1fr}.rc-templates-head-v50,.rc-template-list-top-v50{align-items:stretch;flex-direction:column}.rc-template-search-v50{min-width:0}}
             </style>
 
-            <div class="rc-templates-page-v50">
-                @if(! $templateEditorOpen)
+            <div class="rc-templates-page-v50"
+                 x-data="{
+                    templateEditorOpenClient: @js((bool) ($templateEditorOpen ?? false)),
+                    templateEditorTitle: @js(($templateIsNew ?? false) ? 'New Template' : 'Edit Template'),
+                    openNewTemplateClient() {
+                        this.templateEditorOpenClient = true;
+                        this.templateEditorTitle = 'New Template';
+                        window.__rcTemplateClientMode = 'new';
+                        this.$nextTick(() => {
+                            if (typeof window.rcResetCoachDatabaseTemplateEditor === 'function') {
+                                window.rcResetCoachDatabaseTemplateEditor();
+                            }
+                            const name = document.querySelector('[data-plyr-template-name]');
+                            if (name) {
+                                name.focus({ preventScroll: true });
+                                name.select?.();
+                            }
+                        });
+                    },
+                    closeTemplateEditorClient() {
+                        this.templateEditorOpenClient = false;
+                        window.__rcTemplateClientMode = '';
+                        try { this.$wire.closeTemplateEditor(); } catch (error) {}
+                    }
+                 }"
+                 x-on:rc-template-editor-client-open.window="templateEditorOpenClient = true; templateEditorTitle = ($event.detail?.mode === 'new') ? 'New Template' : 'Edit Template'; window.__rcTemplateClientMode = $event.detail?.mode || ''"
+                 x-on:rc-template-saved-client.window="window.__rcTemplateClientMode = ''">
+                <div x-show="!templateEditorOpenClient" x-cloak>
                     <div class="rc-templates-head-v50" style="margin-top:.25rem">
                         <div>
                             <h2 style="margin:0;color:var(--rc-text);font-size:1.22rem;line-height:1.15;font-weight:760;letter-spacing:-.018em">Templates</h2>
                             <p style="margin:.22rem 0 0;color:var(--rc-muted);font-size:.8rem">Reusable email templates for your coach outreach.</p>
                         </div>
                         <div class="rc-templates-actions-v50">
-                            <button class="rc-btn rc-btn-primary" type="button" wire:click="newTemplate" wire:loading.attr="disabled" wire:target="newTemplate"><span wire:loading.remove wire:target="newTemplate">+ New Template</span><span wire:loading.flex wire:target="newTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading</span></button>
+                            <button class="rc-btn rc-btn-primary" type="button" data-rc-local-action x-on:click.prevent="openNewTemplateClient()">+ New Template</button>
                         </div>
                     </div>
 
@@ -12666,26 +12692,27 @@ CSS;
                             <div class="rc-empty" style="grid-column:1/-1"><strong>No templates found.</strong><span>Create your first reusable email template.</span></div>
                         @endforelse
                     </div>
-                @else
+                </div>
+                <div x-show="templateEditorOpenClient" x-cloak>
                     <div class="rc-templates-head-v50">
                         <div class="rc-templates-title-v50">
-                            <button type="button" class="rc-template-back-v50" wire:click="closeTemplateEditor" aria-label="Back to templates"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+                            <button type="button" class="rc-template-back-v50" data-rc-local-action x-on:click.prevent="closeTemplateEditorClient()" aria-label="Back to templates"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
                             <div>
-                                <h2>{{ $templateIsNew ? 'New Template' : 'Edit Template' }}</h2>
+                                <h2 x-text="templateEditorTitle">{{ $templateIsNew ? 'New Template' : 'Edit Template' }}</h2>
                                 <p>Build a reusable email with formatting and merge variables.</p>
                             </div>
                         </div>
                         <div class="rc-templates-actions-v50">
                             <button class="rc-btn" type="button" x-data x-on:click="document.dispatchEvent(new CustomEvent('rc-open-template-preview'))"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                            <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent="window.rcSaveCoachDatabaseTemplate && window.rcSaveCoachDatabaseTemplate($wire)" wire:loading.attr="disabled" wire:target="saveTemplate"><span wire:loading.remove wire:target="saveTemplate">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplate" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
+                            <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent="window.rcSaveCoachDatabaseTemplate && window.rcSaveCoachDatabaseTemplate($wire)" wire:loading.attr="disabled" wire:target="saveTemplateFromClient"><span wire:loading.remove wire:target="saveTemplateFromClient">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplateFromClient" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
                         </div>
                     </div>
 
                     <div class="rc-template-editor-layout-v50" wire:key="template-editor-{{ $templateEditorRefreshKey }}" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
                         <section class="rc-template-editor-card-v50">
-                            <div class="rc-template-field-v50"><label>Template Name</label><input data-plyr-template-name placeholder="e.g. Spring Showcase Intro" wire:model.live.debounce.650ms="templateName"></div>
-                            <div class="rc-template-field-v50"><label>Subject Line</label><input data-plyr-template-subject x-ref="subject" placeholder="Subject (you can use @{{variables}})" wire:model.live.debounce.650ms="templateSubject"></div>
-                            <div class="rc-template-field-v50"><label>Preview Text</label><input data-plyr-template-preview x-ref="preview" placeholder="Short inbox preview text" wire:model.live.debounce.650ms="templatePreviewText"></div>
+                            <div class="rc-template-field-v50"><label>Template Name</label><input data-plyr-template-name placeholder="e.g. Spring Showcase Intro" value="{{ $templateName ?? '' }}"></div>
+                            <div class="rc-template-field-v50"><label>Subject Line</label><input data-plyr-template-subject x-ref="subject" placeholder="Subject (you can use @{{variables}})" value="{{ $templateSubject ?? '' }}"></div>
+                            <div class="rc-template-field-v50"><label>Preview Text</label><input data-plyr-template-preview x-ref="preview" placeholder="Short inbox preview text" value="{{ $templatePreviewText ?? '' }}"></div>
 
                             <div>
                                 <div class="rc-template-field-label">Insert Variable</div>
@@ -12720,7 +12747,7 @@ CSS;
                                      data-refresh-key="{{ $templateEditorRefreshKey }}"
                                      x-on:input="queueSync()"
                                      x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
-                                <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" wire:model.live.debounce.900ms="templateBody">
+                                <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" value="{{ $templateBody ?? '' }}">
                             </div>
 
                             <div class="rc-attachments-v45" style="box-shadow:none;padding:.85rem">
@@ -12765,7 +12792,7 @@ CSS;
                         </section>
 
                     </div>
-                @endif
+                </div>
             </div>
         </section>
 
@@ -13637,8 +13664,6 @@ CSS;
 
                     const html = this.serializeEditorHtml();
                     this.$refs.hidden.value = html;
-                    this.$refs.hidden.dispatchEvent(new Event('input', { bubbles: true }));
-                    this.$refs.hidden.dispatchEvent(new Event('change', { bubbles: true }));
                 },
                 serializeEditorHtml() {
                     const clone = this.$refs.editor.cloneNode(true);
@@ -15509,6 +15534,34 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 @endif
 
 <script data-navigate-once>
+window.rcResetCoachDatabaseTemplateEditor = function () {
+    window.__rcTemplateClientMode = 'new';
+    const name = document.querySelector('[data-plyr-template-name]');
+    const subject = document.querySelector('[data-plyr-template-subject]');
+    const preview = document.querySelector('[data-plyr-template-preview]');
+    const editor = document.querySelector('[data-plyr-template-editor]');
+    const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
+    const blankHtml = '<p><br></p>';
+
+    if (name) {
+        name.value = 'New Recruiting Email';
+    }
+    if (subject) {
+        subject.value = '';
+    }
+    if (preview) {
+        preview.value = '';
+    }
+    if (editor) {
+        editor.dataset.initialBody = btoa(unescape(encodeURIComponent(blankHtml)));
+        editor.innerHTML = blankHtml;
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    if (hidden) {
+        hidden.value = blankHtml;
+    }
+};
+
 window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const editor = document.querySelector('[data-plyr-template-editor]');
     const name = document.querySelector('[data-plyr-template-name]');
@@ -15526,7 +15579,8 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         String(name?.value || ''),
         String(subject?.value || ''),
         String(preview?.value || ''),
-        String(clone.innerHTML || '')
+        String(clone.innerHTML || ''),
+        window.__rcTemplateClientMode === 'new'
     );
 };
 </script>
