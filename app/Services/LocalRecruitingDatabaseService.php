@@ -26,7 +26,7 @@ class LocalRecruitingDatabaseService
     ];
 
     /**
-     * v132 stable local Recruiting Center cache policy.
+     * v133 stable local Recruiting Center cache policy.
      *
      * The canonical School/Coach catalog is shared by all players, while Favorites
      * and My Lists are player-scoped. Mutating methods below explicitly invalidate
@@ -49,7 +49,7 @@ class LocalRecruitingDatabaseService
         // Avoid two MAX(updated_at) queries on every Livewire render. The fingerprint is checked on a modest cadence, while the expensive catalog/player
         // payloads themselves are version-keyed and persistent. User mutations explicitly
         // invalidate their player caches, so normal tab switches do not randomly go cold.
-        return Cache::remember('recruiting:local-catalog-fingerprint:v132', now()->addMinutes($this->catalogFingerprintMinutes), function (): string {
+        return Cache::remember('recruiting:local-catalog-fingerprint:v133', now()->addMinutes($this->catalogFingerprintMinutes), function (): string {
             $schoolVersion = (string) (School::query()->max('updated_at') ?? '0');
             $coachVersion = (string) (Coach::query()->max('updated_at') ?? '0');
 
@@ -59,32 +59,32 @@ class LocalRecruitingDatabaseService
 
     protected function baseCatalogCacheKey(?string $gender = null): string
     {
-        return 'recruiting:local-school-catalog:v132:' . $this->genderCacheKey($gender) . ':' . $this->catalogFingerprint();
+        return 'recruiting:local-school-catalog:v133:' . $this->genderCacheKey($gender) . ':' . $this->catalogFingerprint();
     }
 
     protected function coachCatalogCacheKey(?string $gender = null): string
     {
-        return 'recruiting:local-coach-catalog:v132:' . $this->genderCacheKey($gender) . ':' . $this->catalogFingerprint();
+        return 'recruiting:local-coach-catalog:v133:' . $this->genderCacheKey($gender) . ':' . $this->catalogFingerprint();
     }
 
     protected function playerSchoolRowsCacheKey(User $user): string
     {
-        return 'recruiting:player-school-rows:v132:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-school-rows:v133:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
     }
 
     protected function playerListsCacheKey(User $user): string
     {
-        return 'recruiting:player-lists:v132:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-lists:v133:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
     }
 
     protected function playerFavoritesCacheKey(User $user): string
     {
-        return 'recruiting:player-favorites:v132:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
+        return 'recruiting:player-favorites:v133:' . $user->getKey() . ':' . $this->genderCacheKey($this->userGender($user)) . ':' . $this->catalogFingerprint();
     }
 
     protected function defaultListsMarkerKey(User $user): string
     {
-        return 'recruiting:default-lists-ready:v132:' . $user->getKey();
+        return 'recruiting:default-lists-ready:v133:' . $user->getKey();
     }
 
     public function forgetUserCaches(User $user): void
@@ -96,7 +96,7 @@ class LocalRecruitingDatabaseService
 
     public function forgetCatalogCaches(): void
     {
-        Cache::forget('recruiting:local-catalog-fingerprint:v132');
+        Cache::forget('recruiting:local-catalog-fingerprint:v133');
     }
 
     public function ensureDefaultLists(User $user): void

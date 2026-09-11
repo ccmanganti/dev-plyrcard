@@ -6,7 +6,7 @@
     $rcCatalogGender = $rcCatalogUser
         ? (\App\Models\Coach::normalizeGender($rcCatalogUser->gender ?? null) ?: 'unassigned')
         : 'guest';
-    $rcCatalogUserKey = (string) ($rcCatalogUser?->getKey() ?? 'guest') . ':' . $rcCatalogGender;
+    $rcCatalogUserKey = (string) ($rcCatalogUser?->getKey() ?? 'guest') . ':' . $rcCatalogGender . ':drawer-v101123';
     $shouldSeedSchoolCatalog = ! ($this->browserSchoolCatalogSeeded ?? false)
         && ($this->allowed ?? false)
         && ! ($this->locked ?? false)
@@ -25,7 +25,7 @@
     </style>
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
-        data-rc-school-drawer-version="10.112.2"
+        data-rc-school-drawer-version="10.112.3"
         data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
         x-data="{
             activeSection: @js((string) $section),
@@ -125,12 +125,45 @@ discoverSelectedIds: [],
                 const userKey = @js($rcCatalogUserKey);
                 const serverRows = @js($globalSchoolDrawerCatalog);
                 window.__plyrRcSchoolCatalogByUser = window.__plyrRcSchoolCatalogByUser || {};
+                const cachedRows = Array.isArray(window.__plyrRcSchoolCatalogByUser[userKey])
+                    ? window.__plyrRcSchoolCatalogByUser[userKey]
+                    : [];
+
+                // v10.112.3: never replace a richer browser roster with a lighter/stale
+                // server row during a Livewire/SPA re-render. The canonical server row wins
+                // for identity/metadata, while a previously hydrated roster is retained only
+                // when the server still declares coaches for that school.
                 if (Array.isArray(serverRows) && serverRows.length) {
-                    window.__plyrRcSchoolCatalogByUser[userKey] = serverRows;
-                    return serverRows;
+                    const cachedById = new Map();
+                    cachedRows.forEach(row => {
+                        const id = String(row?.id ?? row?.school_id ?? '').trim();
+                        if (id) cachedById.set(id, row);
+                    });
+
+                    const mergedRows = serverRows.map(serverRow => {
+                        const id = String(serverRow?.id ?? serverRow?.school_id ?? '').trim();
+                        const cachedRow = id ? cachedById.get(id) : null;
+                        const serverCoaches = Array.isArray(serverRow?.coaches) ? serverRow.coaches.filter(Boolean) : [];
+                        const cachedCoaches = Array.isArray(cachedRow?.coaches) ? cachedRow.coaches.filter(Boolean) : [];
+                        const declaredCount = Number(serverRow?.coach_count ?? serverRow?.coaches_count ?? serverCoaches.length ?? 0);
+                        const coaches = serverCoaches.length
+                            ? serverCoaches
+                            : (declaredCount > 0 && cachedCoaches.length ? cachedCoaches : []);
+
+                        return {
+                            ...(cachedRow || {}),
+                            ...serverRow,
+                            coaches,
+                            coach_count: Math.max(declaredCount, coaches.length),
+                            coaches_count: Math.max(Number(serverRow?.coaches_count ?? declaredCount), coaches.length),
+                        };
+                    });
+
+                    window.__plyrRcSchoolCatalogByUser[userKey] = mergedRows;
+                    return mergedRows;
                 }
-                const cachedRows = window.__plyrRcSchoolCatalogByUser[userKey];
-                return Array.isArray(cachedRows) ? cachedRows : [];
+
+                return cachedRows;
             })(),
             init() {
                 // v10.64: the school drawer never restores browser-global state.
@@ -299,7 +332,13 @@ discoverSelectedIds: [],
                 // Paint a recent cached roster instantly. We still refresh once in the
                 // background, but the drawer never waits on Livewire when data is available.
                 if (!force && cacheFresh) {
-                    applyDetails(cached);
+                    const cacheApplied = applyDetails(cached);
+                    const hasCachedCoaches = Array.isArray(this.optimisticSchool?.coaches) && this.optimisticSchool.coaches.length > 0;
+                    if (cacheApplied && hasCachedCoaches) {
+                        this.discoverSchoolCoachesLoading = false;
+                        this.discoverSchoolCoachesLoadedFor = id;
+                        return;
+                    }
                 }
 
                 const hasVisibleCoaches = Array.isArray(this.optimisticSchool?.coaches) && this.optimisticSchool.coaches.length > 0;
@@ -414,11 +453,19 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesError = '';
                 this.optimisticSchool = merged;
                 this.schoolDrawerOpen = true;
+                const drawerId = String(merged.id ?? merged.school_id ?? '');
                 const hasCatalogRoster = Array.isArray(merged.coaches) && merged.coaches.length > 0;
-                this.discoverSchoolCoachesLoading = !hasCatalogRoster;
-                this.discoverSchoolCoachesLoadedFor = hasCatalogRoster ? String(merged.id ?? merged.school_id ?? '') : '';
-                this.discoverSchoolScoreLoadedFor = '';
-                this.discoverSchoolScoreLoading = true;
+                const declaredCoachCount = Math.max(0, Number(merged.coach_count ?? merged.coaches_count ?? 0));
+                const needsRosterFetch = !hasCatalogRoster && declaredCoachCount > 0;
+
+                // v10.112.3: the canonical Discover catalog already contains the complete
+                // gender-scoped local roster. If it is present, opening the school is 100%
+                // browser-local: no Livewire request, no queue wait, and no chance for a
+                // later response to temporarily clear the Coaching Staff pane.
+                this.discoverSchoolCoachesLoading = needsRosterFetch;
+                this.discoverSchoolCoachesLoadedFor = needsRosterFetch ? '' : drawerId;
+                this.discoverSchoolScoreLoadedFor = drawerId;
+                this.discoverSchoolScoreLoading = false;
                 // Keep the legacy global empty so Livewire/browser state cannot reopen it.
                 window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
@@ -427,14 +474,12 @@ discoverSelectedIds: [],
                 this.discoverSchoolCommsLoadedFor = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
-                this.$nextTick(() => {
-                    const id = String(merged.id ?? merged.school_id ?? '');
-                    // The score is already present in globalSchoolCatalog, so opening the
-                    // drawer is synchronous. Only roster/detail hydration runs in background.
-                    this.discoverSchoolScoreLoading = false;
-                    this.discoverSchoolScoreLoadedFor = id;
-                    this.hydrateDiscoverSchoolDetails(id);
-                });
+
+                // Only fall back to the one-school endpoint when a stale/legacy catalog row
+                // says coaches exist but does not actually carry the roster array.
+                if (needsRosterFetch) {
+                    this.$nextTick(() => this.hydrateDiscoverSchoolDetails(drawerId));
+                }
             },
             async loadDiscoverCommunications(force = false) {
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
@@ -12871,6 +12916,7 @@ CSS;
              interaction state. Favorite/list calls only persist the already-applied state in
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
+             data-rc-school-drawer-version="10.112.3"
              wire:ignore
              hidden
              x-cloak
@@ -12951,9 +12997,8 @@ CSS;
 
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
                     <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
-                        <template x-if="(optimisticSchool?.coaches?.length ?? 0) > 0">
-                            <div style="display:grid;gap:.7rem">
-                                <template x-for="coach in (optimisticSchool?.coaches ?? [])" :key="`discover-drawer-coach-${coach.id}`">
+                        <div style="display:grid;gap:.7rem" x-show="(optimisticSchool?.coaches?.length ?? 0) > 0">
+                                <template x-for="(coach, coachIndex) in (optimisticSchool?.coaches ?? [])" :key="`discover-drawer-coach-${coach.id || coach.email || coachIndex}`">
                                     <div class="rc-school-coach-card">
                                         <div class="rc-school-coach-avatar" x-text="String(coach.name || 'C').split(/\s+/).slice(0,2).map(v => v[0] || '').join('').toUpperCase()"></div>
                                         <div class="rc-school-coach-info">
@@ -12969,8 +13014,7 @@ CSS;
                                         </a>
                                     </div>
                                 </template>
-                            </div>
-                        </template>
+                        </div>
                         <div class="rc-loading-inline" style="padding:1rem .35rem" x-show="discoverSchoolCoachesLoading && ((optimisticSchool?.coaches?.length ?? 0) === 0)">
                             <span class="rc-spinner-mini" aria-hidden="true"></span>
                             <span>Loading coaching staff…</span>

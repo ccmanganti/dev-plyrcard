@@ -13727,7 +13727,7 @@ HTML;
     protected function instantDiscoverCatalogCacheKey($user): string
     {
         $gender = \App\Models\Coach::normalizeGender($user->gender ?? null) ?: 'unassigned';
-        return 'recruiting:instant-school-catalog:v1033:' . (int) $user->getKey() . ':' . $gender;
+        return 'recruiting:instant-school-catalog:v1034:' . (int) $user->getKey() . ':' . $gender;
     }
 
     protected function forgetInstantDiscoverCatalogCache($user = null): void
