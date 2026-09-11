@@ -92,9 +92,9 @@
             inboxOpenPromise: null,
             inboxOpenLastStartedAt: 0,
             openInboxSection(force = false) {
-                // v10.113.7: opening Inbox is cache-only. Do not auto-load
-                // a selected thread on boot/navigation; that caused repeated/double loading
-                // while the onboarding hook and SPA navigation were also firing.
+                // v10.113.11: opening Inbox stays list/cache-first, but selected
+                // conversations are allowed to auto-load their first message page after
+                // the UI paints. Do not launch a full Recruiting Center refresh here.
                 const now = Date.now();
                 if (this.inboxOpenPromise) return this.inboxOpenPromise;
                 if (!force && this.activeSection === 'conversations' && now - Number(this.inboxOpenLastStartedAt || 0) < 1800) {
@@ -219,9 +219,9 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesLoadedFor = '';
                 document.documentElement.removeAttribute('data-rc-inbox-loading');
 
-                // v10.113.5: do not auto-start Inbox work on direct /conversations.
-                // The server-rendered cached state is enough for first paint, and explicit
-                // refresh/thread-load buttons are used when live GHL data is needed.
+                // v10.113.11: after the first paint, the selected Inbox thread may
+                // auto-load its latest 10 messages. This is intentionally scoped to the
+                // selected conversation only; no full Inbox/catalog refresh starts here.
             },
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -10701,14 +10701,15 @@ CSS;
                             </button>
                         </div>
 
-                        {{-- v10.113.7: no automatic Inbox loader. If optimize:clear wiped
-                             Laravel cache and no persistent snapshot exists yet, keep the UI
-                             clickable and let the user explicitly refresh the newest 10 rows. --}}
+                        {{-- v10.113.11: conversations open cache-first, then the selected
+                             thread automatically loads the latest 10 messages exactly once.
+                             No full Inbox refresh, no global reload, and no recurring poll. --}}
 
                         <div
                             class="rc-inbox-list-v56"
                             x-data="{
                                 selectedConversationId: window.__rcInboxPendingConversationId || @js((string) ($selectedConversationId ?? '')),
+                                autoLoadDelay: null,
                                 init() {
                                     const serverConversationId = @js((string) ($selectedConversationId ?? ''));
 
@@ -10718,6 +10719,54 @@ CSS;
                                     }
 
                                     this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
+
+                                    if (this.selectedConversationId) {
+                                        this.queueConversationAutoLoad(this.selectedConversationId, false, 180);
+                                    }
+                                },
+                                conversationHasRenderedMessages(id) {
+                                    const stream = document.querySelector('[data-rc-inbox-message-stream]');
+                                    if (! stream) return false;
+                                    return !! stream.querySelector('.rc-inbox-message-v56');
+                                },
+                                queueConversationAutoLoad(conversationId, force = false, delay = 80) {
+                                    const id = String(conversationId || '');
+                                    if (! id) return;
+
+                                    window.__rcInboxAutoLoad = window.__rcInboxAutoLoad || {};
+                                    const state = window.__rcInboxAutoLoad[id] || { loading: false, loadedAt: 0, requestedAt: 0 };
+                                    const now = Date.now();
+
+                                    if (! force && state.loading) return;
+                                    if (! force && state.loadedAt && now - Number(state.loadedAt) < 180000) return;
+                                    if (! force && state.requestedAt && now - Number(state.requestedAt) < 1500) return;
+
+                                    window.clearTimeout(this.autoLoadDelay);
+                                    this.autoLoadDelay = window.setTimeout(() => {
+                                        const selected = String(this.selectedConversationId || '');
+                                        if (selected !== id) return;
+                                        if (! force && this.conversationHasRenderedMessages(id)) {
+                                            state.loadedAt = Date.now();
+                                            window.__rcInboxAutoLoad[id] = state;
+                                            return;
+                                        }
+
+                                        state.loading = true;
+                                        state.requestedAt = Date.now();
+                                        window.__rcInboxAutoLoad[id] = state;
+                                        document.documentElement.setAttribute('data-rc-thread-autoloading', id);
+
+                                        Promise.resolve(this.$wire.loadSelectedConversationMessagesForClient(id, force))
+                                            .then(() => { state.loadedAt = Date.now(); })
+                                            .catch(() => { state.loadedAt = 0; })
+                                            .finally(() => {
+                                                state.loading = false;
+                                                window.__rcInboxAutoLoad[id] = state;
+                                                if (document.documentElement.getAttribute('data-rc-thread-autoloading') === id) {
+                                                    document.documentElement.removeAttribute('data-rc-thread-autoloading');
+                                                }
+                                            });
+                                    }, delay);
                                 },
                                 selectConversation(conversationId) {
                                     const id = String(conversationId || '');
@@ -10728,9 +10777,12 @@ CSS;
                                     document.documentElement.removeAttribute('data-rc-inbox-loading');
                                     this.selectedConversationId = id;
 
-                                    // v10.113.5: exactly one lightweight Livewire request on click.
-                                    // No automatic GHL message fetch, no second loader, no background poll.
+                                    // One cache-only Livewire select first, then one scoped message request.
+                                    // The message request is deduped per conversation so rapid clicks cannot
+                                    // create the previous double-loading/lag loop.
                                     Promise.resolve(this.$wire.selectConversation(id))
+                                        .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
+                                        .then(() => this.queueConversationAutoLoad(id, false, 40))
                                         .finally(() => document.documentElement.removeAttribute('data-rc-inbox-loading'));
                                 },
                             }"
@@ -10827,18 +10879,20 @@ CSS;
 
                             <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
                                 @if(empty($threadMessages))
-                                    <div class="rc-inbox-empty-v56">
+                                    <div
+                                        class="rc-inbox-empty-v56"
+                                        @if($selectedConversationId)
+                                            x-data="{ id: @js((string) $selectedConversationId) }"
+                                            x-init="$nextTick(() => { const host = document.querySelector('.rc-inbox-list-v56')?.__x?.$data; if (host && typeof host.queueConversationAutoLoad === 'function') host.queueConversationAutoLoad(id, false, 80); })"
+                                        @endif
+                                    >
                                         <div>
-                                            <strong>Messages are not loaded yet.</strong><br>
-                                            <span>Click below to load the latest 10 messages for this conversation.</span>
-                                            @if($selectedConversationId)
-                                                <div style="margin-top:.7rem">
-                                                    <button type="button" class="rc-btn rc-btn-primary" wire:click="loadSelectedConversationMessagesForClient('{{ $selectedConversationId }}', true)" wire:loading.attr="disabled" wire:target="loadSelectedConversationMessagesForClient">
-                                                        <span wire:loading.remove wire:target="loadSelectedConversationMessagesForClient">Load conversation</span>
-                                                        <span wire:loading wire:target="loadSelectedConversationMessagesForClient">Loading 10 messages…</span>
-                                                    </button>
-                                                </div>
-                                            @endif
+                                            <strong>Loading latest messages…</strong><br>
+                                            <span>The latest 10 messages for this conversation will appear automatically.</span>
+                                            <div style="margin-top:.65rem" wire:loading.flex wire:target="loadSelectedConversationMessagesForClient" class="rc-loading-inline">
+                                                <span class="rc-spinner-mini"></span>
+                                                <span>Fetching messages from HighLevel</span>
+                                            </div>
                                         </div>
                                     </div>
                                 @else

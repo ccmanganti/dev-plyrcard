@@ -6010,8 +6010,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     }
 
     /**
-     * Browser-triggered single message load for the selected thread. This replaces the
-     * old select -> background sync -> ensure sequence that caused double loading.
+     * Browser-triggered single message load for the selected thread. The browser calls
+     * this automatically after a conversation is selected. It is deduped client-side and
+     * scoped to the current conversation only, so it does not start the old full Inbox
+     * refresh/background loop that made the Recruiting Center lag.
      */
     public function loadSelectedConversationMessagesForClient(string $conversationId, bool $force = false): void
     {
@@ -6020,6 +6022,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
+        // Paint cached messages instantly when available and fresh enough. This keeps
+        // returning to a recent thread local/cache-only.
         if (! $force && $this->hydrateCachedConversationMessages($conversationId) && $this->inboxMessageCacheIsFresh($conversationId, 300)) {
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
@@ -6027,8 +6031,17 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // This method is now only called by an explicit user action, so the one
-        // GHL request here is expected and does not run during normal Inbox clicks.
+        // If another request already populated messages while this action was queued,
+        // do not call HighLevel again.
+        if (! $force && ! empty($this->messages) && $this->inboxMessageCacheIsFresh($conversationId, 60)) {
+            $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
+            return;
+        }
+
+        // One direct GHL request for the newest page only. No detached sync, no polling,
+        // no selected-thread refresh after the response.
         $this->loadConversationMessages(true, preserveVisibleMessages: true);
         $this->isRefreshingRemoteData = false;
         $this->activeUiOperation = null;
