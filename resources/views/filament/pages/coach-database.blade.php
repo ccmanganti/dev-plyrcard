@@ -18,6 +18,13 @@
 
 <div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
+    <script>
+        // Recruiting Center owns its own lazy loading. Tell any global onboarding/PWA
+        // helpers not to keep retrying missing tour elements on this heavy Livewire page.
+        window.__plyrcardRecruitingCenterPage = true;
+        window.__plyrcardDisableOnboardingAutoStart = true;
+        document.documentElement.setAttribute('data-plyrcard-recruiting-center', '1');
+    </script>
     <style>
         /* v10.66: fail closed. If Alpine/Livewire JS is delayed or errors, the
            school drawer must remain invisible instead of rendering placeholders. */
@@ -54,27 +61,19 @@
             closeFreeGate() {
                 this.freeGateOpen = false;
             },
-            pollInboxMessagesUntilRendered(conversationId = '', attempt = 0) {
-                const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
-                if (String(this.activeSection || '') !== 'conversations') return;
-                if (document.querySelector(selector) && attempt >= 4) {
-                    document.documentElement.removeAttribute('data-rc-inbox-loading');
-                    return;
-                }
-                if (attempt > 45) {
-                    document.documentElement.removeAttribute('data-rc-inbox-loading');
-                    return;
+            inboxOpenPromise: null,
+            inboxOpenLastStartedAt: 0,
+            openInboxSection(force = false) {
+                // v10.113.3: guard repeated SPA/onboarding/nav hooks. Without this, the
+                // Inbox can receive overlapping enter + ensure requests, which is what makes
+                // it feel laggy after staying on the tab for a while.
+                const now = Date.now();
+                if (this.inboxOpenPromise) return this.inboxOpenPromise;
+                if (!force && this.activeSection === 'conversations' && now - Number(this.inboxOpenLastStartedAt || 0) < 1800) {
+                    return Promise.resolve();
                 }
 
-                window.setTimeout(() => {
-                    if (String(this.activeSection || '') !== 'conversations') return;
-                    Promise.resolve(this.$wire.pollDeferredUiData())
-                        .finally(() => this.pollInboxMessagesUntilRendered(conversationId, attempt + 1));
-                }, attempt < 6 ? 1200 : 2200);
-            },
-            openInboxSection() {
-                // v10.113.2: paint cached Inbox state first; if the selected thread is
-                // missing/stale, queue the message fetch after response and poll the cache.
+                this.inboxOpenLastStartedAt = now;
                 const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
                 const hasRenderedMessages = !!document.querySelector(selector);
 
@@ -82,23 +81,19 @@
                     document.documentElement.setAttribute('data-rc-inbox-loading', 'default');
                 }
 
-                return Promise.resolve(this.$wire.enterInboxSection())
+                this.inboxOpenPromise = Promise.resolve(this.$wire.enterInboxSection())
                     .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
                     .then(() => {
-                        const hasMessagesNow = !!document.querySelector(selector);
-                        if (hasMessagesNow) {
-                            document.documentElement.removeAttribute('data-rc-inbox-loading');
-                        } else {
-                            document.documentElement.setAttribute('data-rc-inbox-loading', 'default');
-                        }
+                        // ensureInboxConversationLoaded now queues the real GHL message fetch in
+                        // the background instead of blocking this browser request.
                         return this.$wire.ensureInboxConversationLoaded();
                     })
-                    .then(() => this.pollInboxMessagesUntilRendered())
                     .finally(() => {
-                        if (document.querySelector(selector)) {
-                            document.documentElement.removeAttribute('data-rc-inbox-loading');
-                        }
+                        this.inboxOpenPromise = null;
+                        document.documentElement.removeAttribute('data-rc-inbox-loading');
                     });
+
+                return this.inboxOpenPromise;
             },
 discoverSelectedIds: [],
             discoverSearch: '',
@@ -621,31 +616,10 @@ discoverSelectedIds: [],
                 }
             },
             openComposeForSchool(schoolId) {
-                const rawId = String(schoolId || '').trim();
-                if (!rawId) return;
+                const id = String(schoolId || '').trim();
+                if (!id) return;
 
-                const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
-                    .find(item => [item?.id, item?.local_id, item?.school_id, item?.business_id, item?.company_id, item?.ghl_business_id]
-                        .map(value => String(value ?? '').trim())
-                        .filter(Boolean)
-                        .includes(rawId)) || null;
-                const id = String(row?.id ?? row?.local_id ?? rawId).trim();
                 const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
-
-                // Seed the Compose Alpine controller before the Livewire response comes
-                // back. This makes the selected school appear immediately and also protects
-                // a direct /compose-email?school= URL from an older empty recipient cache.
-                window.__rcComposePendingSchoolId = id;
-                window.__rcComposeRecipientStateV101 = {
-                    key: new URL(href, window.location.href).pathname + new URL(href, window.location.href).search,
-                    path: new URL(href, window.location.href).pathname,
-                    schoolId: id,
-                    selectedCoachIds: [],
-                    targetMode: 'school',
-                    headCoachOnly: true,
-                    chooserOpen: false,
-                };
-
                 this.closeDiscoverSchool();
 
                 // Activate the already-mounted Compose panel synchronously. The Livewire
@@ -659,10 +633,6 @@ discoverSelectedIds: [],
                     const target = new URL(href, window.location.href);
                     window.history.pushState({ ...(window.history.state || {}), rcSection: 'compose' }, '', target.pathname + target.search + target.hash);
                 }
-
-                window.dispatchEvent(new CustomEvent('rc-compose-school-selected', {
-                    detail: { schoolId: id, schoolName: String(row?.name || '') }
-                }));
 
                 return Promise.resolve(this.$wire.composeEmailSchool(id));
             },
@@ -10164,12 +10134,18 @@ discoverSelectedIds: [],
                 @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
             </style>
 
+            @if($isLoadingConversations || $isLoadingConversationMessages || $isRefreshingRemoteData)
+                <div wire:poll.2s="pollDeferredUiData" style="display:none" aria-hidden="true"></div>
+            @endif
+
             <div class="rc-section-async-banner {{ $isLoadingConversations ? 'is-visible' : '' }}">
-                Loading conversations. Use the refresh button to update the inbox.
+                Loading conversations in the background. Cached inbox stays usable.
             </div>
 
             @php
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
+                $filteredConversationTotal = (int) ($this->filteredConversationTotal ?? $inboxConversations->count());
+                $canLoadMoreInboxConversations = (bool) ($this->canLoadMoreInboxConversations ?? false);
                 $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
                 if (! $selectedConversation && $inboxConversations->isNotEmpty()) {
                     $selectedConversation = $inboxConversations->first();
@@ -10806,31 +10782,6 @@ CSS;
 
                                     this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
                                 },
-                                pollSelectedConversation(id, attempt = 0) {
-                                    const selected = String(this.selectedConversationId || '');
-                                    if (!id || selected !== String(id)) return;
-
-                                    const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
-                                    if (document.querySelector(selector) && attempt >= 4) {
-                                        if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
-                                            document.documentElement.removeAttribute('data-rc-inbox-loading');
-                                        }
-                                        return;
-                                    }
-
-                                    if (attempt > 45) {
-                                        if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
-                                            document.documentElement.removeAttribute('data-rc-inbox-loading');
-                                        }
-                                        return;
-                                    }
-
-                                    window.setTimeout(() => {
-                                        if (String(this.selectedConversationId || '') !== String(id)) return;
-                                        Promise.resolve(this.$wire.pollDeferredUiData())
-                                            .finally(() => this.pollSelectedConversation(id, attempt + 1));
-                                    }, attempt < 6 ? 1200 : 2200);
-                                },
                                 selectConversation(conversationId) {
                                     const id = String(conversationId || '');
                                     if (! id || id === String(this.selectedConversationId || '')) return;
@@ -10839,29 +10790,26 @@ CSS;
                                     document.documentElement.setAttribute('data-rc-inbox-loading', id);
                                     this.selectedConversationId = id;
 
-                                    // v10.113.2: selection is local/cache-only. The second request only queues
-                                    // a fresh ten-message page after response; this poll hydrates the cache when
-                                    // that background fetch finishes instead of blocking the click for GHL.
+                                    // v10.113: selection is local/cache-only, so the selected coach and
+                                    // cached thread paint without waiting on GHL. Only after that response do
+                                    // we refresh a stale/missing thread. Cached messages stay visible while
+                                    // the second request runs.
                                     Promise.resolve(this.$wire.selectConversation(id))
                                         .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
                                         .then(() => {
-                                            const hasRenderedMessages = !!document.querySelector(
-                                                '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
-                                            );
-                                            if (!hasRenderedMessages) {
-                                                document.documentElement.setAttribute('data-rc-inbox-loading', id);
-                                            } else if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                            if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
                                                 document.documentElement.removeAttribute('data-rc-inbox-loading');
                                             }
 
-                                            return this.$wire.refreshConversationMessagesIfStale(id);
+                                            const askServerToEnsure = () => this.$wire.refreshConversationMessagesIfStale(id);
+                                            if ('requestIdleCallback' in window) {
+                                                window.requestIdleCallback(askServerToEnsure, { timeout: 1500 });
+                                                return;
+                                            }
+                                            window.setTimeout(askServerToEnsure, 60);
                                         })
-                                        .then(() => this.pollSelectedConversation(id))
-                                        .finally(() => {
-                                            const hasRenderedMessages = !!document.querySelector(
-                                                '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
-                                            );
-                                            if (hasRenderedMessages && document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                        .catch(() => {
+                                            if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
                                                 document.documentElement.removeAttribute('data-rc-inbox-loading');
                                             }
                                         });
@@ -10912,6 +10860,15 @@ CSS;
                             @empty
                                 <div class="rc-inbox-empty-v56"><div><strong>No conversations found.</strong><br><span>Try another search or send a new coach email.</span></div></div>
                             @endforelse
+
+                            @if($canLoadMoreInboxConversations)
+                                <div style="padding:.75rem .95rem">
+                                    <button type="button" class="rc-btn" style="width:100%" wire:click="loadMoreInboxConversations" wire:loading.attr="disabled" wire:target="loadMoreInboxConversations">
+                                        <span wire:loading.remove wire:target="loadMoreInboxConversations">Load 10 more conversations · {{ $inboxConversations->count() }} of {{ $filteredConversationTotal }}</span>
+                                        <span wire:loading wire:target="loadMoreInboxConversations">Loading…</span>
+                                    </button>
+                                </div>
+                            @endif
                         </div>
                     </aside>
 
@@ -12084,68 +12041,20 @@ CSS;
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
-                    recipientStateKey() {
-                        return String(window.location?.pathname || '') + String(window.location?.search || '');
-                    },
-                    resolveSchoolId(value) {
-                        const id = String(value || '').trim();
-                        if (!id) return '';
-
-                        const row = this.schools.find(item => [
-                            item?.id,
-                            item?.local_id,
-                            item?.school_id,
-                            item?.business_id,
-                            item?.company_id,
-                            item?.ghl_business_id,
-                        ].map(v => String(v ?? '').trim()).filter(Boolean).includes(id));
-
-                        return row ? String(row.id || '') : '';
-                    },
-                    applyExternalSchoolSelection(value) {
-                        const resolvedId = this.resolveSchoolId(value);
-                        if (!resolvedId) return false;
-
-                        this.selectedSchoolId = resolvedId;
-                        this.schoolQuery = '';
-                        this.coachQuery = '';
-                        this.selectedCoachIds = [];
-                        this.targetMode = 'school';
-                        this.headCoachOnly = true;
-                        this.chooserOpen = false;
-                        this.coachRevision++;
-                        this.rememberRecipientState();
-                        return true;
-                    },
                     init() {
                         const cached = window.__rcComposeRecipientStateV101;
                         const currentPath = String(window.location?.pathname || '');
-                        const currentKey = this.recipientStateKey();
-                        const urlSchoolId = new URLSearchParams(String(window.location?.search || '')).get('school') || '';
-                        const pendingSchoolId = String(window.__rcComposePendingSchoolId || '');
-                        const serverSchoolId = String(this.selectedSchoolId || '');
-                        const explicitSchoolId = pendingSchoolId || urlSchoolId || serverSchoolId;
-
-                        // v10.113.2: an explicit ?school= URL or school-drawer action must
-                        // win over older browser-recipient cache. The previous cache key used
-                        // only pathname, so /compose-email?school=76 could restore an empty
-                        // Compose state and look like Email Coaches did not preselect anything.
-                        if (explicitSchoolId && this.applyExternalSchoolSelection(explicitSchoolId)) {
-                            window.__rcComposePendingSchoolId = '';
-                            return;
-                        }
 
                         // v101: the browser-side Compose recipient state is authoritative
-                        // across Livewire morphs on this same page when there is no explicit
-                        // school target in the URL or drawer action.
-                        const cachedKey = String(cached?.key || cached?.path || '');
-                        const cacheMatches = cached && (cachedKey === currentKey || (!String(window.location?.search || '') && cachedKey === currentPath));
-                        if (cacheMatches) {
+                        // across Livewire morphs on this same page. The server-rendered
+                        // campaignSchoolId may still be empty/older because school/coach
+                        // selection is intentionally local-only for instant interaction.
+                        if (cached && String(cached.path || '') === currentPath) {
                             const cachedSchoolId = String(cached.schoolId || '');
-                            const resolvedCachedSchoolId = cachedSchoolId === '' ? '' : this.resolveSchoolId(cachedSchoolId);
+                            const schoolExists = cachedSchoolId === '' || this.schools.some(row => String(row.id || '') === cachedSchoolId);
 
-                            if (cachedSchoolId === '' || resolvedCachedSchoolId !== '') {
-                                this.selectedSchoolId = resolvedCachedSchoolId;
+                            if (schoolExists) {
+                                this.selectedSchoolId = cachedSchoolId;
                                 this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds].map(String) : [];
                                 this.targetMode = String(cached.targetMode || 'school');
                                 this.headCoachOnly = Boolean(cached.headCoachOnly);
@@ -12157,7 +12066,6 @@ CSS;
                     },
                     rememberRecipientState() {
                         window.__rcComposeRecipientStateV101 = {
-                            key: this.recipientStateKey(),
                             path: String(window.location?.pathname || ''),
                             schoolId: String(this.selectedSchoolId || ''),
                             selectedCoachIds: [...this.selectedCoachIds].map(String),
@@ -12380,9 +12288,7 @@ CSS;
                             await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
                         } finally { this.sendingFast = false; }
                     },
-                }"
-                x-init="init()"
-                x-on:rc-compose-school-selected.window="applyExternalSchoolSelection($event.detail?.schoolId || $event.detail?.school_id || '')">
+                }" x-init="init()">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
