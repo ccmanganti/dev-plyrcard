@@ -25,6 +25,7 @@
     </style>
     <div class="rc-livewire-root"
         data-rc-current-section="{{ $section }}"
+        data-rc-school-drawer-version="10.112.2"
         data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
         x-data="{
             activeSection: @js((string) $section),
@@ -98,7 +99,27 @@ discoverSelectedIds: [],
             discoverSchoolScoreLoadedFor: '',
             discoverSchoolScoreLoading: false,
             rcCatalogUserKey: @js($rcCatalogUserKey),
-            optimisticSchool: null,
+            // v10.112.2: keep the drawer model permanently object-shaped. Alpine may
+            // reevaluate an x-for during close/open or a Livewire morph; a null model
+            // makes even an already-compiled legacy `optimisticSchool.coaches` expression
+            // throw and can stall the entire drawer. Empty/closed is represented by this
+            // object instead, so `coaches` always exists as an array.
+            emptyDrawerSchool() {
+                return {
+                    id: '', school_id: '', business_id: '', company_id: '', ghl_business_id: '',
+                    name: '', logo_url: '', city: '', state: '', division: '', conference: '',
+                    coaches: [], coach_count: 0, coaches_count: 0,
+                    engagement_score: 0, lead_score: 0,
+                    is_favorite: false, list_keys: [], lists: []
+                };
+            },
+            optimisticSchool: {
+                id: '', school_id: '', business_id: '', company_id: '', ghl_business_id: '',
+                name: '', logo_url: '', city: '', state: '', division: '', conference: '',
+                coaches: [], coach_count: 0, coaches_count: 0,
+                engagement_score: 0, lead_score: 0,
+                is_favorite: false, list_keys: [], lists: []
+            },
             schoolDrawerOpen: false,
             globalSchoolCatalog: (() => {
                 const userKey = @js($rcCatalogUserKey);
@@ -116,7 +137,7 @@ discoverSelectedIds: [],
                 // A drawer may only open from an explicit user action that resolves
                 // to a real school in the current canonical school catalog.
                 window.__plyrSchoolDrawerOptimistic = null;
-                this.optimisticSchool = null;
+                this.optimisticSchool = this.emptyDrawerSchool();
                 this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
@@ -537,7 +558,7 @@ discoverSelectedIds: [],
                 this.discoverSchoolScoreRequest = '';
                 this.discoverSchoolScoreLoadedFor = '';
                 this.discoverSchoolScoreLoading = false;
-                this.optimisticSchool = null;
+                this.optimisticSchool = this.emptyDrawerSchool();
                 // v110: explicit close event is also consumed by any nested Discover
                 // controller, so a stale Alpine subtree cannot immediately repaint it.
                 window.dispatchEvent(new CustomEvent('rc-discover-drawer-closed'));
