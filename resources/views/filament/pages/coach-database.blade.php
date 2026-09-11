@@ -7044,28 +7044,15 @@ discoverSelectedIds: [],
         })();
 
         window.initCoachDatabasePage = function (wire) {
+            // v10.113.9: This init must be UI-only. It used to start a background
+            // Coach Database load 900ms after mount and also listened for load-next
+            // events. Those hidden Livewire/GHL requests made the whole Recruiting
+            // Center feel frozen and kept the refresh icon spinning on unrelated tabs.
             window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
 
             window.setTimeout(function () {
                 window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
             }, 250);
-
-            window.setTimeout(function () {
-                if (wire && typeof wire.startBackgroundLoad === 'function') {
-                    wire.startBackgroundLoad();
-                }
-            }, 900);
-
-            if (! window.__plyrCoachDatabaseLoadNextInstalled) {
-                window.__plyrCoachDatabaseLoadNextInstalled = true;
-                window.addEventListener('coach-database-load-next', function () {
-                    window.setTimeout(function () {
-                        if (wire && typeof wire.loadNextBatch === 'function') {
-                            wire.loadNextBatch();
-                        }
-                    }, 75);
-                });
-            }
         };
     </script>
 
@@ -7080,12 +7067,8 @@ discoverSelectedIds: [],
         x-on:rc-discover-count.window="discoverClientCount = Number($event.detail?.total || 0); discoverClientShown = Number($event.detail?.shown || 0)"
         x-on:rc-discover-conferences.window="discoverAvailableConferences = Array.isArray($event.detail?.conferences) ? $event.detail.conferences : []; if (discoverConference && !discoverAvailableConferences.includes(discoverConference)) discoverConference = ''"
     >
-        <span
-            x-show="activeSection === 'dashboard'"
-            wire:poll.15s.visible="pollRealtime"
-            aria-hidden="true"
-            style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:.001;pointer-events:none"
-        ></span>
+        {{-- v10.113.9: removed hidden dashboard pollRealtime. This was another
+             invisible Livewire request source that could keep the whole component busy. --}}
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
@@ -16083,3 +16066,76 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
 </x-filament-panels::page>
 </div>
+
+
+<style id="rc-disable-all-global-reload-v101139">
+    /* v10.113.9: remove every global Coach Database reload control, including
+       section-level orphan refresh buttons that can appear under the header. Manual,
+       scoped buttons such as Inbox's Refresh conversations use different classes
+       and remain available. */
+    .rc-refresh-dropdown-v2,
+    .rc-home-refresh-v2,
+    button[aria-label="Open refresh options"],
+    button[title="Refresh options"],
+    button[wire\:target*="refreshCoachDatabase"],
+    button[wire\:target*="startBackgroundLoad"],
+    button[wire\:target*="loadNextBatch"],
+    button[wire\:click="refreshCoachDatabase"],
+    button[wire\:click="refreshStatsOnly"],
+    button[wire\:click="refreshData"],
+    button[wire\:click="startBackgroundLoad"],
+    button[wire\:click="loadNextBatch"] {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    .rc-home-actions-v2,
+    .rc-global-search-bar,
+    .rc-discover-actions-v29 {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-areas: "search dark" !important;
+    }
+
+    .rc-home-search-v2 { grid-area: search !important; }
+    .rc-home-dark-toggle-v2 { grid-area: dark !important; }
+</style>
+
+<script id="rc-disable-all-global-reload-script-v101139">
+    (() => {
+        const selectors = [
+            '.rc-refresh-dropdown-v2',
+            '.rc-home-refresh-v2',
+            'button[aria-label="Open refresh options"]',
+            'button[title="Refresh options"]',
+            'button[wire\:target*="refreshCoachDatabase"]',
+            'button[wire\:target*="startBackgroundLoad"]',
+            'button[wire\:target*="loadNextBatch"]',
+            'button[wire\:click="refreshCoachDatabase"]',
+            'button[wire\:click="refreshStatsOnly"]',
+            'button[wire\:click="refreshData"]',
+            'button[wire\:click="startBackgroundLoad"]',
+            'button[wire\:click="loadNextBatch"]'
+        ];
+
+        const removeGlobalReloadControls = () => {
+            document.querySelectorAll(selectors.join(',')).forEach((element) => {
+                if (element.closest('[data-rc-inbox-message-stream]') || element.classList.contains('rc-inbox-icon-btn-v56')) {
+                    return;
+                }
+                element.remove();
+            });
+        };
+
+        window.__plyrRemoveRecruitingGlobalReloadControls = removeGlobalReloadControls;
+        removeGlobalReloadControls();
+        document.addEventListener('DOMContentLoaded', removeGlobalReloadControls);
+        document.addEventListener('livewire:navigated', removeGlobalReloadControls);
+        window.addEventListener('rc-client-section', () => requestAnimationFrame(removeGlobalReloadControls));
+
+        if (! window.__plyrRecruitingGlobalReloadObserver) {
+            window.__plyrRecruitingGlobalReloadObserver = new MutationObserver(() => removeGlobalReloadControls());
+            window.__plyrRecruitingGlobalReloadObserver.observe(document.documentElement, { childList: true, subtree: true });
+        }
+    })();
+</script>
