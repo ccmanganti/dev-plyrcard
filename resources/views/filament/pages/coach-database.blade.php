@@ -7144,30 +7144,10 @@ discoverSelectedIds: [],
                                 </div>
                             @endif
                 </div>
-                <div class="rc-refresh-dropdown-v2" x-data="{ open: false }" x-on:keydown.escape.window="open = false" x-on:click.outside="open = false">
-                    <button
-                        type="button"
-                        class="rc-home-refresh-v2"
-                        x-on:click="open = ! open"
-                        wire:loading.attr="disabled"
-                        wire:target="refreshStatsOnly,refreshCoachDatabase,refreshData,startBackgroundLoad,loadNextBatch"
-                        aria-label="Open refresh options"
-                        title="Refresh options"
-                        @disabled($isRecruitingSyncRunning ?? false)
-                    >
-                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20 6v5h-5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.2 11A7.6 7.6 0 1 0 17 16.35" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </button>
-                    <div class="rc-refresh-menu-v2" x-cloak x-show="open" x-transition.origin.top.right>
-                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshStatsOnly" x-on:click="open = false" @disabled($isRecruitingSyncRunning ?? false)>
-                            <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5M4 19h16M8 16v-5M13 16V8M18 16v-8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>Reload stats only</strong><small>Sync email sent, profile views, and social clicks from GHL cache fields.</small></span>
-                        </button>
-                        <button type="button" class="rc-refresh-menu-item-v2" wire:click="refreshCoachDatabase" x-on:click="open = false" @disabled($isRecruitingSyncRunning ?? false)>
-                            <span class="rc-refresh-menu-icon-v2"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M8 4v4M16 10v4M11 16v4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-                            <span class="rc-refresh-menu-copy-v2"><strong>{{ ($isRecruitingSyncRunning ?? false) ? 'Reload running' : 'Reload whole Coach Database' }}</strong><small>{{ ($isRecruitingSyncRunning ?? false) ? 'A locked background sync is already running; existing rows stay visible.' : 'Reload schools, coaches, logos, tags, filters, and stats from GHL without blanking current data.' }}</small></span>
-                        </button>
-                    </div>
-                </div>
+                {{-- v10.113.8: Removed the global top-right refresh/reload dropdown.
+                     It started heavy Recruiting Center/GHL reload actions from the header and
+                     its wire:loading state made the whole page feel locked while those actions ran.
+                     Section-specific manual refresh buttons remain where they are explicitly needed. --}}
                 <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
                     <svg class="rc-dark-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <svg class="rc-dark-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
@@ -16065,5 +16045,41 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         font-size: .64rem !important;
     }
 </style>
+
+
+<style id="rc-remove-global-refresh-v101138">
+    /* v10.113.8: keep the global header quiet. The removed refresh dropdown used
+       refreshStatsOnly / refreshCoachDatabase / refreshData / startBackgroundLoad / loadNextBatch
+       and could surface as a spinning button beside dark mode while those actions ran. */
+    .rc-global-search-bar .rc-refresh-dropdown-v2,
+    .rc-global-search-bar .rc-home-refresh-v2 {
+        display: none !important;
+    }
+
+    .rc-global-search-bar {
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        grid-template-areas: "search dark" !important;
+    }
+
+    .rc-home-actions-v2 {
+        grid-template-columns: minmax(28rem, 1fr) 3rem !important;
+        grid-template-areas:
+            "search dark"
+            ". email" !important;
+    }
+
+    .rc-home-search-v2 { grid-area: search !important; }
+    .rc-home-dark-toggle-v2 { grid-area: dark !important; }
+
+    @media (max-width: 760px) {
+        .rc-home-actions-v2 {
+            grid-template-columns: minmax(0, 1fr) 3rem !important;
+            grid-template-areas:
+                "search dark"
+                "email email" !important;
+        }
+    }
+</style>
+
 </x-filament-panels::page>
 </div>
