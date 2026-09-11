@@ -219,9 +219,9 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesLoadedFor = '';
                 document.documentElement.removeAttribute('data-rc-inbox-loading');
 
-                // v10.113.12: selected Inbox threads auto-load through a detached cache
-                // worker. The browser shows the loading state immediately, while the
-                // large Livewire page is not blocked by the remote message request.
+                // v10.113.11: after the first paint, the selected Inbox thread may
+                // auto-load its latest 10 messages. This is intentionally scoped to the
+                // selected conversation only; no full Inbox/catalog refresh starts here.
             },
             normalizeGlobalSchoolName(value) {
                 return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -7046,7 +7046,7 @@ discoverSelectedIds: [],
         window.initCoachDatabasePage = function (wire) {
             // v10.113.9: This init must be UI-only. It used to start a background
             // Coach Database load 900ms after mount and also listened for load-next
-            // events. Those hidden Livewire/inbox requests made the whole Recruiting
+            // events. Those hidden Livewire/GHL requests made the whole Recruiting
             // Center feel frozen and kept the refresh icon spinning on unrelated tabs.
             window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
 
@@ -7128,7 +7128,7 @@ discoverSelectedIds: [],
                             @endif
                 </div>
                 {{-- v10.113.8: Removed the global top-right refresh/reload dropdown.
-                     It started heavy Recruiting Center/inbox reload actions from the header and
+                     It started heavy Recruiting Center/GHL reload actions from the header and
                      its wire:loading state made the whole page feel locked while those actions ran.
                      Section-specific manual refresh buttons remain where they are explicitly needed. --}}
                 <button type="button" class="rc-home-dark-toggle-v2" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
@@ -7606,7 +7606,7 @@ discoverSelectedIds: [],
                         <div class="rc-reload-main-v101">
                             <div class="rc-reload-copy-v101">
                                 <strong>Recruiting Center is updating</strong>
-                                <span>{{ $recruitingSyncMessage ?: 'Loading schools, coaches, and tracking stats. Existing data stays visible while this runs.' }}</span>
+                                <span>{{ $recruitingSyncMessage ?: 'Loading schools, coaches, and tracking stats from GHL. Existing data stays visible while this runs.' }}</span>
                             </div>
                             <span class="rc-reload-pill-v101"><i class="rc-reload-pulse-v101"></i>{{ $reloadStatusLabel }}</span>
                         </div>
@@ -10037,7 +10037,7 @@ discoverSelectedIds: [],
 
             <style id="rc-inbox-immediate-loader-v1038">
                 /* v10.113.5: disable the full-panel Inbox loading overlay. The overlay made
-                   the entire Recruiting Center feel frozen while slow inbox calls were running. */
+                   the entire Recruiting Center feel frozen while slow GHL calls were running. */
                 html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before,
                 html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after { display:none!important; content:none!important; }
             </style>
@@ -10222,7 +10222,7 @@ discoverSelectedIds: [],
                             . '</body></html>';
                     }
 
-                    // inbox's email detail endpoint returns the complete compiled email
+                    // GHL's email detail endpoint returns the complete compiled email
                     // document in emailMessage.body. Keep its head, style blocks,
                     // media queries, tables, buttons, images, and signatures intact.
                     // Scripts are removed because email clients do not execute them.
@@ -10357,21 +10357,6 @@ CSS;
                     font-size:.78rem;
                     font-weight:750;
                 }
-                html[data-rc-thread-autoloading] .rc-inbox-mid-v56[data-rc-selected-thread] .rc-message-stream-v56:empty::before,
-                html[data-rc-thread-autoloading] .rc-inbox-mid-v56[data-rc-selected-thread] .rc-inbox-empty-v56::before {
-                    content:'';
-                    display:block;
-                    width:1.05rem;
-                    height:1.05rem;
-                    margin:0 auto .7rem;
-                    border-radius:999px;
-                    border:2px solid color-mix(in srgb, var(--rc-accent) 25%, transparent);
-                    border-top-color:var(--rc-accent);
-                    animation:rc-spin-v56 .7s linear infinite;
-                }
-                .rc-thread-loading-copy-v11312 strong{display:block;font-size:.9rem;color:var(--rc-text);margin-bottom:.35rem;}
-                .rc-thread-loading-copy-v11312 span{display:block;color:var(--rc-muted);line-height:1.45;}
-                .rc-thread-loading-copy-v11312 small{display:inline-flex;align-items:center;gap:.38rem;margin-top:.68rem;color:var(--rc-muted);font-size:.74rem;}
             </style>
             <script>
                 (() => {
@@ -10744,46 +10729,6 @@ CSS;
                                     if (! stream) return false;
                                     return !! stream.querySelector('.rc-inbox-message-v56');
                                 },
-                                finishConversationAutoLoad(id, state, loaded = false) {
-                                    state.loading = false;
-                                    state.loadedAt = loaded ? Date.now() : Number(state.loadedAt || 0);
-                                    window.__rcInboxAutoLoad[id] = state;
-                                    if (document.documentElement.getAttribute('data-rc-thread-autoloading') === id) {
-                                        document.documentElement.removeAttribute('data-rc-thread-autoloading');
-                                    }
-                                },
-                                pollConversationMessageCache(id, state, attempt = 0) {
-                                    if (String(this.selectedConversationId || '') !== id) {
-                                        this.finishConversationAutoLoad(id, state, false);
-                                        return;
-                                    }
-                                    if (this.conversationHasRenderedMessages(id)) {
-                                        this.finishConversationAutoLoad(id, state, true);
-                                        return;
-                                    }
-                                    if (attempt >= 10) {
-                                        this.finishConversationAutoLoad(id, state, false);
-                                        return;
-                                    }
-
-                                    const wait = attempt < 2 ? 900 : 1400;
-                                    window.setTimeout(() => {
-                                        if (String(this.selectedConversationId || '') !== id) {
-                                            this.finishConversationAutoLoad(id, state, false);
-                                            return;
-                                        }
-
-                                        Promise.resolve(this.$wire.hydrateSelectedConversationMessagesFromClient(id))
-                                            .then((loaded) => {
-                                                if (loaded || this.conversationHasRenderedMessages(id)) {
-                                                    this.finishConversationAutoLoad(id, state, true);
-                                                    return;
-                                                }
-                                                this.pollConversationMessageCache(id, state, attempt + 1);
-                                            })
-                                            .catch(() => this.pollConversationMessageCache(id, state, attempt + 1));
-                                    }, wait);
-                                },
                                 queueConversationAutoLoad(conversationId, force = false, delay = 80) {
                                     const id = String(conversationId || '');
                                     if (! id) return;
@@ -10796,32 +10741,31 @@ CSS;
                                     if (! force && state.loadedAt && now - Number(state.loadedAt) < 180000) return;
                                     if (! force && state.requestedAt && now - Number(state.requestedAt) < 1500) return;
 
-                                    state.loading = true;
-                                    state.requestedAt = now;
-                                    window.__rcInboxAutoLoad[id] = state;
-                                    document.documentElement.setAttribute('data-rc-thread-autoloading', id);
-
                                     window.clearTimeout(this.autoLoadDelay);
                                     this.autoLoadDelay = window.setTimeout(() => {
                                         const selected = String(this.selectedConversationId || '');
-                                        if (selected !== id) {
-                                            this.finishConversationAutoLoad(id, state, false);
-                                            return;
-                                        }
+                                        if (selected !== id) return;
                                         if (! force && this.conversationHasRenderedMessages(id)) {
-                                            this.finishConversationAutoLoad(id, state, true);
+                                            state.loadedAt = Date.now();
+                                            window.__rcInboxAutoLoad[id] = state;
                                             return;
                                         }
 
+                                        state.loading = true;
+                                        state.requestedAt = Date.now();
+                                        window.__rcInboxAutoLoad[id] = state;
+                                        document.documentElement.setAttribute('data-rc-thread-autoloading', id);
+
                                         Promise.resolve(this.$wire.loadSelectedConversationMessagesForClient(id, force))
-                                            .then((loaded) => {
-                                                if (loaded || this.conversationHasRenderedMessages(id)) {
-                                                    this.finishConversationAutoLoad(id, state, true);
-                                                    return;
+                                            .then(() => { state.loadedAt = Date.now(); })
+                                            .catch(() => { state.loadedAt = 0; })
+                                            .finally(() => {
+                                                state.loading = false;
+                                                window.__rcInboxAutoLoad[id] = state;
+                                                if (document.documentElement.getAttribute('data-rc-thread-autoloading') === id) {
+                                                    document.documentElement.removeAttribute('data-rc-thread-autoloading');
                                                 }
-                                                this.pollConversationMessageCache(id, state, 0);
-                                            })
-                                            .catch(() => this.finishConversationAutoLoad(id, state, false));
+                                            });
                                     }, delay);
                                 },
                                 selectConversation(conversationId) {
@@ -10831,12 +10775,14 @@ CSS;
                                     window.__rcInboxPendingConversationId = id;
                                     window.__rcInboxLoadingConversationId = '';
                                     document.documentElement.removeAttribute('data-rc-inbox-loading');
-                                    document.documentElement.setAttribute('data-rc-thread-autoloading', id);
                                     this.selectedConversationId = id;
 
+                                    // One cache-only Livewire select first, then one scoped message request.
+                                    // The message request is deduped per conversation so rapid clicks cannot
+                                    // create the previous double-loading/lag loop.
                                     Promise.resolve(this.$wire.selectConversation(id))
                                         .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
-                                        .then(() => this.queueConversationAutoLoad(id, false, 0))
+                                        .then(() => this.queueConversationAutoLoad(id, false, 40))
                                         .finally(() => document.documentElement.removeAttribute('data-rc-inbox-loading'));
                                 },
                             }"
@@ -10886,7 +10832,7 @@ CSS;
                                 <div class="rc-inbox-empty-v56">
                                     <div>
                                         <strong>No cached conversations found.</strong><br>
-                                        <span>If the cache was cleared, refresh once to fetch the newest 10 conversations.</span>
+                                        <span>If the cache was cleared, refresh once to fetch the newest 10 conversations from HighLevel.</span>
                                         <div style="margin-top:.7rem">
                                             <button type="button" class="rc-btn rc-btn-primary" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime">
                                                 <span wire:loading.remove wire:target="refreshConversationsRealtime">Refresh conversations</span>
@@ -10908,7 +10854,7 @@ CSS;
                         </div>
                     </aside>
 
-                    <main class="rc-inbox-mid-v56 rc-inbox-mid-loading-host-v82" data-rc-selected-thread>
+                    <main class="rc-inbox-mid-v56 rc-inbox-mid-loading-host-v82">
                         @if($selectedConversation)
                             <div class="rc-inbox-mid-head-v56">
                                 <div class="rc-inbox-coach-title-v56">
@@ -10941,16 +10887,17 @@ CSS;
                                         @endif
                                     >
                                         <div>
-                                            <div class="rc-thread-loading-copy-v11312">
-                                                <strong>Loading latest messages…</strong>
-                                                <span>The latest 10 messages for this conversation will appear automatically.</span>
-                                                <small><span class="rc-spinner-mini"></span>Syncing this conversation</small>
+                                            <strong>Loading latest messages…</strong><br>
+                                            <span>The latest 10 messages for this conversation will appear automatically.</span>
+                                            <div style="margin-top:.65rem" wire:loading.flex wire:target="loadSelectedConversationMessagesForClient" class="rc-loading-inline">
+                                                <span class="rc-spinner-mini"></span>
+                                                <span>Fetching messages from HighLevel</span>
                                             </div>
                                         </div>
                                     </div>
                                 @else
                                     @php
-                                        // The message provider may return messages newest-first or oldest-first depending on
+                                        // GHL may return messages newest-first or oldest-first depending on
                                         // the endpoint/page. Normalize them chronologically, then keep the
                                         // newest 10 so a newly opened conversation always shows the latest emails.
                                         $orderedThreadMessages = collect($threadMessages)
@@ -11060,7 +11007,7 @@ CSS;
                                             ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
                                             $messageBody = is_scalar($messageBody) ? (string) $messageBody : '';
                                             if (trim($messageBody) === '') {
-                                                $messageBody = '<p><em>This email was received, but its body was not included in the message payload.</em></p>';
+                                                $messageBody = '<p><em>This email was received, but HighLevel did not include its body in the message payload.</em></p>';
                                             }
                                             $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
                                             $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
@@ -11976,7 +11923,7 @@ CSS;
             </div>
         </section>
 
-        {{-- v118: Compose school/coach selection is browser-local; the send API is touched only when sending. --}}
+        {{-- v118: Compose school/coach selection is browser-local; GHL is touched only when sending. --}}
         <section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
             <script>
                 (() => {

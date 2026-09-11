@@ -6000,7 +6000,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 try {
                     app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
                 } catch (\Throwable $exception) {
-                    Log::debug('Conversation opened locally but the deferred read-state update failed.', [
+                    Log::debug('Conversation opened locally but the deferred GHL read-state update failed.', [
                         'conversation_id' => $conversationId,
                         'error' => $exception->getMessage(),
                     ]);
@@ -6015,58 +6015,36 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
      * scoped to the current conversation only, so it does not start the old full Inbox
      * refresh/background loop that made the Recruiting Center lag.
      */
-    public function loadSelectedConversationMessagesForClient(string $conversationId, bool $force = false): bool
+    public function loadSelectedConversationMessagesForClient(string $conversationId, bool $force = false): void
     {
         $conversationId = trim($conversationId);
         if ($conversationId === '' || (string) $this->selectedConversationId !== $conversationId) {
-            return false;
+            return;
         }
 
-        // v10.113.12: the auto-load request must never wait on the remote inbox API.
-        // It either paints an existing cache immediately or starts the detached UI sync
-        // worker and returns, so the large Recruiting Center Livewire component stays clickable.
+        // Paint cached messages instantly when available and fresh enough. This keeps
+        // returning to a recent thread local/cache-only.
         if (! $force && $this->hydrateCachedConversationMessages($conversationId) && $this->inboxMessageCacheIsFresh($conversationId, 300)) {
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
             $this->activeUiOperation = null;
-            return true;
+            return;
         }
 
+        // If another request already populated messages while this action was queued,
+        // do not call HighLevel again.
         if (! $force && ! empty($this->messages) && $this->inboxMessageCacheIsFresh($conversationId, 60)) {
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
             $this->activeUiOperation = null;
-            return true;
+            return;
         }
 
-        $this->isLoadingConversationMessages = false;
+        // One direct GHL request for the newest page only. No detached sync, no polling,
+        // no selected-thread refresh after the response.
+        $this->loadConversationMessages(true, preserveVisibleMessages: true);
         $this->isRefreshingRemoteData = false;
         $this->activeUiOperation = null;
-        $this->startDeferredUiSync('messages', $conversationId, $force);
-
-        // The auto-loader owns the visible thread-level loading state. Do not keep
-        // the global Recruiting Center loading flags on after launching the worker.
-        $this->isLoadingConversationMessages = false;
-        $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = null;
-
-        return false;
-    }
-
-    public function hydrateSelectedConversationMessagesFromClient(string $conversationId): bool
-    {
-        $conversationId = trim($conversationId);
-        if ($conversationId === '' || (string) $this->selectedConversationId !== $conversationId) {
-            return false;
-        }
-
-        $loaded = $this->hydrateCachedConversationMessages($conversationId);
-
-        $this->isLoadingConversationMessages = false;
-        $this->isRefreshingRemoteData = false;
-        $this->activeUiOperation = null;
-
-        return $loaded && ! empty($this->messages);
     }
 
     protected function inboxMessageCacheIsFresh(string $conversationId, int $seconds = 180): bool
@@ -6164,7 +6142,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             try {
                 app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
             } catch (\Throwable $exception) {
-                Log::debug('Conversation was marked read locally but remote update failed.', [
+                Log::debug('Conversation was marked read locally but GHL update failed.', [
                     'conversation_id' => $conversationId,
                     'error' => $exception->getMessage(),
                 ]);
@@ -6194,7 +6172,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         if ($user = Auth::user()) {
             $result = app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, $newCount);
             if (! ($result['success'] ?? false)) {
-                Notification::make()->title('Inbox')->body((string) ($result['error'] ?? 'Unable to update unread state right now.'))->warning()->send();
+                Notification::make()->title('Inbox')->body((string) ($result['error'] ?? 'Unable to update unread state in HighLevel.'))->warning()->send();
             }
         }
     }
@@ -6258,7 +6236,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             if (! ($result['success'] ?? false)) {
                 Notification::make()
                     ->title('Inbox')
-                    ->body((string) ($result['error'] ?? 'Unable to load conversation messages right now.'))
+                    ->body((string) ($result['error'] ?? 'Unable to load conversation messages from HighLevel.'))
                     ->warning()
                     ->send();
 
@@ -6333,7 +6311,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             // successful direct Inbox fetch. That duplicate refresh caused another
             // loading cycle immediately after the conversation had already loaded.
         } catch (\Throwable $exception) {
-            Log::warning('Unable to load conversation messages for inbox.', [
+            Log::warning('Unable to load GHL conversation messages for inbox.', [
                 'user_id' => $user->id,
                 'conversation_id' => $conversationId,
                 'cursor' => $requestedCursor,
@@ -6342,7 +6320,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
             Notification::make()
                 ->title('Inbox')
-                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load conversation messages right now.')
+                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load conversation messages from HighLevel.')
                 ->danger()
                 ->send();
         } finally {
