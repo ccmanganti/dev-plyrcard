@@ -54,10 +54,27 @@
             closeFreeGate() {
                 this.freeGateOpen = false;
             },
+            pollInboxMessagesUntilRendered(conversationId = '', attempt = 0) {
+                const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
+                if (String(this.activeSection || '') !== 'conversations') return;
+                if (document.querySelector(selector) && attempt >= 4) {
+                    document.documentElement.removeAttribute('data-rc-inbox-loading');
+                    return;
+                }
+                if (attempt > 45) {
+                    document.documentElement.removeAttribute('data-rc-inbox-loading');
+                    return;
+                }
+
+                window.setTimeout(() => {
+                    if (String(this.activeSection || '') !== 'conversations') return;
+                    Promise.resolve(this.$wire.pollDeferredUiData())
+                        .finally(() => this.pollInboxMessagesUntilRendered(conversationId, attempt + 1));
+                }, attempt < 6 ? 1200 : 2200);
+            },
             openInboxSection() {
-                // v10.113: paint cached Inbox state first; refresh the selected thread only
-                // after the first response reaches the browser. A cold Inbox therefore avoids
-                // two sequential GHL calls before anything can appear on screen.
+                // v10.113.2: paint cached Inbox state first; if the selected thread is
+                // missing/stale, queue the message fetch after response and poll the cache.
                 const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
                 const hasRenderedMessages = !!document.querySelector(selector);
 
@@ -76,7 +93,12 @@
                         }
                         return this.$wire.ensureInboxConversationLoaded();
                     })
-                    .finally(() => document.documentElement.removeAttribute('data-rc-inbox-loading'));
+                    .then(() => this.pollInboxMessagesUntilRendered())
+                    .finally(() => {
+                        if (document.querySelector(selector)) {
+                            document.documentElement.removeAttribute('data-rc-inbox-loading');
+                        }
+                    });
             },
 discoverSelectedIds: [],
             discoverSearch: '',
@@ -599,10 +621,31 @@ discoverSelectedIds: [],
                 }
             },
             openComposeForSchool(schoolId) {
-                const id = String(schoolId || '').trim();
-                if (!id) return;
+                const rawId = String(schoolId || '').trim();
+                if (!rawId) return;
 
+                const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
+                    .find(item => [item?.id, item?.local_id, item?.school_id, item?.business_id, item?.company_id, item?.ghl_business_id]
+                        .map(value => String(value ?? '').trim())
+                        .filter(Boolean)
+                        .includes(rawId)) || null;
+                const id = String(row?.id ?? row?.local_id ?? rawId).trim();
                 const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
+
+                // Seed the Compose Alpine controller before the Livewire response comes
+                // back. This makes the selected school appear immediately and also protects
+                // a direct /compose-email?school= URL from an older empty recipient cache.
+                window.__rcComposePendingSchoolId = id;
+                window.__rcComposeRecipientStateV101 = {
+                    key: new URL(href, window.location.href).pathname + new URL(href, window.location.href).search,
+                    path: new URL(href, window.location.href).pathname,
+                    schoolId: id,
+                    selectedCoachIds: [],
+                    targetMode: 'school',
+                    headCoachOnly: true,
+                    chooserOpen: false,
+                };
+
                 this.closeDiscoverSchool();
 
                 // Activate the already-mounted Compose panel synchronously. The Livewire
@@ -616,6 +659,10 @@ discoverSelectedIds: [],
                     const target = new URL(href, window.location.href);
                     window.history.pushState({ ...(window.history.state || {}), rcSection: 'compose' }, '', target.pathname + target.search + target.hash);
                 }
+
+                window.dispatchEvent(new CustomEvent('rc-compose-school-selected', {
+                    detail: { schoolId: id, schoolName: String(row?.name || '') }
+                }));
 
                 return Promise.resolve(this.$wire.composeEmailSchool(id));
             },
@@ -10759,6 +10806,31 @@ CSS;
 
                                     this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
                                 },
+                                pollSelectedConversation(id, attempt = 0) {
+                                    const selected = String(this.selectedConversationId || '');
+                                    if (!id || selected !== String(id)) return;
+
+                                    const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
+                                    if (document.querySelector(selector) && attempt >= 4) {
+                                        if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                            document.documentElement.removeAttribute('data-rc-inbox-loading');
+                                        }
+                                        return;
+                                    }
+
+                                    if (attempt > 45) {
+                                        if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                            document.documentElement.removeAttribute('data-rc-inbox-loading');
+                                        }
+                                        return;
+                                    }
+
+                                    window.setTimeout(() => {
+                                        if (String(this.selectedConversationId || '') !== String(id)) return;
+                                        Promise.resolve(this.$wire.pollDeferredUiData())
+                                            .finally(() => this.pollSelectedConversation(id, attempt + 1));
+                                    }, attempt < 6 ? 1200 : 2200);
+                                },
                                 selectConversation(conversationId) {
                                     const id = String(conversationId || '');
                                     if (! id || id === String(this.selectedConversationId || '')) return;
@@ -10767,28 +10839,29 @@ CSS;
                                     document.documentElement.setAttribute('data-rc-inbox-loading', id);
                                     this.selectedConversationId = id;
 
-                                    // v10.113: selection is local/cache-only, so the selected coach and
-                                    // cached thread paint without waiting on GHL. Only after that response do
-                                    // we refresh a stale/missing thread. Cached messages stay visible while
-                                    // the second request runs.
+                                    // v10.113.2: selection is local/cache-only. The second request only queues
+                                    // a fresh ten-message page after response; this poll hydrates the cache when
+                                    // that background fetch finishes instead of blocking the click for GHL.
                                     Promise.resolve(this.$wire.selectConversation(id))
                                         .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
                                         .then(() => {
-                                            if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
-                                                document.documentElement.removeAttribute('data-rc-inbox-loading');
-                                            }
-
                                             const hasRenderedMessages = !!document.querySelector(
                                                 '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
                                             );
                                             if (!hasRenderedMessages) {
                                                 document.documentElement.setAttribute('data-rc-inbox-loading', id);
+                                            } else if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                                document.documentElement.removeAttribute('data-rc-inbox-loading');
                                             }
 
                                             return this.$wire.refreshConversationMessagesIfStale(id);
                                         })
+                                        .then(() => this.pollSelectedConversation(id))
                                         .finally(() => {
-                                            if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                            const hasRenderedMessages = !!document.querySelector(
+                                                '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
+                                            );
+                                            if (hasRenderedMessages && document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
                                                 document.documentElement.removeAttribute('data-rc-inbox-loading');
                                             }
                                         });
@@ -12011,20 +12084,68 @@ CSS;
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
+                    recipientStateKey() {
+                        return String(window.location?.pathname || '') + String(window.location?.search || '');
+                    },
+                    resolveSchoolId(value) {
+                        const id = String(value || '').trim();
+                        if (!id) return '';
+
+                        const row = this.schools.find(item => [
+                            item?.id,
+                            item?.local_id,
+                            item?.school_id,
+                            item?.business_id,
+                            item?.company_id,
+                            item?.ghl_business_id,
+                        ].map(v => String(v ?? '').trim()).filter(Boolean).includes(id));
+
+                        return row ? String(row.id || '') : '';
+                    },
+                    applyExternalSchoolSelection(value) {
+                        const resolvedId = this.resolveSchoolId(value);
+                        if (!resolvedId) return false;
+
+                        this.selectedSchoolId = resolvedId;
+                        this.schoolQuery = '';
+                        this.coachQuery = '';
+                        this.selectedCoachIds = [];
+                        this.targetMode = 'school';
+                        this.headCoachOnly = true;
+                        this.chooserOpen = false;
+                        this.coachRevision++;
+                        this.rememberRecipientState();
+                        return true;
+                    },
                     init() {
                         const cached = window.__rcComposeRecipientStateV101;
                         const currentPath = String(window.location?.pathname || '');
+                        const currentKey = this.recipientStateKey();
+                        const urlSchoolId = new URLSearchParams(String(window.location?.search || '')).get('school') || '';
+                        const pendingSchoolId = String(window.__rcComposePendingSchoolId || '');
+                        const serverSchoolId = String(this.selectedSchoolId || '');
+                        const explicitSchoolId = pendingSchoolId || urlSchoolId || serverSchoolId;
+
+                        // v10.113.2: an explicit ?school= URL or school-drawer action must
+                        // win over older browser-recipient cache. The previous cache key used
+                        // only pathname, so /compose-email?school=76 could restore an empty
+                        // Compose state and look like Email Coaches did not preselect anything.
+                        if (explicitSchoolId && this.applyExternalSchoolSelection(explicitSchoolId)) {
+                            window.__rcComposePendingSchoolId = '';
+                            return;
+                        }
 
                         // v101: the browser-side Compose recipient state is authoritative
-                        // across Livewire morphs on this same page. The server-rendered
-                        // campaignSchoolId may still be empty/older because school/coach
-                        // selection is intentionally local-only for instant interaction.
-                        if (cached && String(cached.path || '') === currentPath) {
+                        // across Livewire morphs on this same page when there is no explicit
+                        // school target in the URL or drawer action.
+                        const cachedKey = String(cached?.key || cached?.path || '');
+                        const cacheMatches = cached && (cachedKey === currentKey || (!String(window.location?.search || '') && cachedKey === currentPath));
+                        if (cacheMatches) {
                             const cachedSchoolId = String(cached.schoolId || '');
-                            const schoolExists = cachedSchoolId === '' || this.schools.some(row => String(row.id || '') === cachedSchoolId);
+                            const resolvedCachedSchoolId = cachedSchoolId === '' ? '' : this.resolveSchoolId(cachedSchoolId);
 
-                            if (schoolExists) {
-                                this.selectedSchoolId = cachedSchoolId;
+                            if (cachedSchoolId === '' || resolvedCachedSchoolId !== '') {
+                                this.selectedSchoolId = resolvedCachedSchoolId;
                                 this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds].map(String) : [];
                                 this.targetMode = String(cached.targetMode || 'school');
                                 this.headCoachOnly = Boolean(cached.headCoachOnly);
@@ -12036,6 +12157,7 @@ CSS;
                     },
                     rememberRecipientState() {
                         window.__rcComposeRecipientStateV101 = {
+                            key: this.recipientStateKey(),
                             path: String(window.location?.pathname || ''),
                             schoolId: String(this.selectedSchoolId || ''),
                             selectedCoachIds: [...this.selectedCoachIds].map(String),
@@ -12258,7 +12380,9 @@ CSS;
                             await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
                         } finally { this.sendingFast = false; }
                     },
-                }" x-init="init()">
+                }"
+                x-init="init()"
+                x-on:rc-compose-school-selected.window="applyExternalSchoolSelection($event.detail?.schoolId || $event.detail?.school_id || '')">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>

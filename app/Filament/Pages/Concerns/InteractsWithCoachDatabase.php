@@ -5887,7 +5887,11 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        $this->loadConversationMessages(true, preserveVisibleMessages: $hasCachedMessages);
+        // v10.113.2: do not make the Livewire click request wait on HighLevel.
+        // Queue the one-page TYPE_EMAIL message fetch after the response is sent,
+        // then let the browser poll the Laravel cache. This keeps the selected
+        // thread responsive even when GHL takes a long time to return messages.
+        $this->queueConversationMessagesRefreshAfterResponse($conversationId, force: false, keepVisibleMessages: $hasCachedMessages);
     }
 
     public function refreshConversationMessagesForClient(string $conversationId): void
@@ -5897,20 +5901,157 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // If cached messages are already visible, keep them on screen while the
-        // newest page refreshes. This avoids a second loading animation/flicker.
-        $this->loadConversationMessages(true, preserveVisibleMessages: ! empty($this->messages));
+        // Manual/client refresh follows the same non-blocking path. Cached messages
+        // stay visible while the fresh ten-message page is fetched after response.
+        $this->queueConversationMessagesRefreshAfterResponse($conversationId, force: true, keepVisibleMessages: ! empty($this->messages));
 
         if ($user = Auth::user()) {
+            app()->terminating(function () use ($user, $conversationId): void {
+                try {
+                    app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+                } catch (\Throwable $exception) {
+                    Log::debug('Unable to sync selected conversation read state after message refresh.', [
+                        'conversation_id' => $conversationId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            });
+        }
+    }
+
+    protected function queueConversationMessagesRefreshAfterResponse(string $conversationId, bool $force = false, bool $keepVisibleMessages = false): void
+    {
+        $user = Auth::user();
+        $conversationId = trim($conversationId);
+
+        if (! $user || $conversationId === '') {
+            return;
+        }
+
+        $lockKey = CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId);
+        $statusKey = CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId);
+
+        if (! $force && Cache::has($lockKey)) {
+            $this->isLoadingConversationMessages = ! $keepVisibleMessages;
+            $this->isRefreshingRemoteData = true;
+            $this->activeUiOperation = $keepVisibleMessages ? null : 'Loading messages';
+            return;
+        }
+
+        Cache::put($lockKey, true, now()->addSeconds(90));
+        Cache::put($statusKey, [
+            'status' => 'queued',
+            'type' => 'messages',
+            'reference' => $conversationId,
+            'user_id' => $user->getKey(),
+            'queued_at' => now()->toIso8601String(),
+            'message' => 'Message refresh queued.',
+        ], now()->addMinutes(10));
+
+        $this->isLoadingConversationMessages = ! $keepVisibleMessages;
+        $this->isRefreshingRemoteData = true;
+        $this->activeUiOperation = $keepVisibleMessages ? null : 'Loading messages';
+
+        app()->terminating(function () use ($user, $conversationId, $lockKey, $statusKey): void {
+            Cache::put($statusKey, [
+                'status' => 'running',
+                'type' => 'messages',
+                'reference' => $conversationId,
+                'user_id' => $user->getKey(),
+                'started_at' => now()->toIso8601String(),
+                'message' => 'Loading latest messages.',
+            ], now()->addMinutes(10));
+
             try {
-                app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+                $result = $this->fetchAndCacheConversationMessagePage($user, $conversationId);
+
+                Cache::put($statusKey, [
+                    'status' => ($result['success'] ?? false) ? 'completed' : 'failed',
+                    'type' => 'messages',
+                    'reference' => $conversationId,
+                    'user_id' => $user->getKey(),
+                    'finished_at' => now()->toIso8601String(),
+                    'message' => ($result['success'] ?? false)
+                        ? 'Messages refreshed.'
+                        : (string) ($result['error'] ?? 'Unable to refresh messages.'),
+                ], now()->addMinutes(10));
             } catch (\Throwable $exception) {
-                Log::debug('Unable to sync selected conversation read state after message refresh.', [
+                Cache::put($statusKey, [
+                    'status' => 'failed',
+                    'type' => 'messages',
+                    'reference' => $conversationId,
+                    'user_id' => $user->getKey(),
+                    'finished_at' => now()->toIso8601String(),
+                    'message' => 'Unable to refresh messages.',
+                    'error' => $exception->getMessage(),
+                ], now()->addMinutes(10));
+
+                Log::warning('Deferred conversation message refresh failed.', [
+                    'user_id' => $user->getKey(),
                     'conversation_id' => $conversationId,
                     'error' => $exception->getMessage(),
                 ]);
+            } finally {
+                Cache::forget($lockKey);
             }
+        });
+    }
+
+    protected function fetchAndCacheConversationMessagePage($user, string $conversationId): array
+    {
+        $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
+            $user,
+            $conversationId,
+            null,
+            $this->messagePageSize
+        );
+
+        if (! ($result['success'] ?? false)) {
+            return $result;
         }
+
+        $rows = collect($result['messages'] ?? [])
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
+            ->sortBy(fn (array $row): int => $this->communicationTimestamp(
+                $row['created_at']
+                ?? $row['date']
+                ?? $row['messageDate']
+                ?? $row['dateAdded']
+                ?? $row['createdAt']
+                ?? null
+            ))
+            ->values();
+
+        $cached = Cache::get(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId), []);
+        $existing = collect(is_array($cached['rows'] ?? null) ? $cached['rows'] : [])
+            ->filter(fn ($row): bool => is_array($row));
+
+        $messages = $existing
+            ->merge($rows)
+            ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+            ->sortBy(fn (array $row): int => $this->communicationTimestamp(
+                $row['created_at']
+                ?? $row['date']
+                ?? $row['messageDate']
+                ?? $row['dateAdded']
+                ?? $row['createdAt']
+                ?? null
+            ))
+            ->take(-200)
+            ->values()
+            ->all();
+
+        Cache::put(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId), [
+            'rows' => $messages,
+            'last_message_id' => filled($result['last_message_id'] ?? null)
+                ? (string) $result['last_message_id']
+                : ($cached['last_message_id'] ?? null),
+            'has_more' => (bool) ($result['has_more'] ?? false),
+            'cached_at' => now()->toIso8601String(),
+        ], now()->addMinutes(10));
+
+        return ['success' => true, 'messages' => $messages];
     }
 
     protected function markConversationReadLocally(string $conversationId): void
@@ -9043,9 +9184,52 @@ protected function templateHtmlForNativeEditor(array $template): string
         if (! $user) {
             return null;
         }
-        // v104: favorites/lists resolve against canonical schools.id only. No
-        // CoachDatabaseSchool / GHL-business-backed membership lookup is allowed.
-        return app(LocalRecruitingDatabaseService::class)->schoolRow($user, $schoolId);
+
+        $needle = trim((string) $schoolId);
+        if ($needle === '') {
+            return null;
+        }
+
+        // v10.113.2: Compose can be opened from the school drawer, a direct
+        // ?school= URL, or an older cached browser row. Resolve against the same
+        // local Compose dataset that the browser uses, and accept every stable
+        // school identity we expose there. This prevents a valid drawer school
+        // from landing on Compose with an empty recipient state.
+        $fromComposeDataset = collect($this->composeClientDataset['schools'] ?? [])
+            ->first(function (array $row) use ($needle): bool {
+                $ids = [
+                    $row['id'] ?? null,
+                    $row['local_id'] ?? null,
+                    $row['school_id'] ?? null,
+                    $row['business_id'] ?? null,
+                    $row['company_id'] ?? null,
+                    $row['ghl_business_id'] ?? null,
+                ];
+
+                return collect($ids)
+                    ->map(fn ($value): string => trim((string) $value))
+                    ->filter()
+                    ->contains($needle);
+            });
+
+        if (is_array($fromComposeDataset)) {
+            return $fromComposeDataset;
+        }
+
+        try {
+            $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $needle);
+            if (is_array($school)) {
+                return $school;
+            }
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to resolve compose school through local recruiting service.', [
+                'user_id' => $user->getKey(),
+                'school_id' => $needle,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return null;
     }
 
     protected function composeCoachesForSchool(array $school, bool $requireEmail = true): Collection
