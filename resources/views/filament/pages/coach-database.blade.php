@@ -7120,7 +7120,10 @@ discoverSelectedIds: [],
         <section class="rc-client-panel-v1033" data-rc-client-section="dashboard" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->take(5)->values()->all();
+                // v10.113: lower dashboard cards use the current local/tracked read models.
+                // No zero-engagement school fallback and no legacy all-purpose lead score.
+                $dashboardInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(4)->values()->all();
+                $dashboardRadarSchools = collect($this->dashboardOutreachRadarSchools ?? [])->take(4)->values()->all();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
 
                 $authUser = auth()->user();
@@ -7168,7 +7171,7 @@ discoverSelectedIds: [],
                 $emailsSent = $emailSentCount;
 
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
-                $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardTopSchools));
+                $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardInterestedSchools));
                 // Match the Coach Engagement drawer exactly: Instagram + YouTube + X.
                 $coachEngagementTotal = $socialClickCount;
 
@@ -7446,30 +7449,9 @@ discoverSelectedIds: [],
                     ->values()
                     ->all();
 
-                $radarSchools = collect($dashboardTopSchools)->take(4)->values()->all();
-
-                if (empty($radarSchools)) {
-                    $radarSchools = collect($this->filteredSchools ?? [])->take(4)->values()->all();
-                }
-
-                $formatActivityTimeLabel = function ($time): string {
-                    if (! $time) {
-                        return 'Recent';
-                    }
-
-                    try {
-                        $timeValue = \Illuminate\Support\Carbon::parse($time);
-
-                        if ($timeValue->lessThan(now()->subYears(3)) || $timeValue->greaterThan(now()->addDay())) {
-                            return 'Recent';
-                        }
-
-                        return $timeValue->diffForHumans();
-                    } catch (\Throwable $exception) {
-                        return 'Recent';
-                    }
-                };
-
+                // v10.113.1: restore the Recent Activity presentation rows that are
+                // consumed by the dashboard markup below. v10.113 accidentally removed this
+                // mapper while replacing the lower dashboard school sections.
                 $dashboardActivityRows = collect($dashboardRecentActivity)->map(function ($activity) use ($formatActivityTimeLabel) {
                     $activityType = strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? 'activity'));
                     $tone = 'blue';
@@ -7496,18 +7478,6 @@ discoverSelectedIds: [],
                     }
 
                     $time = $activity['time'] ?? null;
-                    $timeLabel = 'Recent';
-
-                    if ($time) {
-                        try {
-                            $timeValue = \Illuminate\Support\Carbon::parse($time);
-                            $timeLabel = $timeValue->lessThan(now()->subYears(3))
-                                ? 'Recent'
-                                : $timeValue->diffForHumans();
-                        } catch (\Throwable $exception) {
-                            $timeLabel = 'Recent';
-                        }
-                    }
 
                     return [
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
@@ -7515,84 +7485,55 @@ discoverSelectedIds: [],
                         'url' => $activity['url'] ?? '#',
                         'tone' => $tone,
                         'icon' => $icon,
-                        'time_label' => $timeLabel,
+                        'time_label' => $formatActivityTimeLabel($time),
                     ];
                 })->values();
 
-
-                $radarScoreForSchool = function ($school): int {
-                    return max(
-                        (int) ($school['lead_score'] ?? 0),
-                        (int) ($school['engagement_score'] ?? 0),
-                        ((int) ($school['profile_views'] ?? 0) * 5)
-                            + ((int) ($school['highlight_views'] ?? 0) * 4)
-                            + ((int) ($school['trigger_link_clicks'] ?? $school['link_clicks'] ?? 0) * 3)
-                            + ((int) ($school['replies'] ?? $school['coach_replies'] ?? 0) * 10)
-                            + ((int) ($school['coach_count'] ?? 0))
-                    );
-                };
-
-                $maxRadarScore = max(1, collect($radarSchools)->map(fn ($school) => $radarScoreForSchool($school))->max() ?: 1);
-
-                $radarSchoolRows = collect($radarSchools)->map(function ($school) use ($radarScoreForSchool, $maxRadarScore) {
+                // v10.113 On The Radar = real outreach coverage. Only schools with
+                // successful sent emails are shown, already scoped to the user's current gender.
+                $radarSchoolRows = collect($dashboardRadarSchools)->map(function ($school) {
                     $schoolName = (string) ($school['name'] ?? 'School');
                     $schoolConference = (string) ($school['conference'] ?? $school['league'] ?? 'Conference');
-                    $rawScore = $radarScoreForSchool($school);
-                    $match = $rawScore > 0 ? max(1, min(100, (int) round(($rawScore / $maxRadarScore) * 100))) : 0;
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                     $logoUrl = trim((string) (
                         $school['logo_url']
                         ?? $school['school_logo_url']
                         ?? $school['business_logo_url']
-                        ?? data_get($school, 'head_coach.logo_url')
-                        ?? data_get($school, 'head_coach.school_logo_url')
-                        ?? data_get($school, 'head_coach.business_logo_url')
                         ?? ''
                     ));
 
-                    return [
-                        'id' => $school['id'] ?? $school['business_id'] ?? $schoolName,
+                    return array_merge($school, [
+                        'id' => $school['id'] ?? $school['school_id'] ?? $school['business_id'] ?? $schoolName,
                         'name' => $schoolName,
                         'conference' => $schoolConference,
-                        'match' => $match,
-                        'score' => $rawScore,
+                        'match' => max(0, min(100, (int) ($school['outreach_match_percentage'] ?? 0))),
+                        'contacted_coaches' => max(0, (int) ($school['outreach_contacted_coaches'] ?? 0)),
+                        'total_coaches' => max(0, (int) ($school['outreach_total_coaches'] ?? $school['coach_count'] ?? 0)),
                         'initials' => strtoupper($initials ?: 'PC'),
                         'logo_url' => $logoUrl,
-                    ];
+                    ]);
                 })->values();
 
-                if ($radarSchoolRows->isEmpty()) {
-                    $radarSchoolRows = collect([
-                        ['id' => 'Virginia Commonwealth', 'name' => 'Virginia Commonwealth', 'conference' => 'Atlantic 10 Conference', 'match' => 94, 'initials' => 'VCU', 'logo_url' => ''],
-                        ['id' => 'James Madison University', 'name' => 'James Madison University', 'conference' => 'Sun Belt Conference', 'match' => 91, 'initials' => 'JMU', 'logo_url' => ''],
-                        ['id' => 'Duke University', 'name' => 'Duke University', 'conference' => 'ACC Conference', 'match' => 89, 'initials' => 'DU', 'logo_url' => ''],
-                        ['id' => 'Wake Forest University', 'name' => 'Wake Forest University', 'conference' => 'ACC Conference', 'match' => 86, 'initials' => 'WF', 'logo_url' => ''],
-                    ]);
-                }
-
-                $interestedSchoolRows = collect($dashboardTopSchools)->take(4)->values()->map(function ($school, $rank) {
+                // v10.113 Schools Most Interested = actual tracked engagement count,
+                // highest to lowest. Do not inject sample/zero-engagement schools.
+                $interestedSchoolRows = collect($dashboardInterestedSchools)->values()->map(function ($school, $rank) {
                     $schoolName = (string) ($school['name'] ?? 'School');
-                    $views = (int) (($school['profile_views'] ?? 0) + ($school['highlight_views'] ?? 0) + ($school['link_clicks'] ?? 0));
-                    $score = max($views, (int) ($school['lead_score'] ?? $school['engagement_score'] ?? 0));
+                    $profileViews = max(0, (int) ($school['profile_views'] ?? 0));
+                    $linkClicks = max(0, (int) ($school['interest_clicks'] ?? 0));
+                    $engagements = max(0, (int) ($school['engagement_count'] ?? ($profileViews + $linkClicks)));
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
 
-                    return [
+                    return array_merge($school, [
                         'rank' => $rank + 1,
+                        'id' => $school['id'] ?? $school['school_id'] ?? $school['business_id'] ?? $schoolName,
                         'name' => $schoolName,
-                        'score' => $score,
+                        'engagements' => $engagements,
+                        'profile_views' => $profileViews,
+                        'link_clicks' => $linkClicks,
                         'initials' => strtoupper($initials ?: 'S'),
                         'logo_url' => trim((string) ($school['logo_url'] ?? $school['school_logo_url'] ?? $school['business_logo_url'] ?? '')),
-                    ];
-                })->values();
-
-                if ($interestedSchoolRows->isEmpty()) {
-                    $interestedSchoolRows = collect([
-                        ['rank' => 1, 'name' => 'Virginia Commonwealth', 'score' => 14, 'initials' => 'VCU'],
-                        ['rank' => 2, 'name' => 'University of Maryland', 'score' => 9, 'initials' => 'M'],
-                        ['rank' => 3, 'name' => 'Florida State', 'score' => 7, 'initials' => 'FS'],
-                        ['rank' => 4, 'name' => 'Indiana University', 'score' => 6, 'initials' => 'IU'],
                     ]);
-                }
+                })->values();
             @endphp
 
             <style id="rc-dashboard-email-live-fetch-v136">
@@ -7859,13 +7800,13 @@ discoverSelectedIds: [],
                         <div class="rc-home-panel-head-v2">
                             <div>
                                 <h2>On The Radar</h2>
-                                <p>Local school records · engagement signals from GHL</p>
+                                <p>Schools you've reached out to</p>
                             </div>
-                            <a href="#">View All</a>
+                            <a href="#" x-on:click.prevent="activeSection='conversations'; $nextTick(() => openInboxSection())">View All</a>
                         </div>
 
                         <div class="rc-radar-schools-v2">
-                            @foreach($radarSchoolRows as $radarSchool)
+                            @forelse($radarSchoolRows as $radarSchool)
                                 <button type="button" class="rc-radar-card-v2" x-on:click.stop="openGlobalSchool(@js($radarSchool))">
                                     <span class="rc-radar-logo-v2 {{ empty($radarSchool['logo_url']) ? 'is-missing-logo' : '' }}">
                                         @if(! empty($radarSchool['logo_url']))
@@ -7875,26 +7816,30 @@ discoverSelectedIds: [],
                                     </span>
                                     <strong>{{ $radarSchool['name'] }}</strong>
                                     <small>{{ $radarSchool['conference'] }}</small>
-                                    <em>{{ $radarSchool['match'] }}% Match</em>
+                                    <em title="{{ number_format($radarSchool['contacted_coaches']) }} of {{ number_format($radarSchool['total_coaches']) }} coaches contacted">{{ $radarSchool['match'] }}% Match</em>
                                 </button>
-                            @endforeach
+                            @empty
+                                <div class="rc-home-empty-v2" style="grid-column:1/-1">Schools will appear here after you successfully email their coaches.</div>
+                            @endforelse
                         </div>
 
-                        <div class="rc-home-dots-v2">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                        </div>
+                        @if($radarSchoolRows->isNotEmpty())
+                            <div class="rc-home-dots-v2">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        @endif
                     </section>
 
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Schools Most Interested</h2>
-                            <span>Local schools + GHL engagement</span>
+                            <span>Highest engagement first</span>
                         </div>
 
                         <div class="rc-interested-list-v2">
-                            @foreach($interestedSchoolRows as $interestedSchool)
+                            @forelse($interestedSchoolRows as $interestedSchool)
                                 <button type="button" class="rc-interested-row-v2" x-on:click.stop="openGlobalSchool(@js($interestedSchool))">
                                     <span class="rc-interested-rank-v2">{{ $interestedSchool['rank'] }}</span>
                                     <span class="rc-interested-logo-v2 {{ empty($interestedSchool['logo_url']) ? 'is-missing-logo' : '' }}">
@@ -7905,14 +7850,16 @@ discoverSelectedIds: [],
                                     </span>
                                     <span>
                                         <strong>{{ $interestedSchool['name'] }}</strong>
-                                        <small>Profile views</small>
+                                        <small>{{ number_format($interestedSchool['profile_views']) }} profile {{ \Illuminate\Support\Str::plural('view', $interestedSchool['profile_views']) }} · {{ number_format($interestedSchool['link_clicks']) }} link {{ \Illuminate\Support\Str::plural('click', $interestedSchool['link_clicks']) }}</small>
                                     </span>
-                                    <b>{{ $interestedSchool['score'] }}</b>
+                                    <b title="Total tracked engagements">{{ number_format($interestedSchool['engagements']) }}</b>
                                 </button>
-                            @endforeach
+                            @empty
+                                <div class="rc-home-empty-v2">No tracked school engagement yet.</div>
+                            @endforelse
                         </div>
 
-                        <a class="rc-home-outline-btn-v2" href="#">View Full Analytics</a>
+                        <a class="rc-home-outline-btn-v2" href="#" x-on:click.prevent="dashboardDetail = 'profile-views'">View Full Analytics</a>
                     </section>
                 </div>
             </div>

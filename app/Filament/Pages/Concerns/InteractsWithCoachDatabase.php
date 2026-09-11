@@ -6795,6 +6795,7 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                     sendResult: $result,
                     renderedHtml: $trackedBody,
                 );
+                Cache::forget($this->dashboardOutreachRadarCacheKey($user));
 
                 $this->prependDashboardActivity([
                         'type' => 'email_sent',
@@ -10058,6 +10059,194 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         return array_slice($steps, 0, 3);
     }
 
+    protected function dashboardOutreachRadarCacheKey($user): string
+    {
+        $gender = \App\Models\Coach::normalizeGender($user->gender ?? null) ?: 'unassigned';
+
+        return 'recruiting:dashboard-outreach-radar:v113:' . (int) $user->getKey() . ':' . $gender;
+    }
+
+    /**
+     * Schools the athlete has actually reached out to.
+     *
+     * A school's Match percentage is outreach coverage, not an engagement/CES score:
+     * unique current-gender coaches successfully emailed / current visible coaches.
+     */
+    public function getDashboardOutreachRadarSchoolsProperty(): array
+    {
+        $user = Auth::user();
+        if (! $user || ! Schema::hasTable('coach_database_email_messages')) {
+            return [];
+        }
+
+        if (! Schema::hasColumn('coach_database_email_messages', 'athlete_user_id')
+            || ! Schema::hasColumn('coach_database_email_messages', 'sent_at')) {
+            return [];
+        }
+
+        return Cache::remember(
+            $this->dashboardOutreachRadarCacheKey($user),
+            now()->addSeconds(30),
+            function () use ($user): array {
+                // Use the canonical local catalog directly. It is already scoped to the
+                // logged-in athlete's gender and includes that audience's complete roster.
+                $schools = collect(app(LocalRecruitingDatabaseService::class)->schoolRows($user))
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values();
+
+                if ($schools->isEmpty()) {
+                    return [];
+                }
+
+                $byBusinessId = $schools->flatMap(function (array $school): array {
+                    return collect([
+                        $school['id'] ?? null,
+                        $school['local_id'] ?? null,
+                        $school['school_id'] ?? null,
+                        $school['business_id'] ?? null,
+                        $school['company_id'] ?? null,
+                        $school['ghl_business_id'] ?? null,
+                    ])->map(fn ($id): string => strtolower(trim((string) $id)))
+                        ->filter()
+                        ->unique()
+                        ->mapWithKeys(fn (string $id): array => [$id => $school])
+                        ->all();
+                });
+
+                $byName = $schools
+                    ->filter(fn (array $school): bool => $this->normalizeSchoolMatchKey((string) ($school['name'] ?? '')) !== '')
+                    ->keyBy(fn (array $school): string => $this->normalizeSchoolMatchKey((string) ($school['name'] ?? '')));
+
+                $columns = ['athlete_user_id', 'sent_at'];
+                foreach (['school_business_id', 'school_name', 'coach_contact_id', 'recipient_email'] as $column) {
+                    if (Schema::hasColumn('coach_database_email_messages', $column)) {
+                        $columns[] = $column;
+                    }
+                }
+
+                $messages = DB::table('coach_database_email_messages')
+                    ->where('athlete_user_id', $user->getKey())
+                    ->whereNotNull('sent_at')
+                    ->orderByDesc('sent_at')
+                    ->limit(5000)
+                    ->get(array_values(array_unique($columns)));
+
+                $radar = [];
+
+                foreach ($messages as $message) {
+                    $message = (array) $message;
+                    $businessId = strtolower(trim((string) ($message['school_business_id'] ?? '')));
+                    $schoolName = trim((string) ($message['school_name'] ?? ''));
+                    $schoolKey = $this->normalizeSchoolMatchKey($schoolName);
+
+                    $school = ($businessId !== '' ? $byBusinessId->get($businessId) : null)
+                        ?? ($schoolKey !== '' ? $byName->get($schoolKey) : null);
+
+                    // Fail closed to the current gender-scoped canonical school catalog.
+                    if (! is_array($school)) {
+                        continue;
+                    }
+
+                    $schoolId = trim((string) ($school['id'] ?? $school['school_id'] ?? ''));
+                    if ($schoolId === '') {
+                        continue;
+                    }
+
+                    $visibleCoaches = collect($school['coaches'] ?? [])
+                        ->filter(fn ($coach): bool => is_array($coach));
+
+                    $visibleEmails = $visibleCoaches
+                        ->pluck('email')
+                        ->map(fn ($email): string => strtolower(trim((string) $email)))
+                        ->filter()
+                        ->unique();
+
+                    $visibleIds = $visibleCoaches
+                        ->flatMap(fn (array $coach): array => [
+                            $coach['id'] ?? null,
+                            $coach['local_id'] ?? null,
+                            $coach['contact_id'] ?? null,
+                            $coach['ghl_contact_id'] ?? null,
+                        ])
+                        ->map(fn ($id): string => strtolower(trim((string) $id)))
+                        ->filter()
+                        ->unique();
+
+                    $recipientEmail = strtolower(trim((string) ($message['recipient_email'] ?? '')));
+                    $contactId = strtolower(trim((string) ($message['coach_contact_id'] ?? '')));
+                    $coachIdentity = '';
+
+                    // Email is the stable identity across subaccounts. Only count a sent email
+                    // when its recipient is still part of the user's current gender audience.
+                    if ($recipientEmail !== '' && $visibleEmails->contains($recipientEmail)) {
+                        $coachIdentity = 'email:' . $recipientEmail;
+                    } elseif ($recipientEmail === '' && $contactId !== '' && $visibleIds->contains($contactId)) {
+                        $coachIdentity = 'id:' . $contactId;
+                    }
+
+                    if ($coachIdentity === '') {
+                        continue;
+                    }
+
+                    $radar[$schoolId] ??= [
+                        'school' => $school,
+                        'contacted' => [],
+                        'message_count' => 0,
+                        'last_sent_at' => null,
+                    ];
+
+                    $radar[$schoolId]['contacted'][$coachIdentity] = true;
+                    $radar[$schoolId]['message_count']++;
+                    $radar[$schoolId]['last_sent_at'] ??= $message['sent_at'] ?? null;
+                }
+
+                return collect($radar)
+                    ->map(function (array $row): array {
+                        $school = is_array($row['school'] ?? null) ? $row['school'] : [];
+                        $contacted = count($row['contacted'] ?? []);
+                        $rosterCount = collect($school['coaches'] ?? [])->filter(fn ($coach): bool => is_array($coach))->count();
+                        $total = max($rosterCount, (int) ($school['coach_count'] ?? 0), (int) ($school['coaches_count'] ?? 0));
+                        $match = $total > 0
+                            ? max(0, min(100, (int) round(($contacted / $total) * 100)))
+                            : 0;
+
+                        $school['outreach_match_percentage'] = $match;
+                        $school['outreach_contacted_coaches'] = $contacted;
+                        $school['outreach_total_coaches'] = $total;
+                        $school['outreach_message_count'] = max(0, (int) ($row['message_count'] ?? 0));
+                        $school['last_outreach_at'] = $row['last_sent_at'] ?? null;
+
+                        // Dashboard cards only need identity/display fields. openGlobalSchool()
+                        // resolves the full instant roster from the v10.112.3 browser catalog.
+                        unset($school['coaches'], $school['staff'], $school['coaching_staff'], $school['contacts']);
+
+                        return $school;
+                    })
+                    ->filter(fn (array $school): bool => (int) ($school['outreach_contacted_coaches'] ?? 0) > 0)
+                    ->sort(function (array $a, array $b): int {
+                        $match = (int) ($b['outreach_match_percentage'] ?? 0) <=> (int) ($a['outreach_match_percentage'] ?? 0);
+                        if ($match !== 0) {
+                            return $match;
+                        }
+
+                        $contacted = (int) ($b['outreach_contacted_coaches'] ?? 0) <=> (int) ($a['outreach_contacted_coaches'] ?? 0);
+                        if ($contacted !== 0) {
+                            return $contacted;
+                        }
+
+                        return strcmp((string) ($b['last_outreach_at'] ?? ''), (string) ($a['last_outreach_at'] ?? ''));
+                    })
+                    ->take(12)
+                    ->values()
+                    ->all();
+            }
+        );
+    }
+
+    /**
+     * Rank only schools with real tracked interest, highest engagement first.
+     * Engagement = tracked profile views + tracked social/link clicks.
+     */
     public function getDashboardMostInterestedSchoolsProperty(): array
     {
         $schools = collect($this->allSchools())
@@ -10090,24 +10279,15 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
             $school = ($schoolId !== '' ? $byBusinessId->get($schoolId) : null)
                 ?? ($schoolKey !== '' ? $byName->get($schoolKey) : null);
 
-            if (! is_array($school) && $schoolName === '' && $schoolId === '') {
+            // The local gender-scoped catalog is authoritative. Do not create synthetic
+            // schools from old tracking/snapshot data that the athlete cannot currently see.
+            if (! is_array($school)) {
                 return null;
             }
 
-            if (! is_array($school)) {
-                $school = [
-                    'id' => $schoolId !== '' ? $schoolId : md5(strtolower($schoolName)),
-                    'business_id' => $schoolId,
-                    'name' => $schoolName !== '' ? $schoolName : 'School',
-                    'conference' => '',
-                    'division' => '',
-                    'logo_url' => $row['logo'] ?? $row['logo_url'] ?? null,
-                ];
-            }
-
-            $canonicalId = trim((string) ($school['id'] ?? $school['business_id'] ?? $school['company_id'] ?? ''));
+            $canonicalId = trim((string) ($school['id'] ?? $school['school_id'] ?? ''));
             if ($canonicalId === '') {
-                $canonicalId = md5(strtolower(trim((string) ($school['name'] ?? $schoolName))));
+                return null;
             }
 
             return ['key' => $canonicalId, 'school' => $school];
@@ -10148,26 +10328,30 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
                 $school = is_array($row['school'] ?? null) ? $row['school'] : [];
                 $views = max(0, (int) ($row['profile_views'] ?? 0));
                 $clicks = max(0, (int) ($row['engagement_clicks'] ?? 0));
+                $engagements = $views + $clicks;
 
                 $school['profile_views'] = $views;
                 $school['interest_clicks'] = $clicks;
-                // Ranking can use click activity as a secondary signal, while
-                // the number rendered on the dashboard remains profile views.
-                $school['interest_rank_score'] = ($views * 1000000) + $clicks;
-                $school['lead_score'] = $school['interest_rank_score'];
+                $school['engagement_count'] = $engagements;
+                $school['interest_rank_score'] = $engagements;
 
                 return $school;
             })
-            ->filter(fn (array $school): bool => (int) ($school['profile_views'] ?? 0) > 0 || (int) ($school['interest_clicks'] ?? 0) > 0)
+            ->filter(fn (array $school): bool => (int) ($school['engagement_count'] ?? 0) > 0)
             ->sort(function (array $a, array $b): int {
+                $engagements = (int) ($b['engagement_count'] ?? 0) <=> (int) ($a['engagement_count'] ?? 0);
+                if ($engagements !== 0) {
+                    return $engagements;
+                }
+
                 $views = (int) ($b['profile_views'] ?? 0) <=> (int) ($a['profile_views'] ?? 0);
                 if ($views !== 0) {
                     return $views;
                 }
 
-                return (int) ($b['interest_clicks'] ?? 0) <=> (int) ($a['interest_clicks'] ?? 0);
+                return strcasecmp((string) ($a['name'] ?? ''), (string) ($b['name'] ?? ''));
             })
-            ->take(5)
+            ->take(20)
             ->values()
             ->all();
     }
@@ -12304,6 +12488,7 @@ protected function ensureComposeBodyHasFooter(): void
                     sendResult: $result,
                     renderedHtml: $trackedBody,
                 );
+                Cache::forget($this->dashboardOutreachRadarCacheKey($user));
 
                 $this->prependDashboardActivity([
                     'type' => 'email_sent',
