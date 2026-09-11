@@ -61,6 +61,9 @@ trait InteractsWithCoachDatabase
     protected ?array $dashboardTrackingStatsMemo = null;
     protected ?array $dashboardMetricsMemo = null;
 
+    /** @var array<string, array> */
+    protected array $inboxSchoolRowMemo = [];
+
     public bool $allowed = false;
     public bool $locked = false;
     public bool $isRecruitingAccountReady = false;
@@ -489,36 +492,19 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
+        // v10.113: entering Inbox is deliberately split into a fast paint and an
+        // optional message refresh. The first request never waits on a conversation-message
+        // API call. Cached rows/messages paint immediately; the browser asks for a stale or
+        // missing thread only after that response has reached the screen.
+        $hadMessagesBeforePrime = ! empty($this->messages);
         $hasCachedInbox = $this->primeInboxFromCacheForNavigation();
         $this->inboxInitialLoadCompleted = $hasCachedInbox;
+        $hydratedMessagesDuringPrime = ! $hadMessagesBeforePrime && ! empty($this->messages);
 
-        // v10.103.10: the Inbox list may be cached while the default selected thread has
-        // never had its messages cached. In that case the old fast path skipped rendering
-        // and returned with a selected coach but an empty message pane. Treat the default
-        // selection exactly like a manual conversation click: hydrate its cached messages
-        // first, then fetch the latest page in this same Inbox-entry request only when the
-        // thread cache is empty.
-        if ($hasCachedInbox && $this->selectedConversationId && empty($this->messages)) {
-            $this->hydrateCachedConversationMessages((string) $this->selectedConversationId);
-
-            if (empty($this->messages)) {
-                $this->isLoadingConversationMessages = true;
-                $this->isRefreshingRemoteData = false;
-                $this->activeUiOperation = 'Loading messages';
-                $this->loadConversationMessages(true);
-
-                // Do not skip this render. The response contains the default thread that
-                // was missing from the already-mounted Inbox panel.
-                $this->dispatch('rc-section-switched', section: 'conversations');
-                return;
-            }
-        }
-
-        // When both the cached Inbox rows and the selected thread are already available,
-        // there is nothing to morph. Keep this request renderless so revisiting Inbox stays
-        // instant and does not repaint the panel.
         if ($hasCachedInbox) {
-            if (method_exists($this, 'skipRender')) {
+            // If this request did not hydrate any new visible state, avoid morphing the giant
+            // Recruiting Center tree. The already-mounted cached Inbox can be shown as-is.
+            if (! $hydratedMessagesDuringPrime && method_exists($this, 'skipRender')) {
                 $this->skipRender();
             }
 
@@ -526,9 +512,9 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        // First-ever Inbox visit has no conversation cache to display. Fetch the Inbox once;
-        // loadConversations() already selects the first row and loads that row's messages
-        // when no cached thread exists.
+        // Cold Inbox: fetch only the small conversation summary page. loadConversations()
+        // selects/hydrates the first cached thread when available, but no longer performs a
+        // second sequential HighLevel request for its messages.
         $this->inboxInitialLoadCompleted = true;
         $this->loadConversations();
         $this->dispatch('rc-section-switched', section: 'conversations');
@@ -1296,15 +1282,7 @@ trait InteractsWithCoachDatabase
             return;
         }
 
-        if (empty($this->messages)) {
-            $this->hydrateCachedConversationMessages($conversationId);
-        }
-
-        if (! empty($this->messages)) {
-            return;
-        }
-
-        $this->loadConversationMessages(true);
+        $this->refreshConversationMessagesIfStale($conversationId);
     }
 
     public function pollDeferredUiData(): void
@@ -1714,7 +1692,7 @@ trait InteractsWithCoachDatabase
         $this->loadConversations();
 
         if ($this->selectedConversationId) {
-            $this->loadConversationMessages(true);
+            $this->loadConversationMessages(true, preserveVisibleMessages: ! empty($this->messages));
         }
 
         $this->isLoadingConversations = false;
@@ -3521,6 +3499,12 @@ trait InteractsWithCoachDatabase
 
     protected function cacheInboxConversations(array $rows): void
     {
+        $rows = collect($rows)
+            ->filter(fn ($row): bool => is_array($row))
+            ->map(fn (array $row): array => $this->normalizeInboxConversationSummary($row))
+            ->values()
+            ->all();
+
         Cache::put($this->conversationInboxCacheKey(), [
             'rows' => $rows,
             'cached_at' => now()->toIso8601String(),
@@ -3546,6 +3530,7 @@ trait InteractsWithCoachDatabase
         if (is_array($cached) && is_array($cached['rows'] ?? null)) {
             $this->conversations = collect($cached['rows'])
                 ->filter(fn ($row): bool => is_array($row))
+                ->map(fn (array $row): array => $this->normalizeInboxConversationSummary($row))
                 ->values()
                 ->all();
         }
@@ -3746,7 +3731,7 @@ trait InteractsWithCoachDatabase
                 $row['last_message'] = trim(strip_tags((string) ($row['last_message'] ?? $row['snippet'] ?? '')));
                 $row['unread_count'] = (int) ($row['unread_count'] ?? 0);
 
-                return $row;
+                return $this->normalizeInboxConversationSummary($row);
             })
             ->sortByDesc(function (array $row): int {
                 $value = $row['last_message_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? null;
@@ -3817,12 +3802,9 @@ trait InteractsWithCoachDatabase
                 }
             }
 
-            // v10.77: A newly loaded Inbox must not stop at a selected conversation
-            // with an empty message pane. If there is no cached thread yet, fetch the
-            // selected first conversation now so it is populated without another click.
-            if ($this->selectedConversationId && empty($this->messages)) {
-                $this->loadConversationMessages(true);
-            }
+            // v10.113: do not fetch the selected thread here. A cold Inbox used to do
+            // two sequential GHL calls (conversation list, then first thread) before Livewire
+            // could paint. The browser now requests a missing/stale thread after this response.
         } catch (\Throwable $exception) {
             Log::warning('Unable to load GHL conversations for inbox.', [
                 'user_id' => $user->id,
@@ -4548,6 +4530,15 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     protected function selectedConversationCoachRow(): ?array
     {
         $conversation = $this->selectedConversationRow();
+
+        // v10.113: Inbox rows are enriched once when the 50-row summary page is loaded.
+        // Reuse that matched local coach instead of rebuilding allCoaches() for every
+        // selected-thread action (reply, star, school actions, etc.).
+        $localCoach = is_array($conversation['local_coach'] ?? null) ? $conversation['local_coach'] : null;
+        if (is_array($localCoach) && ! empty($localCoach)) {
+            return $localCoach;
+        }
+
         $contactId = trim((string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? ''));
         $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
 
@@ -4569,6 +4560,94 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         return null;
+    }
+
+    /**
+     * Resolve only the selected Inbox conversation back to a canonical local school.
+     * This replaces the Blade-side allSchools() scan that made every Inbox morph rebuild
+     * the complete Recruiting Center catalog.
+     */
+    public function resolveInboxSchoolForConversation(?array $conversation): array
+    {
+        if (! is_array($conversation) || empty($conversation)) {
+            return [];
+        }
+
+        $user = Auth::user();
+        $localCoach = is_array($conversation['local_coach'] ?? null) ? $conversation['local_coach'] : [];
+        $localSchool = is_array($conversation['local_school'] ?? null) ? $conversation['local_school'] : [];
+        $fallbackName = trim((string) (
+            $localSchool['name']
+            ?? $conversation['school']
+            ?? $conversation['company_name']
+            ?? $localCoach['school']
+            ?? ''
+        ));
+
+        if (! $user) {
+            return array_merge($localSchool, ['name' => $fallbackName]);
+        }
+
+        $candidates = collect([
+            $localSchool['id'] ?? null,
+            $localCoach['school_id'] ?? null,
+            $conversation['school_id'] ?? null,
+            $localSchool['business_id'] ?? null,
+            $conversation['business_id'] ?? null,
+            $conversation['company_id'] ?? null,
+            $conversation['ghl_business_id'] ?? null,
+            $fallbackName,
+        ])->map(fn ($value): string => trim((string) $value))->filter()->unique()->values();
+
+        foreach ($candidates as $candidate) {
+            if (array_key_exists($candidate, $this->inboxSchoolRowMemo)) {
+                return $this->inboxSchoolRowMemo[$candidate];
+            }
+
+            try {
+                $school = app(LocalRecruitingDatabaseService::class)->schoolRow($user, $candidate);
+            } catch (\Throwable $exception) {
+                Log::debug('Unable to resolve selected Inbox school locally.', [
+                    'user_id' => $user->getKey(),
+                    'candidate' => $candidate,
+                    'error' => $exception->getMessage(),
+                ]);
+                $school = null;
+            }
+
+            if (is_array($school) && ! empty($school)) {
+                foreach ($candidates as $memoKey) {
+                    $this->inboxSchoolRowMemo[$memoKey] = $school;
+                }
+                return $school;
+            }
+        }
+
+        $fallbackId = trim((string) (
+            $localSchool['id']
+            ?? $localCoach['school_id']
+            ?? $conversation['school_id']
+            ?? $conversation['business_id']
+            ?? ''
+        ));
+
+        return array_merge([
+            'id' => $fallbackId,
+            'school_id' => $fallbackId,
+            'name' => $fallbackName,
+            'logo_url' => trim((string) (
+                $localSchool['logo_url']
+                ?? $conversation['school_logo_url']
+                ?? $conversation['logo_url']
+                ?? $localCoach['school_logo_url']
+                ?? ''
+            )),
+            'conference' => $localSchool['conference'] ?? $conversation['conference'] ?? $localCoach['conference'] ?? '',
+            'division' => $localSchool['division'] ?? $conversation['division'] ?? $localCoach['division'] ?? '',
+            'coaches' => ! empty($localCoach) ? [$localCoach] : [],
+            'is_favorite' => false,
+            'list_keys' => [],
+        ], $localSchool);
     }
 
     public function openSelectedConversationInComposer(): void
@@ -5547,6 +5626,138 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return 'outbound';
     }
 
+    /**
+     * Resolve the direction of the most recent conversation-summary message. Unlike
+     * normalizeCommunicationDirection(), unknown is kept neutral here so the Needs Reply
+     * filter never falsely classifies an ambiguous summary as outbound.
+     */
+    protected function inboxConversationDirection(array $row): string
+    {
+        $raw = strtolower(trim((string) (
+            $row['last_message_direction']
+            ?? $row['lastMessageDirection']
+            ?? $row['direction']
+            ?? $row['message_direction']
+            ?? $row['messageDirection']
+            ?? data_get($row, 'last_message.direction')
+            ?? data_get($row, 'lastMessage.direction')
+            ?? $row['last_message_type']
+            ?? ''
+        )));
+
+        $inboundFlag = (bool) (
+            $row['last_message_inbound']
+            ?? $row['lastMessageInbound']
+            ?? $row['is_inbound']
+            ?? $row['isInbound']
+            ?? false
+        );
+        $outboundFlag = (bool) (
+            $row['last_message_outbound']
+            ?? $row['lastMessageOutbound']
+            ?? $row['is_outbound']
+            ?? $row['isOutbound']
+            ?? false
+        );
+
+        if ($inboundFlag
+            || str_contains($raw, 'inbound')
+            || str_contains($raw, 'incoming')
+            || in_array($raw, ['in', 'received', 'receive'], true)) {
+            return 'inbound';
+        }
+
+        if ($outboundFlag
+            || str_contains($raw, 'outbound')
+            || str_contains($raw, 'outgoing')
+            || in_array($raw, ['out', 'sent', 'send'], true)) {
+            return 'outbound';
+        }
+
+        return 'unknown';
+    }
+
+    protected function normalizeInboxConversationSummary(array $row): array
+    {
+        $direction = $this->inboxConversationDirection($row);
+        if ($direction !== 'unknown') {
+            $row['last_message_direction'] = $direction;
+        }
+
+        // Incoming / Needs Reply means the latest known message came from the coach.
+        // Unread is only a fallback when an older cached/API row has no direction field.
+        $row['awaiting_reply'] = $direction === 'inbound'
+            || ($direction === 'unknown' && (int) ($row['unread_count'] ?? 0) > 0);
+
+        return $row;
+    }
+
+    protected function syncConversationAwaitingReplyFromLoadedMessages(string $conversationId): void
+    {
+        $conversationId = trim($conversationId);
+        if ($conversationId === '' || empty($this->messages)) {
+            return;
+        }
+
+        // Prefer the actual newest loaded message over summary metadata. Some older GHL
+        // conversation summaries omit lastMessage.direction even though the message payload
+        // itself contains a reliable inbound/outbound direction. This makes the Incoming
+        // filter stay correct after a thread is opened/read without fetching every thread.
+        $latest = collect($this->messages)
+            ->filter(fn ($row): bool => is_array($row))
+            ->sortByDesc(function (array $row): int {
+                return $this->communicationTimestamp(
+                    $row['created_at']
+                    ?? $row['createdAt']
+                    ?? $row['date']
+                    ?? $row['messageDate']
+                    ?? $row['dateAdded']
+                    ?? null
+                );
+            })
+            ->first();
+
+        if (! is_array($latest)) {
+            return;
+        }
+
+        $direction = strtolower(trim((string) ($latest['direction'] ?? '')));
+        if (! in_array($direction, ['inbound', 'outbound'], true)) {
+            return;
+        }
+
+        $changed = false;
+        $this->conversations = collect($this->conversations ?? [])
+            ->map(function ($row) use ($conversationId, $direction, $latest, &$changed) {
+                if (! is_array($row) || (string) ($row['id'] ?? '') !== $conversationId) {
+                    return $row;
+                }
+
+                $awaitingReply = $direction === 'inbound';
+                if (($row['last_message_direction'] ?? null) !== $direction
+                    || (bool) ($row['awaiting_reply'] ?? false) !== $awaitingReply) {
+                    $changed = true;
+                }
+
+                $row['last_message_direction'] = $direction;
+                $row['direction'] = $direction;
+                $row['awaiting_reply'] = $awaitingReply;
+
+                $latestAt = trim((string) ($latest['created_at'] ?? ''));
+                if ($latestAt !== '') {
+                    $row['last_message_at'] = $latestAt;
+                }
+
+                return $row;
+            })
+            ->values()
+            ->all();
+
+        if ($changed) {
+            $this->cacheInboxConversations($this->conversations);
+        }
+    }
+
     protected function communicationPreviewText(string $value): string
     {
         $text = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?: '');
@@ -5596,11 +5807,9 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // v10.103.9: selecting a thread and obtaining its messages is one Livewire
-        // request. The previous two-request chain rendered an empty thread after the
-        // selection response, then fetched the messages in a second request. That is
-        // what caused "No messages" to flash for a few seconds before the real thread
-        // appeared.
+        // v10.113: make the selection request local/cache-only. The browser paints the
+        // selected coach and any cached messages first, then asks for a stale/missing page
+        // in a second request. This removes GHL latency from the actual click response.
         $hadUnread = collect($this->conversations ?? [])->contains(function ($row) use ($conversationId): bool {
             return is_array($row)
                 && (string) ($row['id'] ?? '') === $conversationId
@@ -5612,21 +5821,15 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->hasMoreMessages = false;
         $this->messages = [];
 
-        $cachedEnvelope = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
         $hasCachedMessages = $this->hydrateCachedConversationMessages($conversationId);
-        $cacheIsFresh = false;
-
-        if ($hasCachedMessages && is_array($cachedEnvelope) && filled($cachedEnvelope['cached_at'] ?? null)) {
-            try {
-                $cacheIsFresh = \Illuminate\Support\Carbon::parse((string) $cachedEnvelope['cached_at'])
-                    ->greaterThanOrEqualTo(now()->subSeconds(90));
-            } catch (\Throwable) {
-                $cacheIsFresh = false;
-            }
-        }
+        $this->isLoadingConversationMessages = ! $hasCachedMessages;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
+                // Read/unread is independent from Needs Reply. Opening an inbound thread
+                // must not make it disappear from the Incoming filter.
                 $row['unread_count'] = 0;
                 $row['status'] = 'Open';
             }
@@ -5634,24 +5837,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         })->values()->all();
         $this->cacheInboxConversations($this->conversations);
 
-        // A very recent cached thread can be returned immediately. Otherwise fetch
-        // the latest message page now, inside this same request. When an older cache
-        // exists, keep it in memory while the refresh runs so no empty state is ever
-        // produced by the server.
-        if (! $cacheIsFresh) {
-            $this->isLoadingConversationMessages = ! $hasCachedMessages;
-            $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = $hasCachedMessages ? null : 'Loading messages';
-            $this->loadConversationMessages(true, preserveVisibleMessages: $hasCachedMessages);
-        } else {
-            $this->isLoadingConversationMessages = false;
-            $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = null;
-        }
-
-        // Marking a conversation read in HighLevel is not required before the thread
-        // can be shown. Send that network request only after Laravel has returned the
-        // Livewire response so it cannot add another second or two to opening a thread.
+        // Marking read in GHL is not required to paint the thread. Keep that request after
+        // the Livewire response so it cannot delay the user's click.
         if ($hadUnread && ($user = Auth::user())) {
             app()->terminating(function () use ($user, $conversationId): void {
                 try {
@@ -5664,6 +5851,43 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 }
             });
         }
+    }
+
+    protected function inboxMessageCacheIsFresh(string $conversationId, int $seconds = 180): bool
+    {
+        $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
+        if (! is_array($cached) || ! is_array($cached['rows'] ?? null) || blank($cached['cached_at'] ?? null)) {
+            return false;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse((string) $cached['cached_at'])
+                ->greaterThanOrEqualTo(now()->subSeconds($seconds));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public function refreshConversationMessagesIfStale(string $conversationId): void
+    {
+        $conversationId = trim($conversationId);
+        if ($conversationId === '' || (string) $this->selectedConversationId !== $conversationId) {
+            return;
+        }
+
+        $hasCachedMessages = ! empty($this->messages);
+        if (! $hasCachedMessages) {
+            $hasCachedMessages = $this->hydrateCachedConversationMessages($conversationId);
+        }
+
+        if ($this->inboxMessageCacheIsFresh($conversationId)) {
+            $this->isLoadingConversationMessages = false;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = null;
+            return;
+        }
+
+        $this->loadConversationMessages(true, preserveVisibleMessages: $hasCachedMessages);
     }
 
     public function refreshConversationMessagesForClient(string $conversationId): void
@@ -5875,6 +6099,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 'has_more' => $this->hasMoreMessages,
                 'cached_at' => now()->toIso8601String(),
             ], now()->addMinutes(10));
+
+            $this->syncConversationAwaitingReplyFromLoadedMessages($conversationId);
 
             // v10.103.6: do not launch a second detached message sync after a
             // successful direct Inbox fetch. That duplicate refresh caused another
@@ -6196,6 +6422,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
     $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
+
+    $this->syncConversationAwaitingReplyFromLoadedMessages($conversationId);
 
     return ! empty($this->messages);
 }
@@ -6587,6 +6815,28 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                 'has_more' => $this->hasMoreMessages,
                 'cached_at' => now()->toIso8601String(),
             ], now()->addMinutes(10));
+
+            // The newest message is now ours, so this thread has been answered. Keep the
+            // conversation summary/cache in sync immediately; the Incoming filter should
+            // remove it without waiting for the next GHL refresh.
+            $now = now()->toIso8601String();
+            $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId, $bodyText, $now) {
+                if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
+                    $row['last_message'] = $bodyText;
+                    $row['snippet'] = $bodyText;
+                    $row['last_message_at'] = $now;
+                    $row['updated_at'] = $now;
+                    $row['last_message_direction'] = 'outbound';
+                    $row['direction'] = 'outbound';
+                    $row['awaiting_reply'] = false;
+                    $row['unread_count'] = 0;
+                    $row['replied'] = true;
+                    $row['has_reply'] = true;
+                }
+
+                return $row;
+            })->sortByDesc(fn ($row) => is_array($row) ? $this->communicationTimestamp($row['last_message_at'] ?? $row['updated_at'] ?? null) : 0)->values()->all();
+            $this->cacheInboxConversations($this->conversations);
 
             $this->quickReplyBody = '';
             $this->quickReplyAttachments = [];
@@ -13107,13 +13357,13 @@ HTML;
             return;
         }
 
-        // v132: Recruiting Center uses a persistent Livewire shell. Redirecting to
-        // ?school= only updates the URL; mount() does not run again, so Compose can
-        // open with an empty school field. Switch sections in-place and select the
-        // canonical local school during the same Livewire request.
-        if ($this->section !== 'compose') {
-            $this->switchRecruitingSection('compose');
-        }
+        // v10.113: the browser activates the already-mounted Compose panel immediately.
+        // Do not call the renderless switchRecruitingSection() from inside this normal
+        // action; that nested server-only switch was never mirrored into the client-side
+        // persistent navigation state, so the school drawer appeared to do nothing.
+        $this->section = 'compose';
+        $this->campaignTargetMode = $this->campaignTargetMode ?: 'list';
+        $this->ensureComposeBodyHasFooter();
 
         $result = $this->selectComposeSchool($schoolId);
 
@@ -13131,6 +13381,7 @@ HTML;
             schoolId: (string) ($result['school_id'] ?? $schoolId),
             schoolName: (string) ($result['school_name'] ?? ''),
         );
+        $this->dispatch('rc-section-switched', section: 'compose');
     }
 
     public function composeEmailCoach(string $coachId): void
@@ -13869,6 +14120,8 @@ HTML;
 
         if ($statusFilter === 'unread') {
             $base = $base->filter(fn (array $conversation): bool => (int) ($conversation['unread_count'] ?? 0) > 0);
+        } elseif ($statusFilter === 'incoming') {
+            $base = $base->filter(fn (array $conversation): bool => (bool) ($conversation['awaiting_reply'] ?? false));
         } elseif ($statusFilter === 'starred') {
             $base = $base->filter(fn (array $conversation): bool => (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false));
         }

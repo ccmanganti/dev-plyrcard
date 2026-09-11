@@ -55,19 +55,27 @@
                 this.freeGateOpen = false;
             },
             openInboxSection() {
-                // v10.103.10: Inbox already paints its cached/default selection locally.
-                // Only cover the message pane when that selected thread has no rendered
-                // messages yet. enterInboxSection() will now fetch that default thread in
-                // the same request when its message cache is missing.
-                const hasRenderedMessages = !!document.querySelector(
-                    '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
-                );
+                // v10.113: paint cached Inbox state first; refresh the selected thread only
+                // after the first response reaches the browser. A cold Inbox therefore avoids
+                // two sequential GHL calls before anything can appear on screen.
+                const selector = '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56';
+                const hasRenderedMessages = !!document.querySelector(selector);
 
                 if (!hasRenderedMessages) {
                     document.documentElement.setAttribute('data-rc-inbox-loading', 'default');
                 }
 
                 return Promise.resolve(this.$wire.enterInboxSection())
+                    .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
+                    .then(() => {
+                        const hasMessagesNow = !!document.querySelector(selector);
+                        if (hasMessagesNow) {
+                            document.documentElement.removeAttribute('data-rc-inbox-loading');
+                        } else {
+                            document.documentElement.setAttribute('data-rc-inbox-loading', 'default');
+                        }
+                        return this.$wire.ensureInboxConversationLoaded();
+                    })
                     .finally(() => document.documentElement.removeAttribute('data-rc-inbox-loading'));
             },
 discoverSelectedIds: [],
@@ -589,6 +597,27 @@ discoverSelectedIds: [],
                 } finally {
                     this.discoverCreatingList = false;
                 }
+            },
+            openComposeForSchool(schoolId) {
+                const id = String(schoolId || '').trim();
+                if (!id) return;
+
+                const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
+                this.closeDiscoverSchool();
+
+                // Activate the already-mounted Compose panel synchronously. The Livewire
+                // call below only attaches the canonical school to the compose form.
+                if (typeof window.__plyrRcActivateSectionClientOnly === 'function') {
+                    window.__plyrRcActivateSectionClientOnly('compose', href, false);
+                } else {
+                    this.activeSection = 'compose';
+                    this.$el.dataset.rcCurrentSection = 'compose';
+                    window.dispatchEvent(new CustomEvent('rc-client-section', { detail: { section: 'compose' } }));
+                    const target = new URL(href, window.location.href);
+                    window.history.pushState({ ...(window.history.state || {}), rcSection: 'compose' }, '', target.pathname + target.search + target.hash);
+                }
+
+                return Promise.resolve(this.$wire.composeEmailSchool(id));
             },
             closeDiscoverSchool() {
                 window.__plyrSchoolDrawerOptimistic = null;
@@ -10100,15 +10129,28 @@ discoverSelectedIds: [],
                 }
                 $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
                 $selectedEmail = strtolower(trim((string) ($selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '')));
-                $selectedCoach = null;
-                if ($selectedContactId !== '') {
-                    $selectedCoach = collect($this->allCoaches())->firstWhere('id', $selectedContactId);
+
+                // v10.113: conversation rows are already enriched in one batched local query.
+                // Reuse that data here instead of calling allCoaches()/allSchools() during
+                // every Inbox Livewire morph.
+                $selectedCoach = is_array($selectedConversation['local_coach'] ?? null)
+                    ? $selectedConversation['local_coach']
+                    : [];
+                if (empty($selectedCoach)) {
+                    $selectedCoach = [
+                        'id' => $selectedContactId,
+                        'ghl_contact_id' => $selectedContactId,
+                        'name' => $selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? 'Coach',
+                        'email' => $selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '',
+                        'phone' => $selectedConversation['phone'] ?? '',
+                        'title' => $selectedConversation['title'] ?? 'Coach',
+                        'school' => $selectedConversation['school'] ?? $selectedConversation['company_name'] ?? 'School',
+                        'school_logo_url' => $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? '',
+                        'conference' => $selectedConversation['conference'] ?? '',
+                        'division' => $selectedConversation['division'] ?? '',
+                    ];
                 }
-                if (! $selectedCoach && $selectedEmail !== '') {
-                    $selectedCoach = collect($this->allCoaches())->first(function ($coach) use ($selectedEmail) {
-                        return strtolower(trim((string) ($coach['email'] ?? ''))) === $selectedEmail;
-                    });
-                }
+
                 $selectedName = (string) ($selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? data_get($selectedCoach, 'name') ?? 'Coach');
                 $selectedSchool = (string) ($selectedConversation['school'] ?? $selectedConversation['company_name'] ?? data_get($selectedCoach, 'school') ?? data_get($selectedCoach, 'company_name') ?? 'School');
                 $selectedTitle = (string) (data_get($selectedCoach, 'title') ?? $selectedConversation['title'] ?? 'Coach');
@@ -10116,44 +10158,19 @@ discoverSelectedIds: [],
                 $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
                 $selectedStarred = (bool) ($selectedConversation['starred'] ?? $selectedConversation['is_starred'] ?? false);
 
-                // v10.57: resolve the Inbox conversation back to the same canonical school row
-                // used by the global school slider. This keeps View School, Favorites and
-                // list membership behavior identical to the school drawer.
-                $selectedSchoolCandidateIds = collect([
-                    data_get($selectedCoach, 'school_id'),
-                    data_get($selectedCoach, 'business_id'),
-                    data_get($selectedCoach, 'ghl_business_id'),
-                    $selectedConversation['school_id'] ?? null,
-                    $selectedConversation['business_id'] ?? null,
-                    $selectedConversation['company_id'] ?? null,
-                    $selectedConversation['ghl_business_id'] ?? null,
-                ])->map(fn ($value) => trim((string) $value))->filter()->unique()->values();
+                $selectedInboxSchool = $this->resolveInboxSchoolForConversation(
+                    is_array($selectedConversation) ? $selectedConversation : null
+                );
 
-                $selectedInboxSchool = collect($this->allSchools())->first(function ($row) use ($selectedSchoolCandidateIds, $selectedSchool) {
-                    if (! is_array($row)) return false;
-                    $rowIds = collect([
-                        $row['id'] ?? null,
-                        $row['school_id'] ?? null,
-                        $row['business_id'] ?? null,
-                        $row['company_id'] ?? null,
-                        $row['ghl_business_id'] ?? null,
-                    ])->map(fn ($value) => trim((string) $value))->filter();
-
-                    if ($selectedSchoolCandidateIds->intersect($rowIds)->isNotEmpty()) return true;
-
-                    $rowName = trim((string) ($row['name'] ?? $row['school'] ?? $row['company_name'] ?? ''));
-                    return $selectedSchool !== '' && $rowName !== '' && strcasecmp($rowName, $selectedSchool) === 0;
-                });
-
-                if (! is_array($selectedInboxSchool)) {
+                if (! is_array($selectedInboxSchool) || empty($selectedInboxSchool)) {
                     $selectedInboxSchool = [
-                        'id' => (string) ($selectedSchoolCandidateIds->first() ?? ''),
-                        'school_id' => (string) ($selectedSchoolCandidateIds->first() ?? ''),
+                        'id' => '',
+                        'school_id' => '',
                         'name' => $selectedSchool,
                         'logo_url' => $selectedSchoolLogo,
                         'conference' => data_get($selectedCoach, 'conference') ?? $selectedConversation['conference'] ?? '',
                         'division' => data_get($selectedCoach, 'division') ?? $selectedConversation['division'] ?? '',
-                        'coaches' => $selectedCoach ? [$selectedCoach] : [],
+                        'coaches' => ! empty($selectedCoach) ? [$selectedCoach] : [],
                         'is_favorite' => false,
                         'list_keys' => [],
                     ];
@@ -10183,16 +10200,13 @@ discoverSelectedIds: [],
                     return strtoupper(collect(explode(' ', trim($name)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 };
                 $threadLogo = function (array $conversation) {
-                    $contactId = (string) ($conversation['contact_id'] ?? $conversation['contactId'] ?? '');
-                    $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
-                    $coach = null;
-                    if ($contactId !== '') {
-                        $coach = collect($this->allCoaches())->firstWhere('id', $contactId);
-                    }
-                    if (! $coach && $email !== '') {
-                        $coach = collect($this->allCoaches())->first(fn($row) => strtolower(trim((string) ($row['email'] ?? ''))) === $email);
-                    }
-                    return trim((string) ($conversation['school_logo_url'] ?? $conversation['logo_url'] ?? data_get($coach, 'school_logo_url') ?? data_get($coach, 'business_logo_url') ?? data_get($coach, 'logo_url') ?? ''));
+                    return trim((string) (
+                        $conversation['school_logo_url']
+                        ?? $conversation['logo_url']
+                        ?? data_get($conversation, 'local_school.logo_url')
+                        ?? data_get($conversation, 'local_coach.school_logo_url')
+                        ?? ''
+                    ));
                 };
                 $formatInboxDate = function ($value): string {
                     if (! $value) { return ''; }
@@ -10679,6 +10693,7 @@ CSS;
 
             <style id="rc-inbox-unread-status-v73">
                 .rc-thread-unread-dot-v56{width:.62rem!important;height:.62rem!important;border-radius:999px!important;background:#ff6338!important;box-shadow:0 0 0 3px rgba(255,99,56,.14)!important;}
+                .rc-thread-status-v56.is-incoming{color:#ff6338!important;background:rgba(255,99,56,.11)!important;}
                 .rc-inbox-icon-btn-v56.is-unread{color:#ff6338!important;background:rgba(255,99,56,.11)!important;border-color:rgba(255,99,56,.28)!important;}
                 .rc-message-status-v56.is-opened{color:#16a34a!important;}
                 .rc-message-status-v56.is-error{color:#dc2626!important;}
@@ -10711,6 +10726,11 @@ CSS;
                                 Unread
                                 @php $unreadConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (int) ($row['unread_count'] ?? 0) > 0)->count(); @endphp
                                 <span wire:key="unread-count-{{ $unreadConversationCount }}">{{ $unreadConversationCount }}</span>
+                            </button>
+                            <button type="button" class="{{ $filterStatus === 'incoming' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'incoming')">
+                                Incoming
+                                @php $incomingConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['awaiting_reply'] ?? false))->count(); @endphp
+                                <span wire:key="incoming-count-{{ $incomingConversationCount }}">{{ $incomingConversationCount }}</span>
                             </button>
                             <button type="button" class="{{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">
                                 Starred
@@ -10747,10 +10767,26 @@ CSS;
                                     document.documentElement.setAttribute('data-rc-inbox-loading', id);
                                     this.selectedConversationId = id;
 
-                                    // v10.103.9: one request only. selectConversation() now selects the
-                                    // coach and returns the latest/cached messages in the same response.
-                                    // Do not render an empty selection first and then launch another request.
+                                    // v10.113: selection is local/cache-only, so the selected coach and
+                                    // cached thread paint without waiting on GHL. Only after that response do
+                                    // we refresh a stale/missing thread. Cached messages stay visible while
+                                    // the second request runs.
                                     Promise.resolve(this.$wire.selectConversation(id))
+                                        .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
+                                        .then(() => {
+                                            if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
+                                                document.documentElement.removeAttribute('data-rc-inbox-loading');
+                                            }
+
+                                            const hasRenderedMessages = !!document.querySelector(
+                                                '[data-rc-client-section=conversations] [data-rc-inbox-message-stream] .rc-inbox-message-v56'
+                                            );
+                                            if (!hasRenderedMessages) {
+                                                document.documentElement.setAttribute('data-rc-inbox-loading', id);
+                                            }
+
+                                            return this.$wire.refreshConversationMessagesIfStale(id);
+                                        })
                                         .finally(() => {
                                             if (document.documentElement.getAttribute('data-rc-inbox-loading') === id) {
                                                 document.documentElement.removeAttribute('data-rc-inbox-loading');
@@ -10770,7 +10806,10 @@ CSS;
                                     $isSelectedThread = $selectedConversationId === $inboxConversationId;
                                     $unreadCount = (int) ($inboxConversation['unread_count'] ?? 0);
                                     $isStarredThread = (bool) ($inboxConversation['starred'] ?? $inboxConversation['is_starred'] ?? false);
-                                    $statusLabel = $unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened');
+                                    $isIncomingThread = (bool) ($inboxConversation['awaiting_reply'] ?? false);
+                                    $statusLabel = $isIncomingThread
+                                        ? 'Incoming'
+                                        : ($unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened'));
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
                                 <button type="button" class="rc-thread-card-v56" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
@@ -10785,7 +10824,7 @@ CSS;
                                         <span class="rc-thread-name-v56">{{ $inboxContactName }}</span>
                                         <span class="rc-thread-school-v56">{{ $inboxSchoolLine }}</span>
                                         <span class="rc-thread-preview-v56">{{ $inboxLastMessage }}</span>
-                                        <span class="rc-thread-status-v56 {{ $statusLabel === 'Opened' ? 'is-opened' : '' }}">{{ $statusLabel }}</span>
+                                        <span class="rc-thread-status-v56 {{ $statusLabel === 'Incoming' ? 'is-incoming' : ($statusLabel === 'Opened' ? 'is-opened' : '') }}">{{ $statusLabel }}</span>
                                     </span>
                                     <span class="rc-thread-card-side-v56">
                                         <span class="rc-thread-date-v56">{{ $inboxDate }}</span>
@@ -12895,7 +12934,7 @@ CSS;
                 </div>
 
                 <div class="rc-school-modal-actions-v72">
-                    <button class="rc-school-action rc-school-action-primary" type="button" x-on:click="if (optimisticSchool?.id) $wire.composeEmailSchool(String(optimisticSchool.id))">
+                    <button class="rc-school-action rc-school-action-primary" type="button" x-on:click="openComposeForSchool(optimisticSchool?.id)">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         <span>Email Coaches</span>
                     </button>
@@ -15615,11 +15654,13 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         setPageChrome(section);
     };
 
-    const switchSection = (section, href = null, replace = false) => {
+    // v10.113: share the synchronous browser half of Recruiting Center navigation
+    // with contextual actions such as Discover School -> Email Coaches. Those actions
+    // already have their own Livewire method and must not trigger a second section-sync call.
+    const activateSectionClientOnly = (section, href = null, replace = false) => {
         const root = currentRoot();
         if (!root || !section) return false;
 
-        const alreadyActive = root.dataset.rcCurrentSection === section;
         root.dataset.rcCurrentSection = section;
         if (section !== 'conversations') {
             document.documentElement.removeAttribute('data-rc-inbox-loading');
@@ -15631,8 +15672,6 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
         window.setTimeout(() => {
             if ((currentRoot()?.dataset?.rcCurrentSection || '') === section) setSidebarActive(section);
         }, 120);
-        // v10.103.3: swap the already-mounted panel synchronously. No request,
-        // loading state, or DOM morph sits between the click and the destination.
         window.dispatchEvent(new CustomEvent('rc-client-section', { detail: { section } }));
 
         if (href) {
@@ -15641,10 +15680,22 @@ window.rcSaveCoachDatabaseTemplate = window.rcSaveCoachDatabaseTemplate || (asyn
             window.history[historyFn]({ ...(window.history.state || {}), rcSection: section }, '', target.pathname + target.search + target.hash);
         }
 
+        return true;
+    };
+
+    window.__plyrRcActivateSectionClientOnly = activateSectionClientOnly;
+
+    const switchSection = (section, href = null, replace = false) => {
+        const root = currentRoot();
+        if (!root || !section) return false;
+
+        const alreadyActive = root.dataset.rcCurrentSection === section;
+        if (!activateSectionClientOnly(section, href, replace)) return false;
+
         if (alreadyActive || pendingSection === section) return true;
 
-        // v10.103.3: the destination is already visible now. This renderless
-        // Livewire call only synchronizes server-side section state and cached helpers.
+        // The destination is already visible now. This renderless Livewire call only
+        // synchronizes server-side section state and cached helpers.
         pendingSection = section;
         clearTimeout(pendingTimer);
         pendingTimer = window.setTimeout(() => { pendingSection = null; }, 3500);
