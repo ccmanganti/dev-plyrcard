@@ -14117,6 +14117,7 @@ CSS;
                 panelButtonLabel: '',
                 panelButtonUrl: '',
                 selectionHandler: null,
+                previewStaticTokens: @js($this->composePreviewTokenValues ?? []),
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -14127,8 +14128,7 @@ CSS;
                     this.$nextTick(() => this.bootEditor());
 
                     document.addEventListener('rc-open-template-preview', () => {
-                        this.syncNow();
-                        this.showPreview = true;
+                        this.openPreview();
                     });
 
                     window.addEventListener('rc-template-editor-refresh', (event) => {
@@ -14521,14 +14521,68 @@ CSS;
                 addTable() {
                     this.insertHtml('<table style="width:100%;border-collapse:collapse;margin:12px 0;"><tr><td style="border:1px solid #e5e7eb;padding:8px;">Label</td><td style="border:1px solid #e5e7eb;padding:8px;">Value</td></tr><tr><td style="border:1px solid #e5e7eb;padding:8px;">School</td><td style="border:1px solid #e5e7eb;padding:8px;">' + this.escapeHtml(this.mergeToken('SchoolName')) + '</td></tr></table>');
                 },
+                templatePreviewValues() {
+                    const current = this.previewStaticTokens || {};
+                    const athleteName = String(current.AthleteName || current.PlayerName || current.Name || 'Superadmin User');
+                    const gpa = String(current.GPA || current.Gpa || current.gpa || '4.0');
+                    const profileLink = String(current.ProfileLink || current.profileLink || '#profile-link');
+                    const highlightLink = String(current.HighlightLink || current.highlightLink || '#highlight-link');
+                    const instagramLink = String(current.InstagramLink || current.instagramLink || '#instagram');
+                    const youtubeLink = String(current.YouTubeLink || current.YoutubeLink || current.youtubeLink || '#youtube');
+                    const xLink = String(current.XLink || current.xLink || '#x');
+
+                    return {
+                        ...current,
+                        CoachName: 'Jordan Taylor',
+                        CoachFirstName: 'Jordan',
+                        CoachLastName: 'Taylor',
+                        CoachTitle: 'Head Coach',
+                        CoachEmail: 'coach@example.com',
+                        SchoolName: 'Sample University',
+                        AthleteName: athleteName,
+                        PlayerName: athleteName,
+                        GPA: gpa,
+                        Gpa: gpa,
+                        ProfileLink: profileLink,
+                        HighlightLink: highlightLink,
+                        InstagramLink: instagramLink,
+                        YouTubeLink: youtubeLink,
+                        YoutubeLink: youtubeLink,
+                        XLink: xLink,
+                    };
+                },
+                renderTemplatePreviewTokens(value) {
+                    let output = window.rcNormalizeCoachDatabaseMergeTokensInHtml
+                        ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(value || ''))
+                        : String(value || '');
+                    const values = this.templatePreviewValues();
+
+                    output = output.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, (_match, rawToken) => {
+                        const token = String(rawToken || '').trim();
+                        const exact = Object.prototype.hasOwnProperty.call(values, token) ? values[token] : undefined;
+                        if (exact !== undefined && exact !== null && String(exact) !== '') return String(exact);
+
+                        const foundKey = Object.keys(values).find((key) => key.toLowerCase() === token.toLowerCase());
+                        if (foundKey) return String(values[foundKey] ?? '');
+                        if (token.toLowerCase().startsWith('custom_values.')) return 'Custom value';
+                        return (_match || '');
+                    });
+
+                    return output;
+                },
+                openPreview() {
+                    this.syncNow();
+                    this.showPreview = true;
+                },
                 previewSubject() {
-                    return this.$refs.subject?.value || 'Subject preview';
+                    return this.renderTemplatePreviewTokens(this.$refs.subject?.value || 'Subject preview');
                 },
                 previewGraphic() {
                     return '';
                 },
                 previewHtml() {
-                    return this.$refs.editor ? this.$refs.editor.innerHTML : '';
+                    const source = this.$refs.editor ? this.$refs.editor.innerHTML : '';
+                    return this.renderTemplatePreviewTokens(source || '<p>Write your message to preview it here.</p>');
                 }
             };
         };
@@ -16288,16 +16342,32 @@ window.rcResetCoachDatabaseTemplateEditor = function () {
     }
 };
 
+window.rcFindCoachDatabaseLivewireComponent = function (startNode) {
+    let node = startNode && startNode.nodeType === 1 ? startNode : startNode?.parentElement;
+    while (node) {
+        if (node.hasAttribute && node.hasAttribute('wire:id')) return node;
+        node = node.parentElement;
+    }
+    return Array.from(document.querySelectorAll('*')).find((el) => el.hasAttribute && el.hasAttribute('wire:id')) || null;
+};
+
 window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const editor = window.rcVisibleCoachDatabaseTemplateEditor ? window.rcVisibleCoachDatabaseTemplateEditor() : document.querySelector('[data-plyr-template-editor]');
     const name = document.querySelector('[data-plyr-template-name]');
     const subject = document.querySelector('[data-plyr-template-subject]');
     const preview = document.querySelector('[data-plyr-template-preview]');
     if (!editor) return;
-    const root = editor.closest('[wire\:id]') || document.querySelector('.rc-livewire-root')?.closest?.('[wire\:id]');
+
+    const root = window.rcFindCoachDatabaseLivewireComponent ? window.rcFindCoachDatabaseLivewireComponent(editor) : null;
     const wireId = root?.getAttribute?.('wire:id');
-    const livewire = $wire || (wireId && window.Livewire?.find ? window.Livewire.find(wireId) : null);
-    if (!livewire || typeof livewire.call !== 'function') return;
+    const livewire = ($wire && typeof $wire.call === 'function')
+        ? $wire
+        : (wireId && window.Livewire?.find ? window.Livewire.find(wireId) : null);
+
+    if (!livewire || typeof livewire.call !== 'function') {
+        console.error('Template save failed: Livewire component was not found.');
+        return;
+    }
 
     // Force one final capture from the live contenteditable before the Livewire call.
     editor.dispatchEvent(new Event('input', { bubbles: true }));
