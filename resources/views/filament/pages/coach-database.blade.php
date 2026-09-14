@@ -7031,7 +7031,7 @@ discoverSelectedIds: [],
 
     <div
         class="rc-wrap"
-        x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
+        x-init="window.initCoachDatabasePage && window.initCoachDatabasePage()"
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
         x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
         x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
