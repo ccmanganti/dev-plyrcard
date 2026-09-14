@@ -13931,54 +13931,15 @@ CSS;
                         .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
                 },
                 highlightMergeTokens(html) {
+                    // v10.113.43: Keep merge variables as normal text in the Template editor.
+                    // The previous non-editable chip spans could hydrate only part of a saved
+                    // body when many {{Variable}} tokens were next to each other. The saved
+                    // database value is already correct, so the editor should render the exact
+                    // stored HTML/text and let the save pipeline normalize the brackets.
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
-                    if (!source) return '';
-                    if (source.includes('rc-merge-token-v48')) return source;
-
-                    const template = document.createElement('template');
-                    template.innerHTML = source;
-                    const pattern = /\{\{\s*([A-Za-z][A-Za-z0-9_ .]{0,80})\s*\}\}/g;
-
-                    const walk = (node) => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            const text = node.nodeValue || '';
-                            if (!pattern.test(text)) {
-                                pattern.lastIndex = 0;
-                                return;
-                            }
-
-                            pattern.lastIndex = 0;
-                            const fragment = document.createDocumentFragment();
-                            let lastIndex = 0;
-                            text.replace(pattern, (match, _name, offset) => {
-                                if (offset > lastIndex) {
-                                    fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
-                                }
-                                const span = document.createElement('span');
-                                span.className = 'rc-merge-token-v48';
-                                span.contentEditable = 'false';
-                                span.textContent = match;
-                                fragment.appendChild(span);
-                                lastIndex = offset + match.length;
-                                return match;
-                            });
-                            if (lastIndex < text.length) {
-                                fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-                            }
-                            node.parentNode?.replaceChild(fragment, node);
-                            return;
-                        }
-
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const tag = String(node.tagName || '').toLowerCase();
-                            if (['script', 'style', 'textarea', 'input', 'select', 'option'].includes(tag)) return;
-                        }
-
-                        Array.from(node.childNodes || []).forEach(walk);
-                    };
-
-                    Array.from(template.content.childNodes || []).forEach(walk);
-                    return template.innerHTML;
+                    return window.rcNormalizeCoachDatabaseMergeTokensInHtml
+                        ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(source)
+                        : source;
                 },
                 cleanUrl(url) { return String(url || '').trim().replace(/["<>]/g, ''); },
                 showNotice(message) {
@@ -14250,54 +14211,15 @@ CSS;
                         : (this.$refs.editor?.innerHTML || '');
                 },
                 highlightMergeTokens(html) {
+                    // v10.113.43: Keep merge variables as normal text in the Template editor.
+                    // The previous non-editable chip spans could hydrate only part of a saved
+                    // body when many {{Variable}} tokens were next to each other. The saved
+                    // database value is already correct, so the editor should render the exact
+                    // stored HTML/text and let the save pipeline normalize the brackets.
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
-                    if (!source) return '';
-                    if (source.includes('rc-merge-token-v48')) return source;
-
-                    const template = document.createElement('template');
-                    template.innerHTML = source;
-                    const pattern = /\{\{\s*([A-Za-z][A-Za-z0-9_ .]{0,80})\s*\}\}/g;
-
-                    const walk = (node) => {
-                        if (node.nodeType === Node.TEXT_NODE) {
-                            const text = node.nodeValue || '';
-                            if (!pattern.test(text)) {
-                                pattern.lastIndex = 0;
-                                return;
-                            }
-
-                            pattern.lastIndex = 0;
-                            const fragment = document.createDocumentFragment();
-                            let lastIndex = 0;
-                            text.replace(pattern, (match, _name, offset) => {
-                                if (offset > lastIndex) {
-                                    fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
-                                }
-                                const span = document.createElement('span');
-                                span.className = 'rc-merge-token-v48';
-                                span.contentEditable = 'false';
-                                span.textContent = match;
-                                fragment.appendChild(span);
-                                lastIndex = offset + match.length;
-                                return match;
-                            });
-                            if (lastIndex < text.length) {
-                                fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
-                            }
-                            node.parentNode?.replaceChild(fragment, node);
-                            return;
-                        }
-
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const tag = String(node.tagName || '').toLowerCase();
-                            if (['script', 'style', 'textarea', 'input', 'select', 'option'].includes(tag)) return;
-                        }
-
-                        Array.from(node.childNodes || []).forEach(walk);
-                    };
-
-                    Array.from(template.content.childNodes || []).forEach(walk);
-                    return template.innerHTML;
+                    return window.rcNormalizeCoachDatabaseMergeTokensInHtml
+                        ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(source)
+                        : source;
                 },
                 editorOwnsNode(node) {
                     const editor = this.$refs.editor;
@@ -14417,7 +14339,9 @@ CSS;
                 insertTokenHtml(token) {
                     const cleanToken = String(token || '').trim();
                     if (!cleanToken) return;
-                    this.insertHtml('<span class="rc-merge-token-v48" contenteditable="false">' + this.escapeHtml(cleanToken) + '</span>&nbsp;');
+                    // Insert the real merge token text, not a contenteditable=false chip.
+                    // This keeps create/edit/save/rehydrate lossless even with many variables.
+                    this.insertHtml(this.escapeHtml(cleanToken) + ' ');
                 },
                 insertMerge(name) {
                     const token = this.mergeToken(name);
