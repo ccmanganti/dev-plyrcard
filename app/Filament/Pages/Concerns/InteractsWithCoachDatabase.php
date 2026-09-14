@@ -6009,7 +6009,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $hasFreshCache = ! $force
             && $this->hydrateCachedConversationMessages($conversationId)
-            && $this->inboxMessageCacheIsFresh($conversationId, 300);
+            && $this->inboxMessageCacheIsFresh($conversationId, 900);
 
         if (! $hasFreshCache) {
             $this->loadConversationMessages(true, false);
@@ -6272,7 +6272,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                         return 0;
                     }
                 })
-                ->take(-200)
+                ->take(-80)
                 ->values()
                 ->all();
 
@@ -6794,7 +6794,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     protected function inboxMessageCacheRenderVersion(): string
     {
-        return 'v10.113.20-inline-rich';
+        return 'v10.113.21-inline-rich-collapsible';
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool

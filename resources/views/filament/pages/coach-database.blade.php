@@ -95,24 +95,13 @@
             inboxOpenPromise: null,
             inboxOpenLastStartedAt: 0,
             openInboxSection(force = false) {
-                // v10.113.11: opening Inbox stays list/cache-first, but selected
-                // conversations are allowed to auto-load their first message page after
-                // the UI paints. Do not launch a full Recruiting Center refresh here.
-                const now = Date.now();
-                if (this.inboxOpenPromise) return this.inboxOpenPromise;
-                if (!force && this.activeSection === 'conversations' && now - Number(this.inboxOpenLastStartedAt || 0) < 1800) {
-                    return Promise.resolve();
-                }
-
-                this.inboxOpenLastStartedAt = now;
-                this.inboxOpenPromise = Promise.resolve(this.$wire.enterInboxSection())
-                    .then(() => new Promise(resolve => window.requestAnimationFrame(resolve)))
-                    .finally(() => {
-                        this.inboxOpenPromise = null;
-                        document.documentElement.removeAttribute('data-rc-inbox-loading');
-                    });
-
-                return this.inboxOpenPromise;
+                // v10.113.21: tab switching must stay browser-only. Calling a Livewire
+                // section-sync here made the whole 16k-line RC component morph even
+                // before the user picked a conversation, causing freeze/unfreeze lag.
+                this.activeSection = 'conversations';
+                document.documentElement.removeAttribute('data-rc-inbox-loading');
+                this.inboxOpenLastStartedAt = Date.now();
+                return Promise.resolve();
             },
 discoverSelectedIds: [],
             discoverSearch: '',
@@ -7000,6 +6989,9 @@ discoverSelectedIds: [],
             };
 
             window.resetCoachDatabaseDashboardScroll = function () {
+                // v10.113.21: keep this intentionally tiny. The previous version
+                // walked document.querySelectorAll('*') up to 18 times after loads,
+                // which could freeze Recruiting Center scrolling/clicks for seconds.
                 if (! isCoachDashboardRoot()) return;
 
                 try {
@@ -7011,31 +7003,10 @@ discoverSelectedIds: [],
                 try { window.scrollTo(0, 0); } catch (error) {}
                 resetOne(document.documentElement);
                 resetOne(document.body);
-
-                document.querySelectorAll('main, .fi-main, .fi-page, .fi-main-ctn, .fi-layout, .fi-body, [data-filament-main], [data-slot="main"], .fi-panel-page').forEach(resetOne);
-
-                document.querySelectorAll('*').forEach(function (el) {
-                    try {
-                        if (el.scrollHeight > el.clientHeight + 40 && getComputedStyle(el).overflowY !== 'visible') {
-                            el.scrollTop = 0;
-                        }
-                    } catch (error) {}
-                });
             };
 
             window.runCoachDatabaseScrollResetLoop = function () {
                 if (! isCoachDashboardRoot()) return;
-
-                let count = 0;
-                const run = function () {
-                    window.resetCoachDatabaseDashboardScroll();
-                    count += 1;
-                    if (count < 18) {
-                        window.setTimeout(run, count < 6 ? 50 : 150);
-                    }
-                };
-
-                run();
                 window.requestAnimationFrame(function () {
                     window.resetCoachDatabaseDashboardScroll();
                 });
@@ -10382,6 +10353,20 @@ CSS;
                 .rc-email-direct-body-v11320 p { margin:.22rem 0; }
                 .rc-email-direct-body-v11320 a { color:var(--rc-accent); }
                 .rc-email-direct-body-v11320 .rc-email-empty-v11320 { color:var(--rc-muted); font-style:italic; }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321 { position:relative; padding-bottom:2.65rem; }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded) .rc-email-direct-body-v11320 { max-height:150px; overflow:hidden; }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded)::after {
+                    content:''; position:absolute; left:0; right:0; bottom:2.2rem; height:2.4rem;
+                    pointer-events:none; background:linear-gradient(to bottom, rgba(255,255,255,0), var(--rc-soft));
+                }
+                .dark .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded)::after { background:linear-gradient(to bottom, rgba(24,24,27,0), var(--rc-soft)); }
+                .rc-message-expand-toggle-v11321 {
+                    position:absolute; right:.72rem; bottom:.58rem; display:none; border:1px solid var(--rc-border);
+                    border-radius:999px; background:var(--rc-surface); color:var(--rc-text); padding:.32rem .62rem;
+                    font-size:.68rem; font-weight:800; line-height:1; cursor:pointer; box-shadow:0 8px 20px rgba(15,23,42,.09);
+                }
+                .rc-message-expand-toggle-v11321:hover { border-color:rgba(255,99,56,.45); color:var(--rc-accent); }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321 .rc-message-expand-toggle-v11321 { display:inline-flex; }
                 .rc-message-stream-v56 { position:relative; }
                 .rc-inbox-thread-loader-v63 {
                     position:absolute;
@@ -10838,10 +10823,33 @@ CSS;
                                                             : '<span class="rc-email-empty-v11320">This email was received, but the message body was not included in the payload.</span>';
                                                     }
                                                 @endphp
-                                                <div class="rc-msg-bubble-v56 rc-msg-bubble-email-v61">
+                                                <div
+                                                    class="rc-msg-bubble-v56 rc-msg-bubble-email-v61"
+                                                    x-data="{
+                                                        expanded: false,
+                                                        collapsible: false,
+                                                        measure() {
+                                                            this.$nextTick(() => {
+                                                                const body = this.$refs.body;
+                                                                this.collapsible = !!(body && body.scrollHeight > 150);
+                                                            });
+                                                        },
+                                                        init() { this.measure(); }
+                                                    }"
+                                                    x-init="init()"
+                                                    x-bind:class="{ 'rc-message-collapsible-v11321': collapsible, 'is-expanded': expanded }"
+                                                >
                                                     <div class="rc-email-direct-v11320" aria-label="Email message">
-                                                        <div class="rc-email-direct-body-v11320">{!! $emailBodyForInline !!}</div>
+                                                        <div class="rc-email-direct-body-v11320" x-ref="body">{!! $emailBodyForInline !!}</div>
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        class="rc-message-expand-toggle-v11321"
+                                                        x-show="collapsible"
+                                                        x-cloak
+                                                        x-on:click.stop="expanded = ! expanded"
+                                                        x-text="expanded ? 'Minimize' : 'Maximize'"
+                                                    >Maximize</button>
                                                 </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
