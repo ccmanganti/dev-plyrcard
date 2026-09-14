@@ -8150,7 +8150,7 @@ discoverSelectedIds: [],
                     window.__rcCoachEngagementFilterObserverBound = true;
                     let scheduled = false;
                     const scheduleApply = () => {
-                        if (scheduled) return;
+                        if (scheduled || !window.__rcCoachEngagementFilter) return;
                         scheduled = true;
                         window.requestAnimationFrame(() => {
                             scheduled = false;
@@ -8158,27 +8158,16 @@ discoverSelectedIds: [],
                         });
                     };
 
-                    const observer = new MutationObserver((mutations) => {
-                        if (!window.__rcCoachEngagementFilter) return;
-                        if (mutations.some((mutation) => mutation.type === 'childList')) scheduleApply();
-                    });
-
-                    const bindObserver = () => {
-                        if (!document.body) return;
-                        observer.disconnect();
-                        observer.observe(document.body, { childList: true, subtree: true });
-                        scheduleApply();
-                    };
-
-                    document.addEventListener('DOMContentLoaded', bindObserver, { once: true });
+                    // v10.113.22: do not observe the entire Livewire DOM. The old
+                    // MutationObserver fired on every Inbox/template morph and caused
+                    // the 3-5 second freeze/unfreeze behavior. Re-apply only after
+                    // explicit navigation/morph lifecycle events when a filter exists.
                     document.addEventListener('livewire:navigated', scheduleApply);
                     document.addEventListener('livewire:init', () => {
                         if (window.Livewire?.hook) {
                             window.Livewire.hook('morph.updated', scheduleApply);
                         }
                     }, { once: true });
-
-                    if (document.body) bindObserver();
                 }
 
                 window.rcApplyCoachEngagementFilter();
@@ -10353,18 +10342,17 @@ CSS;
                 .rc-email-direct-body-v11320 p { margin:.22rem 0; }
                 .rc-email-direct-body-v11320 a { color:var(--rc-accent); }
                 .rc-email-direct-body-v11320 .rc-email-empty-v11320 { color:var(--rc-muted); font-style:italic; }
-                .rc-msg-bubble-v56.rc-message-collapsible-v11321 { position:relative; padding-bottom:2.65rem; }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321 { position:relative; padding-bottom:2.25rem; }
                 .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded) .rc-email-direct-body-v11320 { max-height:150px; overflow:hidden; }
-                .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded)::after {
-                    content:''; position:absolute; left:0; right:0; bottom:2.2rem; height:2.4rem;
-                    pointer-events:none; background:linear-gradient(to bottom, rgba(255,255,255,0), var(--rc-soft));
-                }
-                .dark .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded)::after { background:linear-gradient(to bottom, rgba(24,24,27,0), var(--rc-soft)); }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321:not(.is-expanded)::after { content:none; }
                 .rc-message-expand-toggle-v11321 {
-                    position:absolute; right:.72rem; bottom:.58rem; display:none; border:1px solid var(--rc-border);
-                    border-radius:999px; background:var(--rc-surface); color:var(--rc-text); padding:.32rem .62rem;
-                    font-size:.68rem; font-weight:800; line-height:1; cursor:pointer; box-shadow:0 8px 20px rgba(15,23,42,.09);
+                    position:absolute; right:.62rem; bottom:.52rem; display:none; align-items:center; justify-content:center;
+                    width:1.75rem; height:1.55rem; border:1px solid var(--rc-border); border-radius:999px;
+                    background:color-mix(in srgb, var(--rc-surface) 94%, transparent); color:var(--rc-text);
+                    padding:0; cursor:pointer; box-shadow:0 8px 20px rgba(15,23,42,.08);
                 }
+                .rc-message-expand-toggle-v11321 svg { width:.82rem; height:.82rem; transition:transform .15s ease; }
+                .rc-msg-bubble-v56.rc-message-collapsible-v11321.is-expanded .rc-message-expand-toggle-v11321 svg { transform:rotate(180deg); }
                 .rc-message-expand-toggle-v11321:hover { border-color:rgba(255,99,56,.45); color:var(--rc-accent); }
                 .rc-msg-bubble-v56.rc-message-collapsible-v11321 .rc-message-expand-toggle-v11321 { display:inline-flex; }
                 .rc-message-stream-v56 { position:relative; }
@@ -10551,7 +10539,13 @@ CSS;
                                     const token = ++this.requestToken;
                                     loader.busy = true;
                                     loader.queued = '';
-                                    loader.promise = Promise.resolve(this.$wire.openConversationAndLoadLatestMessages(id, force))
+                                    loader.promise = new Promise((resolve) => {
+                                            // Let the selected row + loading overlay paint before Livewire begins.
+                                            // Without this frame, Chrome may appear frozen until the request returns.
+                                            window.requestAnimationFrame(() => {
+                                                window.setTimeout(() => resolve(this.$wire.openConversationAndLoadLatestMessages(id, force)), 0);
+                                            });
+                                        })
                                         .catch(() => {})
                                         .finally(() => {
                                             loader.busy = false;
@@ -10848,8 +10842,9 @@ CSS;
                                                         x-show="collapsible"
                                                         x-cloak
                                                         x-on:click.stop="expanded = ! expanded"
-                                                        x-text="expanded ? 'Minimize' : 'Maximize'"
-                                                    >Maximize</button>
+                                                        x-bind:aria-label="expanded ? 'Collapse email message' : 'Expand email message'"
+                                                        x-bind:title="expanded ? 'Collapse' : 'Expand'"
+                                                    ><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
                                                 </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
@@ -11780,9 +11775,16 @@ CSS;
                     };
 
                     hideLegacyComposeOpeners();
-                    const observer = new MutationObserver(() => hideLegacyComposeOpeners());
-                    observer.observe(document.documentElement, { childList: true, subtree: true });
-                    document.addEventListener('livewire:navigated', () => hideLegacyComposeOpeners());
+                    // v10.113.22: no whole-document MutationObserver here. Compose is
+                    // mounted even while Inbox is open, so the old observer scanned the
+                    // entire app on every Livewire DOM change. One-shot hooks are enough
+                    // to hide legacy overlays without making scrolling/clicks freeze.
+                    document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(hideLegacyComposeOpeners));
+                    document.addEventListener('livewire:init', () => {
+                        if (window.Livewire?.hook) {
+                            window.Livewire.hook('morph.updated', () => window.requestAnimationFrame(hideLegacyComposeOpeners));
+                        }
+                    }, { once: true });
                 })();
             </script>
 
@@ -16028,7 +16030,7 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     .rc-home-dark-toggle-v2 { grid-area: dark !important; }
 </style>
 
-<script id="rc-disable-all-global-reload-script-v1011310">
+<script id="rc-disable-all-global-reload-script-v1011322">
     (() => {
         const selectors = [
             '.rc-refresh-dropdown-v2',
@@ -16046,24 +16048,31 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         ];
 
         const removeGlobalReloadControls = () => {
-            document.querySelectorAll(selectors.join(',')).forEach((element) => {
-                if (element.closest('[data-rc-inbox-message-stream]') || element.classList.contains('rc-inbox-icon-btn-v56')) {
-                    return;
-                }
-                element.remove();
-            });
+            // v10.113.22: run only on page/navigation lifecycle events. The previous
+            // whole-document MutationObserver queried the full DOM after every small
+            // Inbox morph, which was a major source of intermittent UI freezes.
+            try {
+                document.querySelectorAll(selectors.join(',')).forEach((element) => {
+                    if (element.closest('[data-rc-inbox-message-stream]') || element.classList.contains('rc-inbox-icon-btn-v56')) {
+                        return;
+                    }
+                    element.remove();
+                });
+            } catch (_) {}
         };
 
         window.__plyrRemoveRecruitingGlobalReloadControls = removeGlobalReloadControls;
-        removeGlobalReloadControls();
-        document.addEventListener('DOMContentLoaded', removeGlobalReloadControls);
-        document.addEventListener('livewire:navigated', removeGlobalReloadControls);
-        window.addEventListener('rc-client-section', () => requestAnimationFrame(removeGlobalReloadControls));
-
-        if (! window.__plyrRecruitingGlobalReloadObserver) {
-            window.__plyrRecruitingGlobalReloadObserver = new MutationObserver(() => removeGlobalReloadControls());
-            window.__plyrRecruitingGlobalReloadObserver.observe(document.documentElement, { childList: true, subtree: true });
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', removeGlobalReloadControls, { once: true });
+        } else {
+            removeGlobalReloadControls();
         }
+        document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(removeGlobalReloadControls));
+        document.addEventListener('livewire:init', () => {
+            if (window.Livewire?.hook) {
+                window.Livewire.hook('morph.updated', () => window.requestAnimationFrame(removeGlobalReloadControls));
+            }
+        }, { once: true });
     })();
 </script>
 

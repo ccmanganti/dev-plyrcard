@@ -6272,7 +6272,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                         return 0;
                     }
                 })
-                ->take(-80)
+                ->take(-30)
                 ->values()
                 ->all();
 
@@ -6603,7 +6603,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 ->whereIn(DB::raw('LOWER(recipient_email)'), $recipientEmails->all())
                 ->whereNotNull('rendered_html')
                 ->orderByDesc('sent_at')
-                ->limit(250)
+                ->limit(50)
                 ->get(array_values(array_unique($columns)));
 
             if ($localMessages->isEmpty()) {
@@ -6794,7 +6794,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     protected function inboxMessageCacheRenderVersion(): string
     {
-        return 'v10.113.21-inline-rich-collapsible';
+        return 'v10.113.22-inline-rich-chevrons';
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool
