@@ -12521,7 +12521,9 @@ CSS;
                         if (this.sendingFast) return;
                         if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
                         const wire = wireInstance || this.$wire || (() => {
-                            const root = this.$root?.closest?.('[wire\:id]') || document.querySelector('.rc-livewire-root')?.closest?.('[wire\:id]');
+                            const root = window.rcFindCoachDatabaseLivewireComponent
+                                ? window.rcFindCoachDatabaseLivewireComponent(this.$root || document.querySelector('.rc-livewire-root'))
+                                : document.querySelector('[wire\:id]');
                             const id = root?.getAttribute?.('wire:id');
                             return id && window.Livewire?.find ? window.Livewire.find(id) : null;
                         })();
@@ -12650,10 +12652,19 @@ CSS;
                                                     type="button"
                                                     class="{{ (string) ($campaignTemplateId ?? '') === (string) ($template['id'] ?? '') ? 'is-active' : '' }}"
                                                     data-rc-local-action
+                                                    data-rc-compose-template-body-base64="{{ e($template['compose_body_editor_base64'] ?? '') }}"
+                                                    data-rc-compose-template-key="{{ e($template['compose_body_editor_key'] ?? '') }}"
                                                     x-bind:disabled="loadingTemplateId !== ''"
                                                     x-on:click.prevent.stop="
                                                         const id = @js((string) ($template['id'] ?? ''));
                                                         if (!id || loadingTemplateId) return;
+                                                        const bodyBase64 = $el.dataset.rcComposeTemplateBodyBase64 || '';
+                                                        const bodyKey = 'compose-local-' + id + '-' + ($el.dataset.rcComposeTemplateKey || Date.now());
+                                                        if (bodyBase64 && window.rcApplyComposeTemplateBodyBase64) {
+                                                            window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
+                                                            window.__plyrComposeEditorPendingBodyKey = bodyKey;
+                                                            window.rcApplyComposeTemplateBodyBase64(bodyBase64, bodyKey, true);
+                                                        }
                                                         loadingTemplateId = id;
                                                         open = false;
                                                         $wire.call('useTemplateForCompose', id)
@@ -13756,6 +13767,8 @@ CSS;
                 composeRefreshHandler: null,
                 savedSelectionRange: null,
                 selectionHandler: null,
+                lastAppliedBodyBase64: '',
+                lastAppliedBodyKey: '',
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
@@ -13782,15 +13795,14 @@ CSS;
                             const editor = this.$refs.editor;
                             if (!editor || !editor.isConnected) return;
 
-                            const encoded = event.detail?.body || '';
-                            const html = this.decodeInitialBody(encoded);
+                            const encoded = String(event.detail?.body || '');
+                            const key = String(event.detail?.key || ('livewire-' + encoded.length));
+                            if (encoded) {
+                                window.__plyrComposeEditorPendingBodyBase64 = encoded;
+                                window.__plyrComposeEditorPendingBodyKey = key;
+                            }
 
-                            editor.dataset.initialBody = encoded;
-                            editor.innerHTML = this.highlightMergeTokens(html || '');
-
-                            // The body already came from Livewire/PHP. Do not immediately
-                            // sync it back to the server here: stale editor instances can
-                            // otherwise overwrite the newly selected template with blank HTML.
+                            this.applyEncodedBody(encoded, key, true);
                         };
 
                         window.__plyrComposeEditorRefreshHandler = this.composeRefreshHandler;
@@ -13809,15 +13821,51 @@ CSS;
                         }
                     }
                 },
-                bootEditor() {
+                bootEditor(force = false) {
                     if (!this.$refs.editor) return;
-                    const html = this.decodeInitialBody(initialBody || this.$refs.editor.dataset.initialBody || '');
-                    if (html && this.$refs.editor.innerHTML.trim() === '') {
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
-                    } else {
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(this.$refs.editor.innerHTML || '');
+                    const pendingBody = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyBase64 || '') : '';
+                    const pendingKey = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyKey || '') : '';
+                    const encoded = pendingBody || initialBody || this.$refs.editor.dataset.initialBody || '';
+                    const key = pendingBody ? pendingKey : String(this.$refs.editor.dataset.refreshKey || 'initial-' + String(encoded || '').length);
+
+                    if (encoded) {
+                        const applied = this.applyEncodedBody(encoded, key, force || this.$refs.editor.innerHTML.trim() === '');
+                        if (applied) return;
+                    }
+
+                    if (this.$refs.editor.innerHTML.trim() !== '') {
+                        const highlighted = this.highlightMergeTokens(this.$refs.editor.innerHTML || '');
+                        if (highlighted !== this.$refs.editor.innerHTML) {
+                            this.$refs.editor.innerHTML = highlighted;
+                        }
                     }
                     this.syncNow();
+                },
+                applyEncodedBody(encoded, key = '', force = false) {
+                    const editor = this.$refs.editor;
+                    encoded = String(encoded || '');
+                    key = String(key || '');
+                    if (!editor || !encoded) return false;
+
+                    const html = this.decodeInitialBody(encoded);
+                    if (!html) return false;
+
+                    const currentText = String(editor.textContent || '').replace(/\s+/g, ' ').trim();
+                    const incomingText = String(html || '').replace(/<br\s*\/?\s*>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                    const shouldApply = force
+                        || this.lastAppliedBodyBase64 !== encoded
+                        || (incomingText.length > currentText.length + 8)
+                        || editor.innerHTML.trim() === '';
+
+                    if (!shouldApply) return false;
+
+                    editor.dataset.initialBody = encoded;
+                    editor.dataset.refreshKey = key;
+                    editor.innerHTML = this.highlightMergeTokens(html || '');
+                    this.lastAppliedBodyBase64 = encoded;
+                    this.lastAppliedBodyKey = key;
+                    this.syncNow();
+                    return true;
                 },
                 decodeInitialBody(initial) {
                     if (!initial) return '';
@@ -14103,6 +14151,23 @@ CSS;
                 return;
             }
             window.dispatchEvent(new CustomEvent('plyr-editor-insert-token', { detail: { token } }));
+        };
+
+        window.rcApplyComposeTemplateBodyBase64 = function (encoded, key = '', force = true) {
+            encoded = String(encoded || '');
+            key = String(key || 'compose-local-' + Date.now());
+            if (!encoded) return false;
+
+            window.__plyrComposeEditorPendingBodyBase64 = encoded;
+            window.__plyrComposeEditorPendingBodyKey = key;
+
+            const editor = window.__plyrNativeEditors?.campaignBody;
+            if (editor && typeof editor.applyEncodedBody === 'function') {
+                return editor.applyEncodedBody(encoded, key, force);
+            }
+
+            window.dispatchEvent(new CustomEvent('rc-compose-editor-refresh', { detail: { body: encoded, key } }));
+            return true;
         };
 
         window.plyrCampaignBodyEditor = function () {

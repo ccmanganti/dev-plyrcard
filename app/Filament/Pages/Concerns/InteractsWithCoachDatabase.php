@@ -4901,7 +4901,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->campaignTemplateId = null;
         $this->selectedTemplateId = null;
 
-        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody), key: 'compose-template-' . sha1($this->campaignTemplateId . '|' . $this->campaignBody));
     }
 
     protected function composeConversationHistoryHtml(int $limit = 2): string
@@ -12688,7 +12688,7 @@ protected function ensureComposeBodyHasFooter(): void
 
         $this->emailBody = $this->campaignBody;
 
-        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody), key: 'compose-template-' . sha1($this->campaignTemplateId . '|' . $this->campaignBody));
         $this->dispatch(
             'rc-compose-template-applied',
             body: base64_encode($this->campaignBody),
@@ -13888,7 +13888,7 @@ protected function applyTemplateToCompose(string $templateId, bool $notify = tru
         $this->pendingTemplateAction = null;
         $this->pendingTemplateActionId = null;
 
-        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody));
+        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody), key: 'compose-template-' . sha1($this->campaignTemplateId . '|' . $this->campaignBody));
 
         if ($notify) {
             Notification::make()
@@ -14578,9 +14578,16 @@ HTML;
                     $preview = trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')));
                 }
 
+                $editorBody = $this->templateHtmlForNativeEditor($template);
+
                 return array_merge($template, [
                     'compose_subject_preview' => \Illuminate\Support\Str::limit($subject !== '' ? $subject : 'Recruiting email', 72),
                     'compose_body_preview' => \Illuminate\Support\Str::limit($preview !== '' ? $preview : 'Personalized message preview', 96),
+                    // v10.113.38: Compose uses this browser-side copy for immediate,
+                    // full-body rendering. It prevents wire:ignore editors from briefly
+                    // showing a partial template while Livewire finishes hydrating.
+                    'compose_body_editor_base64' => base64_encode($editorBody),
+                    'compose_body_editor_key' => sha1((string) ($template['id'] ?? '') . '|' . $editorBody),
                 ]);
             })
             ->values()
