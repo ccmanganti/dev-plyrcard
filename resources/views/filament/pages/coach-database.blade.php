@@ -15845,8 +15845,8 @@ window.rcDecodeTemplateEntities = function (value) {
 window.rcNormalizeCoachDatabaseMergeTokens = function (value) {
     let source = window.rcDecodeTemplateEntities ? window.rcDecodeTemplateEntities(value) : String(value || '');
     source = source.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
-    source = source.replace(/@\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g, '{{$1}}');
-    source = source.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, '{{$1}}');
+    source = source.replace(/@\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g, (_match, token) => '{{' + String(token || '').trim() + '}}');
+    source = source.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, (_match, token) => '{{' + String(token || '').trim() + '}}');
     return source;
 };
 
