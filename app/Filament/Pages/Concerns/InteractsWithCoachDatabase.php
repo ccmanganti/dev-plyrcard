@@ -5995,6 +5995,9 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $this->messageLastId = null;
             $this->hasMoreMessages = false;
             $this->messages = [];
+            $this->isLoadingConversationMessages = true;
+            $this->isRefreshingRemoteData = false;
+            $this->activeUiOperation = 'Loading messages';
         }
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
@@ -6009,7 +6012,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $hasFreshCache = ! $force
             && $this->hydrateCachedConversationMessages($conversationId)
-            && $this->inboxMessageCacheIsFresh($conversationId, 900);
+            && $this->inboxMessageCacheIsFresh($conversationId, 3600);
 
         if (! $hasFreshCache) {
             $this->loadConversationMessages(true, false);
@@ -6272,7 +6275,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                         return 0;
                     }
                 })
-                ->take(-30)
+                ->take(-18)
                 ->values()
                 ->all();
 
@@ -6598,13 +6601,18 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 }
             }
 
-            $localMessages = DB::table('coach_database_email_messages')
-                ->where('athlete_user_id', $user->getKey())
-                ->whereIn(DB::raw('LOWER(recipient_email)'), $recipientEmails->all())
-                ->whereNotNull('rendered_html')
-                ->orderByDesc('sent_at')
-                ->limit(50)
-                ->get(array_values(array_unique($columns)));
+            $recipientKey = sha1(implode('|', $recipientEmails->all()) . '|' . implode('|', array_values(array_unique($columns))));
+            $localMessages = Cache::remember(
+                'recruiting:inbox-local-sent-bodies:v10.113.23:' . $user->getKey() . ':' . $recipientKey,
+                now()->addMinutes(20),
+                fn () => DB::table('coach_database_email_messages')
+                    ->where('athlete_user_id', $user->getKey())
+                    ->whereIn(DB::raw('LOWER(recipient_email)'), $recipientEmails->all())
+                    ->whereNotNull('rendered_html')
+                    ->orderByDesc('sent_at')
+                    ->limit(40)
+                    ->get(array_values(array_unique($columns)))
+            );
 
             if ($localMessages->isEmpty()) {
                 return $rows;
@@ -6794,7 +6802,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     protected function inboxMessageCacheRenderVersion(): string
     {
-        return 'v10.113.22-inline-rich-chevrons';
+        return 'v10.113.23-fast-rich-chevrons';
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool
