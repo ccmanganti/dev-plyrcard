@@ -638,16 +638,17 @@ discoverSelectedIds: [],
                 const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
                 this.closeDiscoverSchool();
 
-                // Activate the already-mounted Compose panel synchronously. The Livewire
-                // call below only attaches the canonical school to the compose form.
-                if (typeof window.__plyrRcActivateSectionClientOnly === 'function') {
-                    window.__plyrRcActivateSectionClientOnly('compose', href, false);
-                } else {
-                    this.activeSection = 'compose';
-                    this.$el.dataset.rcCurrentSection = 'compose';
-                    window.dispatchEvent(new CustomEvent('rc-client-section', { detail: { section: 'compose' } }));
-                    const target = new URL(href, window.location.href);
-                    window.history.pushState({ ...(window.history.state || {}), rcSection: 'compose' }, '', target.pathname + target.search + target.hash);
+                // Activate Compose only when that panel is already present in the persistent shell.
+                // When this build renders only the current section, Compose may not exist in the DOM;
+                // in that case, use normal navigation so the server mounts the Compose section and
+                // preselects the school from the query string instead of showing a blank panel.
+                const activated = typeof window.__plyrRcActivateSectionClientOnly === 'function'
+                    ? window.__plyrRcActivateSectionClientOnly('compose', href, false)
+                    : false;
+
+                if (!activated) {
+                    window.location.assign(href);
+                    return;
                 }
 
                 return Promise.resolve(this.$wire.composeEmailSchool(id));
@@ -15638,6 +15639,11 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         return true;
     };
 
+    const renderedSectionPanel = (section) => {
+        const safe = String(section || '').replace(/[^a-z0-9_-]/gi, '');
+        return !!safe && !!document.querySelector(`[data-rc-client-section="${safe}"]`);
+    };
+
     const sectionLabels = {
         dashboard: 'Dashboard',
         schools: 'Discover Schools',
@@ -15711,6 +15717,11 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const root = currentRoot();
         if (!root || !section) return false;
 
+        // v10.113.16: this page may render only the active section to keep Inbox fast.
+        // Never switch the browser to a section that is not actually mounted, because
+        // Alpine would hide the current panel and leave the content area blank.
+        if (!renderedSectionPanel(section)) return false;
+
         root.dataset.rcCurrentSection = section;
         if (section !== 'conversations') {
             document.documentElement.removeAttribute('data-rc-inbox-loading');
@@ -15739,6 +15750,15 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const root = currentRoot();
         if (!root || !section) return false;
 
+        if (!renderedSectionPanel(section)) {
+            if (href) {
+                const target = new URL(href, window.location.href);
+                window.location.assign(target.href);
+                return true;
+            }
+            return false;
+        }
+
         const alreadyActive = root.dataset.rcCurrentSection === section;
         if (!activateSectionClientOnly(section, href, replace)) return false;
 
@@ -15765,6 +15785,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const section = sectionFromAnchor(anchor);
         if (!section) return;
         if (isFreePlan() && freePlanLockedSections.has(section)) return;
+        if (!renderedSectionPanel(section)) return;
 
         setSidebarActive(section);
     }, true);
@@ -15778,9 +15799,18 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const section = sectionFromAnchor(anchor);
         if (!section || !currentRoot()) return;
 
+        if (openFreePlanGate(section)) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+        }
+
+        // If the destination panel is not mounted, allow the real Filament/browser
+        // navigation to proceed so the server renders that section instead of blanking.
+        if (!renderedSectionPanel(section)) return;
+
         event.preventDefault();
         event.stopPropagation();
-        if (openFreePlanGate(section)) return;
         switchSection(section, anchor.href, false);
     }, true);
 
@@ -15788,6 +15818,10 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const section = pathToSection(window.location.pathname);
         if (!section || !currentRoot()) return;
         if (openFreePlanGate(section)) return;
+        if (!renderedSectionPanel(section)) {
+            window.location.reload();
+            return;
+        }
         switchSection(section, null, true);
     });
 
