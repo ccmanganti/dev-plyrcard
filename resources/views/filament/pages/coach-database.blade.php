@@ -7539,6 +7539,264 @@ discoverSelectedIds: [],
                 .rc-email-live-fetch-error-v136{color:#ef4444;font-weight:700}
             </style>
 
+            <style id="rc-dashboard-ui-polish-v11338">
+                .rc-home-dashboard-v2 {
+                    gap: 1.05rem !important;
+                    padding-bottom: 2.4rem !important;
+                }
+
+                .rc-home-stats-v2,
+                .rc-home-grid-v2,
+                .rc-home-lower-grid-v2 {
+                    gap: 1.05rem !important;
+                    align-items: stretch !important;
+                }
+
+                .rc-home-stat-v2 {
+                    min-height: 8.25rem !important;
+                    padding: 1rem 1.05rem !important;
+                    grid-template-columns: 2.72rem minmax(0, 1fr) !important;
+                    grid-template-rows: auto auto minmax(1.05rem, auto) !important;
+                    gap: .5rem .82rem !important;
+                    align-content: stretch !important;
+                    overflow: hidden !important;
+                }
+
+                .rc-home-stat-icon-v2 {
+                    width: 2.72rem !important;
+                    height: 2.72rem !important;
+                    grid-row: 1 / span 2 !important;
+                    align-self: start !important;
+                }
+
+                .rc-home-stat-copy-v2 {
+                    align-self: start !important;
+                    padding-top: .08rem !important;
+                }
+
+                .rc-home-stat-label-v2 {
+                    line-height: 1.2 !important;
+                    margin-bottom: .12rem !important;
+                }
+
+                .rc-home-stat-value-v2 {
+                    font-size: 1.62rem !important;
+                    line-height: .98 !important;
+                    margin-top: .1rem !important;
+                }
+
+                .rc-home-progress-v2 {
+                    grid-column: 1 / -1 !important;
+                    align-self: end !important;
+                    margin-top: .15rem !important;
+                }
+
+                .rc-home-stat-sub-v2 {
+                    grid-column: 1 / -1 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    flex-wrap: wrap !important;
+                    gap: .32rem !important;
+                    min-height: 1rem !important;
+                    line-height: 1.28 !important;
+                    overflow-wrap: anywhere !important;
+                }
+
+                .rc-home-stat-sub-v2 .rc-link {
+                    appearance: none !important;
+                    border: 0 !important;
+                    border-radius: 999px !important;
+                    background: rgba(255, 99, 56, .1) !important;
+                    color: #ff6338 !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    min-height: 1.25rem !important;
+                    padding: .12rem .46rem !important;
+                    margin: 0 !important;
+                    font-size: .68rem !important;
+                    font-weight: 800 !important;
+                    line-height: 1 !important;
+                    cursor: pointer !important;
+                }
+
+                .rc-home-panel-v2 {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    min-width: 0 !important;
+                    padding: 1.15rem !important;
+                    overflow: hidden !important;
+                }
+
+                .rc-home-panel-head-v2 {
+                    margin-bottom: .9rem !important;
+                    align-items: center !important;
+                }
+
+                .rc-home-panel-head-v2 h2 {
+                    line-height: 1.1 !important;
+                }
+
+                .rc-home-progress-layout-v2 {
+                    flex: 1 1 auto !important;
+                    align-items: center !important;
+                    gap: 1.15rem !important;
+                }
+
+                .rc-check-list-v2 {
+                    gap: .7rem !important;
+                }
+
+                .rc-profile-milestones-v2 {
+                    margin-top: .65rem !important;
+                }
+
+                .rc-home-activity-list-v2 {
+                    flex: 1 1 auto !important;
+                    min-height: 0 !important;
+                    max-height: 19.6rem !important;
+                    gap: .44rem !important;
+                    padding-right: .35rem !important;
+                }
+
+                .rc-home-activity-v2 {
+                    min-width: 0 !important;
+                    padding: .42rem .38rem !important;
+                    border-radius: .82rem !important;
+                    transition: background .16s ease, transform .16s ease !important;
+                }
+
+                .rc-home-activity-v2:hover {
+                    background: #f8fafc !important;
+                    transform: translateY(-1px) !important;
+                }
+
+                .rc-home-activity-copy-v2,
+                .rc-home-activity-copy-v2 strong,
+                .rc-home-activity-copy-v2 small {
+                    min-width: 0 !important;
+                }
+
+                .rc-home-lower-grid-v2 {
+                    grid-template-columns: minmax(0, 1fr) minmax(320px, .82fr) !important;
+                }
+
+                .rc-home-lower-grid-v2 > .rc-home-panel-v2 {
+                    min-height: 18rem !important;
+                }
+
+                .rc-radar-panel-v2 .rc-home-panel-head-v2,
+                .rc-home-lower-grid-v2 > .rc-home-panel-v2 > .rc-home-panel-head-v2 {
+                    margin-bottom: 1rem !important;
+                }
+
+                .rc-radar-schools-v2 {
+                    flex: 1 1 auto !important;
+                    grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr)) !important;
+                    gap: .75rem !important;
+                    align-content: start !important;
+                }
+
+                .rc-radar-card-v2 {
+                    min-height: 12.2rem !important;
+                    padding-bottom: .85rem !important;
+                    gap: .35rem !important;
+                    transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease !important;
+                }
+
+                .rc-radar-card-v2:hover {
+                    border-color: rgba(255, 99, 56, .34) !important;
+                    box-shadow: 0 10px 24px rgba(15, 23, 42, .08) !important;
+                    transform: translateY(-1px) !important;
+                }
+
+                .rc-radar-logo-v2 {
+                    height: 5.85rem !important;
+                }
+
+                .rc-radar-card-v2 strong {
+                    min-height: 2.1em !important;
+                    display: -webkit-box !important;
+                    -webkit-line-clamp: 2 !important;
+                    -webkit-box-orient: vertical !important;
+                    overflow: hidden !important;
+                }
+
+                .rc-home-dots-v2 {
+                    margin-top: auto !important;
+                    padding-top: .8rem !important;
+                }
+
+                .rc-interested-list-v2 {
+                    flex: 1 1 auto !important;
+                    align-content: start !important;
+                    gap: .45rem !important;
+                }
+
+                .rc-interested-row-v2 {
+                    min-height: 3.45rem !important;
+                    padding: .46rem .52rem !important;
+                    border-radius: .78rem !important;
+                    transition: background .16s ease, transform .16s ease !important;
+                }
+
+                .rc-interested-row-v2:hover {
+                    background: #f8fafc !important;
+                    transform: translateY(-1px) !important;
+                }
+
+                .rc-interested-logo-v2 {
+                    width: 2.45rem !important;
+                    height: 2.45rem !important;
+                }
+
+                .rc-interested-row-v2 span:nth-child(3) {
+                    min-width: 0 !important;
+                }
+
+                .rc-interested-row-v2 small {
+                    display: block !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    max-width: 100% !important;
+                }
+
+                .rc-home-lower-grid-v2 .rc-home-outline-btn-v2 {
+                    margin-top: auto !important;
+                    flex: 0 0 auto !important;
+                }
+
+                .dark .rc-home-activity-v2:hover,
+                .dark .rc-interested-row-v2:hover {
+                    background: rgba(148, 163, 184, .08) !important;
+                }
+
+                @media (max-width: 1180px) {
+                    .rc-home-lower-grid-v2 {
+                        grid-template-columns: 1fr !important;
+                    }
+
+                    .rc-radar-schools-v2 {
+                        grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)) !important;
+                    }
+                }
+
+                @media (max-width: 760px) {
+                    .rc-home-stat-v2 {
+                        min-height: 7.75rem !important;
+                    }
+
+                    .rc-home-lower-grid-v2 > .rc-home-panel-v2 {
+                        min-height: auto !important;
+                    }
+
+                    .rc-home-activity-time-v2 {
+                        display: none !important;
+                    }
+                }
+            </style>
+
             <div class="rc-home-dashboard-v2"
                 wire:key="rc-home-dashboard-email-fetch-{{ (int) $dashboardVisitVersion }}">
                 @include('filament.partials.coach-database-header', [
