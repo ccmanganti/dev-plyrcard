@@ -12976,6 +12976,7 @@ protected function ensureComposeBodyHasFooter(): void
     {
         $body = $this->decodeTemplateEditorPayloadValue($payload['body_b64'] ?? $payload['bodyBase64'] ?? '');
         $rawBody = $this->decodeTemplateEditorPayloadValue($payload['raw_body_b64'] ?? $payload['rawBodyBase64'] ?? $payload['raw_html_b64'] ?? '');
+        $losslessBody = $this->decodeTemplateEditorPayloadValue($payload['lossless_body_b64'] ?? $payload['losslessBodyBase64'] ?? '');
         $hiddenBody = $this->decodeTemplateEditorPayloadValue($payload['hidden_body_b64'] ?? $payload['hiddenBodyBase64'] ?? '');
         $activeBody = $this->decodeTemplateEditorPayloadValue($payload['active_body_b64'] ?? $payload['activeBodyBase64'] ?? '');
         $lastSerializedBody = $this->decodeTemplateEditorPayloadValue($payload['last_serialized_body_b64'] ?? $payload['lastSerializedBodyBase64'] ?? '');
@@ -12985,7 +12986,9 @@ protected function ensureComposeBodyHasFooter(): void
             $body = (string) $payload['body'];
         }
 
-        $candidates = collect([$body, $rawBody, $hiddenBody, $activeBody, $lastSerializedBody])
+        $losslessBody = trim($this->normalizeTemplateMergeTokensForStorage($losslessBody));
+
+        $candidates = collect([$body, $rawBody, $losslessBody, $hiddenBody, $activeBody, $lastSerializedBody])
             ->map(fn (string $candidate): string => trim($this->normalizeTemplateMergeTokensForStorage($candidate)))
             ->filter(fn (string $candidate): bool => $candidate !== '')
             ->unique()
@@ -12994,6 +12997,22 @@ protected function ensureComposeBodyHasFooter(): void
         $best = $candidates
             ->sortByDesc(fn (string $candidate): int => $this->templatePayloadScore($candidate))
             ->first() ?? '';
+
+        if ($losslessBody !== '') {
+            $losslessScore = $this->templatePayloadScore($losslessBody);
+            $bestScore = $this->templatePayloadScore($best);
+            $losslessTokens = preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_ .]{0,80}\s*\}\}/', $losslessBody) ?: 0;
+            $bestTokens = preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_ .]{0,80}\s*\}\}/', $best) ?: 0;
+
+            if (
+                $best === ''
+                || $losslessTokens > $bestTokens
+                || $this->templatePayloadVisibleLength($losslessBody) > ($this->templatePayloadVisibleLength($best) + 8)
+                || $losslessScore >= (int) floor($bestScore * 0.92)
+            ) {
+                $best = $losslessBody;
+            }
+        }
 
         $textHtml = $this->textPayloadToTemplateHtml($bodyText, $rawBody !== '' ? $rawBody : $body);
 
