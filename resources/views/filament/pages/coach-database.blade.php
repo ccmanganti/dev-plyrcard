@@ -622,26 +622,47 @@ discoverSelectedIds: [],
                 }
             },
             openComposeForSchool(schoolId) {
-                const id = String(schoolId || '').trim();
+                const fallbackSchool = this.optimisticSchool || {};
+                const id = String(schoolId || fallbackSchool.id || fallbackSchool.school_id || fallbackSchool.business_id || '').trim();
                 if (!id) return;
 
                 const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
+                let targetPath = '';
+                try { targetPath = new URL(href, window.location.href).pathname; } catch (_) { targetPath = String(window.location?.pathname || ''); }
+
+                window.__rcComposeRecipientStateV101 = {
+                    path: targetPath || String(window.location?.pathname || ''),
+                    schoolId: id,
+                    selectedCoachIds: [],
+                    targetMode: 'school',
+                    headCoachOnly: true,
+                    chooserOpen: false,
+                };
+
                 this.closeDiscoverSchool();
 
-                // Activate Compose only when that panel is already present in the persistent shell.
-                // When this build renders only the current section, Compose may not exist in the DOM;
-                // in that case, use normal navigation so the server mounts the Compose section and
-                // preselects the school from the query string instead of showing a blank panel.
                 const activated = typeof window.__plyrRcActivateSectionClientOnly === 'function'
                     ? window.__plyrRcActivateSectionClientOnly('compose', href, false)
                     : false;
+
+                const notifyCompose = () => window.dispatchEvent(new CustomEvent('rc-compose-select-school', {
+                    detail: { schoolId: id, source: 'school-drawer' },
+                }));
 
                 if (!activated) {
                     window.location.assign(href);
                     return;
                 }
 
-                return Promise.resolve(this.$wire.composeEmailSchool(id));
+                this.$nextTick(() => {
+                    notifyCompose();
+                    window.requestAnimationFrame(notifyCompose);
+                });
+
+                const wire = this.$wire;
+                if (wire && typeof wire.composeEmailSchool === 'function') return Promise.resolve(wire.composeEmailSchool(id));
+                if (wire && typeof wire.call === 'function') return Promise.resolve(wire.call('composeEmailSchool', id)).catch(() => {});
+                return Promise.resolve();
             },
             closeDiscoverSchool() {
                 window.__plyrSchoolDrawerOptimistic = null;
@@ -7860,7 +7881,11 @@ discoverSelectedIds: [],
                             <button
                                 type="button"
                                 class="rc-home-stat-v2 is-{{ $stat['tone'] }} is-clickable"
-                                x-on:click="dashboardDetail = @js($stat['target'])"
+                                @if(($stat['target'] ?? '') === 'favorites')
+                                    x-on:click.prevent.stop="dashboardDetail=''; if (window.__plyrRcActivateSectionClientOnly && window.__plyrRcActivateSectionClientOnly('favorites', @js($this->pageUrl('favorites')), false)) { activeSection='favorites' } else { window.location.assign(@js($this->pageUrl('favorites'))) }"
+                                @else
+                                    x-on:click="dashboardDetail = @js($stat['target'])"
+                                @endif
                             >
                         @else
                             <button
@@ -12257,6 +12282,17 @@ CSS;
                             }
                         }
 
+                        try {
+                            const requestedSchoolId = String(new URLSearchParams(window.location.search || '').get('school') || '').trim();
+                            if (requestedSchoolId && this.schools.some(row => String(row.id || '') === requestedSchoolId)) {
+                                this.selectedSchoolId = requestedSchoolId;
+                                this.selectedCoachIds = [];
+                                this.targetMode = 'school';
+                                this.headCoachOnly = true;
+                                this.chooserOpen = false;
+                            }
+                        } catch (_) {}
+
                         this.rememberRecipientState();
                     },
                     rememberRecipientState() {
@@ -12433,9 +12469,9 @@ CSS;
                         this.coachRevision++;
                         this.rememberRecipientState();
                     },
-                    chooseSchool(school) {
-                        const id = String(school?.id || '');
-                        if (!id) return;
+                    chooseSchoolById(schoolId) {
+                        const id = String(schoolId || '').trim();
+                        if (!id || !this.schools.some(row => String(row.id || '') === id)) return false;
                         this.selectedSchoolId = id;
                         this.schoolQuery = '';
                         this.coachQuery = '';
@@ -12445,6 +12481,12 @@ CSS;
                         this.chooserOpen = false;
                         this.coachRevision++;
                         this.rememberRecipientState();
+                        return true;
+                    },
+                    chooseSchool(school) {
+                        const id = String(school?.id || '');
+                        if (!id) return;
+                        this.chooseSchoolById(id);
                     },
                     chooseHeadCoach() {
                         if (!this.selectedSchool) return;
@@ -12493,7 +12535,7 @@ CSS;
                             toast('Unable to send right now. Please try again.');
                         } finally { this.sendingFast = false; }
                     },
-                }" x-init="init()">
+                }" x-init="init()" x-on:rc-compose-select-school.window="chooseSchoolById($event.detail?.schoolId || $event.detail?.id || '')">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -13317,7 +13359,7 @@ CSS;
                 </div>
 
                 <div class="rc-school-modal-actions-v72">
-                    <button class="rc-school-action rc-school-action-primary" type="button" x-on:click="openComposeForSchool(optimisticSchool?.id)">
+                    <button class="rc-school-action rc-school-action-primary" type="button" x-on:click.stop.prevent="openComposeForSchool(optimisticSchool?.id || optimisticSchool?.school_id || optimisticSchool?.business_id)">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         <span>Email Coaches</span>
                     </button>
