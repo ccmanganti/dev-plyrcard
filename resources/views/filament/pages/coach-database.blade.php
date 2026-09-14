@@ -12934,6 +12934,8 @@ CSS;
                         this.templateEditorOpenClient = true;
                         this.templateEditorTitle = 'New Template';
                         window.__rcTemplateClientMode = 'new';
+                        window.__plyrTemplateEditorPendingBodyBase64 = '';
+                        window.__plyrTemplateEditorPendingBodyKey = '';
                         this.$nextTick(() => {
                             if (typeof window.rcResetCoachDatabaseTemplateEditor === 'function') {
                                 window.rcResetCoachDatabaseTemplateEditor();
@@ -12952,7 +12954,7 @@ CSS;
                     }
                  }"
                  x-on:rc-template-editor-client-open.window="templateEditorOpenClient = true; templateEditorTitle = ($event.detail?.mode === 'new') ? 'New Template' : 'Edit Template'; window.__rcTemplateClientMode = $event.detail?.mode || ''"
-                 x-on:rc-template-saved-client.window="window.__rcTemplateClientMode = ''">
+                 x-on:rc-template-saved-client.window="window.__rcTemplateClientMode = ''; window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''">
                 <div x-show="!templateEditorOpenClient" x-cloak>
                     <div class="rc-templates-head-v50" style="margin-top:.25rem">
                         <div>
@@ -13002,7 +13004,7 @@ CSS;
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it.">
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now());">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -14134,9 +14136,17 @@ CSS;
                     const domKey = String(this.$refs.bodySource?.dataset?.refreshKey || this.$refs.editor?.dataset?.refreshKey || '').trim();
                     const attrBody = String(this.$refs.editor?.dataset?.initialBody || '').trim();
                     const pending = window.__plyrTemplateEditorLastRefresh || {};
+                    const cardBody = String(window.__plyrTemplateEditorPendingBodyBase64 || '').trim();
+                    const cardKey = String(window.__plyrTemplateEditorPendingBodyKey || '').trim();
+
+                    // v10.113.44: when editing from the template card, hydrate the editor
+                    // from the same full body used by the card preview. The Livewire
+                    // editor property can be stale because the editor is wire:ignore,
+                    // which made the edit box show only the first few variables while
+                    // the card preview had the complete saved content.
                     return {
-                        body: domBody || String(pending.body || '').trim() || attrBody,
-                        key: domKey || String(pending.key || '').trim(),
+                        body: cardBody || domBody || String(pending.body || '').trim() || attrBody,
+                        key: cardKey || domKey || String(pending.key || '').trim(),
                     };
                 },
                 templateEditorVisibleText(html) {
@@ -14178,6 +14188,10 @@ CSS;
                     this.$refs.editor.innerHTML = highlighted;
                     this.lastHydratedTemplateKey = String(key || this.$refs.editor.dataset.refreshKey || '');
                     this.lastHydratedTemplateBody = String(encoded || this.$refs.editor.dataset.initialBody || '');
+                    if (encoded && encoded === String(window.__plyrTemplateEditorPendingBodyBase64 || '')) {
+                        window.__plyrTemplateEditorPendingBodyBase64 = '';
+                        window.__plyrTemplateEditorPendingBodyKey = '';
+                    }
                     this.syncNow();
                 },
                 decodeBodyValue(initial) {
