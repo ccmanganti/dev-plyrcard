@@ -15780,16 +15780,22 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const bodyHtml = window.rcCollectCoachDatabaseTemplateHtml
         ? window.rcCollectCoachDatabaseTemplateHtml(editor)
         : String(editor.innerHTML || '');
+    const rawBodyHtml = String(editor.innerHTML || '');
+    const bodyText = String(editor.innerText || editor.textContent || '');
     window.__plyrTemplateEditorActiveBodyHtml = bodyHtml;
 
     const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
     if (hidden) hidden.value = bodyHtml;
 
+    const encode = (value) => window.rcTemplateUnicodeBase64 ? window.rcTemplateUnicodeBase64(value) : btoa(unescape(encodeURIComponent(String(value || ''))));
+
     await $wire.call('saveTemplateFromClientPayload', {
         name: String(name?.value || ''),
         subject: String(subject?.value || ''),
         preview_text: String(preview?.value || ''),
-        body_b64: window.rcTemplateUnicodeBase64 ? window.rcTemplateUnicodeBase64(bodyHtml) : btoa(bodyHtml),
+        body_b64: encode(bodyHtml),
+        raw_body_b64: encode(rawBodyHtml),
+        body_text_b64: encode(bodyText),
         force_new: window.__rcTemplateClientMode === 'new',
     });
 };

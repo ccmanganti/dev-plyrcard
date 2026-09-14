@@ -12817,27 +12817,19 @@ protected function ensureComposeBodyHasFooter(): void
     }
 
     /**
-     * v10.113.34: Save template editor payloads through a compact structured payload.
-     * Passing raw multiline HTML as separate Livewire arguments was unreliable on some
-     * browser/Livewire morph states and could save only the first visual line. The editor
-     * now sends body_b64 so paragraphs, merge chips, links, and inline images survive.
+     * Save template editor payloads through a compact structured payload.
+     *
+     * v10.113.35: The browser now sends three versions of the editor body:
+     * sanitized HTML, raw contenteditable HTML, and visible text. Some Chrome/
+     * contenteditable states can serialize only the first visual line in one of
+     * those sources, so the backend chooses the richest candidate before saving.
+     * This preserves multiline content, merge variables, inline images, and file
+     * attachments instead of saving only line one.
      */
     public function saveTemplateFromClientPayload(array $payload = []): void
     {
         $forceNew = (bool) ($payload['force_new'] ?? $payload['forceNew'] ?? false);
-        $body = '';
-        $encodedBody = trim((string) ($payload['body_b64'] ?? $payload['bodyBase64'] ?? ''));
-
-        if ($encodedBody !== '') {
-            $decoded = base64_decode($encodedBody, true);
-            if (is_string($decoded)) {
-                $body = $decoded;
-            }
-        }
-
-        if (trim($body) === '' && array_key_exists('body', $payload)) {
-            $body = (string) $payload['body'];
-        }
+        $body = $this->bestTemplateEditorPayloadBody($payload);
 
         $this->saveTemplateFromClient(
             name: (string) ($payload['name'] ?? ''),
@@ -12846,6 +12838,129 @@ protected function ensureComposeBodyHasFooter(): void
             body: $body,
             forceNew: $forceNew,
         );
+    }
+
+    protected function decodeTemplateEditorPayloadValue(mixed $value): string
+    {
+        $encoded = trim((string) $value);
+
+        if ($encoded === '') {
+            return '';
+        }
+
+        $decoded = base64_decode($encoded, true);
+
+        return is_string($decoded) ? $decoded : '';
+    }
+
+    protected function templatePayloadVisibleText(string $html): string
+    {
+        $value = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $value = str_replace("Â ", ' ', $value);
+        $value = preg_replace('/[ 	]+/', ' ', $value) ?? $value;
+        $value = preg_replace('/\R+/', "
+", $value) ?? $value;
+
+        return trim($value);
+    }
+
+    protected function templatePayloadVisibleLength(string $html): int
+    {
+        return mb_strlen($this->templatePayloadVisibleText($html));
+    }
+
+    protected function templatePayloadScore(string $html): int
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return 0;
+        }
+
+        $visibleLength = $this->templatePayloadVisibleLength($html);
+        $mergeTokens = preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_ .]{0,80}\s*\}\}/', $html) ?: 0;
+        $images = preg_match_all('/<\s*img/i', $html) ?: 0;
+        $blocks = preg_match_all('/<\s*(p|div|li|h1|h2|h3|blockquote|tr|br)/i', $html) ?: 0;
+
+        return ($visibleLength * 20) + ((int) strlen($html)) + ($mergeTokens * 500) + ($images * 1200) + ($blocks * 75);
+    }
+
+    protected function textPayloadToTemplateHtml(string $text, string $imageSourceHtml = ''): string
+    {
+        $text = str_replace("Â ", ' ', trim($text));
+
+        if ($text === '') {
+            return '';
+        }
+
+        $paragraphs = preg_split('/\R{2,}/', $text) ?: [$text];
+        $html = collect($paragraphs)
+            ->map(function (string $paragraph): string {
+                $paragraph = trim($paragraph);
+
+                if ($paragraph === '') {
+                    return '';
+                }
+
+                return '<p>' . nl2br(e($paragraph), false) . '</p>';
+            })
+            ->filter()
+            ->implode("
+");
+
+        if ($imageSourceHtml !== '' && ! preg_match('/<\s*img/i', $html)) {
+            preg_match_all('/<\s*img[^>]*>/i', $imageSourceHtml, $matches);
+            foreach (array_slice($matches[0] ?? [], 0, 12) as $imageTag) {
+                $html .= "
+<p>" . $this->sanitizeTemplateHtml($imageTag) . '</p>';
+            }
+        }
+
+        return trim($html);
+    }
+
+    protected function bestTemplateEditorPayloadBody(array $payload): string
+    {
+        $body = $this->decodeTemplateEditorPayloadValue($payload['body_b64'] ?? $payload['bodyBase64'] ?? '');
+        $rawBody = $this->decodeTemplateEditorPayloadValue($payload['raw_body_b64'] ?? $payload['rawBodyBase64'] ?? $payload['raw_html_b64'] ?? '');
+        $bodyText = $this->decodeTemplateEditorPayloadValue($payload['body_text_b64'] ?? $payload['bodyTextBase64'] ?? $payload['plain_text_b64'] ?? '');
+
+        if (trim($body) === '' && array_key_exists('body', $payload)) {
+            $body = (string) $payload['body'];
+        }
+
+        $candidates = collect([$body, $rawBody])
+            ->map(fn (string $candidate): string => trim($candidate))
+            ->filter(fn (string $candidate): bool => $candidate !== '')
+            ->unique()
+            ->values();
+
+        $best = $candidates
+            ->sortByDesc(fn (string $candidate): int => $this->templatePayloadScore($candidate))
+            ->first() ?? '';
+
+        $textHtml = $this->textPayloadToTemplateHtml($bodyText, $rawBody !== '' ? $rawBody : $body);
+
+        if ($textHtml !== '') {
+            $textLines = collect(preg_split('/\R+/', trim($bodyText)) ?: [])
+                ->map(fn (string $line): string => trim($line))
+                ->filter()
+                ->count();
+            $bestLines = collect(preg_split('/\R+/', $this->templatePayloadVisibleText($best)) ?: [])
+                ->map(fn (string $line): string => trim($line))
+                ->filter()
+                ->count();
+
+            if (
+                $best === ''
+                || ($textLines > $bestLines && $this->templatePayloadVisibleLength($textHtml) > ($this->templatePayloadVisibleLength($best) + 12))
+                || $this->templatePayloadScore($textHtml) > ($this->templatePayloadScore($best) + 400)
+            ) {
+                $best = $textHtml;
+            }
+        }
+
+        return trim($best);
     }
 
     public function saveTemplate(): void
