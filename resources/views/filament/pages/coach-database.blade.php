@@ -10485,6 +10485,15 @@ CSS;
                 .rc-message-status-v56.is-opened{color:#16a34a!important;}
                 .rc-message-status-v56.is-error{color:#dc2626!important;}
             </style>
+            <style id="rc-inbox-thread-star-position-v11329">
+                /* v10.113.29: starred inbox rows use a small yellow indicator pinned to the bottom-right. */
+                .rc-thread-card-v56{position:relative!important;padding-right:2.2rem!important;}
+                .rc-thread-card-side-v56{align-self:stretch!important;display:flex!important;flex-direction:column!important;align-items:flex-end!important;justify-content:flex-start!important;gap:.35rem!important;min-width:2.2rem!important;position:relative!important;padding-bottom:1.15rem!important;}
+                .rc-thread-star-v56{position:absolute!important;right:.03rem!important;bottom:.03rem!important;width:1rem!important;height:1rem!important;display:grid!important;place-items:center!important;color:#facc15!important;line-height:1!important;filter:drop-shadow(0 1px 1px rgba(92,64,0,.22))!important;pointer-events:none!important;}
+                .rc-thread-star-v56 svg{width:.95rem!important;height:.95rem!important;display:block!important;fill:currentColor!important;stroke:#d97706!important;stroke-width:1.35!important;}
+                .rc-thread-card-spinner-v11327{position:absolute!important;right:.03rem!important;bottom:.08rem!important;z-index:2!important;}
+                .rc-thread-card-v56.is-loading .rc-thread-star-v56{opacity:.18!important;}
+            </style>
             <div class="rc-inbox-page-v56">
                 <div class="rc-inbox-shell-v56">
                     <aside class="rc-inbox-left-v56">
