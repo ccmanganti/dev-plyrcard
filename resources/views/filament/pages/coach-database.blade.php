@@ -13933,7 +13933,7 @@ CSS;
                 highlightMergeTokens(html) {
                     // v10.113.43: Keep merge variables as normal text in the Template editor.
                     // The previous non-editable chip spans could hydrate only part of a saved
-                    // body when many {{Variable}} tokens were next to each other. The saved
+                    // body when many merge-variable tokens were next to each other. The saved
                     // database value is already correct, so the editor should render the exact
                     // stored HTML/text and let the save pipeline normalize the brackets.
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
@@ -14213,7 +14213,7 @@ CSS;
                 highlightMergeTokens(html) {
                     // v10.113.43: Keep merge variables as normal text in the Template editor.
                     // The previous non-editable chip spans could hydrate only part of a saved
-                    // body when many {{Variable}} tokens were next to each other. The saved
+                    // body when many merge-variable tokens were next to each other. The saved
                     // database value is already correct, so the editor should render the exact
                     // stored HTML/text and let the save pipeline normalize the brackets.
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
