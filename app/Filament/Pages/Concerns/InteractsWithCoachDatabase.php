@@ -12816,6 +12816,38 @@ protected function ensureComposeBodyHasFooter(): void
         $this->saveTemplate();
     }
 
+    /**
+     * v10.113.34: Save template editor payloads through a compact structured payload.
+     * Passing raw multiline HTML as separate Livewire arguments was unreliable on some
+     * browser/Livewire morph states and could save only the first visual line. The editor
+     * now sends body_b64 so paragraphs, merge chips, links, and inline images survive.
+     */
+    public function saveTemplateFromClientPayload(array $payload = []): void
+    {
+        $forceNew = (bool) ($payload['force_new'] ?? $payload['forceNew'] ?? false);
+        $body = '';
+        $encodedBody = trim((string) ($payload['body_b64'] ?? $payload['bodyBase64'] ?? ''));
+
+        if ($encodedBody !== '') {
+            $decoded = base64_decode($encodedBody, true);
+            if (is_string($decoded)) {
+                $body = $decoded;
+            }
+        }
+
+        if (trim($body) === '' && array_key_exists('body', $payload)) {
+            $body = (string) $payload['body'];
+        }
+
+        $this->saveTemplateFromClient(
+            name: (string) ($payload['name'] ?? ''),
+            subject: (string) ($payload['subject'] ?? ''),
+            previewText: (string) ($payload['preview_text'] ?? $payload['previewText'] ?? ''),
+            body: $body,
+            forceNew: $forceNew,
+        );
+    }
+
     public function saveTemplate(): void
     {
     $user = Auth::user();
@@ -12865,6 +12897,10 @@ protected function ensureComposeBodyHasFooter(): void
     $this->isSavingTemplate = true;
 
     try {
+        // v10.113.34: If the user chooses files and immediately clicks Save,
+        // finalize the pending Livewire uploads before persisting the template.
+        // This keeps image/file attachments attached to the saved template.
+        $this->addTemplateAttachments();
         $this->resolveTemplateGraphicUpload();
 
         $html = $this->appendAttachmentLinksToHtml(

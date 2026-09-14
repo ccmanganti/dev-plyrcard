@@ -12686,7 +12686,7 @@ CSS;
                         </div>
                         <div class="rc-templates-actions-v50">
                             <button class="rc-btn" type="button" x-data x-on:click="document.dispatchEvent(new CustomEvent('rc-open-template-preview'))"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg> Preview</button>
-                            <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent="window.rcSaveCoachDatabaseTemplate && window.rcSaveCoachDatabaseTemplate($wire)" wire:loading.attr="disabled" wire:target="saveTemplateFromClient"><span wire:loading.remove wire:target="saveTemplateFromClient">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplateFromClient" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
+                            <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent="window.rcSaveCoachDatabaseTemplate && window.rcSaveCoachDatabaseTemplate($wire)" wire:loading.attr="disabled" wire:target="saveTemplateFromClient,saveTemplateFromClientPayload,templateAttachmentUploads,addTemplateAttachments,uploadTemplateEditorImage"><span wire:loading.remove wire:target="saveTemplateFromClient,saveTemplateFromClientPayload">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplateFromClient,saveTemplateFromClientPayload" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
                         </div>
                     </div>
 
@@ -13485,11 +13485,9 @@ CSS;
                     if (modelName && this.$wire) this.$wire.set(modelName, html, false);
                 },
                 serializeEditorHtml() {
-                    const clone = this.$refs.editor.cloneNode(true);
-                    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
-                        node.replaceWith(document.createTextNode(node.textContent || ''));
-                    });
-                    return clone.innerHTML || '';
+                    return window.rcCollectCoachDatabaseTemplateHtml
+                        ? window.rcCollectCoachDatabaseTemplateHtml(this.$refs.editor)
+                        : (this.$refs.editor?.innerHTML || '');
                 },
                 focusEditor() { this.$refs.editor?.focus(); },
                 command(name, value = null) {
@@ -13748,6 +13746,7 @@ CSS;
 
                     const html = this.serializeEditorHtml();
                     this.$refs.hidden.value = html;
+                    window.__plyrTemplateEditorActiveBodyHtml = html;
                 },
                 serializeEditorHtml() {
                     const clone = this.$refs.editor.cloneNode(true);
@@ -15688,6 +15687,59 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 @endif
 
 <script data-navigate-once>
+window.rcTemplateUnicodeBase64 = function (value) {
+    const source = String(value || '');
+    try {
+        return btoa(unescape(encodeURIComponent(source)));
+    } catch (_) {
+        return btoa(source);
+    }
+};
+
+window.rcVisibleCoachDatabaseTemplateEditor = function () {
+    const editors = Array.from(document.querySelectorAll('[data-plyr-template-editor]'));
+    return editors.find((editor) => {
+        const rect = editor.getBoundingClientRect?.();
+        return rect && rect.width > 0 && rect.height > 0 && editor.offsetParent !== null;
+    }) || editors[editors.length - 1] || null;
+};
+
+window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
+    if (!editor) return '';
+
+    const clone = editor.cloneNode(true);
+    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
+        node.replaceWith(document.createTextNode(node.textContent || ''));
+    });
+    clone.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
+    clone.querySelectorAll('[data-placeholder]').forEach((node) => node.removeAttribute('data-placeholder'));
+
+    let html = String(clone.innerHTML || '').trim();
+    const plain = String(editor.innerText || editor.textContent || '').replace(/\u00a0/g, ' ').trim();
+
+    // Some contenteditable states can expose only the first visual line in innerHTML
+    // while innerText still contains the full multiline body. When that happens,
+    // rebuild safe paragraphs so Save keeps every line instead of only line one.
+    const htmlText = String(clone.textContent || '').replace(/\u00a0/g, ' ').trim();
+    const hasRealHtml = /<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i.test(html);
+    if (plain.includes('\n') && (!hasRealHtml || (htmlText && plain.length > htmlText.length + 8))) {
+        html = plain
+            .split(/\n{2,}/)
+            .map((paragraph) => paragraph.trim())
+            .filter(Boolean)
+            .map((paragraph) => '<p>' + paragraph
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;')
+                .replace(/\n/g, '<br>') + '</p>')
+            .join('\n');
+    }
+
+    return html || '<p><br></p>';
+};
+
 window.rcResetCoachDatabaseTemplateEditor = function () {
     window.__rcTemplateClientMode = 'new';
     const name = document.querySelector('[data-plyr-template-name]');
@@ -15717,25 +15769,29 @@ window.rcResetCoachDatabaseTemplateEditor = function () {
 };
 
 window.rcSaveCoachDatabaseTemplate = async function ($wire) {
-    const editor = document.querySelector('[data-plyr-template-editor]');
+    const editor = window.rcVisibleCoachDatabaseTemplateEditor ? window.rcVisibleCoachDatabaseTemplateEditor() : document.querySelector('[data-plyr-template-editor]');
     const name = document.querySelector('[data-plyr-template-name]');
     const subject = document.querySelector('[data-plyr-template-subject]');
     const preview = document.querySelector('[data-plyr-template-preview]');
     if (!editor || !$wire) return;
 
-    const clone = editor.cloneNode(true);
-    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
-        node.replaceWith(document.createTextNode(node.textContent || ''));
-    });
+    // Force one final capture from the live contenteditable before the Livewire call.
+    editor.dispatchEvent(new Event('input', { bubbles: true }));
+    const bodyHtml = window.rcCollectCoachDatabaseTemplateHtml
+        ? window.rcCollectCoachDatabaseTemplateHtml(editor)
+        : String(editor.innerHTML || '');
+    window.__plyrTemplateEditorActiveBodyHtml = bodyHtml;
 
-    await $wire.call(
-        'saveTemplateFromClient',
-        String(name?.value || ''),
-        String(subject?.value || ''),
-        String(preview?.value || ''),
-        String(clone.innerHTML || ''),
-        window.__rcTemplateClientMode === 'new'
-    );
+    const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
+    if (hidden) hidden.value = bodyHtml;
+
+    await $wire.call('saveTemplateFromClientPayload', {
+        name: String(name?.value || ''),
+        subject: String(subject?.value || ''),
+        preview_text: String(preview?.value || ''),
+        body_b64: window.rcTemplateUnicodeBase64 ? window.rcTemplateUnicodeBase64(bodyHtml) : btoa(bodyHtml),
+        force_new: window.__rcTemplateClientMode === 'new',
+    });
 };
 </script>
 
