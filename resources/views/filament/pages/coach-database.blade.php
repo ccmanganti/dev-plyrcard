@@ -1,16 +1,13 @@
 @php
-    // v10.113.14: keep the giant school catalog out of Inbox/template Livewire morphs.
-    // The catalog is only seeded on sections that can actually open/search schools.
-    $rcActiveSectionForSeed = (string) ($section ?? 'dashboard');
-    $rcCatalogHeavySections = ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'campaigns'];
-
+    // v10.103.2: send the canonical local school catalog once, then reuse the browser
+    // copy for instant Recruiting Center navigation instead of serializing it again
+    // in every Livewire response. The cache is keyed by the currently authenticated user.
     $rcCatalogUser = auth()->user();
     $rcCatalogGender = $rcCatalogUser
         ? (\App\Models\Coach::normalizeGender($rcCatalogUser->gender ?? null) ?: 'unassigned')
         : 'guest';
     $rcCatalogUserKey = (string) ($rcCatalogUser?->getKey() ?? 'guest') . ':' . $rcCatalogGender . ':drawer-v101123';
-    $shouldSeedSchoolCatalog = in_array($rcActiveSectionForSeed, $rcCatalogHeavySections, true)
-        && ! ($this->browserSchoolCatalogSeeded ?? false)
+    $shouldSeedSchoolCatalog = ! ($this->browserSchoolCatalogSeeded ?? false)
         && ($this->allowed ?? false)
         && ! ($this->locked ?? false)
         && ! ($this->isFreePlanAccount ?? false);
@@ -638,17 +635,16 @@ discoverSelectedIds: [],
                 const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
                 this.closeDiscoverSchool();
 
-                // Activate Compose only when that panel is already present in the persistent shell.
-                // When this build renders only the current section, Compose may not exist in the DOM;
-                // in that case, use normal navigation so the server mounts the Compose section and
-                // preselects the school from the query string instead of showing a blank panel.
-                const activated = typeof window.__plyrRcActivateSectionClientOnly === 'function'
-                    ? window.__plyrRcActivateSectionClientOnly('compose', href, false)
-                    : false;
-
-                if (!activated) {
-                    window.location.assign(href);
-                    return;
+                // Activate the already-mounted Compose panel synchronously. The Livewire
+                // call below only attaches the canonical school to the compose form.
+                if (typeof window.__plyrRcActivateSectionClientOnly === 'function') {
+                    window.__plyrRcActivateSectionClientOnly('compose', href, false);
+                } else {
+                    this.activeSection = 'compose';
+                    this.$el.dataset.rcCurrentSection = 'compose';
+                    window.dispatchEvent(new CustomEvent('rc-client-section', { detail: { section: 'compose' } }));
+                    const target = new URL(href, window.location.href);
+                    window.history.pushState({ ...(window.history.state || {}), rcSection: 'compose' }, '', target.pathname + target.search + target.hash);
                 }
 
                 return Promise.resolve(this.$wire.composeEmailSchool(id));
@@ -7143,9 +7139,7 @@ discoverSelectedIds: [],
         </div>
 
         <div class="rc-section-host-v1033">
-        
-        @if(in_array((string) ($section ?? 'dashboard'), ['dashboard', 'profile-views', 'coach-engagement'], true) || ($isStatDrawerOpen ?? false))
-<section class="rc-client-panel-v1033" data-rc-client-section="dashboard" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="dashboard" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 // v10.113: lower dashboard cards use the current local/tracked read models.
@@ -7893,8 +7887,6 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
-
 
         <div class="rc-dashboard-persistent-v1033" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
@@ -8565,9 +8557,7 @@ discoverSelectedIds: [],
             </div>
         @endif
 
-        
-        @if((string) ($section ?? 'dashboard') === 'schools')
-<section class="rc-client-panel-v1033" data-rc-client-section="schools" x-show="activeSection === 'schools'" style="{{ ($section === 'schools') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="schools" x-show="activeSection === 'schools'" style="{{ ($section === 'schools') ? '' : 'display:none;' }}">
             @php
                 $discoverSchoolCount = (int) ($this->filteredSchoolsCount ?? 0);
                 $discoverLoadedCount = (int) ($loadedSchoolsCount ?? 0);
@@ -9598,13 +9588,9 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
 
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'favorites')
-<section class="rc-client-panel-v1033" data-rc-client-section="favorites" x-show="activeSection === 'favorites'" style="{{ ($section === 'favorites') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="favorites" x-show="activeSection === 'favorites'" style="{{ ($section === 'favorites') ? '' : 'display:none;' }}">
             <style>
                 .rc-favorites-v37 { display:grid; gap:1.05rem; margin-top:1.15rem; }
                 .rc-favorites-head-v37 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
@@ -9793,12 +9779,8 @@ discoverSelectedIds: [],
                 @endif
             </div>
         </section>
-        @endif
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'lists')
-<section class="rc-client-panel-v1033" data-rc-client-section="lists" x-show="activeSection === 'lists'" style="{{ ($section === 'lists') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="lists" x-show="activeSection === 'lists'" style="{{ ($section === 'lists') ? '' : 'display:none;' }}">
             <style>
                 .rc-my-lists-v115{display:grid;gap:1.15rem}
                 .rc-my-lists-head-v115{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-top:.25rem}
@@ -10029,13 +10011,9 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
 
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'coaches')
-<section class="rc-client-panel-v1033" data-rc-client-section="coaches" x-show="activeSection === 'coaches'" style="{{ ($section === 'coaches') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="coaches" x-show="activeSection === 'coaches'" style="{{ ($section === 'coaches') ? '' : 'display:none;' }}">
             <div class="rc-card rc-toolbar is-flat"><input class="rc-input" placeholder="Search coaches" wire:model.live.debounce.400ms="coachSearch" /></div>
             <div class="rc-card">
                 @forelse($this->filteredCoaches as $coach)
@@ -10046,13 +10024,9 @@ discoverSelectedIds: [],
                 @if($this->canLoadMoreCoaches)<div style="margin-top:1rem"><button class="rc-btn" wire:click="loadMoreCoaches">Load more</button></div>@endif
             </div>
         </section>
-        @endif
-
 
         {{-- v118: Inbox restored from the supplied latest reference implementation. --}}
-        
-        @if((string) ($section ?? 'dashboard') === 'conversations')
-<section class="rc-client-panel-v1033" data-rc-client-section="conversations" x-show="activeSection === 'conversations'" style="{{ ($section === 'conversations') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="conversations" x-show="activeSection === 'conversations'" style="{{ ($section === 'conversations') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
@@ -10114,11 +10088,7 @@ discoverSelectedIds: [],
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $filteredConversationTotal = (int) ($this->filteredConversationTotal ?? $inboxConversations->count());
                 $canLoadMoreInboxConversations = (bool) ($this->canLoadMoreInboxConversations ?? false);
-                $allConversationRows = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row))->values();
-                $unreadConversationCount = $allConversationRows->filter(fn ($row) => (int) ($row['unread_count'] ?? $row['unreadCount'] ?? $row['unreadMessagesCount'] ?? 0) > 0)->count();
-                $incomingConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['awaiting_reply'] ?? false))->count();
-                $starredConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count();
-                $selectedConversation = $selectedConversationId ? $allConversationRows->firstWhere('id', $selectedConversationId) : null;
+                $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
                 $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
                 $selectedEmail = strtolower(trim((string) ($selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '')));
 
@@ -10226,41 +10196,11 @@ discoverSelectedIds: [],
                         return is_scalar($value) ? (string) $value : '';
                     }
                 };
-                $prepareInboxMessageHtml = function ($body, array $message = []): string {
-                    $candidateValues = [
-                        $body,
-                        $message['_body_text'] ?? null,
-                        $message['body_text'] ?? null,
-                        $message['plain_text'] ?? null,
-                        $message['plainText'] ?? null,
-                        $message['text_body'] ?? null,
-                        $message['textBody'] ?? null,
-                        $message['text'] ?? null,
-                        $message['snippet'] ?? null,
-                        $message['preview'] ?? null,
-                        $message['bodyPreview'] ?? null,
-                        $message['message_preview'] ?? null,
-                        data_get($message, 'message.text'),
-                        data_get($message, 'message.body'),
-                        data_get($message, 'emailMessage.text'),
-                        data_get($message, 'emailMessage.body'),
-                        data_get($message, 'email.body'),
-                        data_get($message, 'meta.email.text'),
-                        data_get($message, 'meta.email.body'),
-                        data_get($message, 'payload.text'),
-                        data_get($message, 'payload.body'),
-                    ];
-
-                    $raw = '';
-                    foreach ($candidateValues as $candidate) {
-                        if (is_scalar($candidate) && trim((string) $candidate) !== '') {
-                            $raw = trim((string) $candidate);
-                            break;
-                        }
-                    }
+                $prepareInboxEmailDocument = function ($body): string {
+                    $raw = trim((string) $body);
 
                     if ($raw === '') {
-                        return '<span class="rc-msg-empty-v11315">No visible message content was included.</span>';
+                        return '<!doctype html><html><body style="margin:0;font:14px Arial,sans-serif;color:#64748b">No message body.</body></html>';
                     }
 
                     $decoded = $raw;
@@ -10272,53 +10212,99 @@ discoverSelectedIds: [],
                         $decoded = $next;
                     }
 
-                    $decoded = preg_replace('/<\s*(script|style|noscript)\b[^>]*>.*?<\s*\/\s*\1\s*>/is', ' ', $decoded) ?? $decoded;
-                    $decoded = preg_replace('/<!--.*?-->/s', ' ', $decoded) ?? $decoded;
+                    $hasDocumentHtml = (bool) preg_match('/<!doctype\s+html|<html\b|<head\b|<body\b/i', $decoded);
+                    $hasHtml = (bool) preg_match('/<\s*(table|tbody|tr|td|p|div|br|a|img|ul|ol|li|span|strong|em|h[1-6])\b/i', $decoded);
 
-                    if (preg_match('/<body\b[^>]*>(.*?)<\/body\s*>/is', $decoded, $match)) {
-                        $decoded = $match[1];
+                    if (! $hasHtml) {
+                        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+                            . '<body style="margin:0;padding:0;font:14px/1.6 Arial,sans-serif;color:#111827;white-space:pre-wrap;overflow-wrap:anywhere">'
+                            . e($decoded)
+                            . '</body></html>';
                     }
 
-                    // Convert common block tags to line breaks before stripping HTML.
-                    $decoded = preg_replace('/<\s*br\s*\/?>/i', "\n", $decoded) ?? $decoded;
-                    $decoded = preg_replace('/<\s*\/\s*(p|div|li|h[1-6]|tr|table|section|article|blockquote)\s*>/i', "\n", $decoded) ?? $decoded;
-                    $decoded = preg_replace('/<\s*(p|div|li|h[1-6]|tr|table|section|article|blockquote)\b[^>]*>/i', "\n", $decoded) ?? $decoded;
+                    // inbox's email detail endpoint returns the complete compiled email
+                    // document in emailMessage.body. Keep its head, style blocks,
+                    // media queries, tables, buttons, images, and signatures intact.
+                    // Scripts are removed because email clients do not execute them.
+                    $clean = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $decoded) ?? $decoded;
+                    $clean = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $clean) ?? $clean;
+                    $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
+                    $clean = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $clean) ?? $clean;
 
-                    $text = strip_tags($decoded);
-                    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                    $text = str_replace(["\xc2\xa0", '&nbsp;'], ' ', $text);
-                    $text = preg_replace('/[ \t\r\f\v]+/', ' ', $text) ?? $text;
-                    $text = preg_replace('/\n[ \t]+/', "\n", $text) ?? $text;
-                    $text = preg_replace('/[ \t]+\n/', "\n", $text) ?? $text;
-                    $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
-                    $text = trim($text);
+                    $responsiveEmailCss = <<<'CSS'
+<style id="rc-inbox-email-fit-v62">
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        -webkit-text-size-adjust: 100% !important;
+        text-size-adjust: 100% !important;
+    }
+    body {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+    body, body table, body td, body div, body p, body span,
+    body a, body li, body strong, body em {
+        box-sizing: border-box !important;
+        max-width: 100% !important;
+    }
+    body table {
+        max-width: 100% !important;
+    }
+    body img {
+        max-width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+    }
+    body p, body li, body td, body div, body span, body a {
+        overflow-wrap: anywhere !important;
+        word-break: normal !important;
+    }
+    body p, body li, body td, body div, body span {
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+    }
+    body a {
+        font-size: 12px !important;
+        line-height: 1.35 !important;
+    }
+    body h1 { font-size: 20px !important; line-height: 1.2 !important; }
+    body h2 { font-size: 18px !important; line-height: 1.22 !important; }
+    body h3 { font-size: 16px !important; line-height: 1.25 !important; }
+    body h4, body h5, body h6 { font-size: 14px !important; line-height: 1.3 !important; }
+    .email-content,
+    body > div,
+    body > table {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+    @media (max-width: 640px) {
+        body table[width] { width: 100% !important; }
+        body td[width] { max-width: 100% !important; }
+    }
+</style>
+CSS;
 
-                    if ($text === '') {
-                        foreach (['subject', 'preview', 'snippet'] as $fallbackKey) {
-                            $fallback = $message[$fallbackKey] ?? null;
-                            if (is_scalar($fallback) && trim((string) $fallback) !== '') {
-                                $text = trim((string) $fallback);
-                                break;
-                            }
+                    if ($hasDocumentHtml) {
+                        if (preg_match('/<\/head\s*>/i', $clean)) {
+                            return preg_replace('/<\/head\s*>/i', $responsiveEmailCss . '</head>', $clean, 1) ?? $clean;
                         }
+
+                        if (preg_match('/<body\b/i', $clean)) {
+                            return preg_replace('/<body\b/i', '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' . $responsiveEmailCss . '</head><body', $clean, 1) ?? $clean;
+                        }
+
+                        return $responsiveEmailCss . $clean;
                     }
 
-                    if ($text === '') {
-                        return '<span class="rc-msg-empty-v11315">No visible message content was included.</span>';
-                    }
-
-                    if (mb_strlen($text) > 8000) {
-                        $text = mb_substr($text, 0, 8000) . '…';
-                    }
-
-                    $escaped = e($text);
-                    $escaped = preg_replace_callback('/\bhttps?:\/\/[^\s<]+/i', function (array $match): string {
-                        $url = rtrim($match[0], '.,);]');
-                        $tail = substr($match[0], strlen($url));
-                        return '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer">' . e($url) . '</a>' . e($tail);
-                    }, $escaped) ?? $escaped;
-
-                    return nl2br($escaped, false);
+                    return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                        . $responsiveEmailCss
+                        . '</head><body style="margin:0;padding:0">' . $clean . '</body></html>';
                 };
             @endphp
 
@@ -10333,24 +10319,19 @@ discoverSelectedIds: [],
                     padding:.55rem;
                     overflow:visible;
                 }
-                .rc-msg-content-v11315 {
+                rc-inbox-email-view.rc-email-document-v64 {
                     display:block;
+                    width:100%;
                     max-width:100%;
-                    color:var(--rc-text);
-                    font-size:.84rem;
-                    line-height:1.55;
-                    white-space:normal;
-                    overflow-wrap:anywhere;
-                    word-break:normal;
+                    height:auto;
+                    min-height:0;
+                    overflow:visible;
+                    contain:layout style;
                 }
-                .rc-msg-content-v11315 a {
-                    color:#2563eb;
-                    text-decoration:underline;
-                    overflow-wrap:anywhere;
-                }
-                .rc-msg-empty-v11315 {
-                    color:var(--rc-muted);
-                    font-style:italic;
+                rc-inbox-email-view.rc-email-document-v64::part(toggle) {
+                    position:absolute;
+                    right:.25rem;
+                    bottom:.2rem;
                 }
                 .rc-message-stream-v56 { position:relative; }
                 .rc-inbox-thread-loader-v63 {
@@ -10426,6 +10407,119 @@ discoverSelectedIds: [],
                 .rc-thread-loading-copy-v11312 small{display:inline-flex;align-items:center;gap:.38rem;margin-top:.68rem;color:var(--rc-muted);font-size:.74rem;}
             </style>
             <script>
+                (() => {
+                    if (customElements.get('rc-inbox-email-view')) return;
+
+                    class RcInboxEmailView extends HTMLElement {
+                        connectedCallback() {
+                            if (this.shadowRoot) return;
+
+                            const template = this.querySelector('template');
+                            if (!(template instanceof HTMLTemplateElement)) return;
+
+                            const parsed = new DOMParser().parseFromString(template.innerHTML, 'text/html');
+                            const shadow = this.attachShadow({ mode: 'open' });
+
+                            const base = document.createElement('style');
+                            base.textContent = `
+                                :host { display:block; width:100%; max-width:100%; height:auto; min-height:0; position:relative; }
+                                *, *::before, *::after { box-sizing:border-box; }
+                                .rc-email-viewport { display:block; width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; transition:max-height .18s ease; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px; overflow:hidden; padding-right:2rem; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:""; position:absolute; left:0; right:0; bottom:0; height:2.75rem; z-index:2; pointer-events:none; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)); }
+                                .rc-email-root { display:block; width:100%; max-width:100%; min-width:0; margin:0; overflow:visible; font-size:12px; line-height:1.45; }
+                                .rc-email-root img { max-width:100% !important; height:auto !important; }
+                                .rc-email-root table { max-width:100% !important; }
+                                .rc-email-root td, .rc-email-root th { max-width:100% !important; }
+                                .rc-email-root a { overflow-wrap:anywhere; word-break:break-word; }
+                                .rc-email-toggle { display:none; position:absolute; right:.2rem; bottom:.18rem; z-index:4; width:1.75rem; height:1.75rem; padding:0; border:0; border-radius:0; background:transparent; color:#475569; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; }
+                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex; }
+                                .rc-email-toggle svg { width:.9rem; height:.9rem; transition:transform .18s ease; }
+                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg); }
+                            `;
+                            shadow.appendChild(base);
+
+                            parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+                                const clone = node.cloneNode(true);
+                                if (clone instanceof HTMLStyleElement) {
+                                    clone.textContent = String(clone.textContent || '').replace(/\bbody\b/g, '.rc-email-root');
+                                }
+                                shadow.appendChild(clone);
+                            });
+
+                            const viewport = document.createElement('div');
+                            viewport.className = 'rc-email-viewport';
+
+                            const root = document.createElement('div');
+                            root.className = `rc-email-root ${parsed.body.className || ''}`.trim();
+
+                            const bodyStyle = parsed.body.getAttribute('style');
+                            if (bodyStyle) root.setAttribute('style', bodyStyle);
+
+                            Array.from(parsed.body.childNodes).forEach((node) => {
+                                root.appendChild(document.importNode(node, true));
+                            });
+
+                            viewport.appendChild(root);
+                            shadow.appendChild(viewport);
+
+                            const toggle = document.createElement('button');
+                            toggle.type = 'button';
+                            toggle.className = 'rc-email-toggle';
+                            toggle.setAttribute('part', 'toggle');
+                            toggle.setAttribute('aria-label', 'Expand email');
+                            toggle.setAttribute('aria-expanded', 'false');
+                            toggle.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+                            toggle.addEventListener('click', () => {
+                                const expanded = this.dataset.expanded === '1';
+                                if (expanded) {
+                                    delete this.dataset.expanded;
+                                    toggle.setAttribute('aria-expanded', 'false');
+                                    toggle.setAttribute('aria-label', 'Expand email');
+                                } else {
+                                    this.dataset.expanded = '1';
+                                    toggle.setAttribute('aria-expanded', 'true');
+                                    toggle.setAttribute('aria-label', 'Collapse email');
+                                }
+                            });
+                            shadow.appendChild(toggle);
+
+                            // Keep inbox controls authoritative even after delayed email
+                            // stylesheets finish loading. Email HTML can contain broad rules
+                            // such as div/button/* selectors, so this guard must be the final
+                            // stylesheet in the shadow root and use !important.
+                            const guard = document.createElement('style');
+                            guard.textContent = `
+                                :host { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; min-height:0 !important; position:relative !important; overflow:visible !important; }
+                                .rc-email-viewport { display:block !important; width:100% !important; max-width:100% !important; min-width:0 !important; max-height:none !important; height:auto !important; overflow:visible !important; position:relative !important; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px !important; overflow:hidden !important; padding-right:2rem !important; }
+                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:"" !important; display:block !important; position:absolute !important; left:0 !important; right:0 !important; bottom:0 !important; height:2.75rem !important; z-index:2147483645 !important; pointer-events:none !important; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)) !important; }
+                                .rc-email-toggle { display:none !important; position:absolute !important; right:.2rem !important; bottom:.18rem !important; z-index:2147483646 !important; width:1.75rem !important; height:1.75rem !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:#475569 !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; box-shadow:none !important; appearance:none !important; }
+                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex !important; }
+                                .rc-email-toggle svg { display:block !important; width:.9rem !important; height:.9rem !important; min-width:.9rem !important; min-height:.9rem !important; transition:transform .18s ease !important; }
+                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg) !important; }
+                            `;
+                            shadow.appendChild(guard);
+                            template.remove();
+
+                            const evaluateHeight = () => {
+                                const height = Math.ceil(root.getBoundingClientRect().height);
+                                if (height > 100) this.dataset.collapsible = '1';
+                            };
+
+                            requestAnimationFrame(() => requestAnimationFrame(evaluateHeight));
+                            root.querySelectorAll('img').forEach((image) => {
+                                if (!image.complete) {
+                                    image.addEventListener('load', evaluateHeight, { once:true });
+                                    image.addEventListener('error', evaluateHeight, { once:true });
+                                }
+                            });
+                            if (document.fonts?.ready) document.fonts.ready.then(evaluateHeight).catch(() => {});
+                        }
+                    }
+
+                    customElements.define('rc-inbox-email-view', RcInboxEmailView);
+                })();
 
                 (() => {
                     let activeRun = 0;
@@ -10640,14 +10734,17 @@ discoverSelectedIds: [],
                             <button type="button" class="{{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
                             <button type="button" class="{{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">
                                 Unread
+                                @php $unreadConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (int) ($row['unread_count'] ?? 0) > 0)->count(); @endphp
                                 <span wire:key="unread-count-{{ $unreadConversationCount }}">{{ $unreadConversationCount }}</span>
                             </button>
                             <button type="button" class="{{ $filterStatus === 'incoming' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'incoming')">
                                 Incoming
+                                @php $incomingConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['awaiting_reply'] ?? false))->count(); @endphp
                                 <span wire:key="incoming-count-{{ $incomingConversationCount }}">{{ $incomingConversationCount }}</span>
                             </button>
                             <button type="button" class="{{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">
                                 Starred
+                                @php $starredConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count(); @endphp
                                 <span wire:key="starred-count-{{ $starredConversationCount }}">{{ $starredConversationCount }}</span>
                             </button>
                         </div>
@@ -10671,14 +10768,9 @@ discoverSelectedIds: [],
 
                                     this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
 
-                                    // v10.113.14: this Alpine island can be recreated by a Livewire morph.
-                                    // Autoload once per selected thread per page URL only, otherwise an empty
-                                    // or failed thread can keep re-triggering and make the whole RC feel frozen.
-                                    const bootKey = String(window.location.pathname || '') + ':' + String(this.selectedConversationId || '');
-                                    if (this.selectedConversationId
-                                        && ! this.conversationHasRenderedMessages()
-                                        && window.__rcInboxBootAutoloadedFor !== bootKey) {
-                                        window.__rcInboxBootAutoloadedFor = bootKey;
+                                    // Reloads should show the selected thread automatically. This is a
+                                    // single request only, not the old select -> worker -> poll chain.
+                                    if (this.selectedConversationId && ! this.conversationHasRenderedMessages()) {
                                         this.loadConversation(this.selectedConversationId, false, true);
                                     }
                                 },
@@ -10703,43 +10795,16 @@ discoverSelectedIds: [],
                                     const id = String(conversationId || '');
                                     if (! id) return;
 
+                                    const token = ++this.requestToken;
                                     this.selectedConversationId = id;
                                     this.setThreadLoading(id);
 
-                                    window.__rcInboxMessageLoader = window.__rcInboxMessageLoader || { busy: false, queued: '', promise: null, lastId: '', lastAt: 0 };
-                                    const loader = window.__rcInboxMessageLoader;
-                                    const now = Date.now();
-
-                                    if (!force && loader.busy) {
-                                        loader.queued = id;
-                                        return loader.promise;
-                                    }
-
-                                    if (!force && loader.lastId === id && (now - Number(loader.lastAt || 0)) < 1250) {
-                                        window.requestAnimationFrame(() => this.clearThreadLoading(id, 0));
-                                        return Promise.resolve();
-                                    }
-
-                                    const token = ++this.requestToken;
-                                    loader.busy = true;
-                                    loader.queued = '';
-                                    loader.promise = Promise.resolve(this.$wire.openConversationAndLoadLatestMessages(id, force))
+                                    return Promise.resolve(this.$wire.openConversationAndLoadLatestMessages(id, force))
                                         .catch(() => {})
                                         .finally(() => {
-                                            loader.busy = false;
-                                            loader.lastId = id;
-                                            loader.lastAt = Date.now();
-
+                                            // Let the Livewire morph land first, then remove the local overlay.
                                             window.requestAnimationFrame(() => this.clearThreadLoading(id, token));
-
-                                            const queued = String(loader.queued || '');
-                                            loader.queued = '';
-                                            if (queued && queued !== id) {
-                                                window.setTimeout(() => this.loadConversation(queued, false, false), 0);
-                                            }
                                         });
-
-                                    return loader.promise;
                                 },
                                 selectConversation(conversationId) {
                                     const id = String(conversationId || '');
@@ -10929,10 +10994,6 @@ discoverSelectedIds: [],
                                                 }
                                             }
                                             $messageBody = collect([
-                                                $message['_body_text'] ?? null,
-                                                $message['body_text'] ?? null,
-                                                $message['plain_text'] ?? null,
-                                                $message['plainText'] ?? null,
                                                 $decodedCompressedBody,
                                                 $message['html_body'] ?? null,
                                                 $message['htmlBody'] ?? null,
@@ -10975,10 +11036,12 @@ discoverSelectedIds: [],
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
                                                 @php
-                                                    $messageHtml = $prepareInboxMessageHtml($messageBody, $message);
+                                                    $emailDocument = $prepareInboxEmailDocument($messageBody);
                                                 @endphp
                                                 <div class="rc-msg-bubble-v56 rc-msg-bubble-email-v61">
-                                                    <div class="rc-msg-content-v11315">{!! $messageHtml !!}</div>
+                                                    <rc-inbox-email-view wire:ignore class="rc-email-document-v64" aria-label="Email message">
+                                                        <template>{!! $emailDocument !!}</template>
+                                                    </rc-inbox-email-view>
                                                 </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
@@ -11552,12 +11615,8 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'photos')
-<section class="rc-client-panel-v1033" data-rc-client-section="photos" x-show="activeSection === 'photos'" style="{{ ($section === 'photos') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="photos" x-show="activeSection === 'photos'" style="{{ ($section === 'photos') ? '' : 'display:none;' }}">
             @php
                 $mediaGallery = $this->mediaGallery;
                 $playerGallery = collect($mediaGallery['player'] ?? [])->values();
@@ -11671,23 +11730,15 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'support')
-<section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
             {{-- v10.87: The Support page is intentionally self-contained. --}}
             <div class="rc-support-page-v1 rc-support-page-clean-v87">
                 @include('filament.partials.support-ticket-form')
             </div>
         </section>
-        @endif
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'schedule')
-<section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
@@ -11739,12 +11790,8 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'settings')
-<section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
@@ -11894,13 +11941,9 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
-
 
         {{-- v118: Compose school/coach selection is browser-local; the send API is touched only when sending. --}}
-        
-        @if((string) ($section ?? 'dashboard') === 'compose')
-<section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
             <script>
                 (() => {
                     if (window.__rcComposeLegacyOpenerGuardV82) return;
@@ -12531,12 +12574,8 @@ discoverSelectedIds: [],
             </div>
             @endteleport
         </section>
-        @endif
 
-
-        
-        @if((string) ($section ?? 'dashboard') === 'campaigns')
-<section class="rc-client-panel-v1033" data-rc-client-section="campaigns" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
+        <section class="rc-client-panel-v1033" data-rc-client-section="campaigns" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header')
 
             {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
@@ -12802,8 +12841,6 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-        @endif
-
 
 
         @if($selectedCoachId && $section !== 'conversations')
@@ -15639,11 +15676,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         return true;
     };
 
-    const renderedSectionPanel = (section) => {
-        const safe = String(section || '').replace(/[^a-z0-9_-]/gi, '');
-        return !!safe && !!document.querySelector(`[data-rc-client-section="${safe}"]`);
-    };
-
     const sectionLabels = {
         dashboard: 'Dashboard',
         schools: 'Discover Schools',
@@ -15717,11 +15749,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const root = currentRoot();
         if (!root || !section) return false;
 
-        // v10.113.16: this page may render only the active section to keep Inbox fast.
-        // Never switch the browser to a section that is not actually mounted, because
-        // Alpine would hide the current panel and leave the content area blank.
-        if (!renderedSectionPanel(section)) return false;
-
         root.dataset.rcCurrentSection = section;
         if (section !== 'conversations') {
             document.documentElement.removeAttribute('data-rc-inbox-loading');
@@ -15750,15 +15777,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const root = currentRoot();
         if (!root || !section) return false;
 
-        if (!renderedSectionPanel(section)) {
-            if (href) {
-                const target = new URL(href, window.location.href);
-                window.location.assign(target.href);
-                return true;
-            }
-            return false;
-        }
-
         const alreadyActive = root.dataset.rcCurrentSection === section;
         if (!activateSectionClientOnly(section, href, replace)) return false;
 
@@ -15785,7 +15803,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const section = sectionFromAnchor(anchor);
         if (!section) return;
         if (isFreePlan() && freePlanLockedSections.has(section)) return;
-        if (!renderedSectionPanel(section)) return;
 
         setSidebarActive(section);
     }, true);
@@ -15799,18 +15816,9 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const section = sectionFromAnchor(anchor);
         if (!section || !currentRoot()) return;
 
-        if (openFreePlanGate(section)) {
-            event.preventDefault();
-            event.stopPropagation();
-            return;
-        }
-
-        // If the destination panel is not mounted, allow the real Filament/browser
-        // navigation to proceed so the server renders that section instead of blanking.
-        if (!renderedSectionPanel(section)) return;
-
         event.preventDefault();
         event.stopPropagation();
+        if (openFreePlanGate(section)) return;
         switchSection(section, anchor.href, false);
     }, true);
 
@@ -15818,10 +15826,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const section = pathToSection(window.location.pathname);
         if (!section || !currentRoot()) return;
         if (openFreePlanGate(section)) return;
-        if (!renderedSectionPanel(section)) {
-            window.location.reload();
-            return;
-        }
         switchSection(section, null, true);
     });
 
