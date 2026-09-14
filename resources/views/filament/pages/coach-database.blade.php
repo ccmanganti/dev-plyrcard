@@ -12818,7 +12818,7 @@ CSS;
 
 
         
-<section class="rc-client-panel-v1033" data-rc-client-section="campaigns" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
+<section class="rc-client-panel-v1033" data-rc-client-section="campaigns" data-rc-server-hydrated="{{ ($section === 'campaigns') ? '1' : '0' }}" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header')
 
             {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
@@ -16384,6 +16384,12 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         return !!safe && !!document.querySelector(`[data-rc-client-section="${safe}"]`);
     };
 
+    const sectionNeedsServerHydration = (section) => {
+        if (section !== 'campaigns') return false;
+        const panel = document.querySelector('[data-rc-client-section="campaigns"]');
+        return !!panel && panel.dataset.rcServerHydrated !== '1';
+    };
+
     const sectionLabels = {
         dashboard: 'Dashboard',
         schools: 'Discover Schools',
@@ -16490,7 +16496,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const root = currentRoot();
         if (!root || !section) return false;
 
-        if (!renderedSectionPanel(section)) {
+        if (!renderedSectionPanel(section) || sectionNeedsServerHydration(section)) {
             if (href) {
                 const target = new URL(href, window.location.href);
                 window.location.assign(target.href);
@@ -16546,6 +16552,17 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         if (openFreePlanGate(section)) {
             event.preventDefault();
             event.stopPropagation();
+            return;
+        }
+
+        // Templates are intentionally loaded server-side. When the persistent shell
+        // was mounted from Dashboard/Inbox/etc., the visible Templates panel exists
+        // but its template list is not hydrated yet. Force one real navigation so
+        // clicking Templates shows the saved templates instead of the empty fallback.
+        if (sectionNeedsServerHydration(section)) {
+            event.preventDefault();
+            event.stopPropagation();
+            window.location.assign(anchor.href);
             return;
         }
 
