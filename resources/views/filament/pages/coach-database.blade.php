@@ -12702,7 +12702,7 @@ CSS;
                                 </div>
                             </div>
 
-                            <div x-data="plyrNativeEditorBase('campaignBody')" x-init="mount()" x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)" wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}">
+                            <div x-data="plyrNativeEditorBase('campaignBody')" x-init="window.rcSeedComposeTemplateFromStorage && window.rcSeedComposeTemplateFromStorage(); mount()" x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)" wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}">
                                 <div class="rc-compose-editor-shell-v45">
                                     <div class="rc-compose-toolbar-v45">
                                         <select class="rc-select" x-on:change="formatBlock($event.target.value); $event.target.value='p'">
@@ -12727,6 +12727,7 @@ CSS;
                                         data-plyr-native-editor="campaign-body"
                                         data-placeholder="Write your message..."
                                         data-initial-body="{{ base64_encode($campaignBody ?? '') }}"
+                                        data-refresh-key="{{ sha1((string) ($campaignTemplateId ?? '') . '|' . (string) ($campaignBody ?? '')) }}"
                                         x-on:input="queueSync()"
                                         x-on:blur="syncNow()"
                                     ></div>
@@ -13015,7 +13016,7 @@ CSS;
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <button class="rc-template-use-v52" type="button" data-rc-local-action wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
+                                    <button class="rc-template-use-v52" type="button" data-rc-local-action data-rc-template-id="{{ $templateId }}" data-rc-compose-template-body-base64="{{ base64_encode($templateBodyRaw) }}" data-rc-compose-template-key="{{ sha1($templateId . '|' . $templateBodyRaw) }}" x-on:click="window.rcRememberComposeTemplateBody && window.rcRememberComposeTemplateBody($el.dataset.rcTemplateId || '', $el.dataset.rcComposeTemplateBodyBase64 || '', $el.dataset.rcComposeTemplateKey || '')" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
@@ -13752,6 +13753,44 @@ CSS;
             source = source.replace(/<\/a>\s*(?=<a\b)/gi, '');
             return source;
         };
+
+        window.rcComposeTemplateStorageKey = function (templateId) {
+            return 'plyrcard-compose-template-body:' + String(templateId || '').trim();
+        };
+
+        window.rcRememberComposeTemplateBody = function (templateId, bodyBase64, bodyKey) {
+            templateId = String(templateId || '').trim();
+            bodyBase64 = String(bodyBase64 || '');
+            bodyKey = String(bodyKey || ('card-' + Date.now()));
+            if (!templateId || !bodyBase64) return false;
+            try {
+                window.localStorage.setItem(window.rcComposeTemplateStorageKey(templateId), JSON.stringify({ body: bodyBase64, key: bodyKey, savedAt: Date.now() }));
+            } catch (_) {}
+            window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
+            window.__plyrComposeEditorPendingBodyKey = 'stored-' + templateId + '-' + bodyKey;
+            return true;
+        };
+
+        window.rcSeedComposeTemplateFromStorage = function () {
+            let templateId = '';
+            try { templateId = String(new URLSearchParams(window.location.search || '').get('template') || '').trim(); } catch (_) {}
+            if (!templateId) return false;
+            try {
+                const raw = window.localStorage.getItem(window.rcComposeTemplateStorageKey(templateId));
+                if (!raw) return false;
+                const payload = JSON.parse(raw);
+                const body = String(payload?.body || '');
+                const key = String(payload?.key || ('stored-' + templateId));
+                if (!body) return false;
+                window.__plyrComposeEditorPendingBodyBase64 = body;
+                window.__plyrComposeEditorPendingBodyKey = 'stored-' + templateId + '-' + key;
+                return true;
+            } catch (_) {
+                return false;
+            }
+        };
+
+        window.rcSeedComposeTemplateFromStorage();
 
         window.plyrNativeEditorBase = function (modelName, initialBody = '') {
             return {

@@ -8560,15 +8560,65 @@ protected function templateHtmlForNativeEditor(array $template): string
             return $this->defaultRecruitingTemplateEditorHtml();
         }
 
-        $html = $this->templateHtml($template);
+        // v10.113.39: saved custom templates can carry more than one body field.
+        // Some integrations keep a short/preview HTML in `html` while the complete
+        // editor content lives in `body`. The generic templateHtml() helper checks
+        // `html` first, which made Compose load only the first few variables even
+        // though the template card preview showed the full saved body. For the native
+        // editor, choose the richest body candidate instead of the first non-empty one.
+        $candidates = [];
 
-        if ($html === '') {
-            $html = (string) ($template['body'] ?? $template['html'] ?? '');
+        foreach ([
+            'body', 'body_html', 'bodyHtml', 'editorBody', 'editor_body', 'content', 'template', 'message',
+            'html', 'htmlBody', 'renderedHtml', 'rendered_html', 'editorHtml', 'editor_html', 'editorContent',
+            'raw.body', 'raw.body_html', 'raw.bodyHtml', 'raw.editorBody', 'raw.editor_body', 'raw.content',
+            'raw.template', 'raw.message', 'raw.html', 'raw.htmlBody', 'raw.renderedHtml', 'raw.editorHtml',
+            'raw.editor_html', 'raw.editorContent',
+        ] as $key) {
+            $html = $this->coerceTemplateHtml(data_get($template, $key));
+            if (trim($html) !== '') {
+                $candidates[] = $html;
+            }
         }
 
-        return $this->normalizeHtmlForNativeEditor($html);
+        $fallback = $this->templateHtml($template);
+        if (trim($fallback) !== '') {
+            $candidates[] = $fallback;
+        }
+
+        $bestHtml = '';
+        $bestScore = -1;
+
+        foreach ($candidates as $candidate) {
+            $normalized = $this->normalizeHtmlForNativeEditor($candidate);
+            $score = $this->scoreNativeTemplateEditorHtml($normalized);
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestHtml = $normalized;
+            }
+        }
+
+        return $bestHtml;
     }
-   
+
+    protected function scoreNativeTemplateEditorHtml(string $html): int
+    {
+        $html = trim($html);
+        if ($html === '') {
+            return -1;
+        }
+
+        $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
+        preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/', $html, $tokens);
+        preg_match_all('/<\s*img/i', $html, $images);
+        preg_match_all('/<\s*a/i', $html, $links);
+
+        return mb_strlen($text)
+            + (count($tokens[0] ?? []) * 80)
+            + (count($images[0] ?? []) * 60)
+            + (count($links[0] ?? []) * 25);
+    }
 
     protected function normalizeHtmlForNativeEditor(string $html): string
     {
