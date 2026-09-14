@@ -12901,6 +12901,101 @@ protected function ensureComposeBodyHasFooter(): void
         return is_string($decoded) ? $decoded : '';
     }
 
+    protected function decodeTemplateEditorAstBody(mixed $value): string
+    {
+        $json = $this->decodeTemplateEditorPayloadValue($value);
+
+        if (trim($json) === '') {
+            return '';
+        }
+
+        $decoded = json_decode($json, true);
+
+        if (! is_array($decoded)) {
+            return '';
+        }
+
+        $nodes = is_array($decoded['nodes'] ?? null) ? $decoded['nodes'] : [];
+        $html = $this->templateEditorAstNodesToHtml($nodes);
+
+        return trim($this->normalizeTemplateMergeTokensForStorage($html));
+    }
+
+    protected function templateEditorAstNodesToHtml(array $nodes): string
+    {
+        return collect($nodes)
+            ->map(fn ($node): string => is_array($node) ? $this->templateEditorAstNodeToHtml($node) : '')
+            ->filter(fn (string $html): bool => $html !== '')
+            ->implode('');
+    }
+
+    protected function templateEditorAstNodeToHtml(array $node): string
+    {
+        $type = (string) ($node['type'] ?? '');
+
+        if ($type === 'text') {
+            return e((string) ($node['value'] ?? ''));
+        }
+
+        if ($type === 'token') {
+            return $this->normalizeTemplateMergeTokenText((string) ($node['value'] ?? ''));
+        }
+
+        if ($type === 'br') {
+            return '<br>';
+        }
+
+        if ($type === 'fragment') {
+            return $this->templateEditorAstNodesToHtml(is_array($node['children'] ?? null) ? $node['children'] : []);
+        }
+
+        if ($type !== 'element') {
+            return '';
+        }
+
+        $tag = strtolower(trim((string) ($node['tag'] ?? '')));
+        $allowedTags = ['p','div','br','strong','b','em','i','u','ul','ol','li','blockquote','h1','h2','h3','h4','a','img','table','thead','tbody','tr','td','th'];
+
+        if (! in_array($tag, $allowedTags, true)) {
+            return $this->templateEditorAstNodesToHtml(is_array($node['children'] ?? null) ? $node['children'] : []);
+        }
+
+        if ($tag === 'br') {
+            return '<br>';
+        }
+
+        $attrs = '';
+        $allowedAttrs = ['href','src','alt','title','target','rel','style','class','colspan','rowspan'];
+        $rawAttrs = is_array($node['attrs'] ?? null) ? $node['attrs'] : [];
+
+        foreach ($rawAttrs as $name => $value) {
+            $name = strtolower(trim((string) $name));
+            $value = (string) $value;
+
+            if (! in_array($name, $allowedAttrs, true) || str_starts_with($name, 'on')) {
+                continue;
+            }
+
+            if (($name === 'href' || $name === 'src') && preg_match('/^\s*javascript\s*:/i', $value)) {
+                continue;
+            }
+
+            if ($name === 'class' && ! str_contains($value, 'rc-email-button')) {
+                continue;
+            }
+
+            $attrs .= ' ' . $name . '="' . e($value) . '"';
+        }
+
+        if ($tag === 'img') {
+            return '<img' . $attrs . '>';
+        }
+
+        $children = $this->templateEditorAstNodesToHtml(is_array($node['children'] ?? null) ? $node['children'] : []);
+
+        return '<' . $tag . $attrs . '>' . $children . '</' . $tag . '>';
+    }
+
     protected function templatePayloadVisibleText(string $html): string
     {
         $value = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -12977,6 +13072,7 @@ protected function ensureComposeBodyHasFooter(): void
         $body = $this->decodeTemplateEditorPayloadValue($payload['body_b64'] ?? $payload['bodyBase64'] ?? '');
         $rawBody = $this->decodeTemplateEditorPayloadValue($payload['raw_body_b64'] ?? $payload['rawBodyBase64'] ?? $payload['raw_html_b64'] ?? '');
         $losslessBody = $this->decodeTemplateEditorPayloadValue($payload['lossless_body_b64'] ?? $payload['losslessBodyBase64'] ?? '');
+        $astBody = $this->decodeTemplateEditorAstBody($payload['body_ast_b64'] ?? $payload['bodyAstBase64'] ?? $payload['ast_body_b64'] ?? '');
         $hiddenBody = $this->decodeTemplateEditorPayloadValue($payload['hidden_body_b64'] ?? $payload['hiddenBodyBase64'] ?? '');
         $activeBody = $this->decodeTemplateEditorPayloadValue($payload['active_body_b64'] ?? $payload['activeBodyBase64'] ?? '');
         $lastSerializedBody = $this->decodeTemplateEditorPayloadValue($payload['last_serialized_body_b64'] ?? $payload['lastSerializedBodyBase64'] ?? '');
@@ -12987,8 +13083,9 @@ protected function ensureComposeBodyHasFooter(): void
         }
 
         $losslessBody = trim($this->normalizeTemplateMergeTokensForStorage($losslessBody));
+        $astBody = trim($this->normalizeTemplateMergeTokensForStorage($astBody));
 
-        $candidates = collect([$body, $rawBody, $losslessBody, $hiddenBody, $activeBody, $lastSerializedBody])
+        $candidates = collect([$astBody, $body, $rawBody, $losslessBody, $hiddenBody, $activeBody, $lastSerializedBody])
             ->map(fn (string $candidate): string => trim($this->normalizeTemplateMergeTokensForStorage($candidate)))
             ->filter(fn (string $candidate): bool => $candidate !== '')
             ->unique()
@@ -12997,6 +13094,19 @@ protected function ensureComposeBodyHasFooter(): void
         $best = $candidates
             ->sortByDesc(fn (string $candidate): int => $this->templatePayloadScore($candidate))
             ->first() ?? '';
+
+        if ($astBody !== '') {
+            $astTokens = preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_ .]{0,80}\s*\}\}/', $astBody) ?: 0;
+            $bestTokens = preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_ .]{0,80}\s*\}\}/', $best) ?: 0;
+
+            if (
+                $best === ''
+                || $astTokens > $bestTokens
+                || $this->templatePayloadVisibleLength($astBody) >= max(1, $this->templatePayloadVisibleLength($best) - 5)
+            ) {
+                $best = $astBody;
+            }
+        }
 
         if ($losslessBody !== '') {
             $losslessScore = $this->templatePayloadScore($losslessBody);

@@ -16284,6 +16284,143 @@ window.rcCollectCoachDatabaseTemplatePlainText = function (editor) {
     return browser.length > walked.length ? browser : walked;
 };
 
+window.rcCollectCoachDatabaseTemplateLosslessHtml = function (editor) {
+    if (!editor) return '';
+
+    const escapeText = window.rcEscapeTemplateHtmlText || ((value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;'));
+
+    const normalizeToken = window.rcNormalizeCoachDatabaseMergeTokens || ((value) => String(value || ''));
+    const allowedTags = new Set(['p','div','br','strong','b','em','i','u','ul','ol','li','blockquote','h1','h2','h3','h4','a','img','table','thead','tbody','tr','td','th','span']);
+    const allowedAttrs = new Set(['href','src','alt','title','target','rel','style','class','colspan','rowspan']);
+
+    const safeAttrValue = (value) => String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const serialize = (node) => {
+        if (!node) return '';
+
+        if (node.nodeType === Node.TEXT_NODE) {
+            return escapeText(String(node.nodeValue || '').replace(/\u00a0/g, ' '));
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) {
+            return '';
+        }
+
+        const tag = String(node.tagName || '').toLowerCase();
+
+        if (node.classList && node.classList.contains('rc-merge-token-v48')) {
+            return escapeText(normalizeToken(node.textContent || ''));
+        }
+
+        if (tag === 'br') {
+            return '<br>';
+        }
+
+        if (['script','style','textarea','input','select','option','button','form','iframe','object','embed'].includes(tag)) {
+            return '';
+        }
+
+        const children = Array.from(node.childNodes || []).map(serialize).join('');
+
+        if (!allowedTags.has(tag) || tag === 'span') {
+            return children;
+        }
+
+        let attrs = '';
+        Array.from(node.attributes || []).forEach((attr) => {
+            const name = String(attr.name || '').toLowerCase();
+            if (!allowedAttrs.has(name) || name.startsWith('on')) return;
+            let value = String(attr.value || '');
+            if ((name === 'href' || name === 'src') && /^javascript:/i.test(value.trim())) return;
+            if (name === 'class' && !/rc-email-button/.test(value)) return;
+            attrs += ' ' + name + '="' + safeAttrValue(value) + '"';
+        });
+
+        if (tag === 'img') {
+            return '<img' + attrs + '>';
+        }
+
+        return '<' + tag + attrs + '>' + children + '</' + tag + '>';
+    };
+
+    let html = Array.from(editor.childNodes || []).map(serialize).join('').trim();
+    html = window.rcNormalizeCoachDatabaseMergeTokensInHtml
+        ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(html)
+        : html;
+
+    if (!/<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|br)\b/i.test(html)) {
+        const plain = (window.rcCollectCoachDatabaseTemplatePlainText ? window.rcCollectCoachDatabaseTemplatePlainText(editor) : '').trim();
+        if (plain && plain.length > String(html || '').replace(/<[^>]*>/g, '').length) {
+            html = window.rcTextToTemplateParagraphHtml ? window.rcTextToTemplateParagraphHtml(plain) : escapeText(plain);
+        }
+    }
+
+    return html || '<p><br></p>';
+};
+
+
+window.rcCollectCoachDatabaseTemplateAst = function (editor) {
+    if (!editor) return '';
+
+    const normalizeToken = window.rcNormalizeCoachDatabaseMergeTokens || ((value) => String(value || ''));
+    const allowedTags = new Set(['p','div','br','strong','b','em','i','u','ul','ol','li','blockquote','h1','h2','h3','h4','a','img','table','thead','tbody','tr','td','th','span']);
+    const allowedAttrs = new Set(['href','src','alt','title','target','rel','style','class','colspan','rowspan']);
+
+    const cleanAttr = (name, value) => {
+        name = String(name || '').toLowerCase();
+        value = String(value || '');
+        if (!allowedAttrs.has(name) || name.startsWith('on')) return null;
+        if ((name === 'href' || name === 'src') && /^javascript:/i.test(value.trim())) return null;
+        if (name === 'class' && !/rc-email-button/i.test(value)) return null;
+        return value;
+    };
+
+    const walk = (node) => {
+        if (!node) return null;
+        if (node.nodeType === Node.TEXT_NODE) {
+            return { type: 'text', value: String(node.nodeValue || '').replace(/\u00a0/g, ' ') };
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return null;
+
+        const tag = String(node.tagName || '').toLowerCase();
+
+        if (node.classList && node.classList.contains('rc-merge-token-v48')) {
+            return { type: 'token', value: normalizeToken(node.textContent || '') };
+        }
+
+        if (tag === 'br') return { type: 'br' };
+        if (['script','style','textarea','input','select','option','button','form','iframe','object','embed'].includes(tag)) return null;
+
+        const children = Array.from(node.childNodes || []).map(walk).filter(Boolean);
+        if (!allowedTags.has(tag) || tag === 'span') {
+            return children.length ? { type: 'fragment', children } : null;
+        }
+
+        const attrs = {};
+        Array.from(node.attributes || []).forEach((attr) => {
+            const clean = cleanAttr(attr.name, attr.value);
+            if (clean !== null && clean !== '') attrs[String(attr.name || '').toLowerCase()] = clean;
+        });
+
+        return { type: 'element', tag, attrs, children };
+    };
+
+    try {
+        return JSON.stringify({ version: 1, nodes: Array.from(editor.childNodes || []).map(walk).filter(Boolean) });
+    } catch (_) {
+        return '';
+    }
+};
+
 window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     if (!editor) return '';
 
@@ -16295,13 +16432,25 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     clone.querySelectorAll('[data-placeholder]').forEach((node) => node.removeAttribute('data-placeholder'));
 
     let html = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(clone.innerHTML || '').trim());
+    const losslessHtml = window.rcCollectCoachDatabaseTemplateLosslessHtml ? window.rcCollectCoachDatabaseTemplateLosslessHtml(editor) : '';
     const plain = window.rcCollectCoachDatabaseTemplatePlainText(editor);
     const plainHtml = window.rcTextToTemplateParagraphHtml(plain);
 
     const htmlText = String(clone.textContent || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
+    const losslessText = String(losslessHtml || '').replace(/<br\s*\/?\s*>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
     const htmlLines = htmlText.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
     const plainLines = plain.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
+    const htmlTokens = (String(html || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
+    const losslessTokens = (String(losslessHtml || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
     const hasRealHtml = /<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i.test(html);
+
+    if (losslessHtml && (
+        losslessTokens > htmlTokens
+        || losslessText.length > htmlText.length + 8
+        || (!html && losslessHtml)
+    )) {
+        html = losslessHtml;
+    }
 
     if (plainHtml && (
         !hasRealHtml
@@ -16374,10 +16523,16 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const bodyHtml = window.rcCollectCoachDatabaseTemplateHtml
         ? window.rcCollectCoachDatabaseTemplateHtml(editor)
         : String(editor.innerHTML || '');
+    const losslessBodyHtml = window.rcCollectCoachDatabaseTemplateLosslessHtml
+        ? window.rcCollectCoachDatabaseTemplateLosslessHtml(editor)
+        : bodyHtml;
     const rawBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(editor.innerHTML || ''));
     const bodyText = window.rcCollectCoachDatabaseTemplatePlainText
         ? window.rcCollectCoachDatabaseTemplatePlainText(editor)
         : String(editor.innerText || editor.textContent || '');
+    const bodyAstJson = window.rcCollectCoachDatabaseTemplateAst
+        ? window.rcCollectCoachDatabaseTemplateAst(editor)
+        : '';
     const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
     const hiddenBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(hidden?.value || ''));
     const activeBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(window.__plyrTemplateEditorActiveBodyHtml || ''));
@@ -16395,6 +16550,8 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         preview_text: String(preview?.value || ''),
         body_b64: encode(bodyHtml),
         raw_body_b64: encode(rawBodyHtml),
+        lossless_body_b64: encode(losslessBodyHtml),
+        body_ast_b64: encode(bodyAstJson),
         body_text_b64: encode(bodyText),
         hidden_body_b64: encode(hiddenBodyHtml),
         active_body_b64: encode(activeBodyHtml),
