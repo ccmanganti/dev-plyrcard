@@ -4145,6 +4145,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             'preview' => $previewText,
             'body' => $bodyHtml,
             'html' => $bodyHtml,
+            'body_html' => $bodyHtml,
             'graphicUrl' => $template->graphic_url,
             'graphic_url' => $template->graphic_url,
             'attachments' => is_array($template->attachments) ? $template->attachments : [],
@@ -12877,12 +12878,17 @@ protected function ensureComposeBodyHasFooter(): void
             return 0;
         }
 
-        $visibleLength = $this->templatePayloadVisibleLength($html);
+        $visibleText = $this->templatePayloadVisibleText($html);
+        $visibleLength = mb_strlen($visibleText);
+        $visibleLines = collect(preg_split('/\R+/', $visibleText) ?: [])
+            ->map(fn (string $line): string => trim($line))
+            ->filter()
+            ->count();
         $mergeTokens = preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_ .]{0,80}\s*\}\}/', $html) ?: 0;
-        $images = preg_match_all('/<\s*img/i', $html) ?: 0;
-        $blocks = preg_match_all('/<\s*(p|div|li|h1|h2|h3|blockquote|tr|br)/i', $html) ?: 0;
+        $images = preg_match_all('/<\s*img\b/i', $html) ?: 0;
+        $blocks = preg_match_all('/<\s*(p|div|li|h1|h2|h3|blockquote|tr|br)\b/i', $html) ?: 0;
 
-        return ($visibleLength * 20) + ((int) strlen($html)) + ($mergeTokens * 500) + ($images * 1200) + ($blocks * 75);
+        return ($visibleLength * 25) + ((int) strlen($html)) + ($visibleLines * 650) + ($mergeTokens * 700) + ($images * 1400) + ($blocks * 90);
     }
 
     protected function textPayloadToTemplateHtml(string $text, string $imageSourceHtml = ''): string
@@ -12908,8 +12914,8 @@ protected function ensureComposeBodyHasFooter(): void
             ->implode("
 ");
 
-        if ($imageSourceHtml !== '' && ! preg_match('/<\s*img/i', $html)) {
-            preg_match_all('/<\s*img[^>]*>/i', $imageSourceHtml, $matches);
+        if ($imageSourceHtml !== '' && ! preg_match('/<\s*img\b/i', $html)) {
+            preg_match_all('/<\s*img\b[^>]*>/i', $imageSourceHtml, $matches);
             foreach (array_slice($matches[0] ?? [], 0, 12) as $imageTag) {
                 $html .= "
 <p>" . $this->sanitizeTemplateHtml($imageTag) . '</p>';
@@ -12923,13 +12929,16 @@ protected function ensureComposeBodyHasFooter(): void
     {
         $body = $this->decodeTemplateEditorPayloadValue($payload['body_b64'] ?? $payload['bodyBase64'] ?? '');
         $rawBody = $this->decodeTemplateEditorPayloadValue($payload['raw_body_b64'] ?? $payload['rawBodyBase64'] ?? $payload['raw_html_b64'] ?? '');
+        $hiddenBody = $this->decodeTemplateEditorPayloadValue($payload['hidden_body_b64'] ?? $payload['hiddenBodyBase64'] ?? '');
+        $activeBody = $this->decodeTemplateEditorPayloadValue($payload['active_body_b64'] ?? $payload['activeBodyBase64'] ?? '');
+        $lastSerializedBody = $this->decodeTemplateEditorPayloadValue($payload['last_serialized_body_b64'] ?? $payload['lastSerializedBodyBase64'] ?? '');
         $bodyText = $this->decodeTemplateEditorPayloadValue($payload['body_text_b64'] ?? $payload['bodyTextBase64'] ?? $payload['plain_text_b64'] ?? '');
 
         if (trim($body) === '' && array_key_exists('body', $payload)) {
             $body = (string) $payload['body'];
         }
 
-        $candidates = collect([$body, $rawBody])
+        $candidates = collect([$body, $rawBody, $hiddenBody, $activeBody, $lastSerializedBody])
             ->map(fn (string $candidate): string => trim($candidate))
             ->filter(fn (string $candidate): bool => $candidate !== '')
             ->unique()
@@ -13018,10 +13027,16 @@ protected function ensureComposeBodyHasFooter(): void
         $this->addTemplateAttachments();
         $this->resolveTemplateGraphicUpload();
 
+        $bodyHtml = $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText));
         $html = $this->appendAttachmentLinksToHtml(
-            $this->canonicalizeTemplateEditorHtml($this->buildTemplateHtml($bodyText)),
+            $bodyHtml,
             $this->templateAttachments
         );
+
+        // Keep the hydrated editor body equal to the exact saved body. This prevents
+        // the next Edit click from falling back to an older first-line-only Livewire
+        // value while the newly saved database row is still refreshing.
+        $this->templateBody = $bodyHtml;
 
         $existing = null;
 

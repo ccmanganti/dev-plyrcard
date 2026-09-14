@@ -12802,7 +12802,7 @@ CSS;
                                              x-on:focus="captureSelection()"
                                              x-on:paste="queueSync(); setTimeout(() => captureSelection(), 0)"
                                              x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
-                                        <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" value="{{ $templateBody ?? '' }}">
+                                        <textarea x-ref="hidden" data-plyr-native-editor-hidden="template-body" style="display:none !important;">{!! e($templateBody ?? '') !!}</textarea>
                                         <div class="rc-template-editor-footer-v11331">
                                             <span>Use short paragraphs and one clear call-to-action.</span>
                                             <span>Preview before saving.</span>
@@ -13746,14 +13746,14 @@ CSS;
 
                     const html = this.serializeEditorHtml();
                     this.$refs.hidden.value = html;
+                    this.$refs.editor.dataset.plyrLastSerializedHtml = html;
+                    this.$refs.editor.__plyrLastSerializedHtml = html;
                     window.__plyrTemplateEditorActiveBodyHtml = html;
                 },
                 serializeEditorHtml() {
-                    const clone = this.$refs.editor.cloneNode(true);
-                    clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
-                        node.replaceWith(document.createTextNode(node.textContent || ''));
-                    });
-                    return clone.innerHTML || '';
+                    return window.rcCollectCoachDatabaseTemplateHtml
+                        ? window.rcCollectCoachDatabaseTemplateHtml(this.$refs.editor)
+                        : (this.$refs.editor?.innerHTML || '');
                 },
                 highlightMergeTokens(html) {
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
@@ -15704,6 +15704,70 @@ window.rcVisibleCoachDatabaseTemplateEditor = function () {
     }) || editors[editors.length - 1] || null;
 };
 
+window.rcEscapeTemplateHtmlText = function (value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+};
+
+window.rcTextToTemplateParagraphHtml = function (value) {
+    const text = String(value || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
+    if (!text) return '';
+
+    return text
+        .split(/\n{2,}/)
+        .map((paragraph) => paragraph.trim())
+        .filter(Boolean)
+        .map((paragraph) => '<p>' + window.rcEscapeTemplateHtmlText(paragraph).replace(/\n/g, '<br>') + '</p>')
+        .join('\n');
+};
+
+window.rcCollectCoachDatabaseTemplatePlainText = function (editor) {
+    if (!editor) return '';
+
+    const pieces = [];
+    const append = (value) => {
+        const text = String(value || '').replace(/\u00a0/g, ' ');
+        if (text !== '') pieces.push(text);
+    };
+
+    const walk = (node) => {
+        if (!node) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+            append(node.nodeValue || '');
+            return;
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+        const tag = String(node.tagName || '').toLowerCase();
+        if (tag === 'br') {
+            pieces.push('\n');
+            return;
+        }
+        if (node.classList && node.classList.contains('rc-merge-token-v48')) {
+            append(node.textContent || '');
+            return;
+        }
+        if (['div','p','li','h1','h2','h3','h4','blockquote','tr'].includes(tag) && pieces.length && !String(pieces[pieces.length - 1] || '').endsWith('\n')) {
+            pieces.push('\n');
+        }
+        Array.from(node.childNodes || []).forEach(walk);
+        if (['div','p','li','h1','h2','h3','h4','blockquote','tr'].includes(tag) && !String(pieces[pieces.length - 1] || '').endsWith('\n')) {
+            pieces.push('\n');
+        }
+    };
+
+    Array.from(editor.childNodes || []).forEach(walk);
+
+    const walked = pieces.join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    const browser = String(editor.innerText || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
+
+    return browser.length > walked.length ? browser : walked;
+};
+
 window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     if (!editor) return '';
 
@@ -15715,26 +15779,20 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     clone.querySelectorAll('[data-placeholder]').forEach((node) => node.removeAttribute('data-placeholder'));
 
     let html = String(clone.innerHTML || '').trim();
-    const plain = String(editor.innerText || editor.textContent || '').replace(/\u00a0/g, ' ').trim();
+    const plain = window.rcCollectCoachDatabaseTemplatePlainText(editor);
+    const plainHtml = window.rcTextToTemplateParagraphHtml(plain);
 
-    // Some contenteditable states can expose only the first visual line in innerHTML
-    // while innerText still contains the full multiline body. When that happens,
-    // rebuild safe paragraphs so Save keeps every line instead of only line one.
-    const htmlText = String(clone.textContent || '').replace(/\u00a0/g, ' ').trim();
+    const htmlText = String(clone.textContent || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
+    const htmlLines = htmlText.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
+    const plainLines = plain.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
     const hasRealHtml = /<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i.test(html);
-    if (plain.includes('\n') && (!hasRealHtml || (htmlText && plain.length > htmlText.length + 8))) {
-        html = plain
-            .split(/\n{2,}/)
-            .map((paragraph) => paragraph.trim())
-            .filter(Boolean)
-            .map((paragraph) => '<p>' + paragraph
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;')
-                .replace(/\n/g, '<br>') + '</p>')
-            .join('\n');
+
+    if (plainHtml && (
+        !hasRealHtml
+        || plainLines > htmlLines
+        || (plain.length > htmlText.length + 8 && !/<\s*img\b/i.test(html))
+    )) {
+        html = plainHtml;
     }
 
     return html || '<p><br></p>';
@@ -15781,10 +15839,16 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         ? window.rcCollectCoachDatabaseTemplateHtml(editor)
         : String(editor.innerHTML || '');
     const rawBodyHtml = String(editor.innerHTML || '');
-    const bodyText = String(editor.innerText || editor.textContent || '');
+    const bodyText = window.rcCollectCoachDatabaseTemplatePlainText
+        ? window.rcCollectCoachDatabaseTemplatePlainText(editor)
+        : String(editor.innerText || editor.textContent || '');
+    const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
+    const hiddenBodyHtml = String(hidden?.value || '');
+    const activeBodyHtml = String(window.__plyrTemplateEditorActiveBodyHtml || '');
+    const lastSerializedHtml = String(editor.__plyrLastSerializedHtml || editor.dataset.plyrLastSerializedHtml || '');
+
     window.__plyrTemplateEditorActiveBodyHtml = bodyHtml;
 
-    const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
     if (hidden) hidden.value = bodyHtml;
 
     const encode = (value) => window.rcTemplateUnicodeBase64 ? window.rcTemplateUnicodeBase64(value) : btoa(unescape(encodeURIComponent(String(value || ''))));
@@ -15796,6 +15860,9 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         body_b64: encode(bodyHtml),
         raw_body_b64: encode(rawBodyHtml),
         body_text_b64: encode(bodyText),
+        hidden_body_b64: encode(hiddenBodyHtml),
+        active_body_b64: encode(activeBodyHtml),
+        last_serialized_body_b64: encode(lastSerializedHtml),
         force_new: window.__rcTemplateClientMode === 'new',
     });
 };
