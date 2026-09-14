@@ -7756,10 +7756,55 @@ public function loadTemplateDetail(string $templateId): ?array
      * signature/footer. The footer may still be handled by the send pipeline,
      * but it should not appear while editing templates or composing emails.
      */
+    protected function normalizeTemplateMergeTokensForStorage(string $html): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '';
+        }
+
+        for ($i = 0; $i < 2; $i++) {
+            $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($decoded === $html || trim($decoded) === '') {
+                break;
+            }
+            $html = $decoded;
+        }
+
+        $html = str_replace(["\u{200B}", "\u{200C}", "\u{200D}", "\u{FEFF}"], '', $html);
+
+        $html = preg_replace_callback(
+            '/<span\b[^>]*class=(?:"[^"]*rc-merge-token-v48[^"]*"|\'[^\']*rc-merge-token-v48[^\']*\')[^>]*>(.*?)<\/span>/is',
+            function (array $matches): string {
+                $token = trim(strip_tags((string) ($matches[1] ?? '')));
+                return $this->normalizeTemplateMergeTokenText($token);
+            },
+            $html
+        ) ?? $html;
+
+        $html = preg_replace_callback('/@?\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/', function (array $matches): string {
+            return '{{' . trim((string) ($matches[1] ?? '')) . '}}';
+        }, $html) ?? $html;
+
+        return trim($html);
+    }
+
+    protected function normalizeTemplateMergeTokenText(string $token): string
+    {
+        $token = trim(strip_tags(html_entity_decode($token, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $token = preg_replace('/^@?\{\s*\{\s*/', '', $token) ?? $token;
+        $token = preg_replace('/\s*\}\s*\}$/', '', $token) ?? $token;
+        $token = trim($token);
+
+        return $token !== '' ? '{{' . $token . '}}' : '';
+    }
+
     protected function canonicalizeTemplateEditorHtml(string $html): string
     {
         $html = trim($html);
 
+        $html = $this->normalizeTemplateMergeTokensForStorage($html);
         $html = $this->repairBrokenTemplateLinkFragments($html);
         $html = $this->normalizeTemplateLinksForCurrentTracking($html);
         $html = $this->stripPlyrcardEmailSignatures($html);
@@ -7771,7 +7816,7 @@ public function loadTemplateDetail(string $templateId): ?array
             return '<p><br></p>';
         }
 
-        return $this->dedupePlyrcardSocialIconAnchors($html);
+        return $this->dedupePlyrcardSocialIconAnchors($this->normalizeTemplateMergeTokensForStorage($html));
     }
 
     protected function normalizeTemplateLinksForCurrentTracking(string $html): string
@@ -8322,6 +8367,7 @@ HTML;
 
     protected function buildTemplateHtml(string $text): string
     {
+        $text = $this->normalizeTemplateMergeTokensForStorage($text);
         $text = trim($text);
 
         if ($text === '') {
@@ -8339,12 +8385,13 @@ HTML;
 
     protected function sanitizeTemplateHtml(string $html): string
     {
+        $html = $this->normalizeTemplateMergeTokensForStorage($html);
         $html = trim($html);
         $html = preg_replace('/<\s*(script|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? $html;
         $html = preg_replace("/\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)/i", '', $html) ?? $html;
         $html = preg_replace('/javascript\s*:/i', '', $html) ?? $html;
 
-        return $html;
+        return $this->normalizeTemplateMergeTokensForStorage($html);
     }
 
     protected function renderTemplateHtmlForPreview(string $html): string
@@ -12932,14 +12979,14 @@ protected function ensureComposeBodyHasFooter(): void
         $hiddenBody = $this->decodeTemplateEditorPayloadValue($payload['hidden_body_b64'] ?? $payload['hiddenBodyBase64'] ?? '');
         $activeBody = $this->decodeTemplateEditorPayloadValue($payload['active_body_b64'] ?? $payload['activeBodyBase64'] ?? '');
         $lastSerializedBody = $this->decodeTemplateEditorPayloadValue($payload['last_serialized_body_b64'] ?? $payload['lastSerializedBodyBase64'] ?? '');
-        $bodyText = $this->decodeTemplateEditorPayloadValue($payload['body_text_b64'] ?? $payload['bodyTextBase64'] ?? $payload['plain_text_b64'] ?? '');
+        $bodyText = $this->normalizeTemplateMergeTokensForStorage($this->decodeTemplateEditorPayloadValue($payload['body_text_b64'] ?? $payload['bodyTextBase64'] ?? $payload['plain_text_b64'] ?? ''));
 
         if (trim($body) === '' && array_key_exists('body', $payload)) {
             $body = (string) $payload['body'];
         }
 
         $candidates = collect([$body, $rawBody, $hiddenBody, $activeBody, $lastSerializedBody])
-            ->map(fn (string $candidate): string => trim($candidate))
+            ->map(fn (string $candidate): string => trim($this->normalizeTemplateMergeTokensForStorage($candidate)))
             ->filter(fn (string $candidate): bool => $candidate !== '')
             ->unique()
             ->values();
@@ -13006,7 +13053,8 @@ protected function ensureComposeBodyHasFooter(): void
 
     $name = trim($this->templateName);
     $subject = trim($this->templateSubject);
-    $bodyText = trim($this->templateBody);
+    $bodyText = trim($this->normalizeTemplateMergeTokensForStorage($this->templateBody));
+    $this->templateBody = $bodyText;
 
     if ($name === '' || $subject === '' || $bodyText === '') {
         Notification::make()
@@ -14836,8 +14884,11 @@ HTML;
 
     public function getFilteredConversationsProperty(): array
     {
+        // Browser-only status filters need the matching rows already present in the DOM.
+        // Render a larger lightweight list so Incoming/Unread/Starred rows outside the
+        // first 10 still appear instantly without a Livewire filter request.
         return collect($this->filteredConversationsWithoutLimit())
-            ->take(max(10, (int) $this->inboxConversationDisplayLimit))
+            ->take(max(80, (int) $this->inboxConversationDisplayLimit))
             ->values()
             ->all();
     }

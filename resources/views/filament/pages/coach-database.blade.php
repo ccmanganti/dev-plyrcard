@@ -10570,6 +10570,19 @@ CSS;
                                     const stream = document.querySelector('[data-rc-inbox-message-stream]');
                                     return !! (stream && stream.querySelector('.rc-inbox-message-v56'));
                                 },
+                                scrollToNewestMessage() {
+                                    const run = () => {
+                                        const stream = document.querySelector('[data-rc-inbox-message-stream]');
+                                        if (stream) stream.scrollTop = stream.scrollHeight;
+                                    };
+                                    window.requestAnimationFrame(() => {
+                                        window.requestAnimationFrame(() => {
+                                            run();
+                                            window.setTimeout(run, 90);
+                                            window.setTimeout(run, 260);
+                                        });
+                                    });
+                                },
                                 setThreadLoading(id) {
                                     this.selectedLoadingId = id;
                                     window.__rcInboxPendingConversationId = id;
@@ -10621,7 +10634,10 @@ CSS;
                                             loader.lastId = id;
                                             loader.lastAt = Date.now();
 
-                                            window.requestAnimationFrame(() => this.clearThreadLoading(id, token));
+                                            window.requestAnimationFrame(() => {
+                                                this.clearThreadLoading(id, token);
+                                                this.scrollToNewestMessage();
+                                            });
 
                                             const queued = String(loader.queued || '');
                                             loader.queued = '';
@@ -12189,12 +12205,22 @@ CSS;
                         this.coachRevision++;
                         this.rememberRecipientState();
                     },
-                    async sendFast() {
+                    async sendFast(wireInstance = null) {
                         if (this.sendingFast) return;
                         if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
+                        const wire = wireInstance || this.$wire || (() => {
+                            const root = this.$root?.closest?.('[wire\:id]') || document.querySelector('.rc-livewire-root')?.closest?.('[wire\:id]');
+                            const id = root?.getAttribute?.('wire:id');
+                            return id && window.Livewire?.find ? window.Livewire.find(id) : null;
+                        })();
+                        if (!wire || typeof wire.call !== 'function') { toast('Composer is still loading. Try again in a second.'); return; }
+                        window.__plyrNativeEditors?.campaignBody?.syncNow?.();
                         this.sendingFast = true;
                         try {
-                            await this.$wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
+                            await wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to send right now. Please try again.');
                         } finally { this.sendingFast = false; }
                     },
                 }" x-init="init()">
@@ -12217,7 +12243,7 @@ CSS;
                             <span wire:loading.remove wire:target="openSaveComposeTemplatePrompt">Save as Template</span>
                             <span wire:loading.flex wire:target="openSaveComposeTemplatePrompt" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                         </button>
-                        <button class="rc-btn rc-btn-primary" type="button" x-on:click="sendFast()" x-bind:disabled="sendingFast">
+                        <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent.stop="sendFast($wire)" x-bind:disabled="sendingFast">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
                             <span x-show="!sendingFast" x-text="recipientCount > 0 ? `Send to ${recipientCount.toLocaleString()} coach${recipientCount === 1 ? '' : 'es'}` : 'Add a school'"></span>
                             <span x-cloak x-show="sendingFast" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
@@ -12343,13 +12369,13 @@ CSS;
                             <div>
                                 <div class="rc-compose-label-v45">Insert Variable</div>
                                 <div class="rc-compose-vars-v45">
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachFirstName'})">@{{CoachFirstName}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachLastName'})">@{{CoachLastName}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'SchoolName'})">@{{SchoolName}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'CoachTitle'})">@{{CoachTitle}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'AthleteName'})">@{{AthleteName}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'ProfileLink'})">@{{ProfileLink}}</button>
-                                    <button class="rc-compose-var-v45" type="button" x-data x-on:click="$dispatch('plyr-editor-insert-token',{token:'HighlightLink'})">@{{HighlightLink}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','CoachFirstName')">@{{CoachFirstName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','CoachLastName')">@{{CoachLastName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','SchoolName')">@{{SchoolName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','CoachTitle')">@{{CoachTitle}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','AthleteName')">@{{AthleteName}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','ProfileLink')">@{{ProfileLink}}</button>
+                                    <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','HighlightLink')">@{{HighlightLink}}</button>
                                 </div>
                             </div>
 
@@ -13412,6 +13438,8 @@ CSS;
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
+                    window.__plyrNativeEditors = window.__plyrNativeEditors || {};
+                    if (modelName) window.__plyrNativeEditors[modelName] = this;
                     const captureSelection = typeof this.captureSelection === 'function'
                         ? this.captureSelection.bind(this)
                         : null;
@@ -13489,7 +13517,90 @@ CSS;
                         ? window.rcCollectCoachDatabaseTemplateHtml(this.$refs.editor)
                         : (this.$refs.editor?.innerHTML || '');
                 },
-                focusEditor() { this.$refs.editor?.focus(); },
+                editorOwnsNode(node) {
+                    const editor = this.$refs.editor;
+                    if (!editor || !node) return false;
+                    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+                    return node === editor || element === editor || editor.contains(element);
+                },
+                rangeBelongsToEditor(range) {
+                    if (!range) return false;
+                    return this.editorOwnsNode(range.commonAncestorContainer)
+                        || this.editorOwnsNode(range.startContainer)
+                        || this.editorOwnsNode(range.endContainer);
+                },
+                captureSelection() {
+                    const selection = window.getSelection?.();
+                    if (!selection || selection.rangeCount < 1) return;
+                    const range = selection.getRangeAt(0);
+                    if (this.rangeBelongsToEditor(range)) {
+                        this.savedSelectionRange = range.cloneRange();
+                    }
+                    if (modelName) {
+                        window.__plyrNativeEditors = window.__plyrNativeEditors || {};
+                        window.__plyrNativeEditors[modelName] = this;
+                    }
+                },
+                restoreSelection() {
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection?.();
+                    if (!editor || !selection || !this.savedSelectionRange || !this.rangeBelongsToEditor(this.savedSelectionRange)) return false;
+                    try {
+                        try { editor.focus({ preventScroll: true }); } catch (_) { editor.focus(); }
+                        selection.removeAllRanges();
+                        selection.addRange(this.savedSelectionRange);
+                        return true;
+                    } catch (_) {
+                        this.savedSelectionRange = null;
+                        return false;
+                    }
+                },
+                focusEditor() {
+                    const editor = this.$refs.editor;
+                    if (!editor) return;
+                    try { editor.focus({ preventScroll: true }); } catch (_) { editor.focus(); }
+                    if (modelName) {
+                        window.__plyrNativeEditors = window.__plyrNativeEditors || {};
+                        window.__plyrNativeEditors[modelName] = this;
+                    }
+                },
+                insertHtmlAtSavedSelection(html) {
+                    const editor = this.$refs.editor;
+                    if (!editor) return;
+                    if (!this.restoreSelection()) {
+                        this.focusEditor();
+                        const selection = window.getSelection?.();
+                        if (selection) {
+                            const range = document.createRange();
+                            range.selectNodeContents(editor);
+                            range.collapse(false);
+                            selection.removeAllRanges();
+                            selection.addRange(range);
+                            this.savedSelectionRange = range.cloneRange();
+                        }
+                    }
+                    const selection = window.getSelection?.();
+                    if (!selection || selection.rangeCount < 1) {
+                        editor.insertAdjacentHTML('beforeend', html);
+                        this.syncNow();
+                        return;
+                    }
+                    const range = selection.getRangeAt(0);
+                    const template = document.createElement('template');
+                    template.innerHTML = String(html || '');
+                    const fragment = template.content.cloneNode(true);
+                    const lastNode = fragment.lastChild;
+                    range.deleteContents();
+                    range.insertNode(fragment);
+                    const nextRange = document.createRange();
+                    if (lastNode && lastNode.parentNode) nextRange.setStartAfter(lastNode);
+                    else { nextRange.selectNodeContents(editor); nextRange.collapse(false); }
+                    nextRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(nextRange);
+                    this.savedSelectionRange = nextRange.cloneRange();
+                    this.syncNow();
+                },
                 command(name, value = null) {
                     this.focusEditor();
                     document.execCommand(name, false, value);
@@ -13590,10 +13701,8 @@ CSS;
                 },
                 mergeToken(name) { return '{' + '{' + String(name || '').trim() + '}' + '}'; },
                 insertHtml(html) {
-                    if (!this.restoreSelection()) this.focusEditor();
-                    document.execCommand('insertHTML', false, html);
+                    this.insertHtmlAtSavedSelection(html);
                     this.captureSelection();
-                    this.syncNow();
                 },
                 insertMerge(name) {
                     const token = this.mergeToken(name);
@@ -13660,6 +13769,20 @@ CSS;
                     this.openButtonPanel();
                 }
             };
+        };
+
+        window.rcPreparePlyrNativeEditor = function (modelName) {
+            const editor = window.__plyrNativeEditors?.[modelName];
+            if (editor && typeof editor.captureSelection === 'function') editor.captureSelection();
+        };
+
+        window.rcInsertPlyrNativeMergeToken = function (modelName, token) {
+            const editor = window.__plyrNativeEditors?.[modelName];
+            if (editor && typeof editor.insertMerge === 'function') {
+                editor.insertMerge(token);
+                return;
+            }
+            window.dispatchEvent(new CustomEvent('plyr-editor-insert-token', { detail: { token } }));
         };
 
         window.plyrCampaignBodyEditor = function () {
@@ -15713,6 +15836,31 @@ window.rcEscapeTemplateHtmlText = function (value) {
         .replace(/'/g, '&#039;');
 };
 
+window.rcDecodeTemplateEntities = function (value) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = String(value || '');
+    return textarea.value;
+};
+
+window.rcNormalizeCoachDatabaseMergeTokens = function (value) {
+    let source = window.rcDecodeTemplateEntities ? window.rcDecodeTemplateEntities(value) : String(value || '');
+    source = source.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
+    source = source.replace(/@\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g, '{{$1}}');
+    source = source.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, '{{$1}}');
+    return source;
+};
+
+window.rcNormalizeCoachDatabaseMergeTokensInHtml = function (html) {
+    const template = document.createElement('template');
+    template.innerHTML = String(html || '');
+    template.content.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
+        node.replaceWith(document.createTextNode(window.rcNormalizeCoachDatabaseMergeTokens(node.textContent || '')));
+    });
+    let output = template.innerHTML;
+    output = output.replace(/<span\b[^>]*class=(?:"[^"]*rc-merge-token-v48[^"]*"|'[^']*rc-merge-token-v48[^']*')[^>]*>(.*?)<\/span>/gis, (_match, inner) => window.rcNormalizeCoachDatabaseMergeTokens(String(inner || '').replace(/<[^>]*>/g, '')));
+    return window.rcNormalizeCoachDatabaseMergeTokens(output);
+};
+
 window.rcTextToTemplateParagraphHtml = function (value) {
     const text = String(value || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
     if (!text) return '';
@@ -15773,12 +15921,12 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
 
     const clone = editor.cloneNode(true);
     clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
-        node.replaceWith(document.createTextNode(node.textContent || ''));
+        node.replaceWith(document.createTextNode(window.rcNormalizeCoachDatabaseMergeTokens(node.textContent || '')));
     });
     clone.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
     clone.querySelectorAll('[data-placeholder]').forEach((node) => node.removeAttribute('data-placeholder'));
 
-    let html = String(clone.innerHTML || '').trim();
+    let html = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(clone.innerHTML || '').trim());
     const plain = window.rcCollectCoachDatabaseTemplatePlainText(editor);
     const plainHtml = window.rcTextToTemplateParagraphHtml(plain);
 
@@ -15831,21 +15979,25 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const name = document.querySelector('[data-plyr-template-name]');
     const subject = document.querySelector('[data-plyr-template-subject]');
     const preview = document.querySelector('[data-plyr-template-preview]');
-    if (!editor || !$wire) return;
+    if (!editor) return;
+    const root = editor.closest('[wire\:id]') || document.querySelector('.rc-livewire-root')?.closest?.('[wire\:id]');
+    const wireId = root?.getAttribute?.('wire:id');
+    const livewire = $wire || (wireId && window.Livewire?.find ? window.Livewire.find(wireId) : null);
+    if (!livewire || typeof livewire.call !== 'function') return;
 
     // Force one final capture from the live contenteditable before the Livewire call.
     editor.dispatchEvent(new Event('input', { bubbles: true }));
     const bodyHtml = window.rcCollectCoachDatabaseTemplateHtml
         ? window.rcCollectCoachDatabaseTemplateHtml(editor)
         : String(editor.innerHTML || '');
-    const rawBodyHtml = String(editor.innerHTML || '');
+    const rawBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(editor.innerHTML || ''));
     const bodyText = window.rcCollectCoachDatabaseTemplatePlainText
         ? window.rcCollectCoachDatabaseTemplatePlainText(editor)
         : String(editor.innerText || editor.textContent || '');
     const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
-    const hiddenBodyHtml = String(hidden?.value || '');
-    const activeBodyHtml = String(window.__plyrTemplateEditorActiveBodyHtml || '');
-    const lastSerializedHtml = String(editor.__plyrLastSerializedHtml || editor.dataset.plyrLastSerializedHtml || '');
+    const hiddenBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(hidden?.value || ''));
+    const activeBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(window.__plyrTemplateEditorActiveBodyHtml || ''));
+    const lastSerializedHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(editor.__plyrLastSerializedHtml || editor.dataset.plyrLastSerializedHtml || ''));
 
     window.__plyrTemplateEditorActiveBodyHtml = bodyHtml;
 
@@ -15853,7 +16005,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
 
     const encode = (value) => window.rcTemplateUnicodeBase64 ? window.rcTemplateUnicodeBase64(value) : btoa(unescape(encodeURIComponent(String(value || ''))));
 
-    await $wire.call('saveTemplateFromClientPayload', {
+    await livewire.call('saveTemplateFromClientPayload', {
         name: String(name?.value || ''),
         subject: String(subject?.value || ''),
         preview_text: String(preview?.value || ''),
