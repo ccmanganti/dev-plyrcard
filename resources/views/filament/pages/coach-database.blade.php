@@ -10225,11 +10225,41 @@ discoverSelectedIds: [],
                         return is_scalar($value) ? (string) $value : '';
                     }
                 };
-                $prepareInboxEmailDocument = function ($body): string {
-                    $raw = trim((string) $body);
+                $prepareInboxMessageHtml = function ($body, array $message = []): string {
+                    $candidateValues = [
+                        $body,
+                        $message['_body_text'] ?? null,
+                        $message['body_text'] ?? null,
+                        $message['plain_text'] ?? null,
+                        $message['plainText'] ?? null,
+                        $message['text_body'] ?? null,
+                        $message['textBody'] ?? null,
+                        $message['text'] ?? null,
+                        $message['snippet'] ?? null,
+                        $message['preview'] ?? null,
+                        $message['bodyPreview'] ?? null,
+                        $message['message_preview'] ?? null,
+                        data_get($message, 'message.text'),
+                        data_get($message, 'message.body'),
+                        data_get($message, 'emailMessage.text'),
+                        data_get($message, 'emailMessage.body'),
+                        data_get($message, 'email.body'),
+                        data_get($message, 'meta.email.text'),
+                        data_get($message, 'meta.email.body'),
+                        data_get($message, 'payload.text'),
+                        data_get($message, 'payload.body'),
+                    ];
+
+                    $raw = '';
+                    foreach ($candidateValues as $candidate) {
+                        if (is_scalar($candidate) && trim((string) $candidate) !== '') {
+                            $raw = trim((string) $candidate);
+                            break;
+                        }
+                    }
 
                     if ($raw === '') {
-                        return '<!doctype html><html><body style="margin:0;font:14px Arial,sans-serif;color:#64748b">No message body.</body></html>';
+                        return '<span class="rc-msg-empty-v11315">No visible message content was included.</span>';
                     }
 
                     $decoded = $raw;
@@ -10241,99 +10271,53 @@ discoverSelectedIds: [],
                         $decoded = $next;
                     }
 
-                    $hasDocumentHtml = (bool) preg_match('/<!doctype\s+html|<html\b|<head\b|<body\b/i', $decoded);
-                    $hasHtml = (bool) preg_match('/<\s*(table|tbody|tr|td|p|div|br|a|img|ul|ol|li|span|strong|em|h[1-6])\b/i', $decoded);
+                    $decoded = preg_replace('/<\s*(script|style|noscript)\b[^>]*>.*?<\s*\/\s*\1\s*>/is', ' ', $decoded) ?? $decoded;
+                    $decoded = preg_replace('/<!--.*?-->/s', ' ', $decoded) ?? $decoded;
 
-                    if (! $hasHtml) {
-                        return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
-                            . '<body style="margin:0;padding:0;font:14px/1.6 Arial,sans-serif;color:#111827;white-space:pre-wrap;overflow-wrap:anywhere">'
-                            . e($decoded)
-                            . '</body></html>';
+                    if (preg_match('/<body\b[^>]*>(.*?)<\/body\s*>/is', $decoded, $match)) {
+                        $decoded = $match[1];
                     }
 
-                    // inbox's email detail endpoint returns the complete compiled email
-                    // document in emailMessage.body. Keep its head, style blocks,
-                    // media queries, tables, buttons, images, and signatures intact.
-                    // Scripts are removed because email clients do not execute them.
-                    $clean = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $decoded) ?? $decoded;
-                    $clean = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $clean) ?? $clean;
-                    $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
-                    $clean = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $clean) ?? $clean;
+                    // Convert common block tags to line breaks before stripping HTML.
+                    $decoded = preg_replace('/<\s*br\s*\/?>/i', "\n", $decoded) ?? $decoded;
+                    $decoded = preg_replace('/<\s*\/\s*(p|div|li|h[1-6]|tr|table|section|article|blockquote)\s*>/i', "\n", $decoded) ?? $decoded;
+                    $decoded = preg_replace('/<\s*(p|div|li|h[1-6]|tr|table|section|article|blockquote)\b[^>]*>/i', "\n", $decoded) ?? $decoded;
 
-                    $responsiveEmailCss = <<<'CSS'
-<style id="rc-inbox-email-fit-v62">
-    html, body {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        overflow-x: hidden !important;
-        -webkit-text-size-adjust: 100% !important;
-        text-size-adjust: 100% !important;
-    }
-    body {
-        font-size: 12px !important;
-        line-height: 1.45 !important;
-    }
-    body, body table, body td, body div, body p, body span,
-    body a, body li, body strong, body em {
-        box-sizing: border-box !important;
-        max-width: 100% !important;
-    }
-    body table {
-        max-width: 100% !important;
-    }
-    body img {
-        max-width: 100% !important;
-        height: auto !important;
-        object-fit: contain !important;
-    }
-    body p, body li, body td, body div, body span, body a {
-        overflow-wrap: anywhere !important;
-        word-break: normal !important;
-    }
-    body p, body li, body td, body div, body span {
-        font-size: 12px !important;
-        line-height: 1.45 !important;
-    }
-    body a {
-        font-size: 12px !important;
-        line-height: 1.35 !important;
-    }
-    body h1 { font-size: 20px !important; line-height: 1.2 !important; }
-    body h2 { font-size: 18px !important; line-height: 1.22 !important; }
-    body h3 { font-size: 16px !important; line-height: 1.25 !important; }
-    body h4, body h5, body h6 { font-size: 14px !important; line-height: 1.3 !important; }
-    .email-content,
-    body > div,
-    body > table {
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-    }
-    @media (max-width: 640px) {
-        body table[width] { width: 100% !important; }
-        body td[width] { max-width: 100% !important; }
-    }
-</style>
-CSS;
+                    $text = strip_tags($decoded);
+                    $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                    $text = str_replace(["\xc2\xa0", '&nbsp;'], ' ', $text);
+                    $text = preg_replace('/[ \t\r\f\v]+/', ' ', $text) ?? $text;
+                    $text = preg_replace('/\n[ \t]+/', "\n", $text) ?? $text;
+                    $text = preg_replace('/[ \t]+\n/', "\n", $text) ?? $text;
+                    $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
+                    $text = trim($text);
 
-                    if ($hasDocumentHtml) {
-                        if (preg_match('/<\/head\s*>/i', $clean)) {
-                            return preg_replace('/<\/head\s*>/i', $responsiveEmailCss . '</head>', $clean, 1) ?? $clean;
+                    if ($text === '') {
+                        foreach (['subject', 'preview', 'snippet'] as $fallbackKey) {
+                            $fallback = $message[$fallbackKey] ?? null;
+                            if (is_scalar($fallback) && trim((string) $fallback) !== '') {
+                                $text = trim((string) $fallback);
+                                break;
+                            }
                         }
-
-                        if (preg_match('/<body\b/i', $clean)) {
-                            return preg_replace('/<body\b/i', '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' . $responsiveEmailCss . '</head><body', $clean, 1) ?? $clean;
-                        }
-
-                        return $responsiveEmailCss . $clean;
                     }
 
-                    return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-                        . $responsiveEmailCss
-                        . '</head><body style="margin:0;padding:0">' . $clean . '</body></html>';
+                    if ($text === '') {
+                        return '<span class="rc-msg-empty-v11315">No visible message content was included.</span>';
+                    }
+
+                    if (mb_strlen($text) > 8000) {
+                        $text = mb_substr($text, 0, 8000) . '…';
+                    }
+
+                    $escaped = e($text);
+                    $escaped = preg_replace_callback('/\bhttps?:\/\/[^\s<]+/i', function (array $match): string {
+                        $url = rtrim($match[0], '.,);]');
+                        $tail = substr($match[0], strlen($url));
+                        return '<a href="' . e($url) . '" target="_blank" rel="noopener noreferrer">' . e($url) . '</a>' . e($tail);
+                    }, $escaped) ?? $escaped;
+
+                    return nl2br($escaped, false);
                 };
             @endphp
 
@@ -10348,19 +10332,24 @@ CSS;
                     padding:.55rem;
                     overflow:visible;
                 }
-                rc-inbox-email-view.rc-email-document-v64 {
+                .rc-msg-content-v11315 {
                     display:block;
-                    width:100%;
                     max-width:100%;
-                    height:auto;
-                    min-height:0;
-                    overflow:visible;
-                    contain:layout style;
+                    color:var(--rc-text);
+                    font-size:.84rem;
+                    line-height:1.55;
+                    white-space:normal;
+                    overflow-wrap:anywhere;
+                    word-break:normal;
                 }
-                rc-inbox-email-view.rc-email-document-v64::part(toggle) {
-                    position:absolute;
-                    right:.25rem;
-                    bottom:.2rem;
+                .rc-msg-content-v11315 a {
+                    color:#2563eb;
+                    text-decoration:underline;
+                    overflow-wrap:anywhere;
+                }
+                .rc-msg-empty-v11315 {
+                    color:var(--rc-muted);
+                    font-style:italic;
                 }
                 .rc-message-stream-v56 { position:relative; }
                 .rc-inbox-thread-loader-v63 {
@@ -10436,119 +10425,6 @@ CSS;
                 .rc-thread-loading-copy-v11312 small{display:inline-flex;align-items:center;gap:.38rem;margin-top:.68rem;color:var(--rc-muted);font-size:.74rem;}
             </style>
             <script>
-                (() => {
-                    if (customElements.get('rc-inbox-email-view')) return;
-
-                    class RcInboxEmailView extends HTMLElement {
-                        connectedCallback() {
-                            if (this.shadowRoot) return;
-
-                            const template = this.querySelector('template');
-                            if (!(template instanceof HTMLTemplateElement)) return;
-
-                            const parsed = new DOMParser().parseFromString(template.innerHTML, 'text/html');
-                            const shadow = this.attachShadow({ mode: 'open' });
-
-                            const base = document.createElement('style');
-                            base.textContent = `
-                                :host { display:block; width:100%; max-width:100%; height:auto; min-height:0; position:relative; }
-                                *, *::before, *::after { box-sizing:border-box; }
-                                .rc-email-viewport { display:block; width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; transition:max-height .18s ease; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px; overflow:hidden; padding-right:2rem; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:""; position:absolute; left:0; right:0; bottom:0; height:2.75rem; z-index:2; pointer-events:none; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)); }
-                                .rc-email-root { display:block; width:100%; max-width:100%; min-width:0; margin:0; overflow:visible; font-size:12px; line-height:1.45; }
-                                .rc-email-root img { max-width:100% !important; height:auto !important; }
-                                .rc-email-root table { max-width:100% !important; }
-                                .rc-email-root td, .rc-email-root th { max-width:100% !important; }
-                                .rc-email-root a { overflow-wrap:anywhere; word-break:break-word; }
-                                .rc-email-toggle { display:none; position:absolute; right:.2rem; bottom:.18rem; z-index:4; width:1.75rem; height:1.75rem; padding:0; border:0; border-radius:0; background:transparent; color:#475569; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; }
-                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex; }
-                                .rc-email-toggle svg { width:.9rem; height:.9rem; transition:transform .18s ease; }
-                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg); }
-                            `;
-                            shadow.appendChild(base);
-
-                            parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-                                const clone = node.cloneNode(true);
-                                if (clone instanceof HTMLStyleElement) {
-                                    clone.textContent = String(clone.textContent || '').replace(/\bbody\b/g, '.rc-email-root');
-                                }
-                                shadow.appendChild(clone);
-                            });
-
-                            const viewport = document.createElement('div');
-                            viewport.className = 'rc-email-viewport';
-
-                            const root = document.createElement('div');
-                            root.className = `rc-email-root ${parsed.body.className || ''}`.trim();
-
-                            const bodyStyle = parsed.body.getAttribute('style');
-                            if (bodyStyle) root.setAttribute('style', bodyStyle);
-
-                            Array.from(parsed.body.childNodes).forEach((node) => {
-                                root.appendChild(document.importNode(node, true));
-                            });
-
-                            viewport.appendChild(root);
-                            shadow.appendChild(viewport);
-
-                            const toggle = document.createElement('button');
-                            toggle.type = 'button';
-                            toggle.className = 'rc-email-toggle';
-                            toggle.setAttribute('part', 'toggle');
-                            toggle.setAttribute('aria-label', 'Expand email');
-                            toggle.setAttribute('aria-expanded', 'false');
-                            toggle.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                            toggle.addEventListener('click', () => {
-                                const expanded = this.dataset.expanded === '1';
-                                if (expanded) {
-                                    delete this.dataset.expanded;
-                                    toggle.setAttribute('aria-expanded', 'false');
-                                    toggle.setAttribute('aria-label', 'Expand email');
-                                } else {
-                                    this.dataset.expanded = '1';
-                                    toggle.setAttribute('aria-expanded', 'true');
-                                    toggle.setAttribute('aria-label', 'Collapse email');
-                                }
-                            });
-                            shadow.appendChild(toggle);
-
-                            // Keep inbox controls authoritative even after delayed email
-                            // stylesheets finish loading. Email HTML can contain broad rules
-                            // such as div/button/* selectors, so this guard must be the final
-                            // stylesheet in the shadow root and use !important.
-                            const guard = document.createElement('style');
-                            guard.textContent = `
-                                :host { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; min-height:0 !important; position:relative !important; overflow:visible !important; }
-                                .rc-email-viewport { display:block !important; width:100% !important; max-width:100% !important; min-width:0 !important; max-height:none !important; height:auto !important; overflow:visible !important; position:relative !important; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px !important; overflow:hidden !important; padding-right:2rem !important; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:"" !important; display:block !important; position:absolute !important; left:0 !important; right:0 !important; bottom:0 !important; height:2.75rem !important; z-index:2147483645 !important; pointer-events:none !important; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)) !important; }
-                                .rc-email-toggle { display:none !important; position:absolute !important; right:.2rem !important; bottom:.18rem !important; z-index:2147483646 !important; width:1.75rem !important; height:1.75rem !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:#475569 !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; box-shadow:none !important; appearance:none !important; }
-                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex !important; }
-                                .rc-email-toggle svg { display:block !important; width:.9rem !important; height:.9rem !important; min-width:.9rem !important; min-height:.9rem !important; transition:transform .18s ease !important; }
-                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg) !important; }
-                            `;
-                            shadow.appendChild(guard);
-                            template.remove();
-
-                            const evaluateHeight = () => {
-                                const height = Math.ceil(root.getBoundingClientRect().height);
-                                if (height > 100) this.dataset.collapsible = '1';
-                            };
-
-                            requestAnimationFrame(() => requestAnimationFrame(evaluateHeight));
-                            root.querySelectorAll('img').forEach((image) => {
-                                if (!image.complete) {
-                                    image.addEventListener('load', evaluateHeight, { once:true });
-                                    image.addEventListener('error', evaluateHeight, { once:true });
-                                }
-                            });
-                            if (document.fonts?.ready) document.fonts.ready.then(evaluateHeight).catch(() => {});
-                        }
-                    }
-
-                    customElements.define('rc-inbox-email-view', RcInboxEmailView);
-                })();
 
                 (() => {
                     let activeRun = 0;
@@ -11052,6 +10928,10 @@ CSS;
                                                 }
                                             }
                                             $messageBody = collect([
+                                                $message['_body_text'] ?? null,
+                                                $message['body_text'] ?? null,
+                                                $message['plain_text'] ?? null,
+                                                $message['plainText'] ?? null,
                                                 $decodedCompressedBody,
                                                 $message['html_body'] ?? null,
                                                 $message['htmlBody'] ?? null,
@@ -11094,12 +10974,10 @@ CSS;
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
                                                 @php
-                                                    $emailDocument = $prepareInboxEmailDocument($messageBody);
+                                                    $messageHtml = $prepareInboxMessageHtml($messageBody, $message);
                                                 @endphp
                                                 <div class="rc-msg-bubble-v56 rc-msg-bubble-email-v61">
-                                                    <rc-inbox-email-view wire:ignore class="rc-email-document-v64" aria-label="Email message">
-                                                        <template>{!! $emailDocument !!}</template>
-                                                    </rc-inbox-email-view>
+                                                    <div class="rc-msg-content-v11315">{!! $messageHtml !!}</div>
                                                 </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">

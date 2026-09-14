@@ -6230,9 +6230,14 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 return;
             }
 
-            $rows = collect($result['messages'] ?? [])
+            $normalizedRows = collect($result['messages'] ?? [])
                 ->filter(fn ($row): bool => is_array($row))
-                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
+                ->map(fn (array $row): array => $this->normalizeConversationMessageRow($row));
+
+            $normalizedRows = $this->enrichConversationMessageRowsWithLocalSentBodies($normalizedRows, $user, $conversationId);
+
+            $rows = $normalizedRows
+                ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
                 ->sortBy(function (array $row): int {
                     $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
 
@@ -6283,6 +6288,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 && ($fresh || $addedCount > 0);
 
             $messageCachePayload = [
+                'body_render_version' => 'v10.113.15',
                 'rows' => $this->messages,
                 'last_message_id' => $this->messageLastId,
                 'has_more' => $this->hasMoreMessages,
@@ -6514,11 +6520,29 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
      */
     protected function compactConversationMessageForLivewire(array $row): array
     {
+        // v10.113.15: keep Inbox payloads light and deterministic. The earlier
+        // implementation serialized full HTML email documents into the Livewire
+        // snapshot, then parsed them again in the browser through a custom shadow
+        // DOM element. That is what caused intermittent UI freezes and blank
+        // grey message bars. Store one readable text fragment instead.
+        $bodyCandidates = [];
+
         if (filled($row['_livewire_body_gzip'] ?? null)) {
-            return $row;
+            try {
+                $decoded = gzdecode(base64_decode((string) $row['_livewire_body_gzip'], true) ?: '') ?: '';
+                if (trim($decoded) !== '') {
+                    $bodyCandidates[] = $decoded;
+                }
+            } catch (\Throwable) {
+                // Ignore corrupted legacy cache entries and fall back to other fields.
+            }
         }
 
-        $bodyCandidates = [
+        $bodyCandidates = array_merge($bodyCandidates, [
+            $row['_body_text'] ?? null,
+            $row['body_text'] ?? null,
+            $row['plain_text'] ?? null,
+            $row['plainText'] ?? null,
             $row['html_body'] ?? null,
             $row['htmlBody'] ?? null,
             $row['message_html'] ?? null,
@@ -6530,6 +6554,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             is_scalar($row['message'] ?? null) ? $row['message'] : null,
             $row['text'] ?? null,
             $row['snippet'] ?? null,
+            $row['preview'] ?? null,
+            $row['bodyPreview'] ?? null,
             data_get($row, 'message.html'),
             data_get($row, 'message.body'),
             data_get($row, 'message.content'),
@@ -6537,26 +6563,32 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             data_get($row, 'emailMessage.html'),
             data_get($row, 'emailMessage.body'),
             data_get($row, 'emailMessage.content'),
+            data_get($row, 'emailMessage.text'),
             data_get($row, 'email.html'),
             data_get($row, 'email.body'),
             data_get($row, 'email.content'),
+            data_get($row, 'email.text'),
             data_get($row, 'meta.email.html'),
             data_get($row, 'meta.email.body'),
             data_get($row, 'meta.email.content'),
+            data_get($row, 'meta.email.text'),
             data_get($row, 'payload.html'),
             data_get($row, 'payload.body'),
             data_get($row, 'payload.content'),
-        ];
+            data_get($row, 'payload.text'),
+        ]);
 
         $body = collect($bodyCandidates)
             ->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
 
         if (is_scalar($body) && trim((string) $body) !== '') {
-            $encoded = base64_encode(gzencode((string) $body, 6));
-            $row['_livewire_body_gzip'] = $encoded;
+            $text = $this->readableInboxMessageText((string) $body);
+            if ($text !== '') {
+                $row['_body_text'] = $text;
+            }
         }
 
-        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text', 'snippet'] as $key) {
+        foreach (['html_body', 'htmlBody', 'message_html', 'body', 'html', 'content', 'text_body', 'textBody', 'text', 'snippet', 'preview', 'bodyPreview', 'plain_text', 'plainText', '_livewire_body_gzip'] as $key) {
             unset($row[$key]);
         }
 
@@ -6572,15 +6604,19 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             'emailMessage.html',
             'emailMessage.body',
             'emailMessage.content',
+            'emailMessage.text',
             'email.html',
             'email.body',
             'email.content',
+            'email.text',
             'meta.email.html',
             'meta.email.body',
             'meta.email.content',
+            'meta.email.text',
             'payload.html',
             'payload.body',
             'payload.content',
+            'payload.text',
         ] as $path) {
             data_forget($row, $path);
         }
@@ -6590,6 +6626,208 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         return $row;
+    }
+
+    protected function readableInboxMessageText(string $body): string
+    {
+        $decoded = trim($body);
+
+        if ($decoded === '') {
+            return '';
+        }
+
+        for ($i = 0; $i < 3; $i++) {
+            $next = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if ($next === $decoded || trim($next) === '') {
+                break;
+            }
+            $decoded = $next;
+        }
+
+        $decoded = preg_replace('/<\s*(script|style|noscript)\b[^>]*>.*?<\s*\/\s*\1\s*>/is', ' ', $decoded) ?? $decoded;
+        $decoded = preg_replace('/<!--.*?-->/s', ' ', $decoded) ?? $decoded;
+
+        if (preg_match('/<body\b[^>]*>(.*?)<\/body\s*>/is', $decoded, $match)) {
+            $decoded = $match[1];
+        }
+
+        $decoded = preg_replace('/<\s*br\s*\/?>/i', "\n", $decoded) ?? $decoded;
+        $decoded = preg_replace('/<\s*\/\s*(p|div|li|h[1-6]|tr|table|section|article|blockquote)\s*>/i', "\n", $decoded) ?? $decoded;
+        $decoded = preg_replace('/<\s*(p|div|li|h[1-6]|tr|table|section|article|blockquote)\b[^>]*>/i', "\n", $decoded) ?? $decoded;
+
+        $text = strip_tags($decoded);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = str_replace(["\xc2\xa0", '&nbsp;'], ' ', $text);
+        $text = preg_replace('/[ \t\r\f\v]+/', ' ', $text) ?? $text;
+        $text = preg_replace('/\n[ \t]+/', "\n", $text) ?? $text;
+        $text = preg_replace('/[ \t]+\n/', "\n", $text) ?? $text;
+        $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
+        $text = trim($text);
+
+        if (mb_strlen($text) > 8000) {
+            return mb_substr($text, 0, 8000) . '…';
+        }
+
+        return $text;
+    }
+
+    protected function enrichConversationMessageRowsWithLocalSentBodies(Collection $rows, $user, string $conversationId): Collection
+    {
+        if ($rows->isEmpty() || ! $user || ! Schema::hasTable('coach_database_email_messages')) {
+            return $rows;
+        }
+
+        $conversation = collect($this->conversations ?? [])
+            ->first(fn ($row): bool => is_array($row) && (string) ($row['id'] ?? '') === $conversationId) ?: [];
+
+        $recipientEmail = strtolower(trim((string) (
+            $conversation['email']
+            ?? $conversation['contact_email']
+            ?? $conversation['recipient_email']
+            ?? ''
+        )));
+
+        $messageIds = $rows
+            ->flatMap(function (array $row): array {
+                return [
+                    $row['id'] ?? null,
+                    $row['messageId'] ?? null,
+                    $row['message_id'] ?? null,
+                    $row['ghl_message_id'] ?? null,
+                    data_get($row, 'message.id'),
+                    data_get($row, 'emailMessage.id'),
+                ];
+            })
+            ->filter(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '')
+            ->map(fn ($value): string => (string) $value)
+            ->unique()
+            ->values();
+
+        try {
+            $query = DB::table('coach_database_email_messages')
+                ->where('athlete_user_id', $user->getKey())
+                ->whereNotNull('rendered_html');
+
+            $query->where(function ($inner) use ($messageIds, $recipientEmail): void {
+                if ($messageIds->isNotEmpty()) {
+                    $inner->whereIn('ghl_message_id', $messageIds->all())
+                        ->orWhereIn('message_uuid', $messageIds->all());
+                }
+
+                if ($recipientEmail !== '') {
+                    $method = $messageIds->isNotEmpty() ? 'orWhere' : 'where';
+                    $inner->{$method}('recipient_email', $recipientEmail);
+                }
+            });
+
+            $localRows = $query
+                ->orderByDesc('sent_at')
+                ->limit(80)
+                ->get(['ghl_message_id', 'message_uuid', 'recipient_email', 'subject', 'rendered_html', 'sent_at'])
+                ->map(fn ($row): array => (array) $row)
+                ->values();
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to enrich Inbox messages from local sent email records.', [
+                'user_id' => $user->getKey(),
+                'conversation_id' => $conversationId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $rows;
+        }
+
+        if ($localRows->isEmpty()) {
+            return $rows;
+        }
+
+        $localById = [];
+        foreach ($localRows as $local) {
+            foreach (['ghl_message_id', 'message_uuid'] as $key) {
+                $value = trim((string) ($local[$key] ?? ''));
+                if ($value !== '') {
+                    $localById[$value] = $local;
+                }
+            }
+        }
+
+        $timestampFor = function ($value): int {
+            if (is_numeric($value)) {
+                $number = (int) $value;
+                return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+            }
+
+            try {
+                return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+            } catch (\Throwable) {
+                return 0;
+            }
+        };
+
+        return $rows->map(function (array $row) use ($localById, $localRows, $recipientEmail, $timestampFor): array {
+            $hasBody = collect([
+                $row['body'] ?? null,
+                $row['html'] ?? null,
+                $row['content'] ?? null,
+                $row['text'] ?? null,
+                $row['_body_text'] ?? null,
+                data_get($row, 'emailMessage.body'),
+                data_get($row, 'message.body'),
+            ])->contains(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+
+            if ($hasBody) {
+                return $row;
+            }
+
+            $direction = strtolower(trim((string) ($row['direction'] ?? '')));
+            if (! str_contains($direction, 'out')) {
+                return $row;
+            }
+
+            $ids = collect([
+                $row['id'] ?? null,
+                $row['messageId'] ?? null,
+                $row['message_id'] ?? null,
+                $row['ghl_message_id'] ?? null,
+                data_get($row, 'message.id'),
+                data_get($row, 'emailMessage.id'),
+            ])->filter(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '')
+                ->map(fn ($value): string => (string) $value)
+                ->values();
+
+            $match = null;
+            foreach ($ids as $id) {
+                if (isset($localById[$id])) {
+                    $match = $localById[$id];
+                    break;
+                }
+            }
+
+            if (! $match && $recipientEmail !== '') {
+                $messageTime = $timestampFor($row['created_at'] ?? $row['createdAt'] ?? $row['dateAdded'] ?? $row['date'] ?? $row['messageDate'] ?? null);
+                $candidates = $localRows
+                    ->filter(fn (array $local): bool => strtolower(trim((string) ($local['recipient_email'] ?? ''))) === $recipientEmail)
+                    ->sortBy(function (array $local) use ($timestampFor, $messageTime): int {
+                        $localTime = $timestampFor($local['sent_at'] ?? null);
+                        if ($messageTime <= 0 || $localTime <= 0) {
+                            return PHP_INT_MAX;
+                        }
+
+                        return abs($localTime - $messageTime);
+                    })
+                    ->values();
+
+                $match = $candidates->first();
+            }
+
+            if ($match && trim((string) ($match['rendered_html'] ?? '')) !== '') {
+                $row['body'] = (string) $match['rendered_html'];
+                if (blank($row['subject'] ?? null) && filled($match['subject'] ?? null)) {
+                    $row['subject'] = (string) $match['subject'];
+                }
+            }
+
+            return $row;
+        });
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool
@@ -6607,6 +6845,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
     }
 
     if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
+        return false;
+    }
+
+    if (($cached['body_render_version'] ?? null) !== 'v10.113.15') {
         return false;
     }
 
@@ -7006,6 +7248,7 @@ public function removeQuickReplyAttachmentByUrl(string $url): void
                 ->all();
 
             $messageCachePayload = [
+                'body_render_version' => 'v10.113.15',
                 'rows' => $this->messages,
                 'last_message_id' => $this->messageLastId,
                 'has_more' => $this->hasMoreMessages,
