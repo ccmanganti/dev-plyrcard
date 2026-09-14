@@ -7933,7 +7933,7 @@ discoverSelectedIds: [],
                                                 <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
                                             @else
                                                 {{ $dashboardEmailFetchStatus ?: 'Email activity' }}
-                                                <button type="button" class="rc-link" style="margin-left:.4rem;font-size:.72rem" wire:click="fetchDashboardEmailSentCount" wire:loading.attr="disabled" wire:target="fetchDashboardEmailSentCount">Refresh</button>
+                                                <span role="button" tabindex="0" class="rc-link rc-email-refresh-action-v149" style="margin-left:.4rem;font-size:.72rem" wire:click.stop="fetchDashboardEmailSentCount" wire:keydown.enter.stop="fetchDashboardEmailSentCount" wire:keydown.space.prevent.stop="fetchDashboardEmailSentCount" wire:loading.class="is-disabled" wire:target="fetchDashboardEmailSentCount">Refresh</span>
                                             @endif
                                         </span>
                                         <span class="rc-email-saved-refresh-indicator-v148" wire:loading.inline-flex wire:target="fetchDashboardEmailSentCount" aria-live="polite">
@@ -7947,7 +7947,7 @@ discoverSelectedIds: [],
                                             <span class="rc-email-live-fetch-error-v136">Unable to refresh · showing last saved count</span>
                                         @else
                                             <span>{{ $dashboardEmailFetchStatus ?: 'Email activity' }}</span>
-                                            <button type="button" class="rc-link" style="margin-left:.4rem;font-size:.72rem" wire:click="fetchDashboardEmailSentCount" wire:loading.attr="disabled" wire:target="fetchDashboardEmailSentCount">Refresh</button>
+                                            <span role="button" tabindex="0" class="rc-link rc-email-refresh-action-v149" style="margin-left:.4rem;font-size:.72rem" wire:click.stop="fetchDashboardEmailSentCount" wire:keydown.enter.stop="fetchDashboardEmailSentCount" wire:keydown.space.prevent.stop="fetchDashboardEmailSentCount" wire:loading.class="is-disabled" wire:target="fetchDashboardEmailSentCount">Refresh</span>
                                         @endif
                                     </div>
                                     <div class="rc-home-stat-sub-v2 rc-email-live-fetch-status-v136" wire:loading.flex wire:target="fetchDashboardEmailSentCount">
@@ -7963,6 +7963,18 @@ discoverSelectedIds: [],
 
                 <style>
                     .rc-email-saved-refresh-v148 { min-height: 1.05rem; }
+                    .rc-email-refresh-action-v149 {
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                        user-select: none;
+                        white-space: nowrap;
+                    }
+                    .rc-email-refresh-action-v149.is-disabled {
+                        pointer-events: none;
+                        opacity: .55;
+                    }
                     .rc-email-saved-refresh-indicator-v148 {
                         align-items: center;
                         gap: .32rem;
