@@ -7018,22 +7018,20 @@ discoverSelectedIds: [],
             document.addEventListener('livewire:navigated', window.runCoachDatabaseScrollResetLoop);
         })();
 
-        window.initCoachDatabasePage = function (wire) {
+        window.initCoachDatabasePage = function () {
             // v10.113.9: This init must be UI-only. It used to start a background
             // Coach Database load 900ms after mount and also listened for load-next
             // events. Those hidden Livewire/inbox requests made the whole Recruiting
             // Center feel frozen and kept the refresh icon spinning on unrelated tabs.
+            // v10.113.23: run the scroll reset once only. The delayed second pass
+            // could fire while the user was already interacting with Inbox/Templates.
             window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
-
-            window.setTimeout(function () {
-                window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
-            }, 250);
         };
     </script>
 
     <div
         class="rc-wrap"
-        x-init="window.initCoachDatabasePage && window.initCoachDatabasePage($wire)"
+        x-init="window.initCoachDatabasePage && window.initCoachDatabasePage()"
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
         x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
         x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
@@ -8162,12 +8160,11 @@ discoverSelectedIds: [],
                     // MutationObserver fired on every Inbox/template morph and caused
                     // the 3-5 second freeze/unfreeze behavior. Re-apply only after
                     // explicit navigation/morph lifecycle events when a filter exists.
+                    // v10.113.23: do not bind to Livewire morph.updated. Inbox message
+                    // loads morph frequently, and even small dashboard-only queries can stall
+                    // scroll/click responsiveness. The filter reapplies only on navigation
+                    // or when the filter itself changes.
                     document.addEventListener('livewire:navigated', scheduleApply);
-                    document.addEventListener('livewire:init', () => {
-                        if (window.Livewire?.hook) {
-                            window.Livewire.hook('morph.updated', scheduleApply);
-                        }
-                    }, { once: true });
                 }
 
                 window.rcApplyCoachEngagementFilter();
@@ -11779,12 +11776,9 @@ CSS;
                     // mounted even while Inbox is open, so the old observer scanned the
                     // entire app on every Livewire DOM change. One-shot hooks are enough
                     // to hide legacy overlays without making scrolling/clicks freeze.
+                    // v10.113.23: no Livewire morph hook here. A full-document overlay
+                    // scan after every Inbox message morph causes random freeze/unfreeze lag.
                     document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(hideLegacyComposeOpeners));
-                    document.addEventListener('livewire:init', () => {
-                        if (window.Livewire?.hook) {
-                            window.Livewire.hook('morph.updated', () => window.requestAnimationFrame(hideLegacyComposeOpeners));
-                        }
-                    }, { once: true });
                 })();
             </script>
 
@@ -14848,15 +14842,10 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     window.addEventListener('resize', fit, { passive: true });
     window.addEventListener('orientationchange', fit, { passive: true });
     document.addEventListener('livewire:navigated', fit);
-    document.addEventListener('livewire:initialized', fit);
 
-    if (window.Livewire?.hook) {
-        window.Livewire.hook('morph.updated', ({ el }) => {
-            if (el?.matches?.('.rc-inbox-page-v56, .rc-inbox-shell-v56') || el?.querySelector?.('.rc-inbox-shell-v56')) {
-                fit();
-            }
-        });
-    }
+    // v10.113.23: do not fit on every Livewire morph. Conversation switches can
+    // morph message HTML several times; repeated getBoundingClientRect calls here
+    // are visible as intermittent UI stalls. Resize/navigation is enough.
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', fit, { once: true });
@@ -15725,11 +15714,9 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             }
         });
 
-        if (Livewire.hook) {
-            Livewire.hook('morph.updated', () => {
-                window.requestAnimationFrame(syncCurrentChrome);
-            });
-        }
+        // v10.113.23: sidebar chrome is controlled by pointer/click/popstate and
+        // livewire:navigated. Do not re-query every Recruiting Center sidebar item
+        // after each Livewire morph; Inbox message renders make that too expensive.
     };
 
     if (window.Livewire) bindPersistentLivewireHooks();
@@ -16067,12 +16054,9 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         } else {
             removeGlobalReloadControls();
         }
+        // v10.113.23: no Livewire morph hook. The controls are removed at page
+        // boot/navigation only so Inbox message morphs never trigger a document scan.
         document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(removeGlobalReloadControls));
-        document.addEventListener('livewire:init', () => {
-            if (window.Livewire?.hook) {
-                window.Livewire.hook('morph.updated', () => window.requestAnimationFrame(removeGlobalReloadControls));
-            }
-        }, { once: true });
     })();
 </script>
 
