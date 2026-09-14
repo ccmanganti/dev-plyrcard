@@ -1,13 +1,16 @@
 @php
-    // v10.103.2: send the canonical local school catalog once, then reuse the browser
-    // copy for instant Recruiting Center navigation instead of serializing it again
-    // in every Livewire response. The cache is keyed by the currently authenticated user.
+    // v10.113.14: keep the giant school catalog out of Inbox/template Livewire morphs.
+    // The catalog is only seeded on sections that can actually open/search schools.
+    $rcActiveSectionForSeed = (string) ($section ?? 'dashboard');
+    $rcCatalogHeavySections = ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'campaigns'];
+
     $rcCatalogUser = auth()->user();
     $rcCatalogGender = $rcCatalogUser
         ? (\App\Models\Coach::normalizeGender($rcCatalogUser->gender ?? null) ?: 'unassigned')
         : 'guest';
     $rcCatalogUserKey = (string) ($rcCatalogUser?->getKey() ?? 'guest') . ':' . $rcCatalogGender . ':drawer-v101123';
-    $shouldSeedSchoolCatalog = ! ($this->browserSchoolCatalogSeeded ?? false)
+    $shouldSeedSchoolCatalog = in_array($rcActiveSectionForSeed, $rcCatalogHeavySections, true)
+        && ! ($this->browserSchoolCatalogSeeded ?? false)
         && ($this->allowed ?? false)
         && ! ($this->locked ?? false)
         && ! ($this->isFreePlanAccount ?? false);
@@ -7139,7 +7142,9 @@ discoverSelectedIds: [],
         </div>
 
         <div class="rc-section-host-v1033">
-        <section class="rc-client-panel-v1033" data-rc-client-section="dashboard" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
+        
+        @if(in_array((string) ($section ?? 'dashboard'), ['dashboard', 'profile-views', 'coach-engagement'], true) || ($isStatDrawerOpen ?? false))
+<section class="rc-client-panel-v1033" data-rc-client-section="dashboard" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 // v10.113: lower dashboard cards use the current local/tracked read models.
@@ -7887,6 +7892,8 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
+        @endif
+
 
         <div class="rc-dashboard-persistent-v1033" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
@@ -8557,7 +8564,9 @@ discoverSelectedIds: [],
             </div>
         @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="schools" x-show="activeSection === 'schools'" style="{{ ($section === 'schools') ? '' : 'display:none;' }}">
+        
+        @if((string) ($section ?? 'dashboard') === 'schools')
+<section class="rc-client-panel-v1033" data-rc-client-section="schools" x-show="activeSection === 'schools'" style="{{ ($section === 'schools') ? '' : 'display:none;' }}">
             @php
                 $discoverSchoolCount = (int) ($this->filteredSchoolsCount ?? 0);
                 $discoverLoadedCount = (int) ($loadedSchoolsCount ?? 0);
@@ -9588,9 +9597,13 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
+        @endif
 
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="favorites" x-show="activeSection === 'favorites'" style="{{ ($section === 'favorites') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'favorites')
+<section class="rc-client-panel-v1033" data-rc-client-section="favorites" x-show="activeSection === 'favorites'" style="{{ ($section === 'favorites') ? '' : 'display:none;' }}">
             <style>
                 .rc-favorites-v37 { display:grid; gap:1.05rem; margin-top:1.15rem; }
                 .rc-favorites-head-v37 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
@@ -9779,8 +9792,12 @@ discoverSelectedIds: [],
                 @endif
             </div>
         </section>
+        @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="lists" x-show="activeSection === 'lists'" style="{{ ($section === 'lists') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'lists')
+<section class="rc-client-panel-v1033" data-rc-client-section="lists" x-show="activeSection === 'lists'" style="{{ ($section === 'lists') ? '' : 'display:none;' }}">
             <style>
                 .rc-my-lists-v115{display:grid;gap:1.15rem}
                 .rc-my-lists-head-v115{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-top:.25rem}
@@ -10011,9 +10028,13 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
+        @endif
 
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="coaches" x-show="activeSection === 'coaches'" style="{{ ($section === 'coaches') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'coaches')
+<section class="rc-client-panel-v1033" data-rc-client-section="coaches" x-show="activeSection === 'coaches'" style="{{ ($section === 'coaches') ? '' : 'display:none;' }}">
             <div class="rc-card rc-toolbar is-flat"><input class="rc-input" placeholder="Search coaches" wire:model.live.debounce.400ms="coachSearch" /></div>
             <div class="rc-card">
                 @forelse($this->filteredCoaches as $coach)
@@ -10024,9 +10045,13 @@ discoverSelectedIds: [],
                 @if($this->canLoadMoreCoaches)<div style="margin-top:1rem"><button class="rc-btn" wire:click="loadMoreCoaches">Load more</button></div>@endif
             </div>
         </section>
+        @endif
+
 
         {{-- v118: Inbox restored from the supplied latest reference implementation. --}}
-        <section class="rc-client-panel-v1033" data-rc-client-section="conversations" x-show="activeSection === 'conversations'" style="{{ ($section === 'conversations') ? '' : 'display:none;' }}">
+        
+        @if((string) ($section ?? 'dashboard') === 'conversations')
+<section class="rc-client-panel-v1033" data-rc-client-section="conversations" x-show="activeSection === 'conversations'" style="{{ ($section === 'conversations') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
@@ -10088,7 +10113,11 @@ discoverSelectedIds: [],
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $filteredConversationTotal = (int) ($this->filteredConversationTotal ?? $inboxConversations->count());
                 $canLoadMoreInboxConversations = (bool) ($this->canLoadMoreInboxConversations ?? false);
-                $selectedConversation = $selectedConversationId ? collect($this->conversations)->firstWhere('id', $selectedConversationId) : null;
+                $allConversationRows = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row))->values();
+                $unreadConversationCount = $allConversationRows->filter(fn ($row) => (int) ($row['unread_count'] ?? $row['unreadCount'] ?? $row['unreadMessagesCount'] ?? 0) > 0)->count();
+                $incomingConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['awaiting_reply'] ?? false))->count();
+                $starredConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count();
+                $selectedConversation = $selectedConversationId ? $allConversationRows->firstWhere('id', $selectedConversationId) : null;
                 $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
                 $selectedEmail = strtolower(trim((string) ($selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '')));
 
@@ -10734,17 +10763,14 @@ CSS;
                             <button type="button" class="{{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
                             <button type="button" class="{{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">
                                 Unread
-                                @php $unreadConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (int) ($row['unread_count'] ?? 0) > 0)->count(); @endphp
                                 <span wire:key="unread-count-{{ $unreadConversationCount }}">{{ $unreadConversationCount }}</span>
                             </button>
                             <button type="button" class="{{ $filterStatus === 'incoming' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'incoming')">
                                 Incoming
-                                @php $incomingConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['awaiting_reply'] ?? false))->count(); @endphp
                                 <span wire:key="incoming-count-{{ $incomingConversationCount }}">{{ $incomingConversationCount }}</span>
                             </button>
                             <button type="button" class="{{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">
                                 Starred
-                                @php $starredConversationCount = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row) && (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count(); @endphp
                                 <span wire:key="starred-count-{{ $starredConversationCount }}">{{ $starredConversationCount }}</span>
                             </button>
                         </div>
@@ -10768,9 +10794,14 @@ CSS;
 
                                     this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
 
-                                    // Reloads should show the selected thread automatically. This is a
-                                    // single request only, not the old select -> worker -> poll chain.
-                                    if (this.selectedConversationId && ! this.conversationHasRenderedMessages()) {
+                                    // v10.113.14: this Alpine island can be recreated by a Livewire morph.
+                                    // Autoload once per selected thread per page URL only, otherwise an empty
+                                    // or failed thread can keep re-triggering and make the whole RC feel frozen.
+                                    const bootKey = String(window.location.pathname || '') + ':' + String(this.selectedConversationId || '');
+                                    if (this.selectedConversationId
+                                        && ! this.conversationHasRenderedMessages()
+                                        && window.__rcInboxBootAutoloadedFor !== bootKey) {
+                                        window.__rcInboxBootAutoloadedFor = bootKey;
                                         this.loadConversation(this.selectedConversationId, false, true);
                                     }
                                 },
@@ -10795,16 +10826,43 @@ CSS;
                                     const id = String(conversationId || '');
                                     if (! id) return;
 
-                                    const token = ++this.requestToken;
                                     this.selectedConversationId = id;
                                     this.setThreadLoading(id);
 
-                                    return Promise.resolve(this.$wire.openConversationAndLoadLatestMessages(id, force))
+                                    window.__rcInboxMessageLoader = window.__rcInboxMessageLoader || { busy: false, queued: '', promise: null, lastId: '', lastAt: 0 };
+                                    const loader = window.__rcInboxMessageLoader;
+                                    const now = Date.now();
+
+                                    if (!force && loader.busy) {
+                                        loader.queued = id;
+                                        return loader.promise;
+                                    }
+
+                                    if (!force && loader.lastId === id && (now - Number(loader.lastAt || 0)) < 1250) {
+                                        window.requestAnimationFrame(() => this.clearThreadLoading(id, 0));
+                                        return Promise.resolve();
+                                    }
+
+                                    const token = ++this.requestToken;
+                                    loader.busy = true;
+                                    loader.queued = '';
+                                    loader.promise = Promise.resolve(this.$wire.openConversationAndLoadLatestMessages(id, force))
                                         .catch(() => {})
                                         .finally(() => {
-                                            // Let the Livewire morph land first, then remove the local overlay.
+                                            loader.busy = false;
+                                            loader.lastId = id;
+                                            loader.lastAt = Date.now();
+
                                             window.requestAnimationFrame(() => this.clearThreadLoading(id, token));
+
+                                            const queued = String(loader.queued || '');
+                                            loader.queued = '';
+                                            if (queued && queued !== id) {
+                                                window.setTimeout(() => this.loadConversation(queued, false, false), 0);
+                                            }
                                         });
+
+                                    return loader.promise;
                                 },
                                 selectConversation(conversationId) {
                                     const id = String(conversationId || '');
@@ -11615,8 +11673,12 @@ CSS;
                 </div>
             </div>
         </section>
+        @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="photos" x-show="activeSection === 'photos'" style="{{ ($section === 'photos') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'photos')
+<section class="rc-client-panel-v1033" data-rc-client-section="photos" x-show="activeSection === 'photos'" style="{{ ($section === 'photos') ? '' : 'display:none;' }}">
             @php
                 $mediaGallery = $this->mediaGallery;
                 $playerGallery = collect($mediaGallery['player'] ?? [])->values();
@@ -11730,15 +11792,23 @@ CSS;
                 </div>
             </div>
         </section>
+        @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'support')
+<section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
             {{-- v10.87: The Support page is intentionally self-contained. --}}
             <div class="rc-support-page-v1 rc-support-page-clean-v87">
                 @include('filament.partials.support-ticket-form')
             </div>
         </section>
+        @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'schedule')
+<section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
@@ -11790,8 +11860,12 @@ CSS;
                 </div>
             </div>
         </section>
+        @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'settings')
+<section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
@@ -11941,9 +12015,13 @@ CSS;
                 </div>
             </div>
         </section>
+        @endif
+
 
         {{-- v118: Compose school/coach selection is browser-local; the send API is touched only when sending. --}}
-        <section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
+        
+        @if((string) ($section ?? 'dashboard') === 'compose')
+<section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
             <script>
                 (() => {
                     if (window.__rcComposeLegacyOpenerGuardV82) return;
@@ -12574,8 +12652,12 @@ CSS;
             </div>
             @endteleport
         </section>
+        @endif
 
-        <section class="rc-client-panel-v1033" data-rc-client-section="campaigns" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
+
+        
+        @if((string) ($section ?? 'dashboard') === 'campaigns')
+<section class="rc-client-panel-v1033" data-rc-client-section="campaigns" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header')
 
             {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
@@ -12841,6 +12923,8 @@ CSS;
                 </div>
             </div>
         </section>
+        @endif
+
 
 
         @if($selectedCoachId && $section !== 'conversations')

@@ -64,6 +64,9 @@ trait InteractsWithCoachDatabase
     /** @var array<string, array> */
     protected array $inboxSchoolRowMemo = [];
 
+    /** @var array<string, array<int, array>> */
+    protected array $filteredConversationsMemo = [];
+
     public bool $allowed = false;
     public bool $locked = false;
     public bool $isRecruitingAccountReady = false;
@@ -470,6 +473,8 @@ trait InteractsWithCoachDatabase
             return;
         }
 
+        $wasAlreadyInInbox = $this->section === 'conversations';
+
         $this->search = '';
         $this->coachSearch = '';
         $this->favoriteSchoolSearch = '';
@@ -498,7 +503,7 @@ trait InteractsWithCoachDatabase
         $this->inboxInitialLoadCompleted = true;
         $hydratedMessagesDuringPrime = ! $hadMessagesBeforePrime && ! empty($this->messages);
 
-        if ($hasCachedInbox && ! $hydratedMessagesDuringPrime && method_exists($this, 'skipRender')) {
+        if ($wasAlreadyInInbox && $hasCachedInbox && ! $hydratedMessagesDuringPrime && method_exists($this, 'skipRender')) {
             $this->skipRender();
         }
 
@@ -515,7 +520,6 @@ trait InteractsWithCoachDatabase
      * Sidebar navigation dispatches this method instead of loading another Filament
      * page. Only the state required by the destination section is initialized.
      */
-    #[Renderless]
     public function switchRecruitingSection(string $section): void
     {
         $allowedSections = [
@@ -14369,26 +14373,41 @@ HTML;
         $schoolFilter = trim($this->conversationSchoolFilter);
         $statusFilter = strtolower(trim((string) ($this->conversationStatusFilter ?? 'all')));
         $query = $this->normalizeSearchText($this->conversationSearch);
+        $conversationCount = count($this->conversations ?? []);
+        $conversationHead = (string) data_get($this->conversations, '0.id', '');
+        $conversationTail = (string) data_get($this->conversations, max(0, $conversationCount - 1) . '.id', '');
+        $memoKey = md5(json_encode([
+            $schoolFilter,
+            $statusFilter,
+            $query,
+            $conversationCount,
+            $conversationHead,
+            $conversationTail,
+        ]) ?: 'inbox');
 
-        $base = collect($this->conversations ?? []);
+        if (array_key_exists($memoKey, $this->filteredConversationsMemo)) {
+            return $this->filteredConversationsMemo[$memoKey];
+        }
+
+        $rows = array_values(array_filter($this->conversations ?? [], 'is_array'));
 
         if ($statusFilter === 'unread') {
-            $base = $base->filter(fn (array $conversation): bool => (int) ($conversation['unread_count'] ?? 0) > 0);
+            $rows = array_values(array_filter($rows, fn (array $conversation): bool => $this->inboxConversationUnreadCount($conversation) > 0));
         } elseif ($statusFilter === 'incoming') {
-            $base = $base->filter(fn (array $conversation): bool => (bool) ($conversation['awaiting_reply'] ?? false));
+            $rows = array_values(array_filter($rows, fn (array $conversation): bool => (bool) ($conversation['awaiting_reply'] ?? false)));
         } elseif ($statusFilter === 'starred') {
-            $base = $base->filter(fn (array $conversation): bool => (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false));
+            $rows = array_values(array_filter($rows, fn (array $conversation): bool => (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false)));
         }
 
         if ($schoolFilter !== '') {
-            $base = $base->filter(function (array $conversation) use ($schoolFilter): bool {
+            $rows = array_values(array_filter($rows, function (array $conversation) use ($schoolFilter): bool {
                 return strcasecmp(trim((string) ($conversation['school'] ?? '')), $schoolFilter) === 0
                     || strcasecmp(trim((string) ($conversation['company_name'] ?? '')), $schoolFilter) === 0;
-            });
+            }));
         }
 
         if ($query !== '') {
-            $base = $base->filter(function (array $conversation) use ($query): bool {
+            $rows = array_values(array_filter($rows, function (array $conversation) use ($query): bool {
                 $haystack = $this->normalizeSearchText([
                     $conversation['contact_name'] ?? '',
                     $conversation['name'] ?? '',
@@ -14402,10 +14421,16 @@ HTML;
                 ]);
 
                 return str_contains($haystack, $query);
-            });
+            }));
         }
 
-        return $base->values()->all();
+        // Keep only the last few variants for this render so repeated count/list calls
+        // do not re-filter the same Inbox array, but the memo cannot grow across requests.
+        if (count($this->filteredConversationsMemo) > 4) {
+            $this->filteredConversationsMemo = [];
+        }
+
+        return $this->filteredConversationsMemo[$memoKey] = $rows;
     }
 
     public function getFilteredConversationsProperty(): array
