@@ -12749,6 +12749,7 @@ CSS;
                                         <div class="rc-template-variable-grid-v11331">
                                             @foreach([
                                                 'CoachFirstName' => 'Coach first',
+                                                'CoachLastName' => 'Coach last',
                                                 'SchoolName' => 'School',
                                                 'CoachTitle' => 'Coach title',
                                                 'AthleteName' => 'Athlete',
@@ -12758,11 +12759,10 @@ CSS;
                                                 'YoutubeLink' => 'YouTube',
                                                 'XLink' => 'X link',
                                             ] as $token => $label)
-                                                <button class="rc-template-variable-chip-v11331" type="button" data-token="{{ $token }}" x-on:mousedown.prevent x-on:click="insertMerge($el.dataset.token)"><span>{{ $label }}</span><code>{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</code></button>
+                                                <button class="rc-template-variable-chip-v11331" type="button" data-token="{{ $token }}" x-on:pointerdown.prevent="captureSelection()" x-on:mousedown.prevent="captureSelection()" x-on:click.prevent="insertMerge($el.dataset.token)"><span>{{ $label }}</span><code>{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</code></button>
                                             @endforeach
-                                            <select class="rc-select" style="width:auto;height:2.25rem" x-on:mousedown="captureSelection()" x-on:focus="captureSelection()" x-on:change="insertMergeFromSelect($event)">
+                                            <select class="rc-select" style="width:auto;height:2.25rem" x-on:pointerdown="captureSelection()" x-on:mousedown="captureSelection()" x-on:focus="captureSelection()" x-on:change="insertMergeFromSelect($event)">
                                                 <option value="">More variables</option>
-                                                <option value="CoachLastName">Coach Last Name</option>
                                                 <option value="GraduationYear">Graduation Year</option>
                                                 <option value="Position">Position</option>
                                                 <option value="ClubTeam">Club Team</option>
@@ -13681,9 +13681,13 @@ CSS;
                 panelLinkUrl: '',
                 panelButtonLabel: '',
                 panelButtonUrl: '',
+                selectionHandler: null,
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
+
+                    this.selectionHandler = () => this.captureSelection();
+                    document.addEventListener('selectionchange', this.selectionHandler);
 
                     this.$nextTick(() => this.bootEditor());
 
@@ -13701,6 +13705,12 @@ CSS;
                             this.syncNow();
                         }
                     });
+                },
+                destroy() {
+                    if (this.selectionHandler) {
+                        document.removeEventListener('selectionchange', this.selectionHandler);
+                        this.selectionHandler = null;
+                    }
                 },
                 bootEditor(force = false) {
                     if (!this.$refs.editor) return;
@@ -13796,23 +13806,32 @@ CSS;
                     Array.from(template.content.childNodes || []).forEach(walk);
                     return template.innerHTML;
                 },
-                captureSelection() {
+                editorOwnsNode(node) {
                     const editor = this.$refs.editor;
+                    if (!editor || !node) return false;
+                    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
+                    return node === editor || element === editor || editor.contains(element);
+                },
+                rangeBelongsToEditor(range) {
+                    if (!range) return false;
+                    return this.editorOwnsNode(range.commonAncestorContainer)
+                        || this.editorOwnsNode(range.startContainer)
+                        || this.editorOwnsNode(range.endContainer);
+                },
+                captureSelection() {
                     const selection = window.getSelection?.();
-                    if (!editor || !selection || selection.rangeCount < 1) return;
+                    if (!selection || selection.rangeCount < 1) return;
                     const range = selection.getRangeAt(0);
-                    const node = range.commonAncestorContainer;
-                    if (node === editor || editor.contains(node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode)) {
+                    if (this.rangeBelongsToEditor(range)) {
                         this.savedSelectionRange = range.cloneRange();
                     }
                 },
                 restoreSelection() {
                     const editor = this.$refs.editor;
                     const selection = window.getSelection?.();
-                    if (!editor || !selection) return false;
-                    editor.focus();
-                    if (!this.savedSelectionRange) return false;
+                    if (!editor || !selection || !this.savedSelectionRange || !this.rangeBelongsToEditor(this.savedSelectionRange)) return false;
                     try {
+                        try { editor.focus({ preventScroll: true }); } catch (_) { editor.focus(); }
                         selection.removeAllRanges();
                         selection.addRange(this.savedSelectionRange);
                         return true;
@@ -13822,7 +13841,9 @@ CSS;
                     }
                 },
                 focusEditor() {
-                    this.$refs.editor?.focus();
+                    const editor = this.$refs.editor;
+                    if (!editor) return;
+                    try { editor.focus({ preventScroll: true }); } catch (_) { editor.focus(); }
                 },
                 command(name, value = null) {
                     this.focusEditor();
@@ -13839,22 +13860,65 @@ CSS;
                 placeCaretAtEnd() {
                     const editor = this.$refs.editor;
                     const selection = window.getSelection?.();
-                    if (!editor || !selection) return;
+                    if (!editor || !selection) return null;
                     const range = document.createRange();
                     range.selectNodeContents(editor);
                     range.collapse(false);
                     selection.removeAllRanges();
                     selection.addRange(range);
                     this.savedSelectionRange = range.cloneRange();
+                    return range;
+                },
+                currentEditorRange() {
+                    const selection = window.getSelection?.();
+                    if (selection && selection.rangeCount > 0) {
+                        const activeRange = selection.getRangeAt(0);
+                        if (this.rangeBelongsToEditor(activeRange)) {
+                            return activeRange.cloneRange();
+                        }
+                    }
+
+                    if (this.savedSelectionRange && this.rangeBelongsToEditor(this.savedSelectionRange)) {
+                        return this.savedSelectionRange.cloneRange();
+                    }
+
+                    return null;
                 },
                 insertHtml(html) {
-                    const restored = this.restoreSelection();
-                    if (!restored) {
-                        this.focusEditor();
-                        this.placeCaretAtEnd();
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection?.();
+                    if (!editor || !selection) return;
+
+                    let range = this.currentEditorRange();
+                    this.focusEditor();
+
+                    if (!range || !this.rangeBelongsToEditor(range)) {
+                        range = this.placeCaretAtEnd();
                     }
-                    document.execCommand('insertHTML', false, html);
-                    this.captureSelection();
+
+                    if (!range) return;
+
+                    const template = document.createElement('template');
+                    template.innerHTML = String(html || '');
+                    const fragment = template.content.cloneNode(true);
+                    const lastNode = fragment.lastChild;
+
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    range.deleteContents();
+                    range.insertNode(fragment);
+
+                    const nextRange = document.createRange();
+                    if (lastNode && lastNode.parentNode) {
+                        nextRange.setStartAfter(lastNode);
+                    } else {
+                        nextRange.selectNodeContents(editor);
+                        nextRange.collapse(false);
+                    }
+                    nextRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(nextRange);
+                    this.savedSelectionRange = nextRange.cloneRange();
                     this.syncNow();
                 },
                 insertTokenHtml(token) {
