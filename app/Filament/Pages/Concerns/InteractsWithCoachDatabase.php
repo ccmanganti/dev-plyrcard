@@ -4306,7 +4306,9 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     public function updatedConversationStatusFilter(): void
     {
-        $this->resetInboxConversationWindow();
+        // Kept for compatibility only. The quick status filters run in the browser so
+        // clicking All/Unread/Incoming/Starred does not reset the thread or morph the
+        // full Recruiting Center component.
     }
 
     public function updatedCampaignTargetMode(): void
@@ -5078,20 +5080,28 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->rememberConversationStarOverride($contactId, $nextStarred);
         $this->cacheInboxConversations($this->conversations);
 
-        $result = app(GoHighLevelService::class)->setContactStarredForUser($user, $contactId, $nextStarred);
+        // Starred is maintained as a fast local Inbox preference. Older deployments do
+        // not have a GoHighLevelService::setContactStarredForUser() method, so never
+        // let a missing remote helper break the Inbox. If the helper exists later, use
+        // it as a best-effort sync after the local UI/cache update.
+        $service = app(GoHighLevelService::class);
+        if (method_exists($service, 'setContactStarredForUser')) {
+            $result = $service->setContactStarredForUser($user, $contactId, $nextStarred);
 
-        if (! ($result['success'] ?? false)) {
-            // Roll back the optimistic update when GHL rejects the custom-field write.
-            $applyStarState($currentlyStarred);
-            $this->rememberConversationStarOverride($contactId, $currentlyStarred);
-            $this->cacheInboxConversations($this->conversations);
+            if (! ($result['success'] ?? false)) {
+                // Roll back the optimistic update only when an available remote helper
+                // explicitly rejects the write. Missing helpers are local-only success.
+                $applyStarState($currentlyStarred);
+                $this->rememberConversationStarOverride($contactId, $currentlyStarred);
+                $this->cacheInboxConversations($this->conversations);
 
-            Notification::make()
-                ->title('Recruiting Center')
-                ->body((string) ($result['error'] ?? 'Unable to update the starred value.'))
-                ->danger()
-                ->send();
-            return;
+                Notification::make()
+                    ->title('Recruiting Center')
+                    ->body((string) ($result['error'] ?? 'Unable to update the starred value.'))
+                    ->danger()
+                    ->send();
+                return;
+            }
         }
 
         Notification::make()
@@ -5840,10 +5850,12 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             $row['last_message_direction'] = $direction;
         }
 
-        // Incoming / Needs Reply means the latest known message came from the coach.
-        // Unread is only a fallback when an older cached/API row has no direction field.
-        $row['awaiting_reply'] = $direction === 'inbound'
-            || ($direction === 'unknown' && (int) ($row['unread_count'] ?? 0) > 0);
+        // Incoming / Needs Reply means the latest known message came from the coach
+        // OR the thread still has unread coach mail. Unread is a subset of Incoming:
+        // every unread thread is incoming, but a thread can remain incoming after it
+        // has been opened until the athlete sends a newer outbound reply.
+        $row['awaiting_reply'] = ((int) ($row['unread_count'] ?? 0) > 0)
+            || $direction === 'inbound';
 
         return $row;
     }
@@ -5889,7 +5901,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                     return $row;
                 }
 
-                $awaitingReply = $direction === 'inbound';
+                $awaitingReply = $direction === 'inbound'
+                    || $this->inboxConversationUnreadCount($row) > 0;
                 if (($row['last_message_direction'] ?? null) !== $direction
                     || (bool) ($row['awaiting_reply'] ?? false) !== $awaitingReply) {
                     $changed = true;
@@ -6026,7 +6039,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         if ($hadUnread) {
             app()->terminating(function () use ($user, $conversationId): void {
                 try {
-                    app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+                    $service = app(GoHighLevelService::class);
+                    if (method_exists($service, 'updateConversationUnreadForUser')) {
+                        $service->updateConversationUnreadForUser($user, $conversationId, 0);
+                    }
                 } catch (\Throwable $exception) {
                     Log::debug('Conversation opened locally but the deferred read-state update failed.', [
                         'conversation_id' => $conversationId,
@@ -6130,7 +6146,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         if ($hadUnread && ($user = Auth::user())) {
             try {
-                app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, 0);
+                $service = app(GoHighLevelService::class);
+                if (method_exists($service, 'updateConversationUnreadForUser')) {
+                    $service->updateConversationUnreadForUser($user, $conversationId, 0);
+                }
             } catch (\Throwable $exception) {
                 Log::debug('Conversation was marked read locally but remote update failed.', [
                     'conversation_id' => $conversationId,
@@ -6160,9 +6179,12 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->cacheInboxConversations($this->conversations);
 
         if ($user = Auth::user()) {
-            $result = app(GoHighLevelService::class)->updateConversationUnreadForUser($user, $conversationId, $newCount);
-            if (! ($result['success'] ?? false)) {
-                Notification::make()->title('Inbox')->body((string) ($result['error'] ?? 'Unable to update unread state right now.'))->warning()->send();
+            $service = app(GoHighLevelService::class);
+            if (method_exists($service, 'updateConversationUnreadForUser')) {
+                $result = $service->updateConversationUnreadForUser($user, $conversationId, $newCount);
+                if (! ($result['success'] ?? false)) {
+                    Notification::make()->title('Inbox')->body((string) ($result['error'] ?? 'Unable to update unread state right now.'))->warning()->send();
+                }
             }
         }
     }
@@ -14589,14 +14611,15 @@ HTML;
     protected function filteredConversationsWithoutLimit(): array
     {
         $schoolFilter = trim($this->conversationSchoolFilter);
-        $statusFilter = strtolower(trim((string) ($this->conversationStatusFilter ?? 'all')));
+        // Quick Inbox status filters are browser-only now. Keeping this backend list
+        // status-neutral avoids a full Livewire request/morph when switching All,
+        // Unread, Incoming, and Starred.
         $query = $this->normalizeSearchText($this->conversationSearch);
         $conversationCount = count($this->conversations ?? []);
         $conversationHead = (string) data_get($this->conversations, '0.id', '');
         $conversationTail = (string) data_get($this->conversations, max(0, $conversationCount - 1) . '.id', '');
         $memoKey = md5(json_encode([
             $schoolFilter,
-            $statusFilter,
             $query,
             $conversationCount,
             $conversationHead,
@@ -14609,13 +14632,7 @@ HTML;
 
         $rows = array_values(array_filter($this->conversations ?? [], 'is_array'));
 
-        if ($statusFilter === 'unread') {
-            $rows = array_values(array_filter($rows, fn (array $conversation): bool => $this->inboxConversationUnreadCount($conversation) > 0));
-        } elseif ($statusFilter === 'incoming') {
-            $rows = array_values(array_filter($rows, fn (array $conversation): bool => (bool) ($conversation['awaiting_reply'] ?? false)));
-        } elseif ($statusFilter === 'starred') {
-            $rows = array_values(array_filter($rows, fn (array $conversation): bool => (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false)));
-        }
+        // Status filtering is applied instantly in Alpine on the rendered rows.
 
         if ($schoolFilter !== '') {
             $rows = array_values(array_filter($rows, function (array $conversation) use ($schoolFilter): bool {

@@ -67,6 +67,7 @@
         data-rc-free-plan="{{ ($isFreePlanAccount ?? false) ? '1' : '0' }}"
         x-data="{
             activeSection: @js((string) $section),
+            conversationStatusFilter: 'all',
             freeGateOpen: @js((bool) ($showFreePlanGate ?? false)),
             freeGateSection: @js((string) ($freePlanGateSection ?? 'dashboard')),
             freeGateNames: {
@@ -10062,7 +10063,7 @@ discoverSelectedIds: [],
                 $canLoadMoreInboxConversations = (bool) ($this->canLoadMoreInboxConversations ?? false);
                 $allConversationRows = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row))->values();
                 $unreadConversationCount = $allConversationRows->filter(fn ($row) => (int) ($row['unread_count'] ?? $row['unreadCount'] ?? $row['unreadMessagesCount'] ?? 0) > 0)->count();
-                $incomingConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['awaiting_reply'] ?? false))->count();
+                $incomingConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['awaiting_reply'] ?? false) || (int) ($row['unread_count'] ?? $row['unreadCount'] ?? $row['unreadMessagesCount'] ?? 0) > 0)->count();
                 $starredConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count();
                 $selectedConversation = $selectedConversationId ? $allConversationRows->firstWhere('id', $selectedConversationId) : null;
                 $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
@@ -10133,7 +10134,7 @@ discoverSelectedIds: [],
                     ->all();
 
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
-                $filterStatus = $conversationStatusFilter ?? 'all';
+                $filterStatus = 'all';
                 $threadInitials = function (string $name): string {
                     return strtoupper(collect(explode(' ', trim($name)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 };
@@ -10507,18 +10508,18 @@ CSS;
                         </div>
 
                         <div class="rc-inbox-quick-filters-v56" role="group" aria-label="Conversation filters">
-                            <button type="button" class="{{ $filterStatus === 'all' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'all')">All</button>
-                            <button type="button" class="{{ $filterStatus === 'unread' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'unread')">
+                            <button type="button" x-bind:class="{ 'is-active': conversationStatusFilter === 'all' }" x-on:click.prevent="conversationStatusFilter = 'all'">All</button>
+                            <button type="button" x-bind:class="{ 'is-active': conversationStatusFilter === 'unread' }" x-on:click.prevent="conversationStatusFilter = 'unread'">
                                 Unread
-                                <span wire:key="unread-count-{{ $unreadConversationCount }}">{{ $unreadConversationCount }}</span>
+                                <span>{{ $unreadConversationCount }}</span>
                             </button>
-                            <button type="button" class="{{ $filterStatus === 'incoming' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'incoming')">
+                            <button type="button" x-bind:class="{ 'is-active': conversationStatusFilter === 'incoming' }" x-on:click.prevent="conversationStatusFilter = 'incoming'">
                                 Incoming
-                                <span wire:key="incoming-count-{{ $incomingConversationCount }}">{{ $incomingConversationCount }}</span>
+                                <span>{{ $incomingConversationCount }}</span>
                             </button>
-                            <button type="button" class="{{ $filterStatus === 'starred' ? 'is-active' : '' }}" wire:click="$set('conversationStatusFilter', 'starred')">
+                            <button type="button" x-bind:class="{ 'is-active': conversationStatusFilter === 'starred' }" x-on:click.prevent="conversationStatusFilter = 'starred'">
                                 Starred
-                                <span wire:key="starred-count-{{ $starredConversationCount }}">{{ $starredConversationCount }}</span>
+                                <span>{{ $starredConversationCount }}</span>
                             </button>
                         </div>
 
@@ -10636,13 +10637,13 @@ CSS;
                                     $isSelectedThread = $selectedConversationId === $inboxConversationId;
                                     $unreadCount = (int) ($inboxConversation['unread_count'] ?? 0);
                                     $isStarredThread = (bool) ($inboxConversation['starred'] ?? $inboxConversation['is_starred'] ?? false);
-                                    $isIncomingThread = (bool) ($inboxConversation['awaiting_reply'] ?? false);
+                                    $isIncomingThread = (bool) ($inboxConversation['awaiting_reply'] ?? false) || $unreadCount > 0;
                                     $statusLabel = $isIncomingThread
                                         ? 'Incoming'
                                         : ($unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened'));
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId), 'is-loading': selectedLoadingId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56" x-show="conversationStatusFilter === 'all' || (conversationStatusFilter === 'unread' && @js($unreadCount > 0)) || (conversationStatusFilter === 'incoming' && @js($isIncomingThread)) || (conversationStatusFilter === 'starred' && @js($isStarredThread))" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId), 'is-loading': selectedLoadingId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
                                             <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
@@ -10681,6 +10682,16 @@ CSS;
                                     </div>
                                 </div>
                             @endforelse
+
+                            <div class="rc-inbox-empty-v56" x-cloak x-show="conversationStatusFilter === 'unread' && {{ (int) $unreadConversationCount }} === 0">
+                                <div><strong>No unread conversations.</strong><br><span>Unread emails also count as Incoming.</span></div>
+                            </div>
+                            <div class="rc-inbox-empty-v56" x-cloak x-show="conversationStatusFilter === 'incoming' && {{ (int) $incomingConversationCount }} === 0">
+                                <div><strong>No incoming conversations.</strong><br><span>Incoming means recent inbound emails you have not replied to yet.</span></div>
+                            </div>
+                            <div class="rc-inbox-empty-v56" x-cloak x-show="conversationStatusFilter === 'starred' && {{ (int) $starredConversationCount }} === 0">
+                                <div><strong>No starred conversations.</strong><br><span>Star a coach conversation to keep it here.</span></div>
+                            </div>
 
                             @if($canLoadMoreInboxConversations)
                                 <div style="padding:.75rem .95rem">
