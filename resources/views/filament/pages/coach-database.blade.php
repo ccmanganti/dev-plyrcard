@@ -12553,6 +12553,22 @@ CSS;
                 .rc-template-variable-panel-v11331{border:1px solid rgba(255,99,56,.16);background:rgba(255,99,56,.04);border-radius:.95rem;padding:.82rem;display:grid;gap:.62rem}.rc-template-variable-head-v11331{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}.rc-template-variable-head-v11331 strong{font-size:.82rem;color:var(--rc-text)}.rc-template-variable-head-v11331 span{font-size:.72rem;color:var(--rc-muted)}.rc-template-variable-grid-v11331{display:flex;gap:.42rem;flex-wrap:wrap;align-items:center}.rc-template-variable-chip-v11331{border:1px solid rgba(255,99,56,.22);background:var(--rc-surface);color:#ff6338;border-radius:999px;padding:.42rem .64rem;font-size:.74rem;font-weight:800;display:inline-flex;align-items:center;gap:.34rem;cursor:pointer;box-shadow:0 6px 16px rgba(15,23,42,.035)}.rc-template-variable-chip-v11331:hover{background:#fff2ed;border-color:rgba(255,99,56,.38)}.dark .rc-template-variable-chip-v11331:hover{background:rgba(255,99,56,.14)}.rc-template-variable-chip-v11331 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.66rem;color:var(--rc-muted);font-weight:700}
                 .rc-template-editor-shell-v11331{border:1px solid rgba(148,163,184,.22);border-radius:1rem;overflow:hidden;background:var(--rc-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}.rc-template-editor-toolbar-v11331{display:flex;align-items:center;gap:.38rem;flex-wrap:wrap;padding:.62rem;border-bottom:1px solid rgba(148,163,184,.16);background:rgba(248,250,252,.72)}.dark .rc-template-editor-toolbar-v11331{background:rgba(15,23,42,.38)}.rc-template-editor-toolbar-v11331 .rc-select{height:2.1rem;border-radius:.65rem}.rc-template-editor-toolbar-v11331 .rc-rich-tool{height:2.1rem;min-width:2.1rem;border-radius:.65rem}.rc-template-editor-v50{min-height:24rem!important;padding:1.1rem 1.15rem!important;font-size:.94rem!important;line-height:1.7!important}.rc-template-editor-footer-v11331{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.58rem .75rem;border-top:1px solid rgba(148,163,184,.14);color:var(--rc-muted);font-size:.74rem;background:rgba(248,250,252,.45)}.dark .rc-template-editor-footer-v11331{background:rgba(15,23,42,.28)}
                 .rc-template-attachments-friendly-v11331{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 12px 34px rgba(15,23,42,.05);overflow:hidden}.rc-template-attachment-drop-v11331{border:1px dashed rgba(148,163,184,.45);border-radius:.95rem;min-height:5rem;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--rc-muted);font-size:.78rem;background:rgba(148,163,184,.035);cursor:pointer;padding:.85rem}.rc-template-attachment-drop-v11331:hover{border-color:rgba(255,99,56,.42);background:rgba(255,99,56,.045)}.rc-template-attachment-drop-v11331 strong{display:block;color:var(--rc-text);font-size:.82rem;margin-bottom:.14rem}.rc-template-attachment-drop-v11331 svg{color:#ff6338}.rc-template-bottom-bar-v11331{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.2rem .05rem}.rc-template-bottom-status-v11331{display:flex;align-items:center;gap:.45rem;color:var(--rc-muted);font-size:.78rem}.rc-template-bottom-status-v11331 b{color:#16a34a}
+                /* v10.113.32: tighten template builder spacing and center step numbers */
+                .rc-template-builder-v11331{gap:.72rem!important}
+                .rc-template-builder-intro-v11331{padding:.82rem .95rem!important;border-radius:.95rem!important}
+                .rc-template-builder-card-v11331,.rc-template-attachments-friendly-v11331{border-radius:.95rem!important}
+                .rc-template-builder-card-head-v11331{padding:.78rem .95rem!important;align-items:center!important}
+                .rc-template-builder-body-v11331{padding:.9rem .95rem!important;gap:.72rem!important}
+                .rc-template-builder-title-v11331{align-items:center!important;gap:.62rem!important}
+                .rc-template-builder-number-v11331{width:1.78rem!important;height:1.78rem!important;min-width:1.78rem!important;min-height:1.78rem!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;line-height:1!important;font-size:.78rem!important;padding:0!important;box-sizing:border-box!important}
+                .rc-template-step-pill-v11331{height:1.8rem!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;line-height:1!important;padding:0 .62rem!important}
+                .rc-template-details-grid-v11331{gap:.68rem!important}
+                .rc-template-field-v11331{gap:.28rem!important}.rc-template-field-v11331 input{height:2.62rem!important}.rc-template-help-card-v11331{padding:.58rem .72rem!important}
+                .rc-template-variable-panel-v11331{padding:.68rem .72rem!important;gap:.5rem!important;border-radius:.85rem!important}.rc-template-variable-grid-v11331{gap:.36rem!important}.rc-template-variable-chip-v11331{padding:.34rem .54rem!important;gap:.28rem!important;line-height:1.1!important}
+                .rc-template-editor-toolbar-v11331{padding:.48rem!important;gap:.3rem!important}.rc-template-editor-toolbar-v11331 .rc-rich-tool,.rc-template-editor-toolbar-v11331 .rc-select{height:2rem!important;min-height:2rem!important}
+                .rc-template-editor-v50{min-height:19.5rem!important;padding:.9rem 1rem!important;line-height:1.58!important}
+                .rc-template-editor-footer-v11331{padding:.5rem .68rem!important}
+                .rc-template-bottom-bar-v11331{padding:0!important;margin-top:-.2rem!important}
                 @media(max-width:900px){.rc-template-builder-intro-v11331,.rc-template-builder-card-head-v11331{align-items:flex-start;flex-direction:column}.rc-template-builder-steps-v11331{justify-content:flex-start}.rc-template-details-grid-v11331{grid-template-columns:1fr}.rc-template-editor-v50{min-height:18rem!important}}
                 
                 /* Compact templates cards */
@@ -12742,9 +12758,9 @@ CSS;
                                                 'YoutubeLink' => 'YouTube',
                                                 'XLink' => 'X link',
                                             ] as $token => $label)
-                                                <button class="rc-template-variable-chip-v11331" type="button" data-token="{{ $token }}" x-on:click="insertMerge($el.dataset.token)"><span>{{ $label }}</span><code>{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</code></button>
+                                                <button class="rc-template-variable-chip-v11331" type="button" data-token="{{ $token }}" x-on:mousedown.prevent x-on:click="insertMerge($el.dataset.token)"><span>{{ $label }}</span><code>{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</code></button>
                                             @endforeach
-                                            <select class="rc-select" style="width:auto;height:2.25rem" x-on:change="insertMergeFromSelect($event)">
+                                            <select class="rc-select" style="width:auto;height:2.25rem" x-on:mousedown="captureSelection()" x-on:focus="captureSelection()" x-on:change="insertMergeFromSelect($event)">
                                                 <option value="">More variables</option>
                                                 <option value="CoachLastName">Coach Last Name</option>
                                                 <option value="GraduationYear">Graduation Year</option>
@@ -12779,7 +12795,12 @@ CSS;
                                              data-placeholder="Write your reusable email template..."
                                              data-initial-body="{{ base64_encode($templateBody ?? '') }}"
                                              data-refresh-key="{{ $templateEditorRefreshKey }}"
-                                             x-on:input="queueSync()"
+                                             x-on:input="queueSync(); captureSelection()"
+                                             x-on:keyup="captureSelection()"
+                                             x-on:mouseup="captureSelection()"
+                                             x-on:click="captureSelection()"
+                                             x-on:focus="captureSelection()"
+                                             x-on:paste="queueSync(); setTimeout(() => captureSelection(), 0)"
                                              x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
                                         <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" value="{{ $templateBody ?? '' }}">
                                         <div class="rc-template-editor-footer-v11331">
@@ -13544,6 +13565,7 @@ CSS;
                     this.activePanel = '';
                 },
                 openLinkPanel() {
+                    this.captureSelection();
                     const selection = String(window.getSelection?.() || '').trim();
                     this.panelLinkLabel = selection || 'Profile link';
                     this.panelLinkUrl = this.mergeToken('ProfileLink');
@@ -13651,6 +13673,7 @@ CSS;
                 showPreview: false,
                 mounted: false,
                 syncTimer: null,
+                savedSelectionRange: null,
                 uploadingImages: false,
                 editorNotice: '',
                 activePanel: '',
@@ -13813,16 +13836,36 @@ CSS;
                 mergeToken(name) {
                     return '{' + '{' + String(name || '').trim() + '}' + '}';
                 },
+                placeCaretAtEnd() {
+                    const editor = this.$refs.editor;
+                    const selection = window.getSelection?.();
+                    if (!editor || !selection) return;
+                    const range = document.createRange();
+                    range.selectNodeContents(editor);
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    this.savedSelectionRange = range.cloneRange();
+                },
                 insertHtml(html) {
-                    if (!this.restoreSelection()) this.focusEditor();
+                    const restored = this.restoreSelection();
+                    if (!restored) {
+                        this.focusEditor();
+                        this.placeCaretAtEnd();
+                    }
                     document.execCommand('insertHTML', false, html);
                     this.captureSelection();
                     this.syncNow();
                 },
+                insertTokenHtml(token) {
+                    const cleanToken = String(token || '').trim();
+                    if (!cleanToken) return;
+                    this.insertHtml('<span class="rc-merge-token-v48" contenteditable="false">' + this.escapeHtml(cleanToken) + '</span>&nbsp;');
+                },
                 insertMerge(name) {
                     const token = this.mergeToken(name);
                     if (!token) return;
-                    this.insertHtml('<span class="rc-merge-token-v48" contenteditable="false">' + this.escapeHtml(token) + '</span>&nbsp;');
+                    this.insertTokenHtml(token);
                 },
                 mergeTokenFromSelect(event) {
                     const select = event?.target;
@@ -13838,7 +13881,7 @@ CSS;
                 insertMergeFromSelect(event) {
                     const token = this.mergeTokenFromSelect(event);
                     if (!token) return;
-                    this.insertHtml(this.escapeHtml(token));
+                    this.insertTokenHtml(token);
                 },
                 insertFieldMerge(refName, event) {
                     const token = this.mergeTokenFromSelect(event);
@@ -13866,7 +13909,7 @@ CSS;
                 insertMergeFromSelect(event) {
                     const token = this.mergeTokenFromSelect(event);
                     if (!token) return;
-                    this.insertHtml(this.escapeHtml(token));
+                    this.insertTokenHtml(token);
                 },
                 insertFieldMerge(refName, event) {
                     const token = this.mergeTokenFromSelect(event);
@@ -13891,6 +13934,7 @@ CSS;
                     this.activePanel = '';
                 },
                 openLinkPanel() {
+                    this.captureSelection();
                     const selection = String(window.getSelection?.() || '').trim();
                     this.panelLinkLabel = selection || 'Profile link';
                     this.panelLinkUrl = this.mergeToken('ProfileLink');
