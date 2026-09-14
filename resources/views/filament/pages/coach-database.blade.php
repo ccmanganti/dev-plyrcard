@@ -13408,7 +13408,9 @@ CSS;
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
                 const attrQuote = '(?:"|\\\'|&quot;|&#034;|&#39;)';
                 const classAttr = item.className ? ' class="' + item.className + '"' : '';
-                const replacement = '<a' + classAttr + ' href="{{' + item.token + '}}" target="_blank" style="' + item.style + '">' + item.label + '</a>';
+                const mergeOpen = '{' + '{';
+                const mergeClose = '}' + '}';
+                const replacement = '<a' + classAttr + ' href="' + mergeOpen + item.token + mergeClose + '" target="_blank" style="' + item.style + '">' + item.label + '</a>';
                 source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*(?:data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*)?(?:target\\s*=\\s*' + attrQuote + '?_blank' + attrQuote + '?\\s*)?[^>\\n\\r]*>\\s*' + escReg(item.label), 'gi'), replacement);
                 if (['InstagramLink', 'XLink', 'TwitterLink', 'YoutubeLink', 'YouTubeLink'].includes(item.token)) {
                     source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*[^>\\n\\r]*>\\s*', 'gi'), replacement + ' ');
@@ -15845,8 +15847,8 @@ window.rcDecodeTemplateEntities = function (value) {
 window.rcNormalizeCoachDatabaseMergeTokens = function (value) {
     let source = window.rcDecodeTemplateEntities ? window.rcDecodeTemplateEntities(value) : String(value || '');
     source = source.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
-    source = source.replace(/@\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g, (_match, token) => '{{' + String(token || '').trim() + '}}');
-    source = source.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, (_match, token) => '{{' + String(token || '').trim() + '}}');
+    source = source.replace(/@\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g, (_match, token) => ('{' + '{') + String(token || '').trim() + ('}' + '}'));
+    source = source.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, (_match, token) => ('{' + '{') + String(token || '').trim() + ('}' + '}'));
     return source;
 };
 
