@@ -12876,6 +12876,8 @@ CSS;
                 .rc-template-field-v50{display:grid;gap:.4rem}.rc-template-field-v50 label{font-size:.75rem;color:var(--rc-text);font-weight:760}.rc-template-field-v50 input{width:100%;height:2.65rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface);color:var(--rc-text);padding:0 .78rem;font-size:.88rem;outline:none}.rc-template-field-v50 input:focus{border-color:#ff6338;box-shadow:0 0 0 3px rgba(255,99,56,.12)}
                 .rc-template-editor-shell-v50{border:1px solid var(--rc-border);border-radius:.9rem;overflow:hidden;background:var(--rc-surface)}
                 .rc-template-editor-v50{min-height:19rem;padding:1rem;background:var(--rc-surface);color:var(--rc-text);outline:none;font-size:.9rem;line-height:1.65}.rc-template-editor-v50:empty:before{content:attr(data-placeholder);color:var(--rc-muted)}
+                .rc-template-editor-v50 .rc-merge-token-v48{display:inline-block!important;background:rgba(255,99,56,.16)!important;color:#ff4f2f!important;border:1px solid rgba(255,99,56,.18)!important;border-radius:.4rem!important;padding:.04rem .28rem!important;margin:0 .05rem!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace!important;font-size:.92em!important;font-weight:760!important;white-space:nowrap!important;line-height:1.45!important;user-select:text!important;}
+                .dark .rc-template-editor-v50 .rc-merge-token-v48{background:rgba(255,99,56,.20)!important;color:#ff9b84!important;border-color:rgba(255,99,56,.24)!important;}
                 .rc-template-attachments-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.06);padding:1rem;margin-top:1rem}.rc-template-drop-v50{border:1px dashed rgba(148,163,184,.42);border-radius:.95rem;min-height:4.6rem;display:grid;place-items:center;text-align:center;color:var(--rc-muted);font-size:.82rem;background:rgba(148,163,184,.035);cursor:pointer}
 
                 /* v10.113.31: friendlier new-template builder */
@@ -12936,6 +12938,8 @@ CSS;
                         window.__rcTemplateClientMode = 'new';
                         window.__plyrTemplateEditorPendingBodyBase64 = '';
                         window.__plyrTemplateEditorPendingBodyKey = '';
+                        window.__plyrTemplateEditorFullBodyBase64 = '';
+                        window.__plyrTemplateEditorFullBodyKey = '';
                         this.$nextTick(() => {
                             if (typeof window.rcResetCoachDatabaseTemplateEditor === 'function') {
                                 window.rcResetCoachDatabaseTemplateEditor();
@@ -12953,8 +12957,8 @@ CSS;
                         try { this.$wire.closeTemplateEditor(); } catch (error) {}
                     }
                  }"
-                 x-on:rc-template-editor-client-open.window="templateEditorOpenClient = true; templateEditorTitle = ($event.detail?.mode === 'new') ? 'New Template' : 'Edit Template'; window.__rcTemplateClientMode = $event.detail?.mode || ''"
-                 x-on:rc-template-saved-client.window="window.__rcTemplateClientMode = ''; window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''">
+                 x-on:rc-template-editor-client-open.window="templateEditorOpenClient = true; templateEditorTitle = ($event.detail?.mode === 'new') ? 'New Template' : 'Edit Template'; window.__rcTemplateClientMode = $event.detail?.mode || ''; if (($event.detail?.mode || '') === 'new') { window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''; window.__plyrTemplateEditorFullBodyBase64 = ''; window.__plyrTemplateEditorFullBodyKey = ''; }"
+                 x-on:rc-template-saved-client.window="window.__rcTemplateClientMode = ''; window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''; window.__plyrTemplateEditorFullBodyBase64 = ''; window.__plyrTemplateEditorFullBodyKey = ''">
                 <div x-show="!templateEditorOpenClient" x-cloak>
                     <div class="rc-templates-head-v50" style="margin-top:.25rem">
                         <div>
@@ -13004,7 +13008,7 @@ CSS;
                                         <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                                         Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
                                     </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now());">
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__rcTemplateClientMode = 'edit'; window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now()); window.__plyrTemplateEditorFullBodyBase64 = window.__plyrTemplateEditorPendingBodyBase64; window.__plyrTemplateEditorFullBodyKey = window.__plyrTemplateEditorPendingBodyKey;">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
                                         Edit
                                     </button>
@@ -13933,15 +13937,53 @@ CSS;
                         .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
                 },
                 highlightMergeTokens(html) {
-                    // v10.113.43: Keep merge variables as normal text in the Template editor.
-                    // The previous non-editable chip spans could hydrate only part of a saved
-                    // body when many merge-variable tokens were next to each other. The saved
-                    // database value is already correct, so the editor should render the exact
-                    // stored HTML/text and let the save pipeline normalize the brackets.
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
-                    return window.rcNormalizeCoachDatabaseMergeTokensInHtml
+                    const normalized = window.rcNormalizeCoachDatabaseMergeTokensInHtml
                         ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(source)
                         : source;
+                    return this.wrapMergeTokensForEditor(normalized);
+                },
+                wrapMergeTokensForEditor(html) {
+                    const template = document.createElement('template');
+                    template.innerHTML = String(html || '');
+                    const pattern = /\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g;
+                    const skip = new Set(['script','style','textarea','input','select','option','button']);
+                    const makeTokenSpan = (tokenName) => {
+                        const span = document.createElement('span');
+                        span.className = 'rc-merge-token-v48';
+                        span.dataset.mergeToken = String(tokenName || '').trim();
+                        span.textContent = this.mergeToken(tokenName);
+                        return span;
+                    };
+                    const walk = (node) => {
+                        if (!node) return;
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const tag = String(node.tagName || '').toLowerCase();
+                            if (skip.has(tag) || node.classList?.contains('rc-merge-token-v48')) return;
+                            Array.from(node.childNodes || []).forEach(walk);
+                            return;
+                        }
+                        if (node.nodeType !== Node.TEXT_NODE) return;
+                        const text = String(node.nodeValue || '');
+                        if (!pattern.test(text)) return;
+                        pattern.lastIndex = 0;
+                        const fragment = document.createDocumentFragment();
+                        let lastIndex = 0;
+                        let match;
+                        while ((match = pattern.exec(text)) !== null) {
+                            if (match.index > lastIndex) {
+                                fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+                            }
+                            fragment.appendChild(makeTokenSpan(String(match[1] || '').trim()));
+                            lastIndex = match.index + match[0].length;
+                        }
+                        if (lastIndex < text.length) {
+                            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+                        }
+                        node.replaceWith(fragment);
+                    };
+                    Array.from(template.content.childNodes || []).forEach(walk);
+                    return template.innerHTML;
                 },
                 cleanUrl(url) { return String(url || '').trim().replace(/["<>]/g, ''); },
                 showNotice(message) {
@@ -14138,15 +14180,17 @@ CSS;
                     const pending = window.__plyrTemplateEditorLastRefresh || {};
                     const cardBody = String(window.__plyrTemplateEditorPendingBodyBase64 || '').trim();
                     const cardKey = String(window.__plyrTemplateEditorPendingBodyKey || '').trim();
+                    const fullBody = String(window.__plyrTemplateEditorFullBodyBase64 || '').trim();
+                    const fullKey = String(window.__plyrTemplateEditorFullBodyKey || '').trim();
+                    const mode = String(window.__rcTemplateClientMode || '').trim();
 
-                    // v10.113.44: when editing from the template card, hydrate the editor
-                    // from the same full body used by the card preview. The Livewire
-                    // editor property can be stale because the editor is wire:ignore,
-                    // which made the edit box show only the first few variables while
-                    // the card preview had the complete saved content.
+                    if (mode === 'new') {
+                        return { body: domBody || attrBody, key: domKey };
+                    }
+
                     return {
-                        body: cardBody || domBody || String(pending.body || '').trim() || attrBody,
-                        key: cardKey || domKey || String(pending.key || '').trim(),
+                        body: cardBody || fullBody || String(pending.body || '').trim() || domBody || attrBody,
+                        key: cardKey || fullKey || String(pending.key || '').trim() || domKey,
                     };
                 },
                 templateEditorVisibleText(html) {
@@ -14185,13 +14229,13 @@ CSS;
                     const highlighted = this.highlightMergeTokens(html || '');
                     if (encoded) this.$refs.editor.dataset.initialBody = encoded;
                     if (key) this.$refs.editor.dataset.refreshKey = key;
+                    if (encoded && String(window.__rcTemplateClientMode || '') !== 'new') {
+                        window.__plyrTemplateEditorFullBodyBase64 = encoded;
+                        window.__plyrTemplateEditorFullBodyKey = String(key || this.$refs.editor.dataset.refreshKey || '');
+                    }
                     this.$refs.editor.innerHTML = highlighted;
                     this.lastHydratedTemplateKey = String(key || this.$refs.editor.dataset.refreshKey || '');
                     this.lastHydratedTemplateBody = String(encoded || this.$refs.editor.dataset.initialBody || '');
-                    if (encoded && encoded === String(window.__plyrTemplateEditorPendingBodyBase64 || '')) {
-                        window.__plyrTemplateEditorPendingBodyBase64 = '';
-                        window.__plyrTemplateEditorPendingBodyKey = '';
-                    }
                     this.syncNow();
                 },
                 decodeBodyValue(initial) {
@@ -14225,15 +14269,53 @@ CSS;
                         : (this.$refs.editor?.innerHTML || '');
                 },
                 highlightMergeTokens(html) {
-                    // v10.113.43: Keep merge variables as normal text in the Template editor.
-                    // The previous non-editable chip spans could hydrate only part of a saved
-                    // body when many merge-variable tokens were next to each other. The saved
-                    // database value is already correct, so the editor should render the exact
-                    // stored HTML/text and let the save pipeline normalize the brackets.
                     const source = window.plyrRepairBrokenEditorLinkFragments ? window.plyrRepairBrokenEditorLinkFragments(String(html || '')) : String(html || '');
-                    return window.rcNormalizeCoachDatabaseMergeTokensInHtml
+                    const normalized = window.rcNormalizeCoachDatabaseMergeTokensInHtml
                         ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(source)
                         : source;
+                    return this.wrapMergeTokensForEditor(normalized);
+                },
+                wrapMergeTokensForEditor(html) {
+                    const template = document.createElement('template');
+                    template.innerHTML = String(html || '');
+                    const pattern = /\{\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\}/g;
+                    const skip = new Set(['script','style','textarea','input','select','option','button']);
+                    const makeTokenSpan = (tokenName) => {
+                        const span = document.createElement('span');
+                        span.className = 'rc-merge-token-v48';
+                        span.dataset.mergeToken = String(tokenName || '').trim();
+                        span.textContent = this.mergeToken(tokenName);
+                        return span;
+                    };
+                    const walk = (node) => {
+                        if (!node) return;
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            const tag = String(node.tagName || '').toLowerCase();
+                            if (skip.has(tag) || node.classList?.contains('rc-merge-token-v48')) return;
+                            Array.from(node.childNodes || []).forEach(walk);
+                            return;
+                        }
+                        if (node.nodeType !== Node.TEXT_NODE) return;
+                        const text = String(node.nodeValue || '');
+                        if (!pattern.test(text)) return;
+                        pattern.lastIndex = 0;
+                        const fragment = document.createDocumentFragment();
+                        let lastIndex = 0;
+                        let match;
+                        while ((match = pattern.exec(text)) !== null) {
+                            if (match.index > lastIndex) {
+                                fragment.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+                            }
+                            fragment.appendChild(makeTokenSpan(String(match[1] || '').trim()));
+                            lastIndex = match.index + match[0].length;
+                        }
+                        if (lastIndex < text.length) {
+                            fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+                        }
+                        node.replaceWith(fragment);
+                    };
+                    Array.from(template.content.childNodes || []).forEach(walk);
+                    return template.innerHTML;
                 },
                 editorOwnsNode(node) {
                     const editor = this.$refs.editor;
@@ -14353,9 +14435,8 @@ CSS;
                 insertTokenHtml(token) {
                     const cleanToken = String(token || '').trim();
                     if (!cleanToken) return;
-                    // Insert the real merge token text, not a contenteditable=false chip.
-                    // This keeps create/edit/save/rehydrate lossless even with many variables.
-                    this.insertHtml(this.escapeHtml(cleanToken) + ' ');
+                    const normalized = window.rcNormalizeCoachDatabaseMergeTokens ? window.rcNormalizeCoachDatabaseMergeTokens(cleanToken) : cleanToken;
+                    this.insertHtml('<span class="rc-merge-token-v48">' + this.escapeHtml(normalized) + '</span>&nbsp;');
                 },
                 insertMerge(name) {
                     const token = this.mergeToken(name);
