@@ -10415,6 +10415,63 @@ CSS;
                 .rc-thread-loading-copy-v11312 strong{display:block;font-size:.9rem;color:var(--rc-text);margin-bottom:.35rem;}
                 .rc-thread-loading-copy-v11312 span{display:block;color:var(--rc-muted);line-height:1.45;}
                 .rc-thread-loading-copy-v11312 small{display:inline-flex;align-items:center;gap:.38rem;margin-top:.68rem;color:var(--rc-muted);font-size:.74rem;}
+
+                /* v10.113.27: use real DOM loaders instead of pseudo-elements so the
+                   thread-switch animation paints immediately before Livewire starts. */
+                html[data-rc-thread-autoloading] [data-rc-inbox-message-stream]::before,
+                html[data-rc-thread-autoloading] [data-rc-inbox-message-stream]::after {
+                    display:none!important;
+                    content:none!important;
+                }
+                .rc-inbox-switch-loader-v11327 {
+                    position:absolute;
+                    inset:0;
+                    z-index:90;
+                    display:none;
+                    align-items:center;
+                    justify-content:center;
+                    background:color-mix(in srgb, var(--rc-surface) 92%, transparent);
+                    backdrop-filter:blur(1.5px);
+                    pointer-events:none;
+                }
+                html[data-rc-thread-autoloading] [data-rc-inbox-message-stream] .rc-inbox-switch-loader-v11327 {
+                    display:flex;
+                }
+                .rc-inbox-switch-loader-card-v11327 {
+                    display:inline-flex;
+                    align-items:center;
+                    gap:.62rem;
+                    min-height:2.8rem;
+                    padding:.72rem 1rem;
+                    border:1px solid var(--rc-border);
+                    border-radius:.9rem;
+                    background:var(--rc-surface);
+                    color:var(--rc-text);
+                    box-shadow:0 18px 42px rgba(15,23,42,.16);
+                    font-size:.82rem;
+                    font-weight:800;
+                }
+                .rc-inbox-switch-loader-card-v11327 .rc-spinner-mini,
+                .rc-thread-card-spinner-v11327 {
+                    width:.95rem;
+                    height:.95rem;
+                    border-width:2px;
+                    color:var(--rc-accent);
+                    flex:0 0 auto;
+                }
+                .rc-thread-card-v56 { position:relative; }
+                .rc-thread-card-v56.is-loading {
+                    background:rgba(255,99,56,.17)!important;
+                    border-left-color:#ff6338!important;
+                }
+                .rc-thread-card-spinner-v11327 {
+                    display:none;
+                    margin-top:.45rem;
+                    margin-left:auto;
+                }
+                .rc-thread-card-v56.is-loading .rc-thread-card-spinner-v11327 {
+                    display:inline-block;
+                }
             </style>
             {{-- v10.113.20: direct Inbox email rendering; no custom element/shadow DOM. --}}
 
@@ -10537,10 +10594,11 @@ CSS;
                                     loader.busy = true;
                                     loader.queued = '';
                                     loader.promise = new Promise((resolve) => {
-                                            // Let the selected row + loading overlay paint before Livewire begins.
-                                            // Without this frame, Chrome may appear frozen until the request returns.
+                                            // v10.113.27: let Alpine update the selected row and real loader,
+                                            // then give Chrome one committed paint before the Livewire request.
+                                            const startRequest = () => resolve(this.$wire.openConversationAndLoadLatestMessages(id, force));
                                             window.requestAnimationFrame(() => {
-                                                window.setTimeout(() => resolve(this.$wire.openConversationAndLoadLatestMessages(id, force)), 0);
+                                                window.requestAnimationFrame(() => window.setTimeout(startRequest, 20));
                                             });
                                         })
                                         .catch(() => {})
@@ -10584,7 +10642,7 @@ CSS;
                                         : ($unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened'));
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId), 'is-loading': selectedLoadingId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
                                             <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
@@ -10606,6 +10664,7 @@ CSS;
                                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke-width="1.5" stroke-linejoin="round"/></svg>
                                             </span>
                                         @endif
+                                        <span class="rc-thread-card-spinner-v11327 rc-spinner-mini" x-cloak x-show="selectedLoadingId === @js($inboxConversationId)" aria-hidden="true"></span>
                                     </span>
                                 </button>
                             @empty
@@ -10658,6 +10717,12 @@ CSS;
                             </div>
 
                             <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
+                                <div class="rc-inbox-switch-loader-v11327" aria-live="polite" aria-hidden="true">
+                                    <div class="rc-inbox-switch-loader-card-v11327">
+                                        <span class="rc-spinner-mini" aria-hidden="true"></span>
+                                        <span>Opening conversation…</span>
+                                    </div>
+                                </div>
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56">
                                         <div>
