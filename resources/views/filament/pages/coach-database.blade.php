@@ -12660,9 +12660,14 @@ CSS;
                                                         if (!id || loadingTemplateId) return;
                                                         const bodyBase64 = $el.dataset.rcComposeTemplateBodyBase64 || '';
                                                         const bodyKey = 'compose-local-' + id + '-' + ($el.dataset.rcComposeTemplateKey || Date.now());
+                                                        if (bodyBase64 && window.rcRememberComposeTemplateBody) {
+                                                            window.rcRememberComposeTemplateBody(id, bodyBase64, bodyKey);
+                                                        }
                                                         if (bodyBase64 && window.rcApplyComposeTemplateBodyBase64) {
                                                             window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
                                                             window.__plyrComposeEditorPendingBodyKey = bodyKey;
+                                                            window.__plyrComposeEditorFullBodyBase64 = bodyBase64;
+                                                            window.__plyrComposeEditorFullBodyKey = bodyKey;
                                                             window.rcApplyComposeTemplateBodyBase64(bodyBase64, bodyKey, true);
                                                         }
                                                         loadingTemplateId = id;
@@ -13016,9 +13021,9 @@ CSS;
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <button class="rc-template-use-v52" type="button" data-rc-local-action data-rc-template-id="{{ $templateId }}" data-rc-compose-template-body-base64="{{ base64_encode($templateBodyRaw) }}" data-rc-compose-template-key="{{ sha1($templateId . '|' . $templateBodyRaw) }}" x-on:click="window.rcRememberComposeTemplateBody && window.rcRememberComposeTemplateBody($el.dataset.rcTemplateId || '', $el.dataset.rcComposeTemplateBodyBase64 || '', $el.dataset.rcComposeTemplateKey || '')" wire:click="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})">
-                                        <span wire:loading.remove wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                        Use Template</span><span wire:loading.flex wire:target="useTemplateForCompose({{ \Illuminate\Support\Js::from($templateId) }})" style="align-items:center;gap:.4rem"><span class="rc-spinner-mini"></span> Loading</span>
+                                    <button class="rc-template-use-v52" type="button" data-rc-local-action data-rc-template-id="{{ $templateId }}" data-rc-compose-template-body-base64="{{ base64_encode($templateBodyRaw) }}" data-rc-compose-template-key="{{ sha1($templateId . '|' . $templateBodyRaw) }}" x-on:click.prevent.stop="window.rcOpenComposeTemplateFromCard ? window.rcOpenComposeTemplateFromCard($el, @js($this->pageUrl('compose'))) : $wire.call('useTemplateForCompose', @js($templateId))">
+                                        <span style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                                        Use Template</span>
                                     </button>
                                     <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__rcTemplateClientMode = 'edit'; window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now()); window.__plyrTemplateEditorFullBodyBase64 = window.__plyrTemplateEditorPendingBodyBase64; window.__plyrTemplateEditorFullBodyKey = window.__plyrTemplateEditorPendingBodyKey;">
                                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
@@ -13763,18 +13768,35 @@ CSS;
             bodyBase64 = String(bodyBase64 || '');
             bodyKey = String(bodyKey || ('card-' + Date.now()));
             if (!templateId || !bodyBase64) return false;
+            const finalKey = 'stored-' + templateId + '-' + bodyKey;
             try {
                 window.localStorage.setItem(window.rcComposeTemplateStorageKey(templateId), JSON.stringify({ body: bodyBase64, key: bodyKey, savedAt: Date.now() }));
+                window.localStorage.setItem('plyrcard-compose-template-active', JSON.stringify({ id: templateId, key: bodyKey, savedAt: Date.now() }));
             } catch (_) {}
             window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
-            window.__plyrComposeEditorPendingBodyKey = 'stored-' + templateId + '-' + bodyKey;
+            window.__plyrComposeEditorPendingBodyKey = finalKey;
+            window.__plyrComposeEditorFullBodyBase64 = bodyBase64;
+            window.__plyrComposeEditorFullBodyKey = finalKey;
             return true;
         };
 
         window.rcSeedComposeTemplateFromStorage = function () {
             let templateId = '';
             try { templateId = String(new URLSearchParams(window.location.search || '').get('template') || '').trim(); } catch (_) {}
+
+            try {
+                if (!templateId) {
+                    const activeRaw = window.localStorage.getItem('plyrcard-compose-template-active');
+                    const active = activeRaw ? JSON.parse(activeRaw) : null;
+                    const savedAt = Number(active?.savedAt || 0);
+                    if (active?.id && savedAt && (Date.now() - savedAt) < 10 * 60 * 1000) {
+                        templateId = String(active.id || '').trim();
+                    }
+                }
+            } catch (_) {}
+
             if (!templateId) return false;
+
             try {
                 const raw = window.localStorage.getItem(window.rcComposeTemplateStorageKey(templateId));
                 if (!raw) return false;
@@ -13782,12 +13804,82 @@ CSS;
                 const body = String(payload?.body || '');
                 const key = String(payload?.key || ('stored-' + templateId));
                 if (!body) return false;
+                const finalKey = 'stored-' + templateId + '-' + key;
                 window.__plyrComposeEditorPendingBodyBase64 = body;
-                window.__plyrComposeEditorPendingBodyKey = 'stored-' + templateId + '-' + key;
+                window.__plyrComposeEditorPendingBodyKey = finalKey;
+                window.__plyrComposeEditorFullBodyBase64 = body;
+                window.__plyrComposeEditorFullBodyKey = finalKey;
                 return true;
             } catch (_) {
                 return false;
             }
+        };
+
+        window.rcDecodeEditorBodyBase64 = function (encoded) {
+            encoded = String(encoded || '');
+            if (!encoded) return '';
+            try { return decodeURIComponent(escape(window.atob(encoded))); }
+            catch (error) { try { return window.atob(encoded); } catch (_) { return ''; } }
+        };
+
+        window.rcEditorBodyScore = function (html) {
+            html = String(html || '');
+            if (!html.trim()) return 0;
+            const text = html
+                .replace(/<br\s*\/?\s*>/gi, '\n')
+                .replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, '\n')
+                .replace(/<[^>]*>/g, ' ')
+                .replace(/&nbsp;/gi, ' ')
+                .replace(/&amp;/gi, '&')
+                .replace(/&lt;/gi, '<')
+                .replace(/&gt;/gi, '>')
+                .replace(/\s+/g, ' ')
+                .trim();
+            const tokens = (html.match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
+            const images = (html.match(/<\s*img\b/gi) || []).length;
+            const links = (html.match(/<\s*a\b/gi) || []).length;
+            const blocks = (html.match(/<\s*(p|div|li|h[1-6]|blockquote|tr|br)\b/gi) || []).length;
+            return text.length + (tokens * 120) + (images * 100) + (links * 30) + (blocks * 18) + Math.min(html.length, 1200) / 20;
+        };
+
+        window.rcChooseComposeEditorBodyBase64 = function (incomingEncoded, incomingKey = '') {
+            incomingEncoded = String(incomingEncoded || '');
+            incomingKey = String(incomingKey || '');
+            const fullEncoded = String(window.__plyrComposeEditorFullBodyBase64 || '');
+            const fullKey = String(window.__plyrComposeEditorFullBodyKey || incomingKey || 'compose-full');
+
+            if (!fullEncoded) {
+                return { body: incomingEncoded, key: incomingKey };
+            }
+
+            if (!incomingEncoded || incomingEncoded === fullEncoded) {
+                return { body: fullEncoded, key: fullKey };
+            }
+
+            const incomingHtml = window.rcDecodeEditorBodyBase64(incomingEncoded);
+            const fullHtml = window.rcDecodeEditorBodyBase64(fullEncoded);
+            const incomingScore = window.rcEditorBodyScore(incomingHtml);
+            const fullScore = window.rcEditorBodyScore(fullHtml);
+            const incomingTokens = (incomingHtml.match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
+            const fullTokens = (fullHtml.match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
+
+            if (fullTokens > incomingTokens || fullScore > incomingScore + 25 || fullHtml.length > incomingHtml.length + 30) {
+                return { body: fullEncoded, key: fullKey };
+            }
+
+            return { body: incomingEncoded, key: incomingKey };
+        };
+
+        window.rcOpenComposeTemplateFromCard = function (element, fallbackUrl) {
+            const id = String(element?.dataset?.rcTemplateId || '').trim();
+            const body = String(element?.dataset?.rcComposeTemplateBodyBase64 || '');
+            const key = String(element?.dataset?.rcComposeTemplateKey || ('card-' + Date.now()));
+            if (id && body && window.rcRememberComposeTemplateBody) {
+                window.rcRememberComposeTemplateBody(id, body, key);
+            }
+            const baseUrl = String(fallbackUrl || window.location.href || '').trim();
+            const separator = baseUrl.includes('?') ? '&' : '?';
+            window.location.href = baseUrl + separator + 'template=' + encodeURIComponent(id) + '&templateBodyKey=' + encodeURIComponent(key);
         };
 
         window.rcSeedComposeTemplateFromStorage();
@@ -13834,8 +13926,13 @@ CSS;
                             const editor = this.$refs.editor;
                             if (!editor || !editor.isConnected) return;
 
-                            const encoded = String(event.detail?.body || '');
-                            const key = String(event.detail?.key || ('livewire-' + encoded.length));
+                            let encoded = String(event.detail?.body || '');
+                            let key = String(event.detail?.key || ('livewire-' + encoded.length));
+                            if (window.rcChooseComposeEditorBodyBase64) {
+                                const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
+                                encoded = String(chosen.body || encoded || '');
+                                key = String(chosen.key || key || ('livewire-' + encoded.length));
+                            }
                             if (encoded) {
                                 window.__plyrComposeEditorPendingBodyBase64 = encoded;
                                 window.__plyrComposeEditorPendingBodyKey = key;
@@ -13864,8 +13961,13 @@ CSS;
                     if (!this.$refs.editor) return;
                     const pendingBody = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyBase64 || '') : '';
                     const pendingKey = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyKey || '') : '';
-                    const encoded = pendingBody || initialBody || this.$refs.editor.dataset.initialBody || '';
-                    const key = pendingBody ? pendingKey : String(this.$refs.editor.dataset.refreshKey || 'initial-' + String(encoded || '').length);
+                    let encoded = pendingBody || initialBody || this.$refs.editor.dataset.initialBody || '';
+                    let key = pendingBody ? pendingKey : String(this.$refs.editor.dataset.refreshKey || 'initial-' + String(encoded || '').length);
+                    if (modelName === 'campaignBody' && window.rcChooseComposeEditorBodyBase64) {
+                        const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
+                        encoded = String(chosen.body || encoded || '');
+                        key = String(chosen.key || key || 'initial-' + String(encoded || '').length);
+                    }
 
                     if (encoded) {
                         const applied = this.applyEncodedBody(encoded, key, force || this.$refs.editor.innerHTML.trim() === '');
@@ -13884,6 +13986,11 @@ CSS;
                     const editor = this.$refs.editor;
                     encoded = String(encoded || '');
                     key = String(key || '');
+                    if (modelName === 'campaignBody' && window.rcChooseComposeEditorBodyBase64) {
+                        const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
+                        encoded = String(chosen.body || encoded || '');
+                        key = String(chosen.key || key || '');
+                    }
                     if (!editor || !encoded) return false;
 
                     const html = this.decodeInitialBody(encoded);
@@ -14199,6 +14306,14 @@ CSS;
 
             window.__plyrComposeEditorPendingBodyBase64 = encoded;
             window.__plyrComposeEditorPendingBodyKey = key;
+            window.__plyrComposeEditorFullBodyBase64 = encoded;
+            window.__plyrComposeEditorFullBodyKey = key;
+
+            if (window.rcChooseComposeEditorBodyBase64) {
+                const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
+                encoded = String(chosen.body || encoded || '');
+                key = String(chosen.key || key || '');
+            }
 
             const editor = window.__plyrNativeEditors?.campaignBody;
             if (editor && typeof editor.applyEncodedBody === 'function') {
