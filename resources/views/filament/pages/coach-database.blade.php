@@ -722,7 +722,7 @@ discoverSelectedIds: [],
             }
         }"
         x-on:rc-client-section.window="activeSection = String($event.detail?.section || activeSection)"
-        x-on:rc-fast-section.window="(($event.detail?.section || '') === 'conversations') ? openInboxSection() : $wire.switchRecruitingSection($event.detail?.section || 'dashboard')"
+        x-on:rc-fast-section.window="activeSection = String($event.detail?.section || activeSection)"
         x-on:rc-free-plan-gate.window="openFreeGate($event.detail?.section || 'dashboard')"
         x-on:rc-free-plan-gate-close.window="closeFreeGate()"
         x-on:keydown.escape.window="if (freeGateOpen) closeFreeGate()"
@@ -10338,20 +10338,50 @@ CSS;
                     padding:.55rem;
                     overflow:visible;
                 }
-                rc-inbox-email-view.rc-email-document-v64 {
+                .rc-email-direct-v11320 {
+                    position:relative;
                     display:block;
-                    width:100%;
                     max-width:100%;
-                    height:auto;
-                    min-height:0;
-                    overflow:visible;
-                    contain:layout style;
+                    overflow:hidden;
+                    color:var(--rc-text);
+                    font-size:.82rem;
+                    line-height:1.55;
                 }
-                rc-inbox-email-view.rc-email-document-v64::part(toggle) {
+                .rc-email-direct-v11320::before {
+                    content:'';
                     position:absolute;
-                    right:.25rem;
-                    bottom:.2rem;
+                    left:0;
+                    top:.25rem;
+                    bottom:.25rem;
+                    width:.22rem;
+                    border-radius:999px;
+                    background:var(--rc-accent);
+                    opacity:.78;
                 }
+                .rc-email-direct-body-v11320 {
+                    max-width:100%;
+                    min-width:0;
+                    padding-left:.95rem;
+                    overflow-wrap:anywhere;
+                    word-break:normal;
+                }
+                .rc-email-direct-body-v11320 :where(p, div, table, tbody, tr, td, span, a, ul, ol, li, h1, h2, h3, h4) {
+                    max-width:100% !important;
+                    overflow-wrap:anywhere !important;
+                    word-break:normal !important;
+                }
+                .rc-email-direct-body-v11320 table {
+                    width:auto !important;
+                    max-width:100% !important;
+                    border-collapse:collapse;
+                }
+                .rc-email-direct-body-v11320 img {
+                    max-width:100% !important;
+                    height:auto !important;
+                }
+                .rc-email-direct-body-v11320 p { margin:.22rem 0; }
+                .rc-email-direct-body-v11320 a { color:var(--rc-accent); }
+                .rc-email-direct-body-v11320 .rc-email-empty-v11320 { color:var(--rc-muted); font-style:italic; }
                 .rc-message-stream-v56 { position:relative; }
                 .rc-inbox-thread-loader-v63 {
                     position:absolute;
@@ -10416,299 +10446,8 @@ CSS;
                 .rc-thread-loading-copy-v11312 span{display:block;color:var(--rc-muted);line-height:1.45;}
                 .rc-thread-loading-copy-v11312 small{display:inline-flex;align-items:center;gap:.38rem;margin-top:.68rem;color:var(--rc-muted);font-size:.74rem;}
             </style>
-            <script>
-                (() => {
-                    if (customElements.get('rc-inbox-email-view')) return;
+            {{-- v10.113.20: direct Inbox email rendering; no custom element/shadow DOM. --}}
 
-                    class RcInboxEmailView extends HTMLElement {
-                        connectedCallback() {
-                            if (this.shadowRoot) return;
-
-                            const template = this.querySelector('template');
-                            if (!(template instanceof HTMLTemplateElement)) return;
-
-                            const parsed = new DOMParser().parseFromString(template.innerHTML, 'text/html');
-                            const shadow = this.attachShadow({ mode: 'open' });
-
-                            const base = document.createElement('style');
-                            base.textContent = `
-                                :host { display:block; width:100%; max-width:100%; height:auto; min-height:0; position:relative; }
-                                *, *::before, *::after { box-sizing:border-box; }
-                                .rc-email-viewport { display:block; width:100%; max-width:100%; min-width:0; max-height:none; overflow:visible; transition:max-height .18s ease; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px; overflow:hidden; padding-right:2rem; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:""; position:absolute; left:0; right:0; bottom:0; height:2.75rem; z-index:2; pointer-events:none; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)); }
-                                .rc-email-root { display:block; width:100%; max-width:100%; min-width:0; margin:0; overflow:visible; font-size:12px; line-height:1.45; }
-                                .rc-email-root img { max-width:100% !important; height:auto !important; }
-                                .rc-email-root table { max-width:100% !important; }
-                                .rc-email-root td, .rc-email-root th { max-width:100% !important; }
-                                .rc-email-root a { overflow-wrap:anywhere; word-break:break-word; }
-                                .rc-email-toggle { display:none; position:absolute; right:.2rem; bottom:.18rem; z-index:4; width:1.75rem; height:1.75rem; padding:0; border:0; border-radius:0; background:transparent; color:#475569; align-items:center; justify-content:center; cursor:pointer; box-shadow:none; }
-                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex; }
-                                .rc-email-toggle svg { width:.9rem; height:.9rem; transition:transform .18s ease; }
-                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg); }
-                            `;
-                            shadow.appendChild(base);
-
-                            parsed.head.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
-                                const clone = node.cloneNode(true);
-                                if (clone instanceof HTMLStyleElement) {
-                                    clone.textContent = String(clone.textContent || '').replace(/\bbody\b/g, '.rc-email-root');
-                                }
-                                shadow.appendChild(clone);
-                            });
-
-                            const viewport = document.createElement('div');
-                            viewport.className = 'rc-email-viewport';
-
-                            const root = document.createElement('div');
-                            root.className = `rc-email-root ${parsed.body.className || ''}`.trim();
-
-                            const bodyStyle = parsed.body.getAttribute('style');
-                            if (bodyStyle) root.setAttribute('style', bodyStyle);
-
-                            Array.from(parsed.body.childNodes).forEach((node) => {
-                                root.appendChild(document.importNode(node, true));
-                            });
-
-                            viewport.appendChild(root);
-                            shadow.appendChild(viewport);
-
-                            const toggle = document.createElement('button');
-                            toggle.type = 'button';
-                            toggle.className = 'rc-email-toggle';
-                            toggle.setAttribute('part', 'toggle');
-                            toggle.setAttribute('aria-label', 'Expand email');
-                            toggle.setAttribute('aria-expanded', 'false');
-                            toggle.innerHTML = '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M5 7.5 10 12.5 15 7.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-                            toggle.addEventListener('click', () => {
-                                const expanded = this.dataset.expanded === '1';
-                                if (expanded) {
-                                    delete this.dataset.expanded;
-                                    toggle.setAttribute('aria-expanded', 'false');
-                                    toggle.setAttribute('aria-label', 'Expand email');
-                                } else {
-                                    this.dataset.expanded = '1';
-                                    toggle.setAttribute('aria-expanded', 'true');
-                                    toggle.setAttribute('aria-label', 'Collapse email');
-                                }
-                            });
-                            shadow.appendChild(toggle);
-
-                            // Keep inbox controls authoritative even after delayed email
-                            // stylesheets finish loading. Email HTML can contain broad rules
-                            // such as div/button/* selectors, so this guard must be the final
-                            // stylesheet in the shadow root and use !important.
-                            const guard = document.createElement('style');
-                            guard.textContent = `
-                                :host { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; min-height:0 !important; position:relative !important; overflow:visible !important; }
-                                .rc-email-viewport { display:block !important; width:100% !important; max-width:100% !important; min-width:0 !important; max-height:none !important; height:auto !important; overflow:visible !important; position:relative !important; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"])) .rc-email-viewport { max-height:100px !important; overflow:hidden !important; padding-right:2rem !important; }
-                                :host([data-collapsible="1"]:not([data-expanded="1"]))::after { content:"" !important; display:block !important; position:absolute !important; left:0 !important; right:0 !important; bottom:0 !important; height:2.75rem !important; z-index:2147483645 !important; pointer-events:none !important; background:linear-gradient(to bottom, rgba(242,244,248,0), rgba(242,244,248,.96) 78%, rgba(242,244,248,1)) !important; }
-                                .rc-email-toggle { display:none !important; position:absolute !important; right:.2rem !important; bottom:.18rem !important; z-index:2147483646 !important; width:1.75rem !important; height:1.75rem !important; min-width:0 !important; min-height:0 !important; margin:0 !important; padding:0 !important; border:0 !important; border-radius:0 !important; background:transparent !important; color:#475569 !important; align-items:center !important; justify-content:center !important; cursor:pointer !important; box-shadow:none !important; appearance:none !important; }
-                                :host([data-collapsible="1"]) .rc-email-toggle { display:flex !important; }
-                                .rc-email-toggle svg { display:block !important; width:.9rem !important; height:.9rem !important; min-width:.9rem !important; min-height:.9rem !important; transition:transform .18s ease !important; }
-                                :host([data-expanded="1"]) .rc-email-toggle svg { transform:rotate(180deg) !important; }
-                            `;
-                            shadow.appendChild(guard);
-                            template.remove();
-
-                            const evaluateHeight = () => {
-                                const height = Math.ceil(root.getBoundingClientRect().height);
-                                if (height > 100) this.dataset.collapsible = '1';
-                            };
-
-                            requestAnimationFrame(() => requestAnimationFrame(evaluateHeight));
-                            root.querySelectorAll('img').forEach((image) => {
-                                if (!image.complete) {
-                                    image.addEventListener('load', evaluateHeight, { once:true });
-                                    image.addEventListener('error', evaluateHeight, { once:true });
-                                }
-                            });
-                            if (document.fonts?.ready) document.fonts.ready.then(evaluateHeight).catch(() => {});
-                        }
-                    }
-
-                    customElements.define('rc-inbox-email-view', RcInboxEmailView);
-                })();
-
-                (() => {
-                    let activeRun = 0;
-                    let observer = null;
-                    let observedStream = null;
-                    let loadingOlderMessages = false;
-                    let forceLatestAfterConversationChange = true;
-                    let olderAnchor = null;
-                    let scrollListener = null;
-
-                    const getStream = () => document.querySelector('[data-rc-inbox-message-stream]');
-                    const isNearBottom = (stream, threshold = 120) => {
-                        if (!stream) return false;
-                        return (stream.scrollHeight - stream.scrollTop - stream.clientHeight) <= threshold;
-                    };
-
-                    const moveToLatest = (force = false) => {
-                        if (loadingOlderMessages) return false;
-
-                        const stream = getStream();
-                        if (!stream) return false;
-                        if (!force && !forceLatestAfterConversationChange && !isNearBottom(stream)) return false;
-
-                        stream.scrollTo({ top: stream.scrollHeight, behavior: 'auto' });
-                        forceLatestAfterConversationChange = false;
-                        return true;
-                    };
-
-                    const restoreOlderAnchor = () => {
-                        if (!loadingOlderMessages || !olderAnchor) return;
-
-                        const run = ++activeRun;
-                        const delays = [0, 16, 50, 120, 250, 500];
-                        delays.forEach((delay, index) => {
-                            window.setTimeout(() => {
-                                if (run !== activeRun || !olderAnchor) return;
-                                const stream = getStream();
-                                if (!stream) return;
-
-                                const addedHeight = Math.max(0, stream.scrollHeight - olderAnchor.height);
-                                stream.scrollTop = Math.max(0, olderAnchor.top + addedHeight);
-
-                                if (index === delays.length - 1) {
-                                    loadingOlderMessages = false;
-                                    olderAnchor = null;
-                                }
-                            }, delay);
-                        });
-                    };
-
-                    const showLatestMessage = (force = false) => {
-                        if (loadingOlderMessages) return;
-
-                        const stream = getStream();
-                        if (!stream) return;
-                        if (!force && !forceLatestAfterConversationChange && !isNearBottom(stream)) return;
-
-                        const run = ++activeRun;
-                        const delays = force ? [0, 16, 50, 120, 250, 500, 900] : [0, 50, 180];
-                        delays.forEach((delay) => {
-                            window.setTimeout(() => {
-                                if (run !== activeRun || loadingOlderMessages) return;
-                                moveToLatest(force);
-                            }, delay);
-                        });
-                    };
-
-                    const observeStream = () => {
-                        const stream = getStream();
-                        if (!stream) return;
-                        if (observedStream === stream) return;
-
-                        observer?.disconnect();
-                        if (observedStream && scrollListener) {
-                            observedStream.removeEventListener('scroll', scrollListener);
-                        }
-
-                        observedStream = stream;
-                        scrollListener = () => {
-                            // Once the user intentionally scrolls away from the newest
-                            // message, never fight them by snapping back to the bottom.
-                            if (!loadingOlderMessages && !isNearBottom(stream)) {
-                                forceLatestAfterConversationChange = false;
-                                activeRun += 1;
-                            }
-                        };
-                        stream.addEventListener('scroll', scrollListener, { passive: true });
-
-                        observer = new MutationObserver(() => {
-                            if (loadingOlderMessages) {
-                                restoreOlderAnchor();
-                                return;
-                            }
-
-                            if (forceLatestAfterConversationChange || isNearBottom(stream)) {
-                                showLatestMessage(forceLatestAfterConversationChange);
-                            }
-                        });
-                        observer.observe(stream, { childList:true, subtree:true });
-
-                        stream.addEventListener('load', () => {
-                            if (loadingOlderMessages) {
-                                restoreOlderAnchor();
-                                return;
-                            }
-
-                            if (forceLatestAfterConversationChange || isNearBottom(stream)) {
-                                showLatestMessage(forceLatestAfterConversationChange);
-                            }
-                        }, true);
-
-                        if (forceLatestAfterConversationChange) showLatestMessage(true);
-                    };
-
-                    document.addEventListener('click', (event) => {
-                        const clickedElement = event.target instanceof Element
-                            ? event.target.closest('[wire\\:click]')
-                            : null;
-                        const loadOlderButton = clickedElement?.getAttribute('wire:click') === 'loadOlderConversationMessages'
-                            ? clickedElement
-                            : null;
-
-                        if (loadOlderButton) {
-                            const stream = getStream();
-                            loadingOlderMessages = true;
-                            forceLatestAfterConversationChange = false;
-                            activeRun += 1;
-                            olderAnchor = stream ? { height: stream.scrollHeight, top: stream.scrollTop } : null;
-                            return;
-                        }
-
-                        if (!event.target?.closest?.('[data-rc-inbox-conversation-trigger]')) return;
-                        loadingOlderMessages = false;
-                        olderAnchor = null;
-                        forceLatestAfterConversationChange = true;
-                        activeRun += 1;
-
-                        window.setTimeout(() => {
-                            observeStream();
-                            showLatestMessage(true);
-                        }, 0);
-                    }, true);
-
-                    const boot = () => {
-                        forceLatestAfterConversationChange = true;
-                        observeStream();
-                        showLatestMessage(true);
-                    };
-
-                    document.addEventListener('DOMContentLoaded', boot, { once:true });
-                    document.addEventListener('livewire:navigated', boot);
-                    document.addEventListener('livewire:initialized', boot);
-
-                    if (window.Livewire?.hook) {
-                        window.Livewire.hook('morph.updated', ({ el }) => {
-                            if (el?.matches?.('[data-rc-inbox-message-stream]')
-                                || el?.querySelector?.('[data-rc-inbox-message-stream]')) {
-                                observeStream();
-                                if (loadingOlderMessages) restoreOlderAnchor();
-                                else if (forceLatestAfterConversationChange || isNearBottom(getStream())) {
-                                    showLatestMessage(forceLatestAfterConversationChange);
-                                }
-                            }
-                        });
-
-                        window.Livewire.hook('commit', ({ succeed }) => {
-                            succeed(() => {
-                                queueMicrotask(() => {
-                                    observeStream();
-                                    if (loadingOlderMessages) restoreOlderAnchor();
-                                    else if (forceLatestAfterConversationChange || isNearBottom(getStream())) {
-                                        showLatestMessage(forceLatestAfterConversationChange);
-                                    }
-                                });
-                            });
-                        });
-                    }
-                })();
-            </script>
 
 
             <style id="rc-inbox-unread-status-v73">
@@ -11082,11 +10821,27 @@ CSS;
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
                                                 @php
                                                     $emailDocument = $prepareInboxEmailDocument($messageBody);
+                                                    $emailBodyForInline = $emailDocument;
+                                                    if (preg_match('/<body\b[^>]*>(.*?)<\/body>/is', $emailDocument, $bodyMatch)) {
+                                                        $emailBodyForInline = $bodyMatch[1];
+                                                    }
+                                                    $emailBodyForInline = preg_replace('/<\s*style\b[^>]*>.*?<\s*\/\s*style\s*>/is', '', $emailBodyForInline) ?? $emailBodyForInline;
+                                                    $emailBodyForInline = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $emailBodyForInline) ?? $emailBodyForInline;
+                                                    $emailBodyForInline = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $emailBodyForInline) ?? $emailBodyForInline;
+                                                    $emailBodyForInline = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $emailBodyForInline) ?? $emailBodyForInline;
+                                                    $emailBodyForInline = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $emailBodyForInline) ?? $emailBodyForInline;
+                                                    $emailBodyForInline = preg_replace('/<\/?(?:html|head|body|meta|title|link)\b[^>]*>/i', '', $emailBodyForInline) ?? $emailBodyForInline;
+                                                    if (trim(strip_tags($emailBodyForInline)) === '') {
+                                                        $fallbackText = trim(strip_tags(html_entity_decode((string) $messageBody, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+                                                        $emailBodyForInline = $fallbackText !== ''
+                                                            ? nl2br(e($fallbackText))
+                                                            : '<span class="rc-email-empty-v11320">This email was received, but the message body was not included in the payload.</span>';
+                                                    }
                                                 @endphp
                                                 <div class="rc-msg-bubble-v56 rc-msg-bubble-email-v61">
-                                                    <rc-inbox-email-view wire:ignore class="rc-email-document-v64" aria-label="Email message">
-                                                        <template>{!! $emailDocument !!}</template>
-                                                    </rc-inbox-email-view>
+                                                    <div class="rc-email-direct-v11320" aria-label="Email message">
+                                                        <div class="rc-email-direct-body-v11320">{!! $emailBodyForInline !!}</div>
+                                                    </div>
                                                 </div>
                                                 @if($messageAttachments->isNotEmpty())
                                                     <div class="rc-message-attachments" style="padding:.6rem 0 0;background:transparent">
@@ -11626,7 +11381,7 @@ CSS;
                                                         type="button"
                                                         class="rc-btn"
                                                         style="width:100%;min-height:1.85rem;padding:.3rem .45rem;font-size:.61rem;margin-top:.1rem;"
-                                                        x-on:click.stop="listsOpen=false; $wire.switchRecruitingSection('lists')"
+                                                        x-on:click.stop="listsOpen=false; window.__plyrRcActivateSectionClientOnly && window.__plyrRcActivateSectionClientOnly('lists', '/admin/coach-database/lists')"
                                                     >Go to My Lists</button>
                                                 </div>
                                             @endforelse
@@ -15859,12 +15614,16 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
 
         if (alreadyActive || pendingSection === section) return true;
 
-        // The destination is already visible now. This renderless Livewire call only
-        // synchronizes server-side section state and cached helpers.
-        pendingSection = section;
+        // v10.113.20: keep sidebar navigation purely client-side. The old
+        // renderless section-sync call still made Livewire morph the whole 16k-line
+        // page after quick tab switches, causing the freeze/unfreeze behavior.
+        // The URL, sidebar highlight, and Alpine section state are already updated.
+        pendingSection = null;
         clearTimeout(pendingTimer);
-        pendingTimer = window.setTimeout(() => { pendingSection = null; }, 3500);
-        window.dispatchEvent(new CustomEvent('rc-fast-section', { detail: { section } }));
+        pendingTimer = null;
+        if (section === 'conversations') {
+            document.documentElement.removeAttribute('data-rc-inbox-loading');
+        }
         return true;
     };
 

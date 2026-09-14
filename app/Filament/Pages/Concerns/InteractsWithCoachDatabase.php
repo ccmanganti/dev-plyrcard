@@ -6794,7 +6794,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     protected function inboxMessageCacheRenderVersion(): string
     {
-        return 'v10.113.19-rich';
+        return 'v10.113.20-inline-rich';
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool
