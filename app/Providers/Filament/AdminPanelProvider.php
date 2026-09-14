@@ -40,11 +40,7 @@ class AdminPanelProvider extends PanelProvider
             // v10.103.3: keep the Filament shell mounted between Admin pages and
             // prefetch destinations while the pointer is moving toward a sidebar item.
             // Recruiting Center itself switches locally; this covers Users, Websites, etc.
-            ->spa(hasPrefetching: false)
-            // v10.113.23: disable Filament hover prefetching. Recruiting Center already
-            // handles its own instant client tabs; prefetching admin/coach-database
-            // destinations can start hidden Livewire requests while the user is only
-            // moving the mouse, which creates the intermittent 3-5 second freezes.
+            ->spa(hasPrefetching: true)
             // v10.103.4: once the current request is already inside Recruiting Center,
             // its sidebar links are client-side tabs. Exclude those destination URLs
             // from Filament's wire:navigate so the same click cannot also start a
