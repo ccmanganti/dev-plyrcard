@@ -13125,6 +13125,7 @@ CSS;
                                         </div>
                                         <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
                                         <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .75rem"><span class="rc-spinner-mini"></span> Uploading image</div>
+                                        <textarea x-ref="bodySource" data-plyr-template-body-source data-refresh-key="{{ $templateEditorRefreshKey }}" style="display:none !important;">{{ base64_encode($templateBody ?? '') }}</textarea>
                                         <div x-ref="editor"
                                              wire:ignore
                                              class="rc-template-editor-v50"
@@ -14117,6 +14118,8 @@ CSS;
                 panelButtonLabel: '',
                 panelButtonUrl: '',
                 selectionHandler: null,
+                lastHydratedTemplateKey: '',
+                lastHydratedTemplateBody: '',
                 previewStaticTokens: @js($this->composePreviewTokenValues ?? []),
                 mount() {
                     if (this.mounted) return;
@@ -14125,7 +14128,11 @@ CSS;
                     this.selectionHandler = () => this.captureSelection();
                     document.addEventListener('selectionchange', this.selectionHandler);
 
-                    this.$nextTick(() => this.bootEditor());
+                    this.$nextTick(() => {
+                        this.bootEditor(true);
+                        setTimeout(() => this.bootEditor(false), 80);
+                        setTimeout(() => this.bootEditor(false), 260);
+                    });
 
                     document.addEventListener('rc-open-template-preview', () => {
                         this.openPreview();
@@ -14133,12 +14140,9 @@ CSS;
 
                     window.addEventListener('rc-template-editor-refresh', (event) => {
                         const encoded = event.detail?.body || '';
-                        const html = this.decodeBodyValue(encoded);
-                        if (this.$refs.editor && html.trim() !== '') {
-                            this.$refs.editor.dataset.initialBody = encoded;
-                            this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
-                            this.syncNow();
-                        }
+                        const key = String(event.detail?.key || '');
+                        window.__plyrTemplateEditorLastRefresh = { body: encoded, key };
+                        this.applyEncodedTemplateBody(encoded, key, true);
                     });
                 },
                 destroy() {
@@ -14150,16 +14154,69 @@ CSS;
                 bootEditor(force = false) {
                     if (!this.$refs.editor) return;
 
-                    const current = String(this.$refs.editor.innerHTML || '').trim();
-                    const currentLooksEmpty = current === '' || current === '<br>' || current.includes('Write your reusable email template...');
-                    const html = this.decodeInitialBody();
+                    const source = this.templateHydrationSource();
+                    const encoded = source.body || '';
+                    const key = source.key || '';
+                    const html = this.decodeBodyValue(encoded);
 
-                    if (html && (force || currentLooksEmpty)) {
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(html);
-                    } else if (current && !current.includes('rc-merge-token-v48')) {
-                        this.$refs.editor.innerHTML = this.highlightMergeTokens(current);
+                    if (html && this.shouldHydrateTemplateEditor(html, String(this.$refs.editor.innerHTML || ''), force, key, encoded)) {
+                        this.applyTemplateBodyHtml(html, encoded, key);
+                    } else if (String(this.$refs.editor.innerHTML || '').trim() && !String(this.$refs.editor.innerHTML || '').includes('rc-merge-token-v48')) {
+                        this.$refs.editor.innerHTML = this.highlightMergeTokens(this.$refs.editor.innerHTML || '');
+                        this.syncNow();
+                    } else {
+                        this.syncNow();
                     }
+                },
+                templateHydrationSource() {
+                    const domBody = String(this.$refs.bodySource?.value || '').trim();
+                    const domKey = String(this.$refs.bodySource?.dataset?.refreshKey || this.$refs.editor?.dataset?.refreshKey || '').trim();
+                    const attrBody = String(this.$refs.editor?.dataset?.initialBody || '').trim();
+                    const pending = window.__plyrTemplateEditorLastRefresh || {};
+                    return {
+                        body: domBody || String(pending.body || '').trim() || attrBody,
+                        key: domKey || String(pending.key || '').trim(),
+                    };
+                },
+                templateEditorVisibleText(html) {
+                    const template = document.createElement('template');
+                    template.innerHTML = String(html || '');
+                    const text = template.content?.textContent || String(html || '').replace(/<[^>]*>/g, '');
+                    return String(text || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+                },
+                templateEditorTokenCount(html) {
+                    return (String(html || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
+                },
+                shouldHydrateTemplateEditor(nextHtml, currentHtml, force = false, key = '', encoded = '') {
+                    const next = String(nextHtml || '').trim();
+                    const current = String(currentHtml || '').trim();
+                    if (!next) return false;
+                    if (force) return true;
+                    if (encoded && encoded !== this.lastHydratedTemplateBody && key && key !== this.lastHydratedTemplateKey) return true;
+                    if (current === '' || current === '<br>' || current.includes('Write your reusable email template...')) return true;
 
+                    const nextTokens = this.templateEditorTokenCount(next);
+                    const currentTokens = this.templateEditorTokenCount(current);
+                    if (nextTokens > currentTokens) return true;
+
+                    const nextText = this.templateEditorVisibleText(next);
+                    const currentText = this.templateEditorVisibleText(current);
+                    return nextText.length > currentText.length + 8;
+                },
+                applyEncodedTemplateBody(encoded, key = '', force = false) {
+                    const html = this.decodeBodyValue(encoded || '');
+                    if (!html || !this.$refs.editor) return;
+                    if (!this.shouldHydrateTemplateEditor(html, String(this.$refs.editor.innerHTML || ''), force, key, encoded)) return;
+                    this.applyTemplateBodyHtml(html, encoded, key);
+                },
+                applyTemplateBodyHtml(html, encoded = '', key = '') {
+                    if (!this.$refs.editor) return;
+                    const highlighted = this.highlightMergeTokens(html || '');
+                    if (encoded) this.$refs.editor.dataset.initialBody = encoded;
+                    if (key) this.$refs.editor.dataset.refreshKey = key;
+                    this.$refs.editor.innerHTML = highlighted;
+                    this.lastHydratedTemplateKey = String(key || this.$refs.editor.dataset.refreshKey || '');
+                    this.lastHydratedTemplateBody = String(encoded || this.$refs.editor.dataset.initialBody || '');
                     this.syncNow();
                 },
                 decodeBodyValue(initial) {
@@ -14171,8 +14228,8 @@ CSS;
                     }
                 },
                 decodeInitialBody() {
-                    const initial = this.$refs.editor?.dataset?.initialBody || '';
-                    return this.decodeBodyValue(initial);
+                    const source = this.templateHydrationSource();
+                    return this.decodeBodyValue(source.body || '');
                 },
                 queueSync() {
                     clearTimeout(this.syncTimer);
