@@ -10377,21 +10377,12 @@ CSS;
                     font-weight:750;
                 }
 
-                html[data-rc-thread-autoloading] .rc-inbox-mid-v56[data-rc-selected-thread] .rc-message-stream-v56:empty::before,
-                html[data-rc-thread-autoloading] .rc-inbox-mid-v56[data-rc-selected-thread] .rc-inbox-empty-v56::before {
-                    content:'';
-                    display:block;
-                    width:1.05rem;
-                    height:1.05rem;
-                    margin:0 auto .7rem;
-                    border-radius:999px;
-                    border:2px solid color-mix(in srgb, var(--rc-accent) 25%, transparent);
-                    border-top-color:var(--rc-accent);
-                    animation:rc-spin-v56 .7s linear infinite;
-                }
                 html[data-rc-thread-autoloading] [data-rc-inbox-message-stream] {
                     position:relative;
                     min-height:16rem;
+                }
+                html[data-rc-thread-autoloading] [data-rc-inbox-message-stream] > .rc-inbox-empty-v56 {
+                    opacity:0;
                 }
                 html[data-rc-thread-autoloading] [data-rc-inbox-message-stream]::after {
                     content:'Loading messages…';
@@ -10401,11 +10392,10 @@ CSS;
                     display:flex;
                     align-items:center;
                     justify-content:center;
-                    background:color-mix(in srgb, var(--rc-surface) 92%, transparent);
+                    background:var(--rc-surface);
                     color:var(--rc-muted);
                     font-size:.88rem;
                     font-weight:750;
-                    backdrop-filter:blur(2px);
                     pointer-events:none;
                 }
                 html[data-rc-thread-autoloading] [data-rc-inbox-message-stream]::before {
@@ -10956,11 +10946,8 @@ CSS;
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56">
                                         <div>
-                                            <div class="rc-thread-loading-copy-v11312">
-                                                <strong>Loading messages…</strong>
-                                                <span>The latest 10 messages will appear automatically.</span>
-                                                <small><span class="rc-spinner-mini"></span>Opening conversation</small>
-                                            </div>
+                                            <strong>Messages are loading.</strong><br>
+                                            <span>The latest messages will appear automatically.</span>
                                         </div>
                                     </div>
                                 @else

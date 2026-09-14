@@ -6514,6 +6514,184 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return $row;
     }
 
+
+    /**
+     * Fill empty outbound tracking rows with the actual locally-rendered email body.
+     *
+     * Some conversation APIs return delivery/open/click events as message rows without
+     * the original HTML content. Keep the direct API path fast, but repair those rows
+     * from coach_database_email_messages when the local send log is available. This
+     * method must never break Inbox loading; all schema/data issues fail closed.
+     */
+    protected function enrichConversationMessageRowsWithLocalSentBodies(Collection $rows, $user, string $conversationId): Collection
+    {
+        if ($rows->isEmpty() || ! $user || ! Schema::hasTable('coach_database_email_messages')) {
+            return $rows;
+        }
+
+        foreach (['athlete_user_id', 'rendered_html', 'sent_at'] as $requiredColumn) {
+            if (! Schema::hasColumn('coach_database_email_messages', $requiredColumn)) {
+                return $rows;
+            }
+        }
+
+        $conversation = collect($this->conversations ?? [])
+            ->first(fn ($row): bool => is_array($row) && (string) ($row['id'] ?? '') === $conversationId);
+        $conversation = is_array($conversation) ? $conversation : [];
+
+        $normalEmail = static function ($value): string {
+            if (is_array($value)) {
+                $value = collect($value)
+                    ->map(fn ($item) => is_array($item) ? ($item['email'] ?? $item['address'] ?? $item['value'] ?? '') : (is_scalar($item) ? (string) $item : ''))
+                    ->first(fn ($email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false) ?: '';
+            }
+
+            $value = strtolower(trim((string) $value));
+            if ($value !== '' && preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $value, $match)) {
+                return strtolower($match[0]);
+            }
+
+            return filter_var($value, FILTER_VALIDATE_EMAIL) !== false ? $value : '';
+        };
+
+        $normalSubject = static fn ($value): string => strtolower(trim(preg_replace('/\s+/', ' ', (string) $value)));
+        $hasBody = static function (array $row): bool {
+            foreach ([
+                'rendered_html', 'renderedHtml', 'html_body', 'htmlBody', 'message_html',
+                'body', 'html', 'content', 'text_body', 'textBody', 'text', 'plain_text',
+                'plainText', 'body_text', '_body_text', '_livewire_body_gzip',
+            ] as $key) {
+                if (isset($row[$key]) && is_scalar($row[$key]) && trim((string) $row[$key]) !== '') {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $recipientEmails = $rows
+            ->flatMap(function (array $row) use ($normalEmail): array {
+                return [
+                    $normalEmail($row['recipient_email'] ?? null),
+                    $normalEmail($row['to'] ?? null),
+                    $normalEmail($row['to_email'] ?? null),
+                    $normalEmail($row['email'] ?? null),
+                    $normalEmail(data_get($row, 'to.email')),
+                    $normalEmail(data_get($row, 'recipient.email')),
+                ];
+            })
+            ->push($normalEmail($conversation['email'] ?? null))
+            ->push($normalEmail($conversation['contact_email'] ?? null))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($recipientEmails->isEmpty()) {
+            return $rows;
+        }
+
+        try {
+            $columns = ['recipient_email', 'subject', 'rendered_html', 'sent_at'];
+            foreach (['ghl_message_id', 'message_uuid'] as $optionalColumn) {
+                if (Schema::hasColumn('coach_database_email_messages', $optionalColumn)) {
+                    $columns[] = $optionalColumn;
+                }
+            }
+
+            $localMessages = DB::table('coach_database_email_messages')
+                ->where('athlete_user_id', $user->getKey())
+                ->whereIn(DB::raw('LOWER(recipient_email)'), $recipientEmails->all())
+                ->whereNotNull('rendered_html')
+                ->orderByDesc('sent_at')
+                ->limit(250)
+                ->get(array_values(array_unique($columns)));
+
+            if ($localMessages->isEmpty()) {
+                return $rows;
+            }
+
+            $byMessageId = [];
+            $byEmailSubject = [];
+            $byEmail = [];
+
+            foreach ($localMessages as $localMessage) {
+                $local = (array) $localMessage;
+                $email = $normalEmail($local['recipient_email'] ?? '');
+                $subject = $normalSubject($local['subject'] ?? '');
+                $html = trim((string) ($local['rendered_html'] ?? ''));
+
+                if ($email === '' || $html === '') {
+                    continue;
+                }
+
+                foreach (['ghl_message_id', 'message_uuid'] as $idColumn) {
+                    $id = trim((string) ($local[$idColumn] ?? ''));
+                    if ($id !== '') {
+                        $byMessageId[$id] = $html;
+                    }
+                }
+
+                if ($subject !== '') {
+                    $byEmailSubject[$email . '|' . $subject] ??= $html;
+                }
+
+                $byEmail[$email] ??= $html;
+            }
+
+            return $rows->map(function (array $row) use ($normalEmail, $normalSubject, $hasBody, $byMessageId, $byEmailSubject, $byEmail, $conversation): array {
+                if ($hasBody($row)) {
+                    return $row;
+                }
+
+                $direction = strtolower(trim((string) ($row['direction'] ?? $row['message_direction'] ?? $row['messageDirection'] ?? '')));
+                $isOutbound = str_contains($direction, 'out') || in_array($direction, ['sent', 'send', 'outgoing'], true);
+                if (! $isOutbound) {
+                    return $row;
+                }
+
+                $messageIds = collect([
+                    $row['id'] ?? null,
+                    $row['message_id'] ?? null,
+                    $row['messageId'] ?? null,
+                    $row['ghl_message_id'] ?? null,
+                ])->map(fn ($id): string => trim((string) $id))->filter()->values();
+
+                foreach ($messageIds as $messageId) {
+                    if (isset($byMessageId[$messageId])) {
+                        $row['rendered_html'] = $byMessageId[$messageId];
+                        return $row;
+                    }
+                }
+
+                $email = $normalEmail($row['recipient_email'] ?? null)
+                    ?: $normalEmail($row['to'] ?? null)
+                    ?: $normalEmail($row['email'] ?? null)
+                    ?: $normalEmail($conversation['email'] ?? null)
+                    ?: $normalEmail($conversation['contact_email'] ?? null);
+                $subject = $normalSubject($row['subject'] ?? $conversation['subject'] ?? '');
+
+                if ($email !== '' && $subject !== '' && isset($byEmailSubject[$email . '|' . $subject])) {
+                    $row['rendered_html'] = $byEmailSubject[$email . '|' . $subject];
+                    return $row;
+                }
+
+                if ($email !== '' && isset($byEmail[$email])) {
+                    $row['rendered_html'] = $byEmail[$email];
+                }
+
+                return $row;
+            });
+        } catch (\Throwable $exception) {
+            Log::debug('Unable to enrich Inbox messages from local sent bodies.', [
+                'user_id' => $user->getKey(),
+                'conversation_id' => $conversationId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $rows;
+        }
+    }
+
     /**
      * Keep full email rendering while preventing large HTML bodies from being
      * serialized verbatim into every Livewire request snapshot.
@@ -6574,8 +6752,15 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
 
         if (is_scalar($body) && trim((string) $body) !== '') {
-            $encoded = base64_encode(gzencode((string) $body, 6));
-            $row['_livewire_body_gzip'] = $encoded;
+            $compressed = function_exists('gzencode') ? gzencode((string) $body, 6) : false;
+            if (is_string($compressed) && $compressed !== '') {
+                $row['_livewire_body_gzip'] = base64_encode($compressed);
+            } else {
+                // Extremely defensive fallback for hosts without zlib. The Blade
+                // still has the ordinary body fields until they are unset below,
+                // so keep a compact readable fallback instead of throwing.
+                $row['_body_text'] = Str::limit(trim(strip_tags((string) $body)), 5000, '');
+            }
         }
 
         foreach ([
@@ -6609,7 +6794,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     protected function inboxMessageCacheRenderVersion(): string
     {
-        return 'v10.113.18-rich';
+        return 'v10.113.19-rich';
     }
 
     protected function hydrateCachedConversationMessages(string $conversationId): bool
