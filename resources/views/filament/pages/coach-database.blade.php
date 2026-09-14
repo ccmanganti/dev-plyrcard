@@ -12539,6 +12539,21 @@ CSS;
                 .rc-template-editor-shell-v50{border:1px solid var(--rc-border);border-radius:.9rem;overflow:hidden;background:var(--rc-surface)}
                 .rc-template-editor-v50{min-height:19rem;padding:1rem;background:var(--rc-surface);color:var(--rc-text);outline:none;font-size:.9rem;line-height:1.65}.rc-template-editor-v50:empty:before{content:attr(data-placeholder);color:var(--rc-muted)}
                 .rc-template-attachments-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.06);padding:1rem;margin-top:1rem}.rc-template-drop-v50{border:1px dashed rgba(148,163,184,.42);border-radius:.95rem;min-height:4.6rem;display:grid;place-items:center;text-align:center;color:var(--rc-muted);font-size:.82rem;background:rgba(148,163,184,.035);cursor:pointer}
+
+                /* v10.113.31: friendlier new-template builder */
+                .rc-template-builder-v11331{display:grid;gap:1rem}
+                .rc-template-builder-intro-v11331{display:flex;align-items:center;justify-content:space-between;gap:1rem;border:1px solid rgba(255,99,56,.16);border-radius:1.05rem;background:linear-gradient(135deg,rgba(255,99,56,.085),rgba(248,250,252,.92));padding:1rem 1.05rem;box-shadow:0 14px 34px rgba(15,23,42,.055)}
+                .dark .rc-template-builder-intro-v11331{background:linear-gradient(135deg,rgba(255,99,56,.13),rgba(15,23,42,.72))}
+                .rc-template-builder-intro-v11331 strong{display:block;color:var(--rc-text);font-size:1rem;letter-spacing:-.01em}.rc-template-builder-intro-v11331 span{display:block;color:var(--rc-muted);font-size:.82rem;margin-top:.16rem;line-height:1.35}
+                .rc-template-builder-steps-v11331{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end}.rc-template-step-pill-v11331{height:1.9rem;border-radius:999px;border:1px solid rgba(255,99,56,.18);background:rgba(255,255,255,.74);color:#ff6338;font-weight:800;font-size:.7rem;display:inline-flex;align-items:center;gap:.34rem;padding:0 .68rem;white-space:nowrap}.dark .rc-template-step-pill-v11331{background:rgba(15,23,42,.45)}
+                .rc-template-builder-card-v11331{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 12px 34px rgba(15,23,42,.055);overflow:hidden}.rc-template-builder-card-head-v11331{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.05rem;border-bottom:1px solid rgba(148,163,184,.18);background:rgba(248,250,252,.56)}.dark .rc-template-builder-card-head-v11331{background:rgba(15,23,42,.35)}
+                .rc-template-builder-title-v11331{display:flex;gap:.72rem;align-items:flex-start;min-width:0}.rc-template-builder-number-v11331{width:1.82rem;height:1.82rem;border-radius:.62rem;background:#ff6338;color:#fff;font-weight:850;display:grid;place-items:center;flex:0 0 auto;box-shadow:0 8px 18px rgba(255,99,56,.22)}.rc-template-builder-title-v11331 strong{display:block;color:var(--rc-text);font-size:.95rem;line-height:1.15}.rc-template-builder-title-v11331 span{display:block;color:var(--rc-muted);font-size:.78rem;line-height:1.35;margin-top:.16rem}
+                .rc-template-builder-body-v11331{padding:1.05rem;display:grid;gap:.95rem}.rc-template-details-grid-v11331{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.82rem}.rc-template-details-grid-v11331 .is-full{grid-column:1/-1}.rc-template-field-v11331{display:grid;gap:.38rem}.rc-template-field-v11331 label{font-size:.74rem;font-weight:800;color:var(--rc-text);letter-spacing:.005em}.rc-template-field-v11331 small{font-size:.7rem;color:var(--rc-muted);line-height:1.35}.rc-template-field-v11331 input{width:100%;height:2.85rem;border:1px solid rgba(148,163,184,.26);border-radius:.85rem;background:var(--rc-surface);color:var(--rc-text);padding:0 .9rem;font-size:.9rem;outline:none;box-shadow:0 8px 20px rgba(15,23,42,.03)}.rc-template-field-v11331 input:focus{border-color:#ff6338;box-shadow:0 0 0 3px rgba(255,99,56,.12)}
+                .rc-template-help-card-v11331{border:1px solid rgba(34,197,94,.18);background:rgba(34,197,94,.065);border-radius:.9rem;padding:.72rem .82rem;color:#166534;font-size:.78rem;line-height:1.4}.dark .rc-template-help-card-v11331{color:#bbf7d0;background:rgba(34,197,94,.11)}
+                .rc-template-variable-panel-v11331{border:1px solid rgba(255,99,56,.16);background:rgba(255,99,56,.04);border-radius:.95rem;padding:.82rem;display:grid;gap:.62rem}.rc-template-variable-head-v11331{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}.rc-template-variable-head-v11331 strong{font-size:.82rem;color:var(--rc-text)}.rc-template-variable-head-v11331 span{font-size:.72rem;color:var(--rc-muted)}.rc-template-variable-grid-v11331{display:flex;gap:.42rem;flex-wrap:wrap;align-items:center}.rc-template-variable-chip-v11331{border:1px solid rgba(255,99,56,.22);background:var(--rc-surface);color:#ff6338;border-radius:999px;padding:.42rem .64rem;font-size:.74rem;font-weight:800;display:inline-flex;align-items:center;gap:.34rem;cursor:pointer;box-shadow:0 6px 16px rgba(15,23,42,.035)}.rc-template-variable-chip-v11331:hover{background:#fff2ed;border-color:rgba(255,99,56,.38)}.dark .rc-template-variable-chip-v11331:hover{background:rgba(255,99,56,.14)}.rc-template-variable-chip-v11331 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.66rem;color:var(--rc-muted);font-weight:700}
+                .rc-template-editor-shell-v11331{border:1px solid rgba(148,163,184,.22);border-radius:1rem;overflow:hidden;background:var(--rc-surface);box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}.rc-template-editor-toolbar-v11331{display:flex;align-items:center;gap:.38rem;flex-wrap:wrap;padding:.62rem;border-bottom:1px solid rgba(148,163,184,.16);background:rgba(248,250,252,.72)}.dark .rc-template-editor-toolbar-v11331{background:rgba(15,23,42,.38)}.rc-template-editor-toolbar-v11331 .rc-select{height:2.1rem;border-radius:.65rem}.rc-template-editor-toolbar-v11331 .rc-rich-tool{height:2.1rem;min-width:2.1rem;border-radius:.65rem}.rc-template-editor-v50{min-height:24rem!important;padding:1.1rem 1.15rem!important;font-size:.94rem!important;line-height:1.7!important}.rc-template-editor-footer-v11331{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.58rem .75rem;border-top:1px solid rgba(148,163,184,.14);color:var(--rc-muted);font-size:.74rem;background:rgba(248,250,252,.45)}.dark .rc-template-editor-footer-v11331{background:rgba(15,23,42,.28)}
+                .rc-template-attachments-friendly-v11331{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 12px 34px rgba(15,23,42,.05);overflow:hidden}.rc-template-attachment-drop-v11331{border:1px dashed rgba(148,163,184,.45);border-radius:.95rem;min-height:5rem;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--rc-muted);font-size:.78rem;background:rgba(148,163,184,.035);cursor:pointer;padding:.85rem}.rc-template-attachment-drop-v11331:hover{border-color:rgba(255,99,56,.42);background:rgba(255,99,56,.045)}.rc-template-attachment-drop-v11331 strong{display:block;color:var(--rc-text);font-size:.82rem;margin-bottom:.14rem}.rc-template-attachment-drop-v11331 svg{color:#ff6338}.rc-template-bottom-bar-v11331{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:.2rem .05rem}.rc-template-bottom-status-v11331{display:flex;align-items:center;gap:.45rem;color:var(--rc-muted);font-size:.78rem}.rc-template-bottom-status-v11331 b{color:#16a34a}
+                @media(max-width:900px){.rc-template-builder-intro-v11331,.rc-template-builder-card-head-v11331{align-items:flex-start;flex-direction:column}.rc-template-builder-steps-v11331{justify-content:flex-start}.rc-template-details-grid-v11331{grid-template-columns:1fr}.rc-template-editor-v50{min-height:18rem!important}}
                 
                 /* Compact templates cards */
                 .rc-template-grid-v50{gap:.78rem!important;margin-top:.85rem!important}
@@ -12660,75 +12675,159 @@ CSS;
                     </div>
 
                     <div class="rc-template-editor-layout-v50" wire:key="template-editor-{{ $templateEditorRefreshKey }}" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
-                        <section class="rc-template-editor-card-v50">
-                            <div class="rc-template-field-v50"><label>Template Name</label><input data-plyr-template-name placeholder="e.g. Spring Showcase Intro" value="{{ $templateName ?? '' }}"></div>
-                            <div class="rc-template-field-v50"><label>Subject Line</label><input data-plyr-template-subject x-ref="subject" placeholder="Subject (you can use @{{variables}})" value="{{ $templateSubject ?? '' }}"></div>
-                            <div class="rc-template-field-v50"><label>Preview Text</label><input data-plyr-template-preview x-ref="preview" placeholder="Short inbox preview text" value="{{ $templatePreviewText ?? '' }}"></div>
-
-                            <div>
-                                <div class="rc-template-field-label">Insert Variable</div>
-                                <div class="rc-toolbar" style="gap:.45rem;flex-wrap:wrap;margin-top:.45rem">
-                                    @foreach(['CoachFirstName','SchoolName','CoachTitle','AthleteName','CoachLastName','ProfileLink','HighlightLink','InstagramLink','YoutubeLink','XLink'] as $token)
-                                        <button class="rc-token-chip" type="button" data-token="{{ $token }}" x-on:click="insertMerge($el.dataset.token)">{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</button>
-                                    @endforeach
-                                    <select class="rc-select" style="width:auto" x-on:change="insertMergeFromSelect($event)"><option value="">More</option><option value="GraduationYear">Graduation Year</option><option value="Position">Position</option><option value="ClubTeam">Club Team</option><option value="GPA">GPA</option><option value="AthleteEmail">Athlete Email</option><option value="AthletePhone">Athlete Phone</option><option value="__custom__">Custom value...</option></select>
+                        <section class="rc-template-editor-card-v50 rc-template-builder-v11331">
+                            <div class="rc-template-builder-intro-v11331">
+                                <div>
+                                    <strong>Build a coach-ready email template</strong>
+                                    <span>Start with the subject, personalize with merge variables, then preview before saving.</span>
+                                </div>
+                                <div class="rc-template-builder-steps-v11331" aria-label="Template builder steps">
+                                    <span class="rc-template-step-pill-v11331">1 Details</span>
+                                    <span class="rc-template-step-pill-v11331">2 Message</span>
+                                    <span class="rc-template-step-pill-v11331">3 Attachments</span>
                                 </div>
                             </div>
 
-                            <div class="rc-template-editor-shell-v50">
-                                <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Template editor toolbar">
-                                    <select class="rc-select" style="width:auto;height:2rem" x-on:change="block($event.target.value); $event.target.value='p'"><option value="p">Paragraph</option><option value="h2">Heading</option><option value="blockquote">Quote</option></select>
-                                    <button class="rc-rich-tool" type="button" x-on:click="command('bold')"><strong>B</strong></button>
-                                    <button class="rc-rich-tool" type="button" x-on:click="command('italic')"><em>I</em></button>
-                                    <button class="rc-rich-tool" type="button" x-on:click="command('underline')"><u>U</u></button>
-                                    <button class="rc-rich-tool" type="button" x-on:click="command('insertUnorderedList')">☷</button>
-                                    <button class="rc-rich-tool" type="button" x-on:click="command('insertOrderedList')">☑</button>
-                                    <button class="rc-rich-tool" type="button" x-on:click="addLink()">🔗</button>
-                                    <button class="rc-rich-tool" type="button" x-on:click="openImageUpload()">▧</button>
+                            <div class="rc-template-builder-card-v11331">
+                                <div class="rc-template-builder-card-head-v11331">
+                                    <div class="rc-template-builder-title-v11331">
+                                        <span class="rc-template-builder-number-v11331">1</span>
+                                        <div><strong>Template details</strong><span>Name it clearly so it is easy to find later in Compose.</span></div>
+                                    </div>
                                 </div>
-                                <input x-ref="imageUpload" type="file" accept="image/*" multiple class="sr-only" x-on:change="uploadInlineImages($event)">
-                                <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .75rem"><span class="rc-spinner-mini"></span> Uploading image</div>
-                                <div x-ref="editor"
-                                     wire:ignore
-                                     class="rc-template-editor-v50"
-                                     data-plyr-template-editor
-                                     contenteditable="true"
-                                     data-placeholder="Write your reusable email template..."
-                                     data-initial-body="{{ base64_encode($templateBody ?? '') }}"
-                                     data-refresh-key="{{ $templateEditorRefreshKey }}"
-                                     x-on:input="queueSync()"
-                                     x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
-                                <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" value="{{ $templateBody ?? '' }}">
-                            </div>
-
-                            <div class="rc-attachments-v45" style="box-shadow:none;padding:.85rem">
-                                <div style="font-weight:700;font-size:.85rem">Attachments ({{ count($templateAttachments ?? []) }})</div>
-                                <div class="rc-attachment-grid-v45">
-                                    @foreach(($templateAttachments ?? []) as $index => $attachment)
-                                        <?php $name = (string) ($attachment['name'] ?? 'Attachment'); $ext = strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE'); ?>
-                                        <div class="rc-attachment-card-v45">
-                                            <div class="rc-attachment-icon-v45 {{ $ext === 'PDF' ? '' : 'is-file' }}">{{ \Illuminate\Support\Str::limit($ext, 4, '') }}</div>
-                                            <div style="min-width:0;flex:1">
-                                                <div style="font-size:.8rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $name }}</div>
-                                                <div class="rc-subtle">{{ $attachment['mime_type'] ?? 'File' }} @if(!empty($attachment['size'])) · {{ number_format(((int) $attachment['size']) / 1048576, 1) }} MB @endif</div>
-                                            </div>
-                                            <button type="button" class="rc-icon-button" wire:click="removeTemplateAttachment({{ $index }})">×</button>
+                                <div class="rc-template-builder-body-v11331">
+                                    <div class="rc-template-details-grid-v11331">
+                                        <div class="rc-template-field-v11331">
+                                            <label>Template name</label>
+                                            <input data-plyr-template-name placeholder="Example: First coach intro" value="{{ $templateName ?? '' }}">
+                                            <small>Only your team sees this name.</small>
                                         </div>
-                                    @endforeach
-                                    <label class="rc-attachment-drop-v45">
+                                        <div class="rc-template-field-v11331">
+                                            <label>Subject line</label>
+                                            <input data-plyr-template-subject x-ref="subject" placeholder="Example: @{{AthleteName}} recruiting introduction" value="{{ $templateSubject ?? '' }}">
+                                            <small>This is what coaches see in their inbox.</small>
+                                        </div>
+                                        <div class="rc-template-field-v11331 is-full">
+                                            <label>Preview text</label>
+                                            <input data-plyr-template-preview x-ref="preview" placeholder="Short inbox preview text after the subject" value="{{ $templatePreviewText ?? '' }}">
+                                            <small>Optional, but helpful for improving open rates.</small>
+                                        </div>
+                                    </div>
+                                    <div class="rc-template-help-card-v11331">Tip: use merge variables so every email feels personal without rewriting it for each coach.</div>
+                                </div>
+                            </div>
+
+                            <div class="rc-template-builder-card-v11331">
+                                <div class="rc-template-builder-card-head-v11331">
+                                    <div class="rc-template-builder-title-v11331">
+                                        <span class="rc-template-builder-number-v11331">2</span>
+                                        <div><strong>Email message</strong><span>Write the reusable body and insert coach/player variables where needed.</span></div>
+                                    </div>
+                                </div>
+                                <div class="rc-template-builder-body-v11331">
+                                    <div class="rc-template-variable-panel-v11331">
+                                        <div class="rc-template-variable-head-v11331">
+                                            <strong>Personalize with merge variables</strong>
+                                            <span>Click a chip to insert it at your cursor.</span>
+                                        </div>
+                                        <div class="rc-template-variable-grid-v11331">
+                                            @foreach([
+                                                'CoachFirstName' => 'Coach first',
+                                                'SchoolName' => 'School',
+                                                'CoachTitle' => 'Coach title',
+                                                'AthleteName' => 'Athlete',
+                                                'ProfileLink' => 'Profile link',
+                                                'HighlightLink' => 'Highlight link',
+                                                'InstagramLink' => 'Instagram',
+                                                'YoutubeLink' => 'YouTube',
+                                                'XLink' => 'X link',
+                                            ] as $token => $label)
+                                                <button class="rc-template-variable-chip-v11331" type="button" data-token="{{ $token }}" x-on:click="insertMerge($el.dataset.token)"><span>{{ $label }}</span><code>{!! '&#123;&#123;' . e($token) . '&#125;&#125;' !!}</code></button>
+                                            @endforeach
+                                            <select class="rc-select" style="width:auto;height:2.25rem" x-on:change="insertMergeFromSelect($event)">
+                                                <option value="">More variables</option>
+                                                <option value="CoachLastName">Coach Last Name</option>
+                                                <option value="GraduationYear">Graduation Year</option>
+                                                <option value="Position">Position</option>
+                                                <option value="ClubTeam">Club Team</option>
+                                                <option value="GPA">GPA</option>
+                                                <option value="AthleteEmail">Athlete Email</option>
+                                                <option value="AthletePhone">Athlete Phone</option>
+                                                <option value="__custom__">Custom value...</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="rc-template-editor-shell-v11331">
+                                        <div class="rc-template-editor-toolbar-v11331" role="toolbar" aria-label="Template editor toolbar">
+                                            <select class="rc-select" style="width:auto" x-on:change="block($event.target.value); $event.target.value='p'"><option value="p">Paragraph</option><option value="h2">Heading</option><option value="blockquote">Quote</option></select>
+                                            <button class="rc-rich-tool" type="button" title="Bold" x-on:click="command('bold')"><strong>B</strong></button>
+                                            <button class="rc-rich-tool" type="button" title="Italic" x-on:click="command('italic')"><em>I</em></button>
+                                            <button class="rc-rich-tool" type="button" title="Underline" x-on:click="command('underline')"><u>U</u></button>
+                                            <button class="rc-rich-tool" type="button" title="Bulleted list" x-on:click="command('insertUnorderedList')">•</button>
+                                            <button class="rc-rich-tool" type="button" title="Numbered list" x-on:click="command('insertOrderedList')">1.</button>
+                                            <button class="rc-rich-tool" type="button" title="Insert link" x-on:click="addLink()">Link</button>
+                                            <button class="rc-rich-tool" type="button" title="Insert image" x-on:click="openImageUpload()">Image</button>
+                                        </div>
+                                        <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
+                                        <div x-show="uploadingImages" class="rc-loading-inline" style="padding:.5rem .75rem"><span class="rc-spinner-mini"></span> Uploading image</div>
+                                        <div x-ref="editor"
+                                             wire:ignore
+                                             class="rc-template-editor-v50"
+                                             data-plyr-template-editor
+                                             contenteditable="true"
+                                             data-placeholder="Write your reusable email template..."
+                                             data-initial-body="{{ base64_encode($templateBody ?? '') }}"
+                                             data-refresh-key="{{ $templateEditorRefreshKey }}"
+                                             x-on:input="queueSync()"
+                                             x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
+                                        <input x-ref="hidden" type="hidden" data-plyr-native-editor-hidden="template-body" value="{{ $templateBody ?? '' }}">
+                                        <div class="rc-template-editor-footer-v11331">
+                                            <span>Use short paragraphs and one clear call-to-action.</span>
+                                            <span>Preview before saving.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rc-template-attachments-friendly-v11331">
+                                <div class="rc-template-builder-card-head-v11331">
+                                    <div class="rc-template-builder-title-v11331">
+                                        <span class="rc-template-builder-number-v11331">3</span>
+                                        <div><strong>Optional attachments</strong><span>Add files only when they support the email.</span></div>
+                                    </div>
+                                    <div class="rc-subtle">{{ count($templateAttachments ?? []) }} attached</div>
+                                </div>
+                                <div class="rc-template-builder-body-v11331">
+                                    @if(! empty($templateAttachments ?? []))
+                                        <div class="rc-attachment-grid-v45">
+                                            @foreach(($templateAttachments ?? []) as $index => $attachment)
+                                                <?php $name = (string) ($attachment['name'] ?? 'Attachment'); $ext = strtoupper(pathinfo($name, PATHINFO_EXTENSION) ?: 'FILE'); ?>
+                                                <div class="rc-attachment-card-v45">
+                                                    <div class="rc-attachment-icon-v45 {{ $ext === 'PDF' ? '' : 'is-file' }}">{{ \Illuminate\Support\Str::limit($ext, 4, '') }}</div>
+                                                    <div style="min-width:0;flex:1">
+                                                        <div style="font-size:.8rem;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ $name }}</div>
+                                                        <div class="rc-subtle">{{ $attachment['mime_type'] ?? 'File' }} @if(!empty($attachment['size'])) · {{ number_format(((int) $attachment['size']) / 1048576, 1) }} MB @endif</div>
+                                                    </div>
+                                                    <button type="button" class="rc-icon-button" wire:click="removeTemplateAttachment({{ $index }})">×</button>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                    <label class="rc-template-attachment-drop-v11331">
                                         <input type="file" multiple style="display:none" wire:model="templateAttachmentUploads" />
                                         <span>
-                                            <svg class="rc-icon-sm" style="margin:0 auto .3rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M12 4v12m0-12 4 4m-4-4-4 4" /></svg>
-                                            <strong style="display:block;color:var(--rc-text);font-size:.82rem">Upload files</strong>
-                                            <span style="font-size:.72rem">or click to browse · Max 25MB per file</span>
+                                            <svg class="rc-icon-sm" style="margin:0 auto .32rem" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1M12 4v12m0-12 4 4m-4-4-4 4" /></svg>
+                                            <strong>Drop files here or click to upload</strong>
+                                            <span>PDFs, images, and documents · Max 25MB per file</span>
                                         </span>
                                     </label>
+                                    <div wire:loading.flex wire:target="templateAttachmentUploads,addTemplateAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading files</div>
                                 </div>
-                                <div wire:loading.flex wire:target="templateAttachmentUploads,addTemplateAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading files</div>
                             </div>
 
-                            <div class="rc-toolbar" style="justify-content:space-between">
-                                <div class="rc-subtle">Words: {{ str_word_count(strip_tags($templateBody ?? '')) }} &nbsp; <span style="color:#16a34a">Looks good!</span></div>
+                            <div class="rc-template-bottom-bar-v11331">
+                                <div class="rc-template-bottom-status-v11331">Words: {{ str_word_count(strip_tags($templateBody ?? '')) }} <b>Looks good</b></div>
                                 @if($selectedTemplateId && ! $templateIsNew)
                                     <button class="rc-btn" type="button" wire:click="deleteTemplate" wire:confirm="Delete this template?">Delete Template</button>
                                 @endif
