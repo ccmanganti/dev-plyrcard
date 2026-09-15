@@ -523,11 +523,25 @@ discoverSelectedIds: [],
                     // Ignore a late response if the user already opened a different school.
                     const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (currentId !== id) return;
-                    this.discoverSchoolComms = Array.isArray(rows) ? rows : [];
+
+                    // Normalize the returned Livewire payload into fresh plain objects and
+                    // give every row a guaranteed unique browser render key. This changes
+                    // only the school-drawer Communications renderer.
+                    const normalizedRows = Array.isArray(rows)
+                        ? rows
+                            .filter(row => row && typeof row === 'object')
+                            .map((row, index) => ({
+                                ...row,
+                                __renderKey: `${id}:${String(row.id || 'row')}:${index}`,
+                            }))
+                        : [];
+
+                    this.discoverSchoolComms = [...normalizedRows];
                     this.discoverSchoolCommsLoadedFor = id;
                 } catch (error) {
                     console.error('Unable to load school communication history.', error);
                     this.discoverSchoolComms = [];
+                    this.discoverSchoolCommsLoadedFor = id;
                 } finally {
                     this.discoverSchoolCommsLoading = false;
                 }
@@ -13501,24 +13515,26 @@ CSS;
                         <div class="rc-school-comms-loading-v123" x-show="discoverSchoolCommsLoading">
                             <span class="rc-spinner-mini"></span><span>Loading conversation history…</span>
                         </div>
-                        <template x-if="!discoverSchoolCommsLoading && discoverSchoolComms.length">
-                            <div class="rc-school-comms-list-v123">
-                                <template x-for="row in discoverSchoolComms" :key="row.id">
-                                    <div class="rc-school-comms-row-v123">
-                                        <span class="rc-school-comms-direction-v123" x-bind:class="row.direction === 'inbound' ? 'is-inbound' : 'is-outbound'" x-text="row.direction === 'inbound' ? '↙' : '↗'"></span>
-                                        <div class="rc-school-comms-copy-v123">
-                                            <strong x-text="row.title || 'Conversation activity'"></strong>
-                                            <span x-text="row.preview || 'No message preview available.'"></span>
-                                            <small>
-                                                <span x-text="row.date_label || ''"></span>
-                                                <span x-show="row.opened"> · Opened</span>
-                                                <span x-show="row.reply"> · Reply</span>
-                                            </small>
-                                        </div>
+
+                        {{-- Keep the list mounted instead of nesting x-for inside x-if. The
+                             existing Communications data/fetching logic stays unchanged. --}}
+                        <div class="rc-school-comms-list-v123" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length > 0" x-cloak>
+                            <template x-for="(row, rowIndex) in discoverSchoolComms" :key="row.__renderKey || `${discoverSchoolCommsLoadedFor}:${rowIndex}`">
+                                <div class="rc-school-comms-row-v123">
+                                    <span class="rc-school-comms-direction-v123" x-bind:class="row.direction === 'inbound' ? 'is-inbound' : 'is-outbound'" x-text="row.direction === 'inbound' ? '↙' : '↗'"></span>
+                                    <div class="rc-school-comms-copy-v123">
+                                        <strong x-text="row.title || 'Conversation activity'"></strong>
+                                        <span x-text="row.preview || 'No message preview available.'"></span>
+                                        <small>
+                                            <span x-text="row.date_label || ''"></span>
+                                            <span x-show="!!row.opened"> · Opened</span>
+                                            <span x-show="!!row.reply"> · Reply</span>
+                                        </small>
                                     </div>
-                                </template>
-                            </div>
-                        </template>
+                                </div>
+                            </template>
+                        </div>
+
                         <div class="rc-empty" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length === 0">
                             <strong>No conversation history yet.</strong>
                             <span>Emails and replies with coaches from this school will appear here.</span>
