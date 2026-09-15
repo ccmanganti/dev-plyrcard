@@ -5468,6 +5468,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
     }
 
+    /**
+     * Return one school's communication history to the browser drawer without
+     * re-rendering the full Recruiting Center Livewire component. The drawer is
+     * Alpine-owned; a normal Livewire morph would recreate that Alpine tree and
+     * clear discoverSchoolComms just as the request finishes.
+     */
+    #[Renderless]
     public function schoolCommunicationHistoryForClient(string $schoolId): array
     {
         $schoolId = trim($schoolId);

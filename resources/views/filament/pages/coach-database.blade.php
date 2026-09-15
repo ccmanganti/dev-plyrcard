@@ -117,6 +117,8 @@ discoverSelectedIds: [],
             discoverSchoolComms: [],
             discoverSchoolCommsLoading: false,
             discoverSchoolCommsLoadedFor: '',
+            discoverSchoolCommsRequestToken: '',
+            discoverSchoolCommsError: '',
             dashboardDetail: @js(in_array($section, ['profile-views', 'coach-engagement'], true) ? $section : ''),
             discoverLists: @js(collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values()->all()),
             discoverBulkNotice: '',
@@ -500,9 +502,11 @@ discoverSelectedIds: [],
                 // Keep the legacy global empty so Livewire/browser state cannot reopen it.
                 window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
+                this.discoverSchoolCommsRequestToken = '';
                 this.discoverSchoolComms = [];
                 this.discoverSchoolCommsLoading = false;
                 this.discoverSchoolCommsLoadedFor = '';
+                this.discoverSchoolCommsError = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
 
@@ -514,22 +518,67 @@ discoverSelectedIds: [],
             },
             async loadDiscoverCommunications(force = false) {
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                if (!id || this.discoverSchoolCommsLoading) return;
-                if (!force && this.discoverSchoolCommsLoadedFor === id && this.discoverSchoolComms.length > 0) return;
+                if (!id) return;
+                if (this.discoverSchoolCommsLoading && !force) return;
+                if (!force && this.discoverSchoolCommsLoadedFor === id) return;
 
+                const userKey = String(this.rcCatalogUserKey || 'guest');
+                window.__plyrRcSchoolCommsByUser = window.__plyrRcSchoolCommsByUser || {};
+                window.__plyrRcSchoolCommsByUser[userKey] = window.__plyrRcSchoolCommsByUser[userKey] || {};
+                const bucket = window.__plyrRcSchoolCommsByUser[userKey];
+                const cachedEntry = bucket[id];
+                const cachedRows = Array.isArray(cachedEntry?.rows) ? cachedEntry.rows : null;
+                const cachedAt = Number(cachedEntry?.cachedAt || 0);
+
+                // Repaint immediately from browser cache when revisiting the same school.
+                // The server still remains the source of truth on a forced refresh.
+                if (!force && cachedRows && cachedAt && (Date.now() - cachedAt) < 120000) {
+                    this.discoverSchoolComms = cachedRows.map(row => ({ ...row }));
+                    this.discoverSchoolCommsLoadedFor = id;
+                    this.discoverSchoolCommsLoading = false;
+                    this.discoverSchoolCommsError = '';
+                    return;
+                }
+
+                const requestToken = id + ':' + Date.now() + ':' + Math.random();
+                this.discoverSchoolCommsRequestToken = requestToken;
                 this.discoverSchoolCommsLoading = true;
+                this.discoverSchoolCommsError = '';
+
                 try {
                     const rows = await this.$wire.call('schoolCommunicationHistoryForClient', id);
-                    // Ignore a late response if the user already opened a different school.
+
+                    // Ignore a late response if the drawer changed school, closed, or a newer
+                    // communications request superseded this one.
                     const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                    if (currentId !== id) return;
-                    this.discoverSchoolComms = Array.isArray(rows) ? rows : [];
+                    if (this.discoverSchoolCommsRequestToken !== requestToken || currentId !== id || !this.schoolDrawerOpen) return;
+
+                    const normalizedRows = Array.isArray(rows)
+                        ? rows.filter(row => row && typeof row === 'object').map(row => ({ ...row }))
+                        : [];
+
+                    // Replace the array reference so Alpine's x-if/x-for dependency is
+                    // guaranteed to invalidate after the async Livewire return.
+                    this.discoverSchoolComms = normalizedRows;
                     this.discoverSchoolCommsLoadedFor = id;
+                    this.discoverSchoolCommsError = '';
+                    bucket[id] = {
+                        rows: normalizedRows.map(row => ({ ...row })),
+                        cachedAt: Date.now(),
+                    };
+
+                    await this.$nextTick();
                 } catch (error) {
                     console.error('Unable to load school communication history.', error);
-                    this.discoverSchoolComms = [];
+                    if (this.discoverSchoolCommsRequestToken === requestToken) {
+                        this.discoverSchoolComms = [];
+                        this.discoverSchoolCommsLoadedFor = '';
+                        this.discoverSchoolCommsError = 'Couldn't load communication history. Please retry.';
+                    }
                 } finally {
-                    this.discoverSchoolCommsLoading = false;
+                    if (this.discoverSchoolCommsRequestToken === requestToken) {
+                        this.discoverSchoolCommsLoading = false;
+                    }
                 }
             },
             discoverListKey(list) {
@@ -677,6 +726,11 @@ discoverSelectedIds: [],
                 this.discoverSchoolScoreRequest = '';
                 this.discoverSchoolScoreLoadedFor = '';
                 this.discoverSchoolScoreLoading = false;
+                this.discoverSchoolCommsRequestToken = '';
+                this.discoverSchoolCommsLoading = false;
+                this.discoverSchoolCommsLoadedFor = '';
+                this.discoverSchoolCommsError = '';
+                this.discoverSchoolComms = [];
                 this.optimisticSchool = this.emptyDrawerSchool();
                 // v110: explicit close event is also consumed by any nested Discover
                 // controller, so a stale Alpine subtree cannot immediately repaint it.
@@ -13448,7 +13502,7 @@ CSS;
                 <div class="rc-school-tabbar-v72 rc-discover-tabbar-v111" role="tablist" aria-label="School detail tabs">
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'coaches' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='coaches'">Coaching Staff</button>
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'roster' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='roster'">Roster &amp; Stats</button>
-                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications(true)">Communications</button>
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications()">Communications</button>
                 </div>
 
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
@@ -13519,7 +13573,12 @@ CSS;
                                 </template>
                             </div>
                         </template>
-                        <div class="rc-empty" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length === 0">
+                        <div class="rc-empty rc-school-comms-error-v124" x-cloak x-show="!discoverSchoolCommsLoading && discoverSchoolCommsError">
+                            <strong>Couldn't load communication history.</strong>
+                            <span x-text="discoverSchoolCommsError"></span>
+                            <button type="button" class="rc-school-coaches-retry-v112" x-on:click.stop="loadDiscoverCommunications(true)">Retry</button>
+                        </div>
+                        <div class="rc-empty" x-show="!discoverSchoolCommsLoading && !discoverSchoolCommsError && discoverSchoolCommsLoadedFor === String(optimisticSchool?.id ?? optimisticSchool?.school_id ?? '') && discoverSchoolComms.length === 0">
                             <strong>No conversation history yet.</strong>
                             <span>Emails and replies with coaches from this school will appear here.</span>
                         </div>
