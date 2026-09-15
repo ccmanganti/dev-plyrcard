@@ -8611,8 +8611,8 @@ protected function templateHtmlForNativeEditor(array $template): string
         $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $text = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
         preg_match_all('/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/', $html, $tokens);
-        preg_match_all('/<\s*img/i', $html, $images);
-        preg_match_all('/<\s*a/i', $html, $links);
+        preg_match_all('/<\s*img\b/i', $html, $images);
+        preg_match_all('/<\s*a\b/i', $html, $links);
 
         return mb_strlen($text)
             + (count($tokens[0] ?? []) * 80)
@@ -13949,7 +13949,7 @@ protected function applyTemplateToCompose(string $templateId, bool $notify = tru
         }
     }
 
-    public function useTemplateForCompose(string $templateId): void
+    public function useTemplateForCompose(string $templateId, bool $fromCompose = false): void
     {
         $templateId = trim($templateId);
 
@@ -13957,17 +13957,21 @@ protected function applyTemplateToCompose(string $templateId, bool $notify = tru
             return;
         }
 
-        // From the Templates/Campaigns page this component cannot carry large editor
-        // state into the separate Compose page route. Redirect with a small template id,
-        // then mount() applies the template immediately on the Compose page.
-        if ($this->section !== 'compose') {
-            $url = $this->pageUrl('compose');
-            $separator = str_contains($url, '?') ? '&' : '?';
-            $this->redirect($url . $separator . 'template=' . urlencode($templateId));
+        // Recruiting Center navigation is intentionally browser-only in several paths,
+        // so the visible Compose panel can be active while Livewire still carries the
+        // section that originally mounted the persistent shell. A template chosen from
+        // Compose must therefore be applied in place instead of being redirected simply
+        // because the server-side section value is stale.
+        if ($fromCompose || $this->section === 'compose') {
+            $this->applyTemplateToCompose($templateId);
             return;
         }
 
-        $this->applyTemplateToCompose($templateId);
+        // A template launched from the Templates page still needs a real navigation so
+        // Compose is mounted and the query-string template can be applied by mount().
+        $url = $this->pageUrl('compose');
+        $separator = str_contains($url, '?') ? '&' : '?';
+        $this->redirect($url . $separator . 'template=' . urlencode($templateId));
     }
 
 

@@ -12672,7 +12672,7 @@ CSS;
                                                         }
                                                         loadingTemplateId = id;
                                                         open = false;
-                                                        $wire.call('useTemplateForCompose', id)
+                                                        $wire.call('useTemplateForCompose', id, true)
                                                             .catch((error) => console.error(error))
                                                             .finally(() => { loadingTemplateId = ''; });
                                                     "
@@ -12707,7 +12707,26 @@ CSS;
                                 </div>
                             </div>
 
-                            <div x-data="plyrNativeEditorBase('campaignBody')" x-init="window.rcSeedComposeTemplateFromStorage && window.rcSeedComposeTemplateFromStorage(); mount()" x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)" wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}">
+                            <div
+                                x-data="plyrNativeEditorBase('campaignBody')"
+                                x-init="
+                                    const serverTemplateId = @js((string) ($campaignTemplateId ?? ''));
+                                    const serverBodyBase64 = @js(base64_encode((string) ($campaignBody ?? '')));
+                                    const serverBodyKey = 'server-' + @js(sha1((string) ($campaignTemplateId ?? '') . '|' . (string) ($campaignBody ?? '')));
+
+                                    if (serverTemplateId && serverBodyBase64 && window.rcRememberComposeTemplateBody) {
+                                        // The database/Livewire body is canonical on a real Compose mount.
+                                        // Refresh browser cache from it so stale localStorage can never win.
+                                        window.rcRememberComposeTemplateBody(serverTemplateId, serverBodyBase64, serverBodyKey);
+                                    } else if (window.rcSeedComposeTemplateFromStorage) {
+                                        window.rcSeedComposeTemplateFromStorage();
+                                    }
+
+                                    mount();
+                                "
+                                x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)"
+                                wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}"
+                            >
                                 <div class="rc-compose-editor-shell-v45">
                                     <div class="rc-compose-toolbar-v45">
                                         <select class="rc-select" x-on:change="formatBlock($event.target.value); $event.target.value='p'">
@@ -13784,17 +13803,10 @@ CSS;
             let templateId = '';
             try { templateId = String(new URLSearchParams(window.location.search || '').get('template') || '').trim(); } catch (_) {}
 
-            try {
-                if (!templateId) {
-                    const activeRaw = window.localStorage.getItem('plyrcard-compose-template-active');
-                    const active = activeRaw ? JSON.parse(activeRaw) : null;
-                    const savedAt = Number(active?.savedAt || 0);
-                    if (active?.id && savedAt && (Date.now() - savedAt) < 10 * 60 * 1000) {
-                        templateId = String(active.id || '').trim();
-                    }
-                }
-            } catch (_) {}
-
+            // Only restore a browser-cached body for an explicit template URL.
+            // Falling back to the last active template made a blank/new Compose screen
+            // inherit stale content from a previous template while the subject came from
+            // current Livewire state.
             if (!templateId) return false;
 
             try {
