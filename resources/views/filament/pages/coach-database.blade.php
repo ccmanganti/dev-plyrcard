@@ -12714,12 +12714,14 @@ CSS;
                                     const serverBodyBase64 = @js(base64_encode((string) ($campaignBody ?? '')));
                                     const serverBodyKey = 'server-' + @js(sha1((string) ($campaignTemplateId ?? '') . '|' . (string) ($campaignBody ?? '')));
 
-                                    if (serverTemplateId && serverBodyBase64 && window.rcRememberComposeTemplateBody) {
-                                        // The database/Livewire body is canonical on a real Compose mount.
-                                        // Refresh browser cache from it so stale localStorage can never win.
-                                        window.rcRememberComposeTemplateBody(serverTemplateId, serverBodyBase64, serverBodyKey);
-                                    } else if (window.rcSeedComposeTemplateFromStorage) {
-                                        window.rcSeedComposeTemplateFromStorage();
+                                    // A Compose route with ?template=... is rendered after Laravel has
+                                    // already loaded that local template. Seed the editor directly from
+                                    // that canonical server body and never restore an older localStorage copy.
+                                    if (serverTemplateId && serverBodyBase64) {
+                                        window.__plyrComposeEditorPendingBodyBase64 = serverBodyBase64;
+                                        window.__plyrComposeEditorPendingBodyKey = serverBodyKey;
+                                        window.__plyrComposeEditorFullBodyBase64 = serverBodyBase64;
+                                        window.__plyrComposeEditorFullBodyKey = serverBodyKey;
                                     }
 
                                     mount();
@@ -13785,13 +13787,13 @@ CSS;
         window.rcRememberComposeTemplateBody = function (templateId, bodyBase64, bodyKey) {
             templateId = String(templateId || '').trim();
             bodyBase64 = String(bodyBase64 || '');
-            bodyKey = String(bodyKey || ('card-' + Date.now()));
+            bodyKey = String(bodyKey || ('compose-' + Date.now()));
             if (!templateId || !bodyBase64) return false;
-            const finalKey = 'stored-' + templateId + '-' + bodyKey;
-            try {
-                window.localStorage.setItem(window.rcComposeTemplateStorageKey(templateId), JSON.stringify({ body: bodyBase64, key: bodyKey, savedAt: Date.now() }));
-                window.localStorage.setItem('plyrcard-compose-template-active', JSON.stringify({ id: templateId, key: bodyKey, savedAt: Date.now() }));
-            } catch (_) {}
+
+            // Keep this as an in-memory instant-paint helper only. Persistent
+            // localStorage was able to outlive template edits and overwrite the
+            // body that Laravel had just loaded from the database.
+            const finalKey = 'memory-' + templateId + '-' + bodyKey;
             window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
             window.__plyrComposeEditorPendingBodyKey = finalKey;
             window.__plyrComposeEditorFullBodyBase64 = bodyBase64;
@@ -13800,31 +13802,9 @@ CSS;
         };
 
         window.rcSeedComposeTemplateFromStorage = function () {
-            let templateId = '';
-            try { templateId = String(new URLSearchParams(window.location.search || '').get('template') || '').trim(); } catch (_) {}
-
-            // Only restore a browser-cached body for an explicit template URL.
-            // Falling back to the last active template made a blank/new Compose screen
-            // inherit stale content from a previous template while the subject came from
-            // current Livewire state.
-            if (!templateId) return false;
-
-            try {
-                const raw = window.localStorage.getItem(window.rcComposeTemplateStorageKey(templateId));
-                if (!raw) return false;
-                const payload = JSON.parse(raw);
-                const body = String(payload?.body || '');
-                const key = String(payload?.key || ('stored-' + templateId));
-                if (!body) return false;
-                const finalKey = 'stored-' + templateId + '-' + key;
-                window.__plyrComposeEditorPendingBodyBase64 = body;
-                window.__plyrComposeEditorPendingBodyKey = finalKey;
-                window.__plyrComposeEditorFullBodyBase64 = body;
-                window.__plyrComposeEditorFullBodyKey = finalKey;
-                return true;
-            } catch (_) {
-                return false;
-            }
+            // Legacy compatibility shim. Compose templates now come from the
+            // canonical Laravel/local-template row, not persistent browser cache.
+            return false;
         };
 
         window.rcDecodeEditorBodyBase64 = function (encoded) {
@@ -13884,17 +13864,15 @@ CSS;
 
         window.rcOpenComposeTemplateFromCard = function (element, fallbackUrl) {
             const id = String(element?.dataset?.rcTemplateId || '').trim();
-            const body = String(element?.dataset?.rcComposeTemplateBodyBase64 || '');
-            const key = String(element?.dataset?.rcComposeTemplateKey || ('card-' + Date.now()));
-            if (id && body && window.rcRememberComposeTemplateBody) {
-                window.rcRememberComposeTemplateBody(id, body, key);
-            }
+            if (!id) return;
+
+            // Only carry the template id. The Compose route loads subject + full
+            // body from the same local database row, so there is no stale browser
+            // body to disagree with it.
             const baseUrl = String(fallbackUrl || window.location.href || '').trim();
             const separator = baseUrl.includes('?') ? '&' : '?';
-            window.location.href = baseUrl + separator + 'template=' + encodeURIComponent(id) + '&templateBodyKey=' + encodeURIComponent(key);
+            window.location.href = baseUrl + separator + 'template=' + encodeURIComponent(id);
         };
-
-        window.rcSeedComposeTemplateFromStorage();
 
         window.plyrNativeEditorBase = function (modelName, initialBody = '') {
             return {
@@ -13938,18 +13916,17 @@ CSS;
                             const editor = this.$refs.editor;
                             if (!editor || !editor.isConnected) return;
 
-                            let encoded = String(event.detail?.body || '');
-                            let key = String(event.detail?.key || ('livewire-' + encoded.length));
-                            if (window.rcChooseComposeEditorBodyBase64) {
-                                const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
-                                encoded = String(chosen.body || encoded || '');
-                                key = String(chosen.key || key || ('livewire-' + encoded.length));
-                            }
-                            if (encoded) {
-                                window.__plyrComposeEditorPendingBodyBase64 = encoded;
-                                window.__plyrComposeEditorPendingBodyKey = key;
-                            }
+                            // This event is emitted after the requested local template was
+                            // loaded by Livewire. It is authoritative even when it is shorter
+                            // than the previously selected template.
+                            const encoded = String(event.detail?.body || '');
+                            const key = String(event.detail?.key || ('livewire-' + encoded.length));
+                            if (!encoded) return;
 
+                            window.__plyrComposeEditorPendingBodyBase64 = encoded;
+                            window.__plyrComposeEditorPendingBodyKey = key;
+                            window.__plyrComposeEditorFullBodyBase64 = encoded;
+                            window.__plyrComposeEditorFullBodyKey = key;
                             this.applyEncodedBody(encoded, key, true);
                         };
 
@@ -13973,13 +13950,13 @@ CSS;
                     if (!this.$refs.editor) return;
                     const pendingBody = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyBase64 || '') : '';
                     const pendingKey = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyKey || '') : '';
-                    let encoded = pendingBody || initialBody || this.$refs.editor.dataset.initialBody || '';
-                    let key = pendingBody ? pendingKey : String(this.$refs.editor.dataset.refreshKey || 'initial-' + String(encoded || '').length);
-                    if (modelName === 'campaignBody' && window.rcChooseComposeEditorBodyBase64) {
-                        const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
-                        encoded = String(chosen.body || encoded || '');
-                        key = String(chosen.key || key || 'initial-' + String(encoded || '').length);
-                    }
+                    const serverBody = String(initialBody || this.$refs.editor.dataset.initialBody || '');
+                    const serverKey = String(this.$refs.editor.dataset.refreshKey || 'initial-' + String(serverBody || '').length);
+
+                    // Server-rendered campaignBody is the saved template. Pending browser
+                    // state is used only when the server genuinely has no body.
+                    let encoded = serverBody || pendingBody;
+                    let key = serverBody ? serverKey : pendingKey;
 
                     if (encoded) {
                         const applied = this.applyEncodedBody(encoded, key, force || this.$refs.editor.innerHTML.trim() === '');
@@ -13998,11 +13975,6 @@ CSS;
                     const editor = this.$refs.editor;
                     encoded = String(encoded || '');
                     key = String(key || '');
-                    if (modelName === 'campaignBody' && window.rcChooseComposeEditorBodyBase64) {
-                        const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
-                        encoded = String(chosen.body || encoded || '');
-                        key = String(chosen.key || key || '');
-                    }
                     if (!editor || !encoded) return false;
 
                     const html = this.decodeInitialBody(encoded);
@@ -14320,12 +14292,6 @@ CSS;
             window.__plyrComposeEditorPendingBodyKey = key;
             window.__plyrComposeEditorFullBodyBase64 = encoded;
             window.__plyrComposeEditorFullBodyKey = key;
-
-            if (window.rcChooseComposeEditorBodyBase64) {
-                const chosen = window.rcChooseComposeEditorBodyBase64(encoded, key);
-                encoded = String(chosen.body || encoded || '');
-                key = String(chosen.key || key || '');
-            }
 
             const editor = window.__plyrNativeEditors?.campaignBody;
             if (editor && typeof editor.applyEncodedBody === 'function') {

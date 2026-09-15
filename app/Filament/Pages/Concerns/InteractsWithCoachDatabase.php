@@ -8601,6 +8601,39 @@ protected function templateHtmlForNativeEditor(array $template): string
         return $bestHtml;
     }
 
+    /**
+     * Compose should use the exact body saved in our local template row.
+     *
+     * The generic native-editor normalizer is useful for imported/legacy email
+     * HTML, but local templates have already been sanitized when saved. Running
+     * them through the import simplifier again can collapse merge-token-only
+     * lines. That is what made a template that visually contained "Hello" plus
+     * merge chips reopen in Compose as only "Hello".
+     */
+    protected function composeTemplateEditorBody(array $template): string
+    {
+        if ((bool) ($template['is_local'] ?? false)) {
+            foreach (['body_html', 'body', 'html'] as $key) {
+                $raw = $template[$key] ?? null;
+
+                if (! is_string($raw) || trim($raw) === '') {
+                    continue;
+                }
+
+                // Local body_html is already app-owned/sanitized. Only normalize
+                // merge-token markup; do not pass it through the legacy DOM
+                // simplifier used for imported templates.
+                $body = $this->normalizeTemplateMergeTokensForStorage($raw);
+
+                if (trim($body) !== '') {
+                    return trim($body);
+                }
+            }
+        }
+
+        return $this->templateHtmlForNativeEditor($template);
+    }
+
     protected function scoreNativeTemplateEditorHtml(string $html): int
     {
         $html = trim($html);
@@ -13894,7 +13927,7 @@ protected function applyTemplateToCompose(string $templateId, bool $notify = tru
 
         $subject = $this->templateSubject($template);
         $previewText = $this->templatePreviewText($template);
-        $body = $this->templateHtmlForNativeEditor($template);
+        $body = $this->composeTemplateEditorBody($template);
 
         if (trim($body) === '') {
             $body = (string) ($template['body'] ?? $template['html'] ?? $template['body_html'] ?? '');
@@ -13938,7 +13971,12 @@ protected function applyTemplateToCompose(string $templateId, bool $notify = tru
         $this->pendingTemplateAction = null;
         $this->pendingTemplateActionId = null;
 
-        $this->dispatch('rc-compose-editor-refresh', body: base64_encode($this->campaignBody), key: 'compose-template-' . sha1($this->campaignTemplateId . '|' . $this->campaignBody));
+        $this->dispatch(
+            'rc-compose-editor-refresh',
+            body: base64_encode($this->campaignBody),
+            key: 'compose-template-' . sha1($this->campaignTemplateId . '|' . $this->campaignBody),
+            templateId: $this->campaignTemplateId,
+        );
 
         if ($notify) {
             Notification::make()
@@ -14632,7 +14670,7 @@ HTML;
                     $preview = trim(strip_tags((string) ($template['body'] ?? $template['html'] ?? '')));
                 }
 
-                $editorBody = $this->templateHtmlForNativeEditor($template);
+                $editorBody = $this->composeTemplateEditorBody($template);
 
                 return array_merge($template, [
                     'compose_subject_preview' => \Illuminate\Support\Str::limit($subject !== '' ? $subject : 'Recruiting email', 72),
