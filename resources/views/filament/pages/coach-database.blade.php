@@ -115,6 +115,7 @@ discoverSelectedIds: [],
             discoverListsOpen: false,
             discoverDrawerTab: 'coaches',
             discoverSchoolComms: [],
+            discoverSchoolCommsHtml: '',
             discoverSchoolCommsLoading: false,
             discoverSchoolCommsLoadedFor: '',
             discoverSchoolCommsRequestToken: '',
@@ -504,6 +505,7 @@ discoverSelectedIds: [],
                 this.discoverDrawerTab = 'coaches';
                 this.discoverSchoolCommsRequestToken = '';
                 this.discoverSchoolComms = [];
+                this.discoverSchoolCommsHtml = '';
                 this.discoverSchoolCommsLoading = false;
                 this.discoverSchoolCommsLoadedFor = '';
                 this.discoverSchoolCommsError = '';
@@ -516,11 +518,46 @@ discoverSelectedIds: [],
                     this.$nextTick(() => this.hydrateDiscoverSchoolDetails(drawerId));
                 }
             },
+            escapeDiscoverCommsHtml(value) {
+                return String(value ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            },
+            buildDiscoverCommunicationsHtml(rows = []) {
+                const safeRows = Array.isArray(rows) ? rows : [];
+                return safeRows.map((row) => {
+                    const direction = String(row?.direction || '').toLowerCase() === 'inbound' ? 'inbound' : 'outbound';
+                    const directionClass = direction === 'inbound' ? ' is-inbound' : ' is-outbound';
+                    const arrow = direction === 'inbound' ? '&#8601;' : '&#8599;';
+                    const title = this.escapeDiscoverCommsHtml(row?.title || 'Conversation activity');
+                    const preview = this.escapeDiscoverCommsHtml(row?.preview || 'No message preview available.');
+                    const dateLabel = this.escapeDiscoverCommsHtml(row?.date_label || '');
+                    const opened = row?.opened ? ' &middot; Opened' : '';
+                    const reply = row?.reply ? ' &middot; Reply' : '';
+                    return '<div class="rc-school-comms-row-v123">'
+                        + '<span class="rc-school-comms-direction-v123' + directionClass + '">' + arrow + '</span>'
+                        + '<div class="rc-school-comms-copy-v123">'
+                        + '<strong>' + title + '</strong>'
+                        + '<span>' + preview + '</span>'
+                        + '<small>' + dateLabel + opened + reply + '</small>'
+                        + '</div></div>';
+                }).join('');
+            },
+            refreshDiscoverCommunicationsHtml() {
+                this.discoverSchoolCommsHtml = this.buildDiscoverCommunicationsHtml(this.discoverSchoolComms);
+            },
             async loadDiscoverCommunications(force = false) {
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                 if (!id) return;
                 if (this.discoverSchoolCommsLoading && !force) return;
-                if (!force && this.discoverSchoolCommsLoadedFor === id) return;
+                if (!force && this.discoverSchoolCommsLoadedFor === id) {
+                    if (this.discoverSchoolComms.length === 0 || this.discoverSchoolCommsHtml) return;
+                    this.refreshDiscoverCommunicationsHtml();
+                    return;
+                }
 
                 const userKey = String(this.rcCatalogUserKey || 'guest');
                 window.__plyrRcSchoolCommsByUser = window.__plyrRcSchoolCommsByUser || {};
@@ -534,6 +571,7 @@ discoverSelectedIds: [],
                 // The server still remains the source of truth on a forced refresh.
                 if (!force && cachedRows && cachedAt && (Date.now() - cachedAt) < 120000) {
                     this.discoverSchoolComms = cachedRows.map(row => ({ ...row }));
+                    this.refreshDiscoverCommunicationsHtml();
                     this.discoverSchoolCommsLoadedFor = id;
                     this.discoverSchoolCommsLoading = false;
                     this.discoverSchoolCommsError = '';
@@ -550,8 +588,10 @@ discoverSelectedIds: [],
 
                     // Ignore a late response if the drawer changed school, closed, or a newer
                     // communications request superseded this one.
-                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
-                    if (this.discoverSchoolCommsRequestToken !== requestToken || currentId !== id || !this.schoolDrawerOpen) return;
+                    // openGlobalSchool()/closeDiscoverSchool() invalidate the request token.
+                    // Do not compare the mutable drawer id again here: a concurrent school-detail
+                    // hydration can normalize identifiers while this request is in flight.
+                    if (this.discoverSchoolCommsRequestToken !== requestToken || !this.schoolDrawerOpen) return;
 
                     const normalizedRows = Array.isArray(rows)
                         ? rows.filter(row => row && typeof row === 'object').map(row => ({ ...row }))
@@ -560,6 +600,7 @@ discoverSelectedIds: [],
                     // Replace the array reference so Alpine's x-if/x-for dependency is
                     // guaranteed to invalidate after the async Livewire return.
                     this.discoverSchoolComms = normalizedRows;
+                    this.refreshDiscoverCommunicationsHtml();
                     this.discoverSchoolCommsLoadedFor = id;
                     this.discoverSchoolCommsError = '';
                     bucket[id] = {
@@ -572,6 +613,7 @@ discoverSelectedIds: [],
                     console.error('Unable to load school communication history.', error);
                     if (this.discoverSchoolCommsRequestToken === requestToken) {
                         this.discoverSchoolComms = [];
+                        this.discoverSchoolCommsHtml = '';
                         this.discoverSchoolCommsLoadedFor = '';
                         this.discoverSchoolCommsError = 'Couldn't load communication history. Please retry.';
                     }
@@ -723,14 +765,15 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesLoading = false;
                 this.discoverSchoolCoachesLoadedFor = '';
                 this.discoverSchoolCoachesError = '';
+                this.discoverSchoolComms = [];
+                this.discoverSchoolCommsHtml = '';
+                this.discoverSchoolCommsLoadedFor = '';
+                this.discoverSchoolCommsRequestToken = '';
+                this.discoverSchoolCommsError = '';
                 this.discoverSchoolScoreRequest = '';
                 this.discoverSchoolScoreLoadedFor = '';
                 this.discoverSchoolScoreLoading = false;
-                this.discoverSchoolCommsRequestToken = '';
                 this.discoverSchoolCommsLoading = false;
-                this.discoverSchoolCommsLoadedFor = '';
-                this.discoverSchoolCommsError = '';
-                this.discoverSchoolComms = [];
                 this.optimisticSchool = this.emptyDrawerSchool();
                 // v110: explicit close event is also consumed by any nested Discover
                 // controller, so a stale Alpine subtree cannot immediately repaint it.
@@ -13555,24 +13598,12 @@ CSS;
                         <div class="rc-school-comms-loading-v123" x-show="discoverSchoolCommsLoading">
                             <span class="rc-spinner-mini"></span><span>Loading conversation history…</span>
                         </div>
-                        <template x-if="!discoverSchoolCommsLoading && discoverSchoolComms.length">
-                            <div class="rc-school-comms-list-v123">
-                                <template x-for="row in discoverSchoolComms" :key="row.id">
-                                    <div class="rc-school-comms-row-v123">
-                                        <span class="rc-school-comms-direction-v123" x-bind:class="row.direction === 'inbound' ? 'is-inbound' : 'is-outbound'" x-text="row.direction === 'inbound' ? '↙' : '↗'"></span>
-                                        <div class="rc-school-comms-copy-v123">
-                                            <strong x-text="row.title || 'Conversation activity'"></strong>
-                                            <span x-text="row.preview || 'No message preview available.'"></span>
-                                            <small>
-                                                <span x-text="row.date_label || ''"></span>
-                                                <span x-show="row.opened"> · Opened</span>
-                                                <span x-show="row.reply"> · Reply</span>
-                                            </small>
-                                        </div>
-                                    </div>
-                                </template>
-                            </div>
-                        </template>
+                        <div
+                            class="rc-school-comms-list-v123"
+                            x-cloak
+                            x-show="!discoverSchoolCommsLoading && !discoverSchoolCommsError && discoverSchoolComms.length > 0"
+                            x-html="discoverSchoolCommsHtml"
+                        ></div>
                         <div class="rc-empty rc-school-comms-error-v124" x-cloak x-show="!discoverSchoolCommsLoading && discoverSchoolCommsError">
                             <strong>Couldn't load communication history.</strong>
                             <span x-text="discoverSchoolCommsError"></span>
