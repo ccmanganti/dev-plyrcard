@@ -595,7 +595,7 @@ trait InteractsWithCoachDatabase
             $this->lists = app(LocalRecruitingDatabaseService::class)->lists($user);
         }
 
-        if (in_array($section, ['campaigns', 'compose'], true) && empty($this->templates)) {
+        if ($section === 'campaigns' && empty($this->templates)) {
             $this->loadTemplates();
         }
 
