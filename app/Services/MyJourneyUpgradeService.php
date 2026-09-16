@@ -30,15 +30,12 @@ class MyJourneyUpgradeService
         }
 
         $billing = $this->billingProfiles->get($user);
-        if (! $this->billingProfiles->isComplete($billing)) {
-            return array_merge([
-                'success' => false,
-                'completed' => false,
-                'error' => true,
-                'reason' => 'billing_profile_required',
-                'message' => 'Complete your billing information to continue with secure checkout.',
-            ], $this->billingProfiles->requirementPayload($user, $billing));
-        }
+
+        // The hosted HighLevel survey is the purchasing form. It collects the
+        // billing address and payment details itself, so an incomplete local
+        // BillingInformation row must never divert an upgrade into PLYRCARD's
+        // native billing form. We only prime enough identity to associate the
+        // hosted checkout with the signed-in player.
 
         $plan = $this->plan();
         $recurring = (int) ($plan['recurring_amount_cents'] ?? 4900);
@@ -90,13 +87,13 @@ class MyJourneyUpgradeService
                 'ghl_sync_status' => 'my_journey_upgrade_contact_error',
             ])->save();
 
-            return array_merge([
+            return [
                 'success' => false,
                 'completed' => false,
                 'error' => true,
-                'reason' => 'billing_contact_unavailable',
-                'message' => 'Your billing information was saved, but the billing contact could not be connected yet. Please review it and try again.',
-            ], $this->billingProfiles->requirementPayload($user, $billing));
+                'reason' => 'checkout_contact_unavailable',
+                'message' => 'Secure checkout could not be connected to your PLYRCARD account. Please try again shortly.',
+            ];
         }
 
         $checkoutUrl = $this->checkoutUrl($user, $billing, $subscriberContactId, $plan);

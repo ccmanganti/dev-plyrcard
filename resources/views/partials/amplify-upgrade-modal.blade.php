@@ -189,17 +189,11 @@
                     statusCopy.textContent = data.message || (data.display_due_today ? `${data.display_due_today} due today.` : 'Complete checkout to continue.');
                     pollTimer = setTimeout(poll, 1800);
                 } catch (e) {
-                    if (['billing_profile_required', 'billing_contact_unavailable'].includes(e.data?.reason) || /billing information|billing profile|billing contact/i.test(String(e.message || ''))) {
-                        const values = e.data?.billing || {};
-                        Object.entries(values).forEach(([key, value]) => { const field = billingForm?.elements?.namedItem(key); if (field && value != null) field.value = value; });
-                        if (billingForm?.elements?.billing_country && !billingForm.elements.billing_country.value) billingForm.elements.billing_country.value = 'US';
-                        show(billing);
-                        statusCopy.textContent = 'Save your billing information, then checkout will continue automatically.';
-                    } else {
-                        show(error);
-                        errorCopy.textContent = e.message || 'Please try again.';
-                        statusCopy.textContent = 'Checkout was not started.';
-                    }
+                    // Purchasing always happens in the hosted HighLevel survey.
+                    // Do not replace the checkout iframe with PLYRCARD's native billing form.
+                    show(error);
+                    errorCopy.textContent = e.message || 'Please try again.';
+                    statusCopy.textContent = 'Secure checkout was not started.';
                 } finally {
                     starting = false;
                 }

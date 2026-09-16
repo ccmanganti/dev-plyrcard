@@ -2035,15 +2035,11 @@
             q('[data-lr-checkout-status]').textContent = data.message || 'Complete checkout below to continue.';
             lockerCheckoutTimer = setTimeout(pollLockerCheckout, 1800);
         } catch (error) {
-            const payload = error?.payload || {};
-            if (payload.reason === 'billing_profile_required' || payload.reason === 'billing_contact_unavailable') {
-                showLockerCheckoutBilling(payload);
-                if (payload.message) showToast(payload.message, payload.reason === 'billing_contact_unavailable');
-            } else {
-                showLockerCheckoutPart(q('[data-lr-checkout-error]'));
-                q('[data-lr-checkout-error-copy]').textContent = error?.message || 'Please try again.';
-                q('[data-lr-checkout-status]').textContent = 'Checkout was not started.';
-            }
+            // Upgrade purchases always belong in the hosted HighLevel survey.
+            // Never switch the Upgrade screen to the native billing-profile form.
+            showLockerCheckoutPart(q('[data-lr-checkout-error]'));
+            q('[data-lr-checkout-error-copy]').textContent = error?.message || 'Please try again.';
+            q('[data-lr-checkout-status]').textContent = 'Secure checkout was not started.';
         } finally {
             lockerCheckoutStarting = false;
         }
