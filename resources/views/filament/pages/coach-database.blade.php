@@ -655,6 +655,16 @@ discoverSelectedIds: [],
 
                 this.closeDiscoverSchool();
 
+                // Compose templates are rendered server-side. If this persistent shell was
+                // mounted from Dashboard/Inbox/etc., the hidden Compose panel may not have
+                // its template options yet. Navigate once to the Compose route so mount()
+                // loads the templates before the dropdown is shown.
+                const composePanel = document.querySelector('[data-rc-client-section="compose"]');
+                if (composePanel && composePanel.dataset.rcServerHydrated !== '1') {
+                    window.location.assign(href);
+                    return;
+                }
+
                 const activated = typeof window.__plyrRcActivateSectionClientOnly === 'function'
                     ? window.__plyrRcActivateSectionClientOnly('compose', href, false)
                     : false;
@@ -12167,7 +12177,7 @@ CSS;
 
         {{-- v118: Compose school/coach selection is browser-local; the send API is touched only when sending. --}}
         
-<section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
+<section class="rc-client-panel-v1033" data-rc-client-section="compose" data-rc-server-hydrated="{{ (in_array((string) ($section ?? ''), ['compose', 'campaigns'], true) || ! empty($templates ?? [])) ? '1' : '0' }}" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
             <script>
                 (() => {
                     if (window.__rcComposeLegacyOpenerGuardV82) return;
@@ -16901,8 +16911,8 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     };
 
     const sectionNeedsServerHydration = (section) => {
-        if (section !== 'campaigns') return false;
-        const panel = document.querySelector('[data-rc-client-section="campaigns"]');
+        if (!['campaigns', 'compose'].includes(section)) return false;
+        const panel = document.querySelector(`[data-rc-client-section="${section}"]`);
         return !!panel && panel.dataset.rcServerHydrated !== '1';
     };
 
@@ -17071,10 +17081,10 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             return;
         }
 
-        // Templates are intentionally loaded server-side. When the persistent shell
-        // was mounted from Dashboard/Inbox/etc., the visible Templates panel exists
-        // but its template list is not hydrated yet. Force one real navigation so
-        // clicking Templates shows the saved templates instead of the empty fallback.
+        // Templates and Compose template options are intentionally loaded server-side.
+        // When the persistent shell was mounted from Dashboard/Inbox/etc., those hidden
+        // panels exist but their template data may not be hydrated yet. Force one real
+        // navigation so the saved templates are present on the first open.
         if (sectionNeedsServerHydration(section)) {
             event.preventDefault();
             event.stopPropagation();
