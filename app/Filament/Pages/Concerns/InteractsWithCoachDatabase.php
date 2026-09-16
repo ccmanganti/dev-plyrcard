@@ -12899,6 +12899,65 @@ protected function ensureComposeBodyHasFooter(): void
         $this->saveComposeAsTemplate();
     }
 
+    public function saveComposeAsTemplateFromClient(array $payload = []): array
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return ['ok' => false, 'message' => 'Your session has expired. Please sign in again.'];
+        }
+
+        $name = trim((string) ($payload['name'] ?? ''));
+        $subject = trim((string) ($payload['subject'] ?? ''));
+        $body = trim((string) ($payload['body'] ?? ''));
+
+        if ($name === '') {
+            return ['ok' => false, 'message' => 'Enter a template name.'];
+        }
+
+        if ($subject === '') {
+            return ['ok' => false, 'message' => 'Add a subject before saving this template.'];
+        }
+
+        if ($body === '') {
+            return ['ok' => false, 'message' => 'Write the email content before saving this template.'];
+        }
+
+        // Compose is often opened through browser-only Recruiting Center navigation,
+        // so do not rely on the server-side section value here. The browser sends the
+        // exact live subject and native-editor HTML that the user can currently see.
+        $this->templateEditorOpen = false;
+        $this->templateIsNew = true;
+        $this->selectedTemplateId = null;
+        $this->previewTemplateId = null;
+        $this->templateName = $name;
+        $this->templateSubject = $subject;
+        $this->templatePreviewText = trim((string) ($payload['preview_text'] ?? $this->campaignPreviewText));
+        $this->templateBody = $body;
+        $this->templateGraphicUrl = trim($this->composeGraphicUrl);
+        $this->templateAttachments = $this->composeAttachments;
+        $this->templateGraphicUpload = null;
+        $this->templateInlineImageUpload = null;
+        $this->templateAttachmentUploads = [];
+
+        $this->saveTemplate();
+
+        $savedId = trim((string) ($this->selectedTemplateId ?? ''));
+        if ($savedId === '') {
+            return ['ok' => false, 'message' => 'Unable to save the template.'];
+        }
+
+        // saveTemplate() refreshes $this->templates. Return the matching Compose option
+        // as well so the open page can add it to the template picker immediately.
+        $template = collect($this->getComposeTemplateOptionsProperty())
+            ->first(fn (array $row): bool => (string) ($row['id'] ?? '') === $savedId);
+
+        return [
+            'ok' => true,
+            'template' => is_array($template) ? $template : null,
+        ];
+    }
+
     public function saveComposeAsTemplate(): void
     {
         $this->templateEditorOpen = false;

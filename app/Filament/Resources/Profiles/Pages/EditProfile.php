@@ -558,29 +558,6 @@ class EditProfile extends Page implements HasForms
                                             ->tel()
                                             ->maxLength(255),
 
-                                        TextInput::make('password')
-                                            ->label('Password')
-                                            ->prefixIcon('heroicon-m-lock-closed')
-                                            ->placeholder('Leave blank to keep current password')
-                                            ->columnSpan(1)
-                                            ->password()
-                                            ->dehydrated(false)
-                                            ->autocomplete('new-password')
-                                            ->revealable()
-                                            ->same('password_confirmation')
-                                            ->nullable()
-                                            ->helperText('Leave blank to keep the current password.'),
-
-                                        TextInput::make('password_confirmation')
-                                            ->label('Confirm Password')
-                                            ->prefixIcon('heroicon-m-lock-closed')
-                                            ->placeholder('Re-enter new password')
-                                            ->columnSpan(1)
-                                            ->password()
-                                            ->autocomplete('new-password')
-                                            ->revealable()
-                                            ->dehydrated(false)
-                                            ->nullable(),
                                     ]),
 
                                 Section::make('Address')

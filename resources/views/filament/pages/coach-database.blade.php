@@ -12292,6 +12292,13 @@ CSS;
                 .rc-compose-editor-foot-v45 { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.6rem .7rem; border-top:1px solid var(--rc-border); color:var(--rc-muted); font-size:.75rem; }
                 .rc-compose-required-v114.is-missing { border-color:#ef4444!important; box-shadow:0 0 0 2px rgba(239,68,68,.10)!important; }
                 .rc-compose-recipient-bar-v45.rc-compose-required-v114.is-missing { border:1px solid #ef4444!important; border-radius:.65rem; padding:.48rem; }
+                .rc-compose-save-template-wrap-v115 { position:relative; display:inline-flex; }
+                .rc-compose-save-template-popover-v115 { position:absolute; z-index:95; top:calc(100% + .5rem); right:0; width:min(21rem,86vw); border:1px solid var(--rc-border); border-radius:.85rem; background:var(--rc-surface); color:var(--rc-text); box-shadow:0 18px 48px rgba(15,23,42,.18); padding:.8rem; display:grid; gap:.65rem; }
+                .rc-compose-save-template-popover-v115 strong { font-size:.82rem; line-height:1.2; }
+                .rc-compose-save-template-popover-v115 p { margin:0; color:var(--rc-muted); font-size:.72rem; line-height:1.35; }
+                .rc-compose-save-template-popover-v115 .rc-input { width:100%; }
+                .rc-compose-save-template-popover-actions-v115 { display:flex; justify-content:flex-end; gap:.45rem; }
+                .rc-compose-save-template-error-v115 { color:#dc2626; font-size:.72rem; font-weight:650; line-height:1.35; }
                 .rc-compose-actions-v45 .rc-btn.is-compose-disabled-v114,
                 .rc-compose-actions-v45 .rc-btn:disabled.is-compose-disabled-v114 { background:#e5e7eb!important; border-color:#d1d5db!important; color:#9ca3af!important; box-shadow:none!important; cursor:not-allowed!important; opacity:1!important; transform:none!important; }
                 .dark .rc-compose-actions-v45 .rc-btn.is-compose-disabled-v114,
@@ -12632,11 +12639,104 @@ CSS;
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" wire:click="openSaveComposeTemplatePrompt" wire:loading.attr="disabled" wire:target="openSaveComposeTemplatePrompt">
-                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
-                            <span wire:loading.remove wire:target="openSaveComposeTemplatePrompt">Save as Template</span>
-                            <span wire:loading.flex wire:target="openSaveComposeTemplatePrompt" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
-                        </button>
+                        <div
+                            class="rc-compose-save-template-wrap-v115"
+                            x-data="{
+                                open:false,
+                                name:'',
+                                saving:false,
+                                error:'',
+                                openPrompt() {
+                                    if (this.saving) return;
+                                    const subject = String(document.querySelector('[data-rc-compose-subject]')?.value || '').trim();
+                                    if (!this.name) this.name = subject;
+                                    this.error = '';
+                                    this.open = !this.open;
+                                    
+                                },
+                                async saveTemplate() {
+                                    if (this.saving) return;
+                                    const templateName = String(this.name || '').trim();
+                                    if (!templateName) {
+                                        this.error = 'Enter a template name.';
+                                        return;
+                                    }
+
+                                    const composePage = document.querySelector('.rc-compose-page-v45') || document;
+                                    const subject = String(composePage.querySelector('[data-rc-compose-subject]')?.value || '').trim();
+                                    const nativeEditor = window.__plyrNativeEditors?.campaignBody;
+                                    const editorElement = composePage.querySelector('[data-plyr-native-editor=campaign-body]');
+                                    const body = String(
+                                        (nativeEditor && typeof nativeEditor.serializeEditorHtml === 'function' ? nativeEditor.serializeEditorHtml() : '')
+                                        || editorElement?.innerHTML
+                                        || ''
+                                    ).trim();
+
+                                    if (!subject) { this.error = 'Add a subject before saving this template.'; return; }
+                                    if (!body || !String(editorElement?.innerText || '').trim()) { this.error = 'Write the email content before saving this template.'; return; }
+
+                                    this.saving = true;
+                                    this.error = '';
+                                    try {
+                                        nativeEditor?.syncNow?.();
+                                        const result = await $wire.call('saveComposeAsTemplateFromClient', {
+                                            name: templateName,
+                                            subject: subject,
+                                            body: body,
+                                        });
+
+                                        if (!result?.ok) {
+                                            this.error = String(result?.message || 'Unable to save the template.');
+                                            return;
+                                        }
+
+                                        this.open = false;
+                                        this.name = '';
+                                        window.dispatchEvent(new CustomEvent('rc-compose-template-created', { detail: { template: result.template || null } }));
+                                    } catch (e) {
+                                        console.error('Unable to save Compose email as template.', e);
+                                        this.error = 'Unable to save the template. Please try again.';
+                                    } finally {
+                                        this.saving = false;
+                                    }
+                                },
+                            }"
+                            x-on:keydown.escape.window="if (!saving) open=false"
+                        >
+                            <button class="rc-btn" type="button" x-bind:disabled="saving" x-on:click.prevent.stop="openPrompt()">
+                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
+                                <span x-show="!saving">Save as Template</span>
+                                <span x-cloak x-show="saving" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                            </button>
+                            <div
+                                x-cloak
+                                x-show="open"
+                                x-on:click.outside="if (!saving) open=false"
+                                class="rc-compose-save-template-popover-v115"
+                            >
+                                <div>
+                                    <strong>Save as Template</strong>
+                                    <p>Give this email a name so you can reuse it later.</p>
+                                </div>
+                                <input
+                                    x-ref="nameInput"
+                                    class="rc-input"
+                                    type="text"
+                                    maxlength="120"
+                                    placeholder="Template name"
+                                    x-model="name"
+                                    x-on:keydown.enter.prevent="saveTemplate()"
+                                >
+                                <div x-cloak x-show="error" class="rc-compose-save-template-error-v115" x-text="error"></div>
+                                <div class="rc-compose-save-template-popover-actions-v115">
+                                    <button class="rc-btn" type="button" x-bind:disabled="saving" x-on:click.prevent="open=false">Cancel</button>
+                                    <button class="rc-btn rc-btn-primary" type="button" x-bind:disabled="saving" x-on:click.prevent="saveTemplate()">
+                                        <span x-show="!saving">Save Template</span>
+                                        <span x-cloak x-show="saving" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         <button class="rc-btn" type="button" data-rc-local-action data-rc-compose-preview-instant-v99 x-on:click.prevent.stop="openPreview()" x-bind:disabled="!composeReady" x-bind:class="{ 'is-compose-disabled-v114': !composeReady }">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
@@ -12724,7 +12824,17 @@ CSS;
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
                                     <input class="rc-input rc-compose-required-v114" style="width:100%" placeholder="Subject line" data-rc-compose-subject wire:model="campaignSubject" x-bind:class="{ 'is-missing': !composeSubjectReady }" />
-                                    <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'', fallbackTemplates:[], loadingTemplates:false, templateFetchFinished:false, needsTemplateFallback:@js(count($this->composeTemplateOptions) === 0) }">
+                                    <div
+                                        class="rc-compose-template-wrap-v45"
+                                        x-data="{ open:false, loadingTemplateId:'', fallbackTemplates:[], loadingTemplates:false, templateFetchFinished:false, needsTemplateFallback:@js(count($this->composeTemplateOptions) === 0), serverTemplateIds:@js(collect($this->composeTemplateOptions)->pluck('id')->map(fn ($id) => (string) $id)->values()->all()) }"
+                                        x-on:rc-compose-template-created.window="
+                                            const template = $event.detail?.template;
+                                            const id = String(template?.id || '').trim();
+                                            if (!id) return;
+                                            fallbackTemplates = [template, ...fallbackTemplates.filter((row) => String(row?.id || '') !== id)];
+                                            templateFetchFinished = true;
+                                        "
+                                    >
                                         <button class="rc-btn" type="button" x-on:click="
                                             open=!open;
                                             if (open && needsTemplateFallback && fallbackTemplates.length === 0 && !loadingTemplates) {
@@ -12790,46 +12900,46 @@ CSS;
                                                 <div class="rc-subtle" style="padding:.5rem" x-show="loadingTemplates" x-cloak>
                                                     <span style="display:inline-flex;align-items:center;gap:.45rem;"><span class="rc-spinner-mini"></span><span>Loading templates…</span></span>
                                                 </div>
-                                                <template x-for="template in fallbackTemplates" :key="String(template.id || '')">
-                                                    <button
-                                                        type="button"
-                                                        x-bind:class="String(@js((string) ($campaignTemplateId ?? ''))) === String(template.id || '') ? 'is-active' : ''"
-                                                        data-rc-local-action
-                                                        x-bind:disabled="loadingTemplateId !== ''"
-                                                        x-on:click.prevent.stop="
-                                                            const id = String(template.id || '').trim();
-                                                            if (!id || loadingTemplateId) return;
-                                                            const bodyBase64 = String(template.compose_body_editor_base64 || '');
-                                                            const bodyKey = 'compose-local-' + id + '-' + (String(template.compose_body_editor_key || '') || Date.now());
-                                                            if (bodyBase64 && window.rcRememberComposeTemplateBody) {
-                                                                window.rcRememberComposeTemplateBody(id, bodyBase64, bodyKey);
-                                                            }
-                                                            if (bodyBase64 && window.rcApplyComposeTemplateBodyBase64) {
-                                                                window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
-                                                                window.__plyrComposeEditorPendingBodyKey = bodyKey;
-                                                                window.__plyrComposeEditorFullBodyBase64 = bodyBase64;
-                                                                window.__plyrComposeEditorFullBodyKey = bodyKey;
-                                                                window.rcApplyComposeTemplateBodyBase64(bodyBase64, bodyKey, true);
-                                                            }
-                                                            loadingTemplateId = id;
-                                                            open = false;
-                                                            $wire.call('useTemplateForCompose', id, true)
-                                                                .catch((error) => console.error(error))
-                                                                .finally(() => { loadingTemplateId = ''; });
-                                                        "
-                                                    >
-                                                        <span style="display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;">
-                                                            <span style="min-width:0;display:block;">
-                                                                <strong x-text="template.name || 'Untitled Template'"></strong>
-                                                                <span x-text="template.compose_subject_preview || 'Recruiting email'"></span>
-                                                            </span>
-                                                            <span x-show="loadingTemplateId === String(template.id || '')" x-cloak class="rc-compose-template-loading-v83"><span class="rc-spinner-mini"></span></span>
-                                                        </span>
-                                                        <div class="rc-compose-template-preview-v45" x-text="template.compose_body_preview || 'Personalized message preview'"></div>
-                                                    </button>
-                                                </template>
-                                                <div class="rc-subtle" style="padding:.5rem" x-show="templateFetchFinished && !loadingTemplates && fallbackTemplates.length === 0" x-cloak>No templates found.</div>
                                             @endforelse
+                                            <template x-for="template in fallbackTemplates.filter((row) => !serverTemplateIds.includes(String(row?.id || '')))" :key="String(template.id || '')">
+                                                <button
+                                                    type="button"
+                                                    x-bind:class="String(@js((string) ($campaignTemplateId ?? ''))) === String(template.id || '') ? 'is-active' : ''"
+                                                    data-rc-local-action
+                                                    x-bind:disabled="loadingTemplateId !== ''"
+                                                    x-on:click.prevent.stop="
+                                                        const id = String(template.id || '').trim();
+                                                        if (!id || loadingTemplateId) return;
+                                                        const bodyBase64 = String(template.compose_body_editor_base64 || '');
+                                                        const bodyKey = 'compose-local-' + id + '-' + (String(template.compose_body_editor_key || '') || Date.now());
+                                                        if (bodyBase64 && window.rcRememberComposeTemplateBody) {
+                                                            window.rcRememberComposeTemplateBody(id, bodyBase64, bodyKey);
+                                                        }
+                                                        if (bodyBase64 && window.rcApplyComposeTemplateBodyBase64) {
+                                                            window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
+                                                            window.__plyrComposeEditorPendingBodyKey = bodyKey;
+                                                            window.__plyrComposeEditorFullBodyBase64 = bodyBase64;
+                                                            window.__plyrComposeEditorFullBodyKey = bodyKey;
+                                                            window.rcApplyComposeTemplateBodyBase64(bodyBase64, bodyKey, true);
+                                                        }
+                                                        loadingTemplateId = id;
+                                                        open = false;
+                                                        $wire.call('useTemplateForCompose', id, true)
+                                                            .catch((error) => console.error(error))
+                                                            .finally(() => { loadingTemplateId = ''; });
+                                                    "
+                                                >
+                                                    <span style="display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;">
+                                                        <span style="min-width:0;display:block;">
+                                                            <strong x-text="template.name || 'Untitled Template'"></strong>
+                                                            <span x-text="template.compose_subject_preview || 'Recruiting email'"></span>
+                                                        </span>
+                                                        <span x-show="loadingTemplateId === String(template.id || '')" x-cloak class="rc-compose-template-loading-v83"><span class="rc-spinner-mini"></span></span>
+                                                    </span>
+                                                    <div class="rc-compose-template-preview-v45" x-text="template.compose_body_preview || 'Personalized message preview'"></div>
+                                                </button>
+                                            </template>
+                                            <div class="rc-subtle" style="padding:.5rem" x-show="templateFetchFinished && !loadingTemplates && @js(count($this->composeTemplateOptions) === 0) && fallbackTemplates.length === 0" x-cloak>No templates found.</div>
                                         </div>
                                     </div>
                                 </div>
@@ -13040,7 +13150,7 @@ CSS;
                 .rc-template-card-main-v50 h3{margin:0;color:var(--rc-text);font-size:1rem;line-height:1.2;font-weight:760;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
                 .rc-template-card-main-v50 p{margin:0;color:var(--rc-muted);font-size:.8rem;line-height:1.3;display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
                 .rc-template-subject-v50{border-radius:.58rem;background:rgba(148,163,184,.11);padding:.55rem .6rem;color:var(--rc-text);font-size:.73rem;line-height:1.32;min-height:2.35rem}.rc-template-subject-v50 strong{font-weight:720;color:var(--rc-text)}
-                .rc-template-card-actions-v50{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.45rem;align-items:center;margin-top:auto}.rc-template-delete-v52{width:1.75rem;height:1.75rem;border:0;background:transparent;color:var(--rc-muted);display:grid;place-items:center;border-radius:.5rem;cursor:pointer}.rc-template-delete-v52:hover{background:rgba(239,68,68,.08);color:#ef4444}.rc-template-body-v52{color:var(--rc-muted);font-size:.74rem;line-height:1.42;min-height:3.25rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.rc-template-use-v52{height:2.3rem;border:0;border-radius:.62rem;background:#ff5f3f;color:#fff;font-weight:720;font-size:.82rem;box-shadow:0 8px 18px rgba(255,95,63,.18);display:inline-flex;align-items:center;justify-content:center;gap:.36rem;cursor:pointer}.rc-template-edit-v52,.rc-template-duplicate-v114{height:2.3rem;border:1px solid var(--rc-border);border-radius:.62rem;background:var(--rc-surface);color:var(--rc-text);font-weight:690;font-size:.82rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:0 .7rem;cursor:pointer}.rc-template-duplicate-v114:hover,.rc-template-edit-v52:hover{border-color:rgba(255,99,56,.38);color:#ff6338}.rc-template-card-actions-v50 button:disabled{cursor:wait;opacity:.68}
+                .rc-template-card-actions-v50{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.45rem;align-items:center;margin-top:auto}.rc-template-delete-v52{width:1.75rem;height:1.75rem;border:0;background:transparent;color:var(--rc-muted);display:grid;place-items:center;border-radius:.5rem;cursor:pointer}.rc-template-delete-v52:hover{background:rgba(239,68,68,.08);color:#ef4444}.rc-template-body-v52{color:var(--rc-muted);font-size:.74rem;line-height:1.42;min-height:3.25rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.rc-template-use-v52{height:2.3rem;border:0;border-radius:.62rem;background:#ff5f3f;color:#fff;font-weight:720;font-size:.82rem;box-shadow:0 8px 18px rgba(255,95,63,.18);display:inline-flex;align-items:center;justify-content:center;gap:.36rem;cursor:pointer}.rc-template-edit-v52{height:2.3rem;border:1px solid var(--rc-border);border-radius:.62rem;background:var(--rc-surface);color:var(--rc-text);font-weight:690;font-size:.82rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:0 .7rem;cursor:pointer}.rc-template-edit-v52:hover{border-color:rgba(255,99,56,.38);color:#ff6338}.rc-template-card-actions-v50 button:disabled{cursor:wait;opacity:.68}
                 .rc-template-editor-layout-v50{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;align-items:start}
                 .rc-template-editor-card-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.07);padding:1.05rem;display:grid;gap:.95rem}
                 .rc-template-ai-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.07);padding:1rem;position:sticky;top:1rem;display:grid;gap:.8rem}
@@ -13099,9 +13209,9 @@ CSS;
                 .rc-template-subject-v50{font-size:.73rem!important;line-height:1.32!important;min-height:2.35rem!important;padding:.55rem .6rem!important;border-radius:.58rem!important}
                 .rc-template-subject-v50 strong{font-weight:720!important}
                 .rc-template-body-v52{font-size:.74rem!important;line-height:1.42!important;min-height:3.25rem!important}
-                .rc-template-use-v52,.rc-template-edit-v52,.rc-template-duplicate-v114{height:2.3rem!important;border-radius:.62rem!important;font-size:.82rem!important}
+                .rc-template-use-v52,.rc-template-edit-v52{height:2.3rem!important;border-radius:.62rem!important;font-size:.82rem!important}
                 .rc-template-use-v52{font-weight:720!important;box-shadow:0 8px 18px rgba(255,95,63,.18)!important}
-                .rc-template-edit-v52,.rc-template-duplicate-v114{font-weight:690!important;padding:0 .7rem!important}
+                .rc-template-edit-v52{font-weight:690!important;padding:0 .7rem!important}
                 .rc-template-delete-v52{width:1.75rem!important;height:1.75rem!important}
 @media(max-width:1180px){.rc-template-grid-v50{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-template-editor-layout-v50{grid-template-columns:1fr}}
                 @media(max-width:720px){.rc-template-grid-v50{grid-template-columns:1fr}.rc-templates-head-v50,.rc-template-list-top-v50{align-items:stretch;flex-direction:column}.rc-template-search-v50{min-width:0}}
@@ -13196,10 +13306,6 @@ CSS;
                                     ">
                                         <span x-show="!usingTemplate" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Use Template</span>
                                         <span x-cloak x-show="usingTemplate" class="rc-loading-inline" style="color:inherit"><span class="rc-spinner-mini"></span> Opening</span>
-                                    </button>
-                                    <button class="rc-template-duplicate-v114" type="button" wire:click="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})" title="Duplicate and save as a new template">
-                                        <span wire:loading.remove wire:target="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})">Duplicate</span>
-                                        <span wire:loading.flex wire:target="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})" class="rc-loading-inline"><span class="rc-spinner-mini"></span></span>
                                     </button>
                                     <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__rcTemplateClientMode = 'edit'; window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now()); window.__plyrTemplateEditorFullBodyBase64 = window.__plyrTemplateEditorPendingBodyBase64; window.__plyrTemplateEditorFullBodyKey = window.__plyrTemplateEditorPendingBodyKey;">
                                         <span wire:loading.remove wire:target="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg> Edit</span>
