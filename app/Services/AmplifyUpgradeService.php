@@ -61,50 +61,14 @@ class AmplifyUpgradeService
 
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
 
-        if ($contactId === '') {
-            // Create/reuse the dedicated payer contact before opening either hosted
-            // checkout. Free enrollment only needs the player identity here; the hosted
-            // $549 form collects the billing address and payment details itself.
-            try {
-                $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
-                $billing->refresh();
-                $user->refresh();
-            } catch (\Throwable $exception) {
-                Log::warning('Amplify checkout could not ensure billing contact.', [
-                    'user_id' => $user->getKey(),
-                    'billing_id' => $billing->getKey(),
-                    'error' => $exception->getMessage(),
-                ]);
-            }
-        }
-
-        if ($contactId === '') {
-            if ($isExistingJourneySubscriber) {
-                return array_merge([
-                    'success' => false,
-                    'completed' => false,
-                    'reason' => 'billing_contact_unavailable',
-                    'message' => 'Your existing My Journey billing contact could not be connected yet. Please review your billing information and try again.',
-                ], $this->billingProfiles->requirementPayload($user, $billing));
-            }
-
-            // Do not send a Free player to the local billing-address recovery screen.
-            // The hosted $549 Amplify form is the enrollment/billing/payment form.
-            return [
-                'success' => false,
-                'completed' => false,
-                'reason' => 'checkout_contact_unavailable',
-                'message' => 'Secure checkout could not be connected to your PLYRCARD account. Please try again shortly.',
-            ];
-        }
-
-        $credentials = $this->billingAccount->credentials($billing);
-        if (($credentials['location_id'] ?? '') === '' || ($credentials['token'] ?? '') === '') {
-            return [
-                'success' => false,
-                'completed' => false,
-                'message' => 'Secure checkout is temporarily unavailable. Please try again shortly.',
-            ];
+        // Existing My Journey members may already have a subscriber contact even
+        // when its local pointer is missing. Recover it if possible, but never block
+        // the one-time Amplify form. Free users intentionally do not need a billing
+        // contact first: the combined Amplify + My Journey form collects it.
+        if ($contactId === '' && $isExistingJourneySubscriber) {
+            $contactId = trim((string) ($this->billingAccount->resolveSubscriberContact($user, $billing, true) ?: ''));
+            $billing->refresh();
+            $user->refresh();
         }
 
         $plan = $this->planConfig();
@@ -153,7 +117,7 @@ class AmplifyUpgradeService
         $checkout = Cache::get($this->cacheKey($user), []);
         $checkout = is_array($checkout) ? $checkout : [];
 
-        if (empty($checkout['started_at']) || empty($checkout['subscriber_contact_id'])) {
+        if (empty($checkout['started_at'])) {
             return [
                 'success' => false,
                 'completed' => false,
@@ -176,7 +140,23 @@ class AmplifyUpgradeService
             ];
         }
 
-        $contactId = trim((string) $checkout['subscriber_contact_id']);
+        $contactId = trim((string) ($checkout['subscriber_contact_id'] ?? ''));
+        if ($contactId === '') {
+            $needsJourneySubscription = (string) ($checkout['previous_plan_key'] ?? 'free') !== 'my-journey';
+            $contactId = trim((string) ($this->billingAccount->resolveSubscriberContact(
+                $user,
+                $billing,
+                $needsJourneySubscription,
+            ) ?: ''));
+
+            if ($contactId === '') {
+                return $this->pending('waiting_for_checkout_contact');
+            }
+
+            $checkout['subscriber_contact_id'] = $contactId;
+            Cache::put($this->cacheKey($user), $checkout, now()->addMinutes(30));
+        }
+
         $credentials = $this->billingAccount->credentials($billing);
         if (($credentials['location_id'] ?? '') === '' || ($credentials['token'] ?? '') === '') {
             return $this->pending('missing_payment_credentials');

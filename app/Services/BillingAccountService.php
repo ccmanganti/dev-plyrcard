@@ -102,6 +102,111 @@ class BillingAccountService
     }
 
     /**
+     * Resolve a subscriber contact that may have been created by a hosted GHL
+     * checkout. This never creates a contact and therefore never blocks opening
+     * the hosted purchasing form. Existing stored subscriber IDs remain first
+     * priority; otherwise we search by the checkout/account email and prefer a
+     * contact that already owns a subscription.
+     */
+    public function resolveSubscriberContact(
+        User $user,
+        BillingInformation $billing,
+        bool $requireSubscription = false,
+    ): ?string {
+        $existing = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
+        $credentials = $this->credentials($billing);
+        $locationId = trim((string) ($credentials['location_id'] ?? ''));
+        $token = trim((string) ($credentials['token'] ?? ''));
+
+        if ($existing !== '') {
+            if ($locationId !== '') {
+                $this->persistSubscriberContact($user, $billing, $existing, $locationId);
+            }
+            return $existing;
+        }
+
+        if ($locationId === '' || $token === '') {
+            return null;
+        }
+
+        $emails = collect([
+            $billing->billing_email,
+            $user->email,
+            $user->personal_email ?? null,
+        ])->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        foreach ($emails as $email) {
+            try {
+                $response = Http::withHeaders(['Version' => '2021-07-28'])
+                    ->withToken($token)
+                    ->acceptJson()
+                    ->timeout((int) config('ghl.timeout', 20))
+                    ->get($this->baseUrl() . '/contacts/search/duplicate', [
+                        'locationId' => $locationId,
+                        'email' => $email,
+                    ]);
+
+                if ($response->failed()) {
+                    continue;
+                }
+
+                $body = $response->json();
+                $body = is_array($body) ? $body : [];
+                $contacts = collect($body['contacts'] ?? (isset($body['contact']) ? [$body['contact']] : []))
+                    ->filter(fn ($contact) => is_array($contact))
+                    ->filter(fn (array $contact): bool => strtolower(trim((string) ($contact['email'] ?? ''))) === $email)
+                    ->values();
+
+                if ($contacts->isEmpty()) {
+                    continue;
+                }
+
+                // Prefer the contact that owns the recurring subscription. This
+                // avoids accidentally binding billing to the athlete/recruiting
+                // contact when both contacts happen to share an email address.
+                foreach ($contacts as $contact) {
+                    $contactId = trim((string) ($contact['id'] ?? $contact['_id'] ?? ''));
+                    if ($contactId === '') {
+                        continue;
+                    }
+
+                    $subscriptions = $this->listSubscriptions($contactId, $credentials);
+                    if (($subscriptions['success'] ?? false) && $this->chooseSubscription($subscriptions['subscriptions'] ?? [])) {
+                        $this->persistSubscriberContact($user, $billing, $contactId, $locationId);
+                        $this->forgetSyncCache($user);
+                        return $contactId;
+                    }
+                }
+
+                if (! $requireSubscription) {
+                    $fallback = $contacts
+                        ->sortByDesc(fn (array $contact): string => (string) ($contact['dateUpdated'] ?? $contact['dateAdded'] ?? ''))
+                        ->first();
+                    $contactId = trim((string) (($fallback['id'] ?? $fallback['_id'] ?? '') ?: ''));
+
+                    if ($contactId !== '') {
+                        $this->persistSubscriberContact($user, $billing, $contactId, $locationId);
+                        $this->forgetSyncCache($user);
+                        return $contactId;
+                    }
+                }
+            } catch (\Throwable $exception) {
+                Log::debug('Hosted checkout subscriber contact is not available yet.', [
+                    'user_id' => $user->getKey(),
+                    'billing_id' => $billing->getKey(),
+                    'email' => $email,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Cross-reference the manually stored subscriber contact against PLYRCARD's
      * billing subaccount. This hydrates billing contact details, checks the real
      * subscription status, refreshes reusable payment references and aligns the

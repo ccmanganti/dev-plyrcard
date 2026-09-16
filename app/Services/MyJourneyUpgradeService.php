@@ -31,12 +31,9 @@ class MyJourneyUpgradeService
 
         $billing = $this->billingProfiles->get($user);
 
-        // The hosted HighLevel survey is the purchasing form. It collects the
-        // billing address and payment details itself, so an incomplete local
-        // BillingInformation row must never divert an upgrade into PLYRCARD's
-        // native billing form. We only prime enough identity to associate the
-        // hosted checkout with the signed-in player.
-
+        // My Journey checkout itself collects the payer, billing address and card.
+        // A Free account must be able to open it even when no billing profile or
+        // subscriber contact exists yet.
         $plan = $this->plan();
         $recurring = (int) ($plan['recurring_amount_cents'] ?? 4900);
         $setup = (int) ($plan['setup_fee_cents'] ?? 0);
@@ -75,26 +72,11 @@ class MyJourneyUpgradeService
             'registration_meta' => $meta,
         ])->save();
 
-        // Use the same payer/subscriber identity architecture as paid registration.
-        // This populates users.ghl_subscriber_contact_id and mirrors the reference
-        // to BillingInformation without ever storing raw card details in Laravel.
-        $subscriberContactId = $this->billingAccounts->ensureBillingContact($user, $billing);
-        $billing->refresh();
-        $user->refresh();
-
-        if (! $subscriberContactId) {
-            $billing->forceFill([
-                'ghl_sync_status' => 'my_journey_upgrade_contact_error',
-            ])->save();
-
-            return [
-                'success' => false,
-                'completed' => false,
-                'error' => true,
-                'reason' => 'checkout_contact_unavailable',
-                'message' => 'Secure checkout could not be connected to your PLYRCARD account. Please try again shortly.',
-            ];
-        }
+        // Reuse an existing subscriber contact when one is already known, but do
+        // not require or create one before the form opens. The hosted My Journey
+        // survey is the source of the payer/subscription information for a Free
+        // user upgrading for the first time.
+        $subscriberContactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
 
         $checkoutUrl = $this->checkoutUrl($user, $billing, $subscriberContactId, $plan);
 
@@ -141,6 +123,15 @@ class MyJourneyUpgradeService
         $rolesBefore = method_exists($user, 'getRoleNames')
             ? $user->getRoleNames()->values()
             : collect();
+
+        // The first My Journey purchase may create the subscriber contact inside
+        // the hosted survey. Discover that contact only after checkout has begun;
+        // do not make it a prerequisite for displaying the form.
+        if (blank($user->ghl_subscriber_contact_id) && blank($billing->ghl_contact_id)) {
+            $this->billingAccounts->resolveSubscriberContact($user, $billing, true);
+            $billing->refresh();
+            $user->refresh();
+        }
 
         try {
             $verification = $this->paymentVerification->verify($user, $billing);

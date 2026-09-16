@@ -60,49 +60,15 @@ class JumpstartUpgradeService
         }
 
         $contactId = trim((string) ($user->ghl_subscriber_contact_id ?: $billing->ghl_contact_id));
-        if ($contactId === '') {
-            try {
-                $contactId = trim((string) ($this->billingAccount->ensureBillingContact($user, $billing) ?: ''));
-                $billing->refresh();
-                $user->refresh()->loadMissing('roles');
-            } catch (\Throwable $exception) {
-                Log::warning('Jumpstart checkout could not ensure billing contact.', [
-                    'user_id' => $user->getKey(),
-                    'billing_id' => $billing->getKey(),
-                    'error' => $exception->getMessage(),
-                ]);
-            }
-        }
 
-        if ($contactId === '') {
-            if ($isExistingJourneySubscriber) {
-                return array_merge([
-                    'success' => false,
-                    'completed' => false,
-                    'reason' => 'billing_contact_unavailable',
-                    'message' => 'Your existing My Journey billing contact could not be connected yet. Please review your billing information and try again.',
-                ], $this->billingProfiles->requirementPayload($user, $billing));
-            }
-
-            // Do not fall back to the local billing-address recovery form for Free
-            // enrollment. The hosted $198 form is the billing/payment form. If the
-            // payer contact cannot be prepared, surface a retryable checkout error.
-            return [
-                'success' => false,
-                'completed' => false,
-                'reason' => 'checkout_contact_unavailable',
-                'message' => 'Secure checkout could not be connected to your PLYRCARD account. Please try again shortly.',
-            ];
-        }
-
-        $credentials = $this->billingAccount->credentials($billing);
-        if (($credentials['location_id'] ?? '') === '' || ($credentials['token'] ?? '') === '') {
-            return [
-                'success' => false,
-                'completed' => false,
-                'reason' => 'billing_credentials_unavailable',
-                'message' => 'Checkout is temporarily unavailable. Please try again shortly.',
-            ];
+        // Existing My Journey members can reuse their subscription contact for the
+        // service-only checkout. If that pointer is missing, recover it if possible.
+        // Free users intentionally proceed without one because the combined
+        // Jumpstart + My Journey form is where subscription billing is collected.
+        if ($contactId === '' && $isExistingJourneySubscriber) {
+            $contactId = trim((string) ($this->billingAccount->resolveSubscriberContact($user, $billing, true) ?: ''));
+            $billing->refresh();
+            $user->refresh()->loadMissing('roles');
         }
 
         $serviceCents = max(1, (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900));
@@ -155,13 +121,30 @@ class JumpstartUpgradeService
 
         $checkout = Cache::get($this->cacheKey($user), []);
         $checkout = is_array($checkout) ? $checkout : [];
-        if (empty($checkout['started_at']) || empty($checkout['subscriber_contact_id'])) {
+        if (empty($checkout['started_at'])) {
             return ['success' => false, 'completed' => false, 'reason' => 'checkout_not_started', 'message' => 'Start the Jumpstart checkout first.'];
         }
 
         $billing = BillingInformation::query()->where('user_id', $user->getKey())->latest('id')->first();
         if (! $billing) {
             return ['success' => false, 'completed' => false, 'reason' => 'billing_not_found', 'message' => 'Billing information could not be loaded.'];
+        }
+
+        $contactId = trim((string) ($checkout['subscriber_contact_id'] ?? ''));
+        if ($contactId === '') {
+            $needsJourneySubscription = (bool) ($checkout['needs_my_journey'] ?? false);
+            $contactId = trim((string) ($this->billingAccount->resolveSubscriberContact(
+                $user,
+                $billing,
+                $needsJourneySubscription,
+            ) ?: ''));
+
+            if ($contactId === '') {
+                return $this->pending('waiting_for_checkout_contact');
+            }
+
+            $checkout['subscriber_contact_id'] = $contactId;
+            Cache::put($this->cacheKey($user), $checkout, now()->addMinutes(30));
         }
 
         $credentials = $this->billingAccount->credentials($billing);
@@ -177,7 +160,6 @@ class JumpstartUpgradeService
 
         $until = now()->addMinutes(2);
         $expectedCents = max(1, (int) ($checkout['expected_amount_cents'] ?? 14900));
-        $contactId = trim((string) $checkout['subscriber_contact_id']);
         $transactionResult = $this->fetchRows('/payments/transactions', (string) $credentials['location_id'], $contactId, (string) $credentials['token'], $since, $until);
         $rows = $this->successfulRows($transactionResult['rows'] ?? [], $contactId, $since, ['succeeded', 'success', 'successful', 'paid', 'completed', 'captured']);
         $match = $this->matchExpectedAmount($rows, $expectedCents);
