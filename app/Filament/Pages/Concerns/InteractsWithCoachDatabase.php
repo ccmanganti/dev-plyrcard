@@ -235,6 +235,12 @@ trait InteractsWithCoachDatabase
     public bool $showSaveTemplateNamePrompt = false;
     public string $composeTemplateSaveName = '';
 
+    // Account security lives in Recruiting Center > Settings instead of Profile.
+    public string $currentPassword = '';
+    public string $newPassword = '';
+    public string $newPasswordConfirmation = '';
+    public bool $isChangingPassword = false;
+
 
     protected function refreshRecruitingAccountReadiness($user = null, bool $refreshUser = false): void
     {
@@ -12648,6 +12654,7 @@ protected function dashboardSocialClickTotal(Collection $rows, string $platform)
         body: base64_encode($this->templateBody),
         key: $this->templateEditorRefreshKey
     );
+    $this->dispatch('rc-template-editor-client-open', mode: 'new');
 }
 
     protected function extractPlyrcardAttachmentLinks(string $html): array
@@ -13352,6 +13359,8 @@ protected function ensureComposeBodyHasFooter(): void
             ->success()
             ->send();
 
+        // Saving is complete: return both Livewire and Alpine to the template list.
+        $this->templateEditorOpen = false;
         $this->dispatch('rc-template-saved-client', id: (string) $row['id']);
     } catch (\Throwable $exception) {
         Log::error('Unable to save local email template.', [
@@ -15024,6 +15033,65 @@ HTML;
         $this->notificationSettings[$key] = ! (bool) $this->notificationSettings[$key];
         if (Auth::id()) {
             Cache::put('coach-database:notification-settings:' . Auth::id(), $this->notificationSettings, now()->addYear());
+        }
+    }
+
+    public function changeAccountPassword(): void
+    {
+        $user = Auth::user();
+        if (! $user || $this->isChangingPassword) {
+            return;
+        }
+
+        $this->resetErrorBag(['currentPassword', 'newPassword', 'newPasswordConfirmation']);
+
+        $this->validate([
+            'currentPassword' => ['required', 'string'],
+            'newPassword' => ['required', 'string', 'min:8', 'same:newPasswordConfirmation'],
+            'newPasswordConfirmation' => ['required', 'string', 'min:8'],
+        ], [
+            'currentPassword.required' => 'Enter your current password.',
+            'newPassword.required' => 'Enter a new password.',
+            'newPassword.min' => 'Your new password must be at least 8 characters.',
+            'newPassword.same' => 'The new password and confirmation do not match.',
+            'newPasswordConfirmation.required' => 'Confirm your new password.',
+        ]);
+
+        if (! \Illuminate\Support\Facades\Hash::check($this->currentPassword, (string) $user->password)) {
+            $this->addError('currentPassword', 'Your current password is incorrect.');
+            return;
+        }
+
+        $this->isChangingPassword = true;
+
+        try {
+            $user->forceFill([
+                'password' => \Illuminate\Support\Facades\Hash::make($this->newPassword),
+            ])->save();
+
+            $this->currentPassword = '';
+            $this->newPassword = '';
+            $this->newPasswordConfirmation = '';
+            $this->resetValidation(['currentPassword', 'newPassword', 'newPasswordConfirmation']);
+
+            Notification::make()
+                ->title('Settings')
+                ->body('Password updated successfully.')
+                ->success()
+                ->send();
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to update Recruiting Center password.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Settings')
+                ->body('Unable to update your password right now.')
+                ->danger()
+                ->send();
+        } finally {
+            $this->isChangingPassword = false;
         }
     }
 

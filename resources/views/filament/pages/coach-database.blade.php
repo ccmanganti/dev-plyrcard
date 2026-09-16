@@ -10326,7 +10326,7 @@ discoverSelectedIds: [],
 
             <style>
                 .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
-                .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#f59e0b;background:rgba(245,158,11,.12)}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
+                .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#facc15!important;background:rgba(250,204,21,.16)!important;border-color:rgba(250,204,21,.34)!important}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-inbox-star-spinner-v114{width:.9rem!important;height:.9rem!important;border-width:2px!important}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
 
                 .rc-inbox-shell-v56,
                 .rc-inbox-list-v56,
@@ -10815,7 +10815,7 @@ CSS;
                             <div class="rc-inbox-head-actions-v56">
                                 <button type="button" class="rc-inbox-icon-btn-v56" wire:click="refreshConversationsRealtime" wire:loading.attr="disabled" wire:target="refreshConversationsRealtime" title="Refresh conversations" aria-label="Refresh conversations">
                                 <span wire:loading.remove wire:target="refreshConversationsRealtime">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M4 7h11M4 12h16M4 17h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M20 4v7h-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                 </span>
                                 <span wire:loading.flex wire:target="refreshConversationsRealtime" class="rc-spinner-mini"></span>
                                 </button>
@@ -11059,7 +11059,10 @@ CSS;
                                     </span>
                                 </div>
                                 <div class="rc-inbox-mid-actions-v56">
-                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="{{ $selectedStarred ? 'currentColor' : 'none' }}"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
+                                    <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedStarred ? 'is-starred' : '' }}" wire:click="starSelectedConversation" wire:loading.attr="disabled" wire:target="starSelectedConversation" title="{{ $selectedStarred ? 'Remove from Starred' : 'Star coach' }}" aria-pressed="{{ $selectedStarred ? 'true' : 'false' }}">
+                                        <span wire:loading.remove wire:target="starSelectedConversation"><svg viewBox="0 0 24 24" width="20" height="20" fill="{{ $selectedStarred ? 'currentColor' : 'none' }}"><path d="m12 3 2.7 5.47 6.03.88-4.36 4.25 1.03 6-5.4-2.84-5.4 2.84 1.03-6-4.36-4.25 6.03-.88L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></span>
+                                        <span wire:loading.flex wire:target="starSelectedConversation" class="rc-spinner-mini rc-inbox-star-spinner-v114" aria-hidden="true"></span>
+                                    </button>
                                     @php $selectedUnread = (int) ($selectedConversation['unread_count'] ?? 0) > 0; @endphp
                                     <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedUnread ? 'is-unread' : '' }}" wire:click="toggleSelectedConversationUnread" title="{{ $selectedUnread ? 'Mark as read' : 'Mark as unread' }}" aria-pressed="{{ $selectedUnread ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M3.5 6.5h17v12h-17v-12Z" stroke="currentColor" stroke-width="1.7"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
                                 </div>
@@ -12076,6 +12079,41 @@ CSS;
                     @endforeach
                 </div>
 
+                <div class="rc-settings-card-v72" id="account-security">
+                    <div class="rc-settings-head-v72">
+                        <div class="rc-settings-icon-v72">🔒</div>
+                        <div>
+                            <h2 style="margin:0;">Account Security</h2>
+                            <p style="margin:.2rem 0 0;color:var(--rc-muted);">Change your PLYRCARD login password here.</p>
+                        </div>
+                    </div>
+                    <form wire:submit.prevent="changeAccountPassword" style="display:grid;gap:.8rem;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:.75rem;">
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">
+                                Current Password
+                                <input class="rc-input" style="width:100%;" type="password" autocomplete="current-password" wire:model.defer="currentPassword" placeholder="Current password">
+                                @error('currentPassword')<span style="color:#dc2626;font-size:.72rem;font-weight:650;">{{ $message }}</span>@enderror
+                            </label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">
+                                New Password
+                                <input class="rc-input" style="width:100%;" type="password" autocomplete="new-password" wire:model.defer="newPassword" placeholder="At least 8 characters">
+                                @error('newPassword')<span style="color:#dc2626;font-size:.72rem;font-weight:650;">{{ $message }}</span>@enderror
+                            </label>
+                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">
+                                Confirm New Password
+                                <input class="rc-input" style="width:100%;" type="password" autocomplete="new-password" wire:model.defer="newPasswordConfirmation" placeholder="Repeat new password">
+                                @error('newPasswordConfirmation')<span style="color:#dc2626;font-size:.72rem;font-weight:650;">{{ $message }}</span>@enderror
+                            </label>
+                        </div>
+                        <div style="display:flex;justify-content:flex-end;">
+                            <button class="rc-btn rc-btn-primary" type="submit" wire:loading.attr="disabled" wire:target="changeAccountPassword">
+                                <span wire:loading.remove wire:target="changeAccountPassword">Change Password</span>
+                                <span wire:loading.flex wire:target="changeAccountPassword" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Updating</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
                 @php
                     $settingsBillingService = app(\App\Services\BillingProfileService::class);
                     // Force an authoritative subscription/payment refresh when Billing & Payments is opened.
@@ -12252,6 +12290,12 @@ CSS;
                 .rc-compose-toolbar-v45 .rc-select { min-height:1.9rem; padding:.28rem .5rem; }
                 .rc-compose-editor-shell-v45 .rc-rich-editor { min-height:24rem; border:0; border-radius:0; box-shadow:none; background:var(--rc-surface); color:var(--rc-text); padding:1rem; }
                 .rc-compose-editor-foot-v45 { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.6rem .7rem; border-top:1px solid var(--rc-border); color:var(--rc-muted); font-size:.75rem; }
+                .rc-compose-required-v114.is-missing { border-color:#ef4444!important; box-shadow:0 0 0 2px rgba(239,68,68,.10)!important; }
+                .rc-compose-recipient-bar-v45.rc-compose-required-v114.is-missing { border:1px solid #ef4444!important; border-radius:.65rem; padding:.48rem; }
+                .rc-compose-actions-v45 .rc-btn.is-compose-disabled-v114,
+                .rc-compose-actions-v45 .rc-btn:disabled.is-compose-disabled-v114 { background:#e5e7eb!important; border-color:#d1d5db!important; color:#9ca3af!important; box-shadow:none!important; cursor:not-allowed!important; opacity:1!important; transform:none!important; }
+                .dark .rc-compose-actions-v45 .rc-btn.is-compose-disabled-v114,
+                .dark .rc-compose-actions-v45 .rc-btn:disabled.is-compose-disabled-v114 { background:#27272a!important; border-color:#3f3f46!important; color:#71717a!important; }
                 .rc-compose-icon-row-v45 { display:flex; gap:.65rem; align-items:center; }
                 .rc-compose-icon-row-v45 button, .rc-compose-icon-row-v45 label { border:0; background:transparent; padding:0; color:var(--rc-muted); cursor:pointer; display:inline-flex; align-items:center; }
                 .rc-attachments-v45 { border:1px solid var(--rc-border); background:var(--rc-surface); border-radius:1rem; box-shadow:0 10px 24px rgba(15,23,42,.05); padding:1rem; display:grid; gap:.85rem; }
@@ -12275,6 +12319,7 @@ CSS;
                     chooserOpen: @js((bool) ($composeChooseCoachesOpen ?? false)),
                     selectedCoachIds: @js(array_values(array_map('strval', $campaignCoachIds ?? []))),
                     coachRevision: 0,
+                    composeValidationRevision: 0,
                     init() {
                         const cached = window.__rcComposeRecipientStateV101;
                         const currentPath = String(window.location?.pathname || '');
@@ -12381,6 +12426,10 @@ CSS;
                         return output;
                     },
                     openPreview() {
+                        if (!this.composeReady) {
+                            toast('Choose a school and add a subject and message before previewing.');
+                            return;
+                        }
                         const coach = this.previewCoach();
                         const subjectInput = this.$root.querySelector('[data-rc-compose-subject]');
                         const editor = this.$root.querySelector('[data-plyr-native-editor=campaign-body]');
@@ -12428,6 +12477,25 @@ CSS;
                         return this.schoolCoaches.map(row => String(row.id));
                     },
                     get recipientCount() { this.coachRevision; return this.activeCoachIds.length; },
+                    get composeRecipientsReady() {
+                        this.coachRevision;
+                        return !!this.selectedSchool && this.recipientCount > 0;
+                    },
+                    get composeSubjectReady() {
+                        this.composeValidationRevision;
+                        const input = this.$root?.querySelector('[data-rc-compose-subject]');
+                        return String(input?.value || '').trim().length > 0;
+                    },
+                    get composeBodyReady() {
+                        this.composeValidationRevision;
+                        const editor = this.$root?.querySelector('[data-plyr-native-editor=campaign-body]');
+                        if (!editor) return false;
+                        const text = String(editor.innerText || editor.textContent || '').replace(/\u200B/g, '').trim();
+                        return text.length > 0 || !!editor.querySelector('img');
+                    },
+                    get composeReady() {
+                        return this.composeRecipientsReady && this.composeSubjectReady && this.composeBodyReady;
+                    },
                     get sendingDescription() {
                         if (!this.selectedSchool) return 'No school selected — search to add one below';
                         if (this.targetMode === 'coaches') return `Sending to ${this.recipientCount.toLocaleString()} selected coach${this.recipientCount === 1 ? '' : 'es'} at ${this.selectedSchool.name}`;
@@ -12533,7 +12601,9 @@ CSS;
                     },
                     async sendFast(wireInstance = null) {
                         if (this.sendingFast) return;
-                        if (!this.selectedSchool || this.recipientCount < 1) { toast('Choose at least one coach.'); return; }
+                        if (!this.composeRecipientsReady) { toast('Choose at least one coach.'); return; }
+                        if (!this.composeSubjectReady) { toast('Add a subject before sending.'); return; }
+                        if (!this.composeBodyReady) { toast('Write a message before sending.'); return; }
                         const wire = wireInstance || this.$wire || (() => {
                             const root = window.rcFindCoachDatabaseLivewireComponent
                                 ? window.rcFindCoachDatabaseLivewireComponent(this.$root || document.querySelector('.rc-livewire-root'))
@@ -12551,7 +12621,7 @@ CSS;
                             toast('Unable to send right now. Please try again.');
                         } finally { this.sendingFast = false; }
                     },
-                }" x-init="init()" x-on:rc-compose-select-school.window="chooseSchoolById($event.detail?.schoolId || $event.detail?.id || '')">
+                }" x-init="init()" x-on:input="composeValidationRevision++" x-on:rc-compose-editor-refresh.window="composeValidationRevision++" x-on:rc-compose-select-school.window="chooseSchoolById($event.detail?.schoolId || $event.detail?.id || '')">
                 <div class="rc-compose-titlebar-v45">
                     <div>
                         <h1>Compose Email</h1>
@@ -12562,16 +12632,16 @@ CSS;
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                             Saved just now
                         </span>
-                        <button class="rc-btn" type="button" data-rc-local-action data-rc-compose-preview-instant-v99 x-on:click.prevent.stop="openPreview()">
-                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
-                            Preview
-                        </button>
                         <button class="rc-btn" type="button" wire:click="openSaveComposeTemplatePrompt" wire:loading.attr="disabled" wire:target="openSaveComposeTemplatePrompt">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /></svg>
                             <span wire:loading.remove wire:target="openSaveComposeTemplatePrompt">Save as Template</span>
                             <span wire:loading.flex wire:target="openSaveComposeTemplatePrompt" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                         </button>
-                        <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent.stop="sendFast($wire)" x-bind:disabled="sendingFast">
+                        <button class="rc-btn" type="button" data-rc-local-action data-rc-compose-preview-instant-v99 x-on:click.prevent.stop="openPreview()" x-bind:disabled="!composeReady" x-bind:class="{ 'is-compose-disabled-v114': !composeReady }">
+                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
+                            Preview
+                        </button>
+                        <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent.stop="sendFast($wire)" x-bind:disabled="sendingFast || !composeReady" x-bind:class="{ 'is-compose-disabled-v114': !composeReady }">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12 3.269 3.125A59.77 59.77 0 0 1 21.485 12 59.77 59.77 0 0 1 3.27 20.875L6 12Zm0 0h7.5" /></svg>
                             <span x-show="!sendingFast" x-text="recipientCount > 0 ? `Send to ${recipientCount.toLocaleString()} coach${recipientCount === 1 ? '' : 'es'}` : 'Add a school'"></span>
                             <span x-cloak x-show="sendingFast" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
@@ -12584,7 +12654,7 @@ CSS;
                         <div class="rc-compose-inner-v45">
                             <div>
                                 <div class="rc-compose-label-v45">Recipients</div>
-                                <div class="rc-compose-recipient-bar-v45">
+                                <div class="rc-compose-recipient-bar-v45 rc-compose-required-v114" x-bind:class="{ 'is-missing': !composeRecipientsReady }">
                                     <template x-if="selectedSchool">
                                         <span class="rc-compose-chip-v45">
                                             <span x-text="`${selectedSchool.name} (${selectedSchoolCoachCount.toLocaleString()} coaches)`"></span>
@@ -12653,7 +12723,7 @@ CSS;
                             <div>
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
-                                    <input class="rc-input" style="width:100%" placeholder="Subject line" data-rc-compose-subject wire:model="campaignSubject" />
+                                    <input class="rc-input rc-compose-required-v114" style="width:100%" placeholder="Subject line" data-rc-compose-subject wire:model="campaignSubject" x-bind:class="{ 'is-missing': !composeSubjectReady }" />
                                     <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'', fallbackTemplates:[], loadingTemplates:false, templateFetchFinished:false, needsTemplateFallback:@js(count($this->composeTemplateOptions) === 0) }">
                                         <button class="rc-btn" type="button" x-on:click="
                                             open=!open;
@@ -12800,7 +12870,7 @@ CSS;
                                 x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)"
                                 wire:key="compose-email-editor-v45-{{ $campaignTemplateId ?: 'blank' }}"
                             >
-                                <div class="rc-compose-editor-shell-v45">
+                                <div class="rc-compose-editor-shell-v45 rc-compose-required-v114" x-bind:class="{ 'is-missing': !composeBodyReady }">
                                     <div class="rc-compose-toolbar-v45">
                                         <select class="rc-select" x-on:change="formatBlock($event.target.value); $event.target.value='p'">
                                             <option value="p">Paragraph</option>
@@ -12970,7 +13040,7 @@ CSS;
                 .rc-template-card-main-v50 h3{margin:0;color:var(--rc-text);font-size:1rem;line-height:1.2;font-weight:760;letter-spacing:-.015em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
                 .rc-template-card-main-v50 p{margin:0;color:var(--rc-muted);font-size:.8rem;line-height:1.3;display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
                 .rc-template-subject-v50{border-radius:.58rem;background:rgba(148,163,184,.11);padding:.55rem .6rem;color:var(--rc-text);font-size:.73rem;line-height:1.32;min-height:2.35rem}.rc-template-subject-v50 strong{font-weight:720;color:var(--rc-text)}
-                .rc-template-card-actions-v50{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.45rem;align-items:center;margin-top:auto}.rc-template-delete-v52{width:1.75rem;height:1.75rem;border:0;background:transparent;color:var(--rc-muted);display:grid;place-items:center;border-radius:.5rem;cursor:pointer}.rc-template-delete-v52:hover{background:rgba(239,68,68,.08);color:#ef4444}.rc-template-body-v52{color:var(--rc-muted);font-size:.74rem;line-height:1.42;min-height:3.25rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.rc-template-use-v52{height:2.3rem;border:0;border-radius:.62rem;background:#ff5f3f;color:#fff;font-weight:720;font-size:.82rem;box-shadow:0 8px 18px rgba(255,95,63,.18);display:inline-flex;align-items:center;justify-content:center;gap:.36rem;cursor:pointer}.rc-template-edit-v52{height:2.3rem;border:1px solid var(--rc-border);border-radius:.62rem;background:var(--rc-surface);color:var(--rc-text);font-weight:690;font-size:.82rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:0 .7rem;cursor:pointer}
+                .rc-template-card-actions-v50{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.45rem;align-items:center;margin-top:auto}.rc-template-delete-v52{width:1.75rem;height:1.75rem;border:0;background:transparent;color:var(--rc-muted);display:grid;place-items:center;border-radius:.5rem;cursor:pointer}.rc-template-delete-v52:hover{background:rgba(239,68,68,.08);color:#ef4444}.rc-template-body-v52{color:var(--rc-muted);font-size:.74rem;line-height:1.42;min-height:3.25rem;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}.rc-template-use-v52{height:2.3rem;border:0;border-radius:.62rem;background:#ff5f3f;color:#fff;font-weight:720;font-size:.82rem;box-shadow:0 8px 18px rgba(255,95,63,.18);display:inline-flex;align-items:center;justify-content:center;gap:.36rem;cursor:pointer}.rc-template-edit-v52,.rc-template-duplicate-v114{height:2.3rem;border:1px solid var(--rc-border);border-radius:.62rem;background:var(--rc-surface);color:var(--rc-text);font-weight:690;font-size:.82rem;display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:0 .7rem;cursor:pointer}.rc-template-duplicate-v114:hover,.rc-template-edit-v52:hover{border-color:rgba(255,99,56,.38);color:#ff6338}.rc-template-card-actions-v50 button:disabled{cursor:wait;opacity:.68}
                 .rc-template-editor-layout-v50{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;align-items:start}
                 .rc-template-editor-card-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.07);padding:1.05rem;display:grid;gap:.95rem}
                 .rc-template-ai-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.07);padding:1rem;position:sticky;top:1rem;display:grid;gap:.8rem}
@@ -13029,9 +13099,9 @@ CSS;
                 .rc-template-subject-v50{font-size:.73rem!important;line-height:1.32!important;min-height:2.35rem!important;padding:.55rem .6rem!important;border-radius:.58rem!important}
                 .rc-template-subject-v50 strong{font-weight:720!important}
                 .rc-template-body-v52{font-size:.74rem!important;line-height:1.42!important;min-height:3.25rem!important}
-                .rc-template-use-v52,.rc-template-edit-v52{height:2.3rem!important;border-radius:.62rem!important;font-size:.82rem!important}
+                .rc-template-use-v52,.rc-template-edit-v52,.rc-template-duplicate-v114{height:2.3rem!important;border-radius:.62rem!important;font-size:.82rem!important}
                 .rc-template-use-v52{font-weight:720!important;box-shadow:0 8px 18px rgba(255,95,63,.18)!important}
-                .rc-template-edit-v52{font-weight:690!important;padding:0 .7rem!important}
+                .rc-template-edit-v52,.rc-template-duplicate-v114{font-weight:690!important;padding:0 .7rem!important}
                 .rc-template-delete-v52{width:1.75rem!important;height:1.75rem!important}
 @media(max-width:1180px){.rc-template-grid-v50{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-template-editor-layout-v50{grid-template-columns:1fr}}
                 @media(max-width:720px){.rc-template-grid-v50{grid-template-columns:1fr}.rc-templates-head-v50,.rc-template-list-top-v50{align-items:stretch;flex-direction:column}.rc-template-search-v50{min-width:0}}
@@ -13067,7 +13137,7 @@ CSS;
                     }
                  }"
                  x-on:rc-template-editor-client-open.window="templateEditorOpenClient = true; templateEditorTitle = ($event.detail?.mode === 'new') ? 'New Template' : 'Edit Template'; window.__rcTemplateClientMode = $event.detail?.mode || ''; if (($event.detail?.mode || '') === 'new') { window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''; window.__plyrTemplateEditorFullBodyBase64 = ''; window.__plyrTemplateEditorFullBodyKey = ''; }"
-                 x-on:rc-template-saved-client.window="window.__rcTemplateClientMode = ''; window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''; window.__plyrTemplateEditorFullBodyBase64 = ''; window.__plyrTemplateEditorFullBodyKey = ''">
+                 x-on:rc-template-saved-client.window="templateEditorOpenClient = false; window.__rcTemplateClientMode = ''; window.__plyrTemplateEditorPendingBodyBase64 = ''; window.__plyrTemplateEditorPendingBodyKey = ''; window.__plyrTemplateEditorFullBodyBase64 = ''; window.__plyrTemplateEditorFullBodyKey = ''">
                 <div x-show="!templateEditorOpenClient" x-cloak>
                     <div class="rc-templates-head-v50" style="margin-top:.25rem">
                         <div>
@@ -13113,13 +13183,27 @@ CSS;
                                 <div class="rc-template-subject-v50"><strong>Subject:</strong> {{ $templateSubjectDisplay }}</div>
                                 <div class="rc-template-body-v52">{{ $templatePreviewDisplay }}</div>
                                 <div class="rc-template-card-actions-v50">
-                                    <button class="rc-template-use-v52" type="button" data-rc-local-action data-rc-template-id="{{ $templateId }}" data-rc-compose-template-body-base64="{{ base64_encode($templateBodyRaw) }}" data-rc-compose-template-key="{{ sha1($templateId . '|' . $templateBodyRaw) }}" x-on:click.prevent.stop="window.rcOpenComposeTemplateFromCard ? window.rcOpenComposeTemplateFromCard($el, @js($this->pageUrl('compose'))) : $wire.call('useTemplateForCompose', @js($templateId))">
-                                        <span style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                                        Use Template</span>
+                                    <button class="rc-template-use-v52" type="button" x-data="{ usingTemplate:false }" x-bind:disabled="usingTemplate" data-rc-local-action data-rc-template-id="{{ $templateId }}" data-rc-compose-template-body-base64="{{ base64_encode($templateBodyRaw) }}" data-rc-compose-template-key="{{ sha1($templateId . '|' . $templateBodyRaw) }}" x-on:click.prevent.stop="
+                                        if (usingTemplate) return;
+                                        usingTemplate = true;
+                                        if (window.rcOpenComposeTemplateFromCard) {
+                                            window.requestAnimationFrame(() => window.rcOpenComposeTemplateFromCard($el, @js($this->pageUrl('compose'))));
+                                        } else {
+                                            Promise.resolve($wire.call('useTemplateForCompose', @js($templateId)))
+                                                .catch((error) => console.error(error))
+                                                .finally(() => { usingTemplate = false; });
+                                        }
+                                    ">
+                                        <span x-show="!usingTemplate" style="display:inline-flex;align-items:center;gap:.4rem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg> Use Template</span>
+                                        <span x-cloak x-show="usingTemplate" class="rc-loading-inline" style="color:inherit"><span class="rc-spinner-mini"></span> Opening</span>
                                     </button>
-                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__rcTemplateClientMode = 'edit'; window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now()); window.__plyrTemplateEditorFullBodyBase64 = window.__plyrTemplateEditorPendingBodyBase64; window.__plyrTemplateEditorFullBodyKey = window.__plyrTemplateEditorPendingBodyKey;">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg>
-                                        Edit
+                                    <button class="rc-template-duplicate-v114" type="button" wire:click="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})" title="Duplicate and save as a new template">
+                                        <span wire:loading.remove wire:target="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})">Duplicate</span>
+                                        <span wire:loading.flex wire:target="duplicateTemplate({{ \Illuminate\Support\Js::from($templateId) }})" class="rc-loading-inline"><span class="rc-spinner-mini"></span></span>
+                                    </button>
+                                    <button class="rc-template-edit-v52" type="button" wire:click="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" wire:loading.attr="disabled" wire:target="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" data-rc-open="template" data-rc-title="{{ $templateNameDisplay }}" data-rc-copy="Opening the editor now. The latest template content will load inside it." data-rc-template-id="{{ $templateId }}" data-rc-template-body-base64="{{ base64_encode($templateBodyRaw) }}" x-on:click="window.__rcTemplateClientMode = 'edit'; window.__plyrTemplateEditorPendingBodyBase64 = $el.dataset.rcTemplateBodyBase64 || ''; window.__plyrTemplateEditorPendingBodyKey = 'card-' + ($el.dataset.rcTemplateId || Date.now()); window.__plyrTemplateEditorFullBodyBase64 = window.__plyrTemplateEditorPendingBodyBase64; window.__plyrTemplateEditorFullBodyKey = window.__plyrTemplateEditorPendingBodyKey;">
+                                        <span wire:loading.remove wire:target="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M9 15h6"/></svg> Edit</span>
+                                        <span wire:loading.flex wire:target="selectTemplate({{ \Illuminate\Support\Js::from($templateId) }})" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening</span>
                                     </button>
                                 </div>
                             </article>
