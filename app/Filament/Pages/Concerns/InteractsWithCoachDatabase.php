@@ -14686,6 +14686,38 @@ HTML;
             ->all();
     }
 
+    /**
+     * Hydrate only the Compose template dropdown when the hidden Compose panel was
+     * rendered before templates were loaded. This is renderless so no other section,
+     * editor, school picker, Inbox state, or Recruiting Center UI is morphed.
+     */
+    #[Renderless]
+    public function composeTemplateOptionsForClient(): array
+    {
+        $user = Auth::user();
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            return [];
+        }
+
+        if (empty($this->templates)) {
+            $this->loadTemplates();
+        }
+
+        return collect($this->getComposeTemplateOptionsProperty())
+            ->map(fn (array $template): array => [
+                'id' => (string) ($template['id'] ?? ''),
+                'name' => (string) ($template['name'] ?? 'Untitled Template'),
+                'compose_subject_preview' => (string) ($template['compose_subject_preview'] ?? 'Recruiting email'),
+                'compose_body_preview' => (string) ($template['compose_body_preview'] ?? 'Personalized message preview'),
+                'compose_body_editor_base64' => (string) ($template['compose_body_editor_base64'] ?? ''),
+                'compose_body_editor_key' => (string) ($template['compose_body_editor_key'] ?? ''),
+            ])
+            ->filter(fn (array $template): bool => $template['id'] !== '')
+            ->values()
+            ->all();
+    }
+
     public function getComposeSelectedListProperty(): ?array
     {
         if ($this->campaignListKey === '') {

@@ -12654,8 +12654,24 @@ CSS;
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
                                     <input class="rc-input" style="width:100%" placeholder="Subject line" data-rc-compose-subject wire:model="campaignSubject" />
-                                    <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'' }">
-                                        <button class="rc-btn" type="button" x-on:click="open=!open">
+                                    <div class="rc-compose-template-wrap-v45" x-data="{ open:false, loadingTemplateId:'', fallbackTemplates:[], loadingTemplates:false, templateFetchFinished:false, needsTemplateFallback:@js(count($this->composeTemplateOptions) === 0) }">
+                                        <button class="rc-btn" type="button" x-on:click="
+                                            open=!open;
+                                            if (open && needsTemplateFallback && fallbackTemplates.length === 0 && !loadingTemplates) {
+                                                loadingTemplates = true;
+                                                templateFetchFinished = false;
+                                                $wire.call('composeTemplateOptionsForClient')
+                                                    .then((rows) => { fallbackTemplates = Array.isArray(rows) ? rows : []; })
+                                                    .catch((error) => {
+                                                        console.error('Unable to load Compose templates.', error);
+                                                        fallbackTemplates = [];
+                                                    })
+                                                    .finally(() => {
+                                                        loadingTemplates = false;
+                                                        templateFetchFinished = true;
+                                                    });
+                                            }
+                                        ">
                                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M7 3h7l5 5v13H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" /></svg>
                                             Templates
                                         </button>
@@ -12701,7 +12717,48 @@ CSS;
                                                     <div class="rc-compose-template-preview-v45">{{ $template['compose_body_preview'] ?? 'Personalized message preview' }}</div>
                                                 </button>
                                             @empty
-                                                <div class="rc-subtle" style="padding:.5rem">No templates found.</div>
+                                                <div class="rc-subtle" style="padding:.5rem" x-show="loadingTemplates" x-cloak>
+                                                    <span style="display:inline-flex;align-items:center;gap:.45rem;"><span class="rc-spinner-mini"></span><span>Loading templates…</span></span>
+                                                </div>
+                                                <template x-for="template in fallbackTemplates" :key="String(template.id || '')">
+                                                    <button
+                                                        type="button"
+                                                        x-bind:class="String(@js((string) ($campaignTemplateId ?? ''))) === String(template.id || '') ? 'is-active' : ''"
+                                                        data-rc-local-action
+                                                        x-bind:disabled="loadingTemplateId !== ''"
+                                                        x-on:click.prevent.stop="
+                                                            const id = String(template.id || '').trim();
+                                                            if (!id || loadingTemplateId) return;
+                                                            const bodyBase64 = String(template.compose_body_editor_base64 || '');
+                                                            const bodyKey = 'compose-local-' + id + '-' + (String(template.compose_body_editor_key || '') || Date.now());
+                                                            if (bodyBase64 && window.rcRememberComposeTemplateBody) {
+                                                                window.rcRememberComposeTemplateBody(id, bodyBase64, bodyKey);
+                                                            }
+                                                            if (bodyBase64 && window.rcApplyComposeTemplateBodyBase64) {
+                                                                window.__plyrComposeEditorPendingBodyBase64 = bodyBase64;
+                                                                window.__plyrComposeEditorPendingBodyKey = bodyKey;
+                                                                window.__plyrComposeEditorFullBodyBase64 = bodyBase64;
+                                                                window.__plyrComposeEditorFullBodyKey = bodyKey;
+                                                                window.rcApplyComposeTemplateBodyBase64(bodyBase64, bodyKey, true);
+                                                            }
+                                                            loadingTemplateId = id;
+                                                            open = false;
+                                                            $wire.call('useTemplateForCompose', id, true)
+                                                                .catch((error) => console.error(error))
+                                                                .finally(() => { loadingTemplateId = ''; });
+                                                        "
+                                                    >
+                                                        <span style="display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;">
+                                                            <span style="min-width:0;display:block;">
+                                                                <strong x-text="template.name || 'Untitled Template'"></strong>
+                                                                <span x-text="template.compose_subject_preview || 'Recruiting email'"></span>
+                                                            </span>
+                                                            <span x-show="loadingTemplateId === String(template.id || '')" x-cloak class="rc-compose-template-loading-v83"><span class="rc-spinner-mini"></span></span>
+                                                        </span>
+                                                        <div class="rc-compose-template-preview-v45" x-text="template.compose_body_preview || 'Personalized message preview'"></div>
+                                                    </button>
+                                                </template>
+                                                <div class="rc-subtle" style="padding:.5rem" x-show="templateFetchFinished && !loadingTemplates && fallbackTemplates.length === 0" x-cloak>No templates found.</div>
                                             @endforelse
                                         </div>
                                     </div>
