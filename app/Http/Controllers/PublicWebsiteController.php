@@ -10,10 +10,15 @@ use Illuminate\Support\Str;
 
 class PublicWebsiteController extends Controller
 {
+    /**
+     * Hosts that should render the main PlyrCard platform homepage
+     * instead of being treated as custom athlete/profile domains.
+     */
     protected array $platformHosts = [
         'localhost',
         '127.0.0.1',
         'dev.plyrcard.com',
+        'test.plyrcard.com',
         'plyrcard.com',
         'www.plyrcard.com',
     ];
@@ -33,19 +38,24 @@ class PublicWebsiteController extends Controller
         'track',
     ];
 
-    public function home(Request $request, YouTubeChannelService $youtube, LocalRecruitingTrackingService $tracking)
-    {
+    public function home(
+        Request $request,
+        YouTubeChannelService $youtube,
+        LocalRecruitingTrackingService $tracking
+    ) {
         $host = strtolower($request->getHost());
 
+        // Main PlyrCard platform domains render the platform homepage directly.
         if ($this->isPlatformHost($host)) {
             return view('pages.index');
         }
 
+        // Other hosts are treated as custom athlete/profile domains.
         $website = $this->findWebsiteByDomain($host);
+
         abort_unless($website, 404);
 
         $this->recordProfileVisit($website, $request, $tracking);
-
         $this->recordDirectVisitUnlessTracked($website, $request);
 
         return $this->renderWebsite($website, $youtube);
@@ -100,8 +110,11 @@ class PublicWebsiteController extends Controller
         return $this->renderWebsite($website, $youtube);
     }
 
-    protected function recordProfileVisit(Website $website, Request $request, LocalRecruitingTrackingService $tracking): void
-    {
+    protected function recordProfileVisit(
+        Website $website,
+        Request $request,
+        LocalRecruitingTrackingService $tracking
+    ): void {
         // A tracked email click records the attributed coach event before redirecting.
         // The redirect adds rc_tracked=1 so the destination request does not create
         // a second anonymous/direct event for the same click.
@@ -158,14 +171,20 @@ class PublicWebsiteController extends Controller
         ]);
     }
 
-    protected function recordDirectVisitUnlessTracked(Website $website, Request $request): void
-    {
-        if ($request->boolean('rc_tracked') || $request->query('rc_source') === 'compose_email') {
+    protected function recordDirectVisitUnlessTracked(
+        Website $website,
+        Request $request
+    ): void {
+        if (
+            $request->boolean('rc_tracked')
+            || $request->query('rc_source') === 'compose_email'
+        ) {
             return;
         }
 
         try {
-            app(LocalRecruitingTrackingService::class)->recordDirectProfileVisit($website, $request);
+            app(LocalRecruitingTrackingService::class)
+                ->recordDirectProfileVisit($website, $request);
         } catch (\Throwable $exception) {
             report($exception);
         }
@@ -195,6 +214,10 @@ class PublicWebsiteController extends Controller
 
     protected function isReservedPath(string $path): bool
     {
-        return in_array($this->normalizeWebsiteName($path), $this->reservedPaths, true);
+        return in_array(
+            $this->normalizeWebsiteName($path),
+            $this->reservedPaths,
+            true
+        );
     }
 }
