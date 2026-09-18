@@ -10982,9 +10982,13 @@ CSS;
                                     // one-shot timer was consumed when the user happened to be typing,
                                     // switching threads, or the Inbox was temporarily hidden. After that,
                                     // automatic Inbox updates silently stopped until a page reload.
+                                    // Keep polling even while the reply editor/search field has focus.
+                                    // The quick-reply editor is wire:ignore and its draft is mirrored into
+                                    // window.__rcInboxReplyDrafts, so an incoming message should never wait
+                                    // for the user to blur the editor. Only defer while another thread/load
+                                    // operation is actively mutating Inbox state.
                                     const shouldDefer = this.realtimePollBusy
                                         || !this.realtimeInboxIsVisible()
-                                        || this.realtimeInboxHasActiveEditor()
                                         || this.selectedLoadingId
                                         || window.__rcInboxMessageLoader?.busy
                                         || document.documentElement.hasAttribute('data-rc-thread-autoloading');
@@ -11022,9 +11026,12 @@ CSS;
                                     window.__rcInboxRealtimeOwner = this;
                                     const lastPollAt = Number(window.__rcInboxRealtimeLastPollAt || 0);
                                     const elapsed = lastPollAt > 0 ? Date.now() - lastPollAt : Number.MAX_SAFE_INTEGER;
+                                    // Messenger-style cadence: check shortly after Inbox opens, then
+                                    // every ~20 seconds while the Inbox panel is visible. This is fast enough
+                                    // for replies to feel live without hammering HighLevel continuously.
                                     const delay = lastPollAt > 0
-                                        ? Math.max(5000, 60000 - elapsed)
-                                        : 15000;
+                                        ? Math.max(3000, 20000 - elapsed)
+                                        : 5000;
 
                                     window.__rcInboxRealtimeTimer = window.setTimeout(() => {
                                         const owner = window.__rcInboxRealtimeOwner;
