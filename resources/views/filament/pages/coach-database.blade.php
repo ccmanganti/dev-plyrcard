@@ -1,4 +1,3 @@
-```
 @php
     // v10.113.14: keep the giant school catalog out of Inbox/template Livewire morphs.
     // The catalog is only seeded on sections that can actually open/search schools.
@@ -17881,4 +17880,3 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
 </x-filament-panels::page>
 </div>
-```
