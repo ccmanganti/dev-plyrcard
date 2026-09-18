@@ -10845,9 +10845,8 @@ CSS;
                             </button>
                         </div>
 
-                        {{-- v10.113.11: conversations open cache-first, then the selected
-                             thread automatically loads the latest 10 messages exactly once.
-                             No full Inbox refresh, no global reload, and no recurring poll. --}}
+                        {{-- Conversations open cache-first. A lightweight Inbox timer then refreshes
+                             the newest summaries and the currently open thread without a page reload. --}}
 
                         <div
                             class="rc-inbox-list-v56"
@@ -10979,10 +10978,21 @@ CSS;
                                     });
                                 },
                                 async pollRealtimeInbox() {
-                                    if (this.realtimePollBusy || !this.realtimeInboxIsVisible()) return;
-                                    if (this.realtimeInboxHasActiveEditor()) return;
-                                    if (this.selectedLoadingId || window.__rcInboxMessageLoader?.busy) return;
-                                    if (document.documentElement.hasAttribute('data-rc-thread-autoloading')) return;
+                                    // A skipped pass must ALWAYS schedule another pass. Previously the
+                                    // one-shot timer was consumed when the user happened to be typing,
+                                    // switching threads, or the Inbox was temporarily hidden. After that,
+                                    // automatic Inbox updates silently stopped until a page reload.
+                                    const shouldDefer = this.realtimePollBusy
+                                        || !this.realtimeInboxIsVisible()
+                                        || this.realtimeInboxHasActiveEditor()
+                                        || this.selectedLoadingId
+                                        || window.__rcInboxMessageLoader?.busy
+                                        || document.documentElement.hasAttribute('data-rc-thread-autoloading');
+
+                                    if (shouldDefer) {
+                                        this.startRealtimePolling();
+                                        return;
+                                    }
 
                                     this.realtimePollBusy = true;
                                     window.__rcInboxRealtimeLastPollAt = Date.now();

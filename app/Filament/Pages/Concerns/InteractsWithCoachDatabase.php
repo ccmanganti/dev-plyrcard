@@ -1684,10 +1684,19 @@ trait InteractsWithCoachDatabase
         $this->inboxInitialLoadCompleted = true;
         $this->inboxConversationDisplayLimit = 10;
 
-        // Manual refresh fetches only the newest 10 conversation summaries. It must not
-        // refresh the selected thread or start a recurring polling loop, because that is
-        // what made the whole Recruiting Center feel locked while Inbox was open.
+        // Refresh the newest conversation summaries first, then refresh the currently
+        // open thread in the SAME request. Keep the visible messages in place while the
+        // latest page is fetched so manual refresh never blanks or jumps the thread.
+        $selectedConversationId = trim((string) ($this->selectedConversationId ?? ''));
+
         $this->loadConversations(force: true);
+
+        if ($selectedConversationId !== '') {
+            // loadConversations() may replace the summary collection, but a manual Inbox
+            // refresh must keep the conversation the user is already reading selected.
+            $this->selectedConversationId = $selectedConversationId;
+            $this->loadConversationMessages(true, true, false);
+        }
 
         $this->isLoadingConversations = false;
         $this->isLoadingConversationMessages = false;
