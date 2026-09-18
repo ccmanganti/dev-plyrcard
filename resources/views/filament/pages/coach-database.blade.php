@@ -1,3 +1,4 @@
+```
 @php
     // v10.113.14: keep the giant school catalog out of Inbox/template Livewire morphs.
     // The catalog is only seeded on sections that can actually open/search schools.
@@ -10898,7 +10899,7 @@ CSS;
                                     });
                                 },
                                 realtimeInboxPanel() {
-                                    return document.querySelector('[data-rc-client-section="conversations"]');
+                                    return document.querySelector('[data-rc-client-section=conversations]');
                                 },
                                 realtimeInboxIsVisible() {
                                     const panel = this.realtimeInboxPanel();
@@ -10910,10 +10911,10 @@ CSS;
                                     const panel = this.realtimeInboxPanel();
                                     const active = document.activeElement;
                                     if (!panel || !active || !panel.contains(active)) return false;
-                                    return active.matches('input, textarea, select, [contenteditable="true"]');
+                                    return active.matches('input, textarea, select, [contenteditable=true]');
                                 },
                                 captureRealtimeScrollState() {
-                                    const list = document.querySelector('[data-rc-client-section="conversations"] .rc-inbox-list-v56');
+                                    const list = document.querySelector('[data-rc-client-section=conversations] .rc-inbox-list-v56');
                                     const stream = document.querySelector('[data-rc-inbox-message-stream]');
                                     let anchorId = '';
                                     let anchorOffset = 0;
@@ -10944,14 +10945,14 @@ CSS;
                                 restoreRealtimeScrollState(state) {
                                     if (!state) return;
                                     const restore = () => {
-                                        const list = document.querySelector('[data-rc-client-section="conversations"] .rc-inbox-list-v56');
+                                        const list = document.querySelector('[data-rc-client-section=conversations] .rc-inbox-list-v56');
                                         const stream = document.querySelector('[data-rc-inbox-message-stream]');
 
                                         if (list) {
                                             let restoredByAnchor = false;
                                             if (state.anchorId) {
-                                                const escaped = window.CSS && CSS.escape ? CSS.escape(state.anchorId) : state.anchorId.replace(/"/g, '\\"');
-                                                const anchor = list.querySelector(`[data-rc-conversation-id="${escaped}"]`);
+                                                const anchor = Array.from(list.querySelectorAll('[data-rc-inbox-conversation-trigger][data-rc-conversation-id]'))
+                                                    .find(card => String(card.dataset.rcConversationId || '') === String(state.anchorId || ''));
                                                 if (anchor) {
                                                     const listRect = list.getBoundingClientRect();
                                                     const currentOffset = anchor.getBoundingClientRect().top - listRect.top;
@@ -17880,3 +17881,4 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
 </x-filament-panels::page>
 </div>
+```
