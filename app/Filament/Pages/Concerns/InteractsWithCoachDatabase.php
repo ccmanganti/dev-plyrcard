@@ -4350,10 +4350,105 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     public function pollConversationUpdates(): void
     {
-        // Disabled for inbox performance. The old periodic refresh repeatedly
-        // rehydrated the conversation list while the user scrolled, which caused
-        // visible lag on long threads. Use the inbox refresh button to pull GHL.
-        return;
+        $user = Auth::user();
+
+        if (! $user || ! $this->allowed || $this->locked) {
+            return;
+        }
+
+        /*
+         * v10.114: quiet Inbox refresh.
+         *
+         * This intentionally does not call loadConversations(force: true). The manual
+         * refresh path replaces the visible conversation array and toggles loading state,
+         * which is appropriate for an explicit click but disruptive for a background poll.
+         * Instead we merge the newest GHL summaries into the existing list, preserve any
+         * older rows the user already loaded, and silently refresh only the open thread.
+         */
+        try {
+            $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
+                'limit' => 10,
+                'status' => 'all',
+                'search' => '',
+                'fetch_all' => false,
+            ]);
+
+            if ($result['success'] ?? false) {
+                $freshRows = $this->enrichConversationRowsWithLocalDatabase(
+                    (array) ($result['conversations'] ?? [])
+                );
+
+                $merged = collect($this->conversations ?? [])
+                    ->filter(fn ($row): bool => is_array($row) && filled($row['id'] ?? null))
+                    ->keyBy(fn (array $row): string => (string) $row['id']);
+
+                foreach ($freshRows as $row) {
+                    if (! is_array($row) || blank($row['id'] ?? null)) {
+                        continue;
+                    }
+
+                    $id = (string) $row['id'];
+                    $existing = is_array($merged->get($id)) ? $merged->get($id) : [];
+                    $merged->put($id, $this->normalizeInboxConversationSummary(array_replace($existing, $row)));
+                }
+
+                $timestamp = static function (array $row): int {
+                    $value = $row['last_message_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? null;
+
+                    if (is_numeric($value)) {
+                        $number = (int) $value;
+                        return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                    }
+
+                    try {
+                        return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                    } catch (\Throwable) {
+                        return 0;
+                    }
+                };
+
+                $this->conversations = $merged
+                    ->values()
+                    ->sortByDesc($timestamp)
+                    ->take(100)
+                    ->values()
+                    ->all();
+
+                $this->cacheInboxConversations($this->conversations);
+
+                if (! $this->selectedConversationId && ! empty($this->conversations)) {
+                    $this->selectedConversationId = (string) ($this->conversations[0]['id'] ?? '');
+                }
+            }
+        } catch (\Throwable $exception) {
+            // Background polling must never interrupt the user with an Inbox toast.
+            Log::debug('Quiet Inbox conversation refresh failed.', [
+                'user_id' => $user->getKey(),
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        $conversationId = trim((string) ($this->selectedConversationId ?? ''));
+
+        if ($conversationId !== '') {
+            try {
+                // Preserve the visible thread and merge only newly returned messages.
+                // The silent flag suppresses background error notifications and avoids
+                // clearing the good cache before a successful replacement is available.
+                $this->loadConversationMessages(true, true, true);
+            } catch (\Throwable $exception) {
+                Log::debug('Quiet Inbox thread refresh failed.', [
+                    'user_id' => $user->getKey(),
+                    'conversation_id' => $conversationId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $this->isLoadingConversations = false;
+        $this->isLoadingConversationMessages = false;
+        $this->isRefreshingRemoteData = false;
+        $this->activeUiOperation = null;
     }
 
 
@@ -6201,7 +6296,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->loadConversationMessages(false);
     }
 
-    public function loadConversationMessages(bool $fresh = false, bool $preserveVisibleMessages = false): void
+    public function loadConversationMessages(bool $fresh = false, bool $preserveVisibleMessages = false, bool $silent = false): void
     {
         $user = Auth::user();
 
@@ -6216,11 +6311,17 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $keepVisibleMessages = $fresh && $preserveVisibleMessages && ! empty($this->messages);
 
         if ($fresh) {
-            Cache::forget($this->deferredUiCacheKey('messages', $conversationId));
-            Cache::forget(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId));
-            Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId));
-            Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId));
-            $this->forgetPersistentRecruitingUiCache('messages', $conversationId);
+            // Normal explicit refreshes keep the existing cache-busting behavior.
+            // A silent background poll preserves the last known-good cache until the
+            // new GHL response succeeds, so a transient API failure cannot blank the
+            // thread on the next render/reload.
+            if (! ($silent && $keepVisibleMessages)) {
+                Cache::forget($this->deferredUiCacheKey('messages', $conversationId));
+                Cache::forget(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId));
+                Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId));
+                Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId));
+                $this->forgetPersistentRecruitingUiCache('messages', $conversationId);
+            }
 
             if (! $keepVisibleMessages) {
                 $this->messages = [];
@@ -6253,11 +6354,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             );
 
             if (! ($result['success'] ?? false)) {
-                Notification::make()
-                    ->title('Inbox')
-                    ->body((string) ($result['error'] ?? 'Unable to load conversation messages right now.'))
-                    ->warning()
-                    ->send();
+                if (! $silent) {
+                    Notification::make()
+                        ->title('Inbox')
+                        ->body((string) ($result['error'] ?? 'Unable to load conversation messages right now.'))
+                        ->warning()
+                        ->send();
+                }
 
                 return;
             }
@@ -6343,11 +6446,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 'error' => $exception->getMessage(),
             ]);
 
-            Notification::make()
-                ->title('Inbox')
-                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load conversation messages right now.')
-                ->danger()
-                ->send();
+            if (! $silent) {
+                Notification::make()
+                    ->title('Inbox')
+                    ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load conversation messages right now.')
+                    ->danger()
+                    ->send();
+            }
         } finally {
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;

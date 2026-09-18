@@ -10855,6 +10855,7 @@ CSS;
                                 selectedConversationId: window.__rcInboxPendingConversationId || @js((string) ($selectedConversationId ?? '')),
                                 selectedLoadingId: '',
                                 requestToken: 0,
+                                realtimePollBusy: false,
                                 init() {
                                     const serverConversationId = @js((string) ($selectedConversationId ?? ''));
                                     if (window.__rcInboxPendingConversationId
@@ -10874,6 +10875,10 @@ CSS;
                                         window.__rcInboxBootAutoloadedFor = bootKey;
                                         this.loadConversation(this.selectedConversationId, false, true);
                                     }
+
+                                    // v10.114: keep Inbox live without a page reload. The timer only runs
+                                    // while this panel is actually visible and pauses during user interaction.
+                                    this.startRealtimePolling();
                                 },
                                 conversationHasRenderedMessages() {
                                     const stream = document.querySelector('[data-rc-inbox-message-stream]');
@@ -10891,6 +10896,132 @@ CSS;
                                             window.setTimeout(run, 260);
                                         });
                                     });
+                                },
+                                realtimeInboxPanel() {
+                                    return document.querySelector('[data-rc-client-section="conversations"]');
+                                },
+                                realtimeInboxIsVisible() {
+                                    const panel = this.realtimeInboxPanel();
+                                    if (!panel || !panel.isConnected || document.visibilityState !== 'visible') return false;
+                                    const style = window.getComputedStyle(panel);
+                                    return style.display !== 'none' && style.visibility !== 'hidden' && panel.getClientRects().length > 0;
+                                },
+                                realtimeInboxHasActiveEditor() {
+                                    const panel = this.realtimeInboxPanel();
+                                    const active = document.activeElement;
+                                    if (!panel || !active || !panel.contains(active)) return false;
+                                    return active.matches('input, textarea, select, [contenteditable="true"]');
+                                },
+                                captureRealtimeScrollState() {
+                                    const list = document.querySelector('[data-rc-client-section="conversations"] .rc-inbox-list-v56');
+                                    const stream = document.querySelector('[data-rc-inbox-message-stream]');
+                                    let anchorId = '';
+                                    let anchorOffset = 0;
+
+                                    if (list) {
+                                        const listRect = list.getBoundingClientRect();
+                                        const cards = Array.from(list.querySelectorAll('[data-rc-inbox-conversation-trigger][data-rc-conversation-id]'));
+                                        const anchor = cards.find((card) => card.getBoundingClientRect().bottom > listRect.top + 2);
+                                        if (anchor) {
+                                            anchorId = String(anchor.dataset.rcConversationId || '');
+                                            anchorOffset = anchor.getBoundingClientRect().top - listRect.top;
+                                        }
+                                    }
+
+                                    const threadTop = stream ? stream.scrollTop : 0;
+                                    const threadHeight = stream ? stream.scrollHeight : 0;
+                                    const threadNearBottom = !!stream && (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 120;
+
+                                    return {
+                                        listTop: list ? list.scrollTop : 0,
+                                        anchorId,
+                                        anchorOffset,
+                                        threadTop,
+                                        threadHeight,
+                                        threadNearBottom,
+                                    };
+                                },
+                                restoreRealtimeScrollState(state) {
+                                    if (!state) return;
+                                    const restore = () => {
+                                        const list = document.querySelector('[data-rc-client-section="conversations"] .rc-inbox-list-v56');
+                                        const stream = document.querySelector('[data-rc-inbox-message-stream]');
+
+                                        if (list) {
+                                            let restoredByAnchor = false;
+                                            if (state.anchorId) {
+                                                const escaped = window.CSS && CSS.escape ? CSS.escape(state.anchorId) : state.anchorId.replace(/"/g, '\\"');
+                                                const anchor = list.querySelector(`[data-rc-conversation-id="${escaped}"]`);
+                                                if (anchor) {
+                                                    const listRect = list.getBoundingClientRect();
+                                                    const currentOffset = anchor.getBoundingClientRect().top - listRect.top;
+                                                    list.scrollTop += currentOffset - Number(state.anchorOffset || 0);
+                                                    restoredByAnchor = true;
+                                                }
+                                            }
+                                            if (!restoredByAnchor) list.scrollTop = Number(state.listTop || 0);
+                                        }
+
+                                        if (stream) {
+                                            if (state.threadNearBottom) {
+                                                stream.scrollTop = stream.scrollHeight;
+                                            } else {
+                                                stream.scrollTop = Number(state.threadTop || 0);
+                                            }
+                                        }
+                                    };
+
+                                    window.requestAnimationFrame(() => {
+                                        window.requestAnimationFrame(() => {
+                                            restore();
+                                            window.setTimeout(restore, 90);
+                                        });
+                                    });
+                                },
+                                async pollRealtimeInbox() {
+                                    if (this.realtimePollBusy || !this.realtimeInboxIsVisible()) return;
+                                    if (this.realtimeInboxHasActiveEditor()) return;
+                                    if (this.selectedLoadingId || window.__rcInboxMessageLoader?.busy) return;
+                                    if (document.documentElement.hasAttribute('data-rc-thread-autoloading')) return;
+
+                                    this.realtimePollBusy = true;
+                                    window.__rcInboxRealtimeLastPollAt = Date.now();
+                                    const scrollState = this.captureRealtimeScrollState();
+
+                                    try {
+                                        await this.$wire.pollConversationUpdates();
+                                    } catch (error) {
+                                        // Background refresh is deliberately silent. Manual Refresh remains
+                                        // available if GHL is temporarily unreachable.
+                                    } finally {
+                                        this.realtimePollBusy = false;
+                                        this.restoreRealtimeScrollState(scrollState);
+
+                                        // Livewire may preserve this Alpine island in-place. If so, schedule
+                                        // the next pass here. If it rebuilt the island, init() already did it.
+                                        if (this.$el && this.$el.isConnected) {
+                                            this.startRealtimePolling();
+                                        }
+                                    }
+                                },
+                                startRealtimePolling() {
+                                    if (window.__rcInboxRealtimeTimer) {
+                                        window.clearTimeout(window.__rcInboxRealtimeTimer);
+                                    }
+
+                                    window.__rcInboxRealtimeOwner = this;
+                                    const lastPollAt = Number(window.__rcInboxRealtimeLastPollAt || 0);
+                                    const elapsed = lastPollAt > 0 ? Date.now() - lastPollAt : Number.MAX_SAFE_INTEGER;
+                                    const delay = lastPollAt > 0
+                                        ? Math.max(5000, 60000 - elapsed)
+                                        : 15000;
+
+                                    window.__rcInboxRealtimeTimer = window.setTimeout(() => {
+                                        const owner = window.__rcInboxRealtimeOwner;
+                                        if (owner && typeof owner.pollRealtimeInbox === 'function') {
+                                            owner.pollRealtimeInbox();
+                                        }
+                                    }, delay);
                                 },
                                 setThreadLoading(id) {
                                     this.selectedLoadingId = id;
@@ -10981,7 +11112,7 @@ CSS;
                                         : ($unreadCount > 0 ? 'Unread' : ((bool) ($inboxConversation['replied'] ?? $inboxConversation['has_reply'] ?? false) ? 'Replied' : 'Opened'));
                                     $logo = $threadLogo($inboxConversation);
                                 @endphp
-                                <button type="button" class="rc-thread-card-v56" x-show="conversationStatusFilter === 'all' || (conversationStatusFilter === 'unread' && @js($unreadCount > 0)) || (conversationStatusFilter === 'incoming' && @js($isIncomingThread)) || (conversationStatusFilter === 'starred' && @js($isStarredThread))" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId), 'is-loading': selectedLoadingId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger x-on:click.stop="selectConversation(@js($inboxConversationId))">
+                                <button type="button" class="rc-thread-card-v56" x-show="conversationStatusFilter === 'all' || (conversationStatusFilter === 'unread' && @js($unreadCount > 0)) || (conversationStatusFilter === 'incoming' && @js($isIncomingThread)) || (conversationStatusFilter === 'starred' && @js($isStarredThread))" x-bind:class="{ 'is-selected': selectedConversationId === @js($inboxConversationId), 'is-loading': selectedLoadingId === @js($inboxConversationId) }" data-rc-inbox-conversation-trigger data-rc-conversation-id="{{ $inboxConversationId }}" x-on:click.stop="selectConversation(@js($inboxConversationId))">
                                     <span class="rc-thread-logo-v56">
                                         @if($logo !== '')
                                             <img src="{{ $logo }}" alt="{{ $inboxSchoolLine }} logo" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove();">
@@ -17315,6 +17446,22 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         if (openFreePlanGate(section)) {
             event.preventDefault();
             event.stopPropagation();
+            return;
+        }
+
+        // Settings contains server-rendered billing/payment state and normal POST
+        // forms. Leaving it through the client-only section switch can leave the
+        // persistent shell stuck on Settings in some Filament/Livewire navigation
+        // states. Use a real navigation when leaving Settings so Dashboard and the
+        // other Recruiting Center tabs are always reachable, while preserving the
+        // existing fast client-side navigation everywhere else.
+        const currentSection = currentRoot()?.dataset?.rcCurrentSection
+            || pathToSection(window.location.pathname)
+            || '';
+        if (currentSection === 'settings' && section !== 'settings') {
+            event.preventDefault();
+            event.stopPropagation();
+            window.location.assign(anchor.href);
             return;
         }
 
