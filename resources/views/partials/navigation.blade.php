@@ -83,7 +83,7 @@
       // treated as the marketing application; every other *.plyrcard.com host can
       // resolve to a player Website by its saved domain, slug, or website-name slug.
       $plyrParentDomain = 'plyrcard.com';
-      $plyrPlatformSubdomains = ['www', 'dev', 'app', 'systems', 'admin'];
+      $plyrPlatformSubdomains = ['www', 'dev', 'test', 'app', 'systems', 'admin'];
       $plyrParkedSubdomain = null;
       if (str_ends_with($plyrCurrentHostBase, '.' . $plyrParentDomain)) {
           $candidate = substr($plyrCurrentHostBase, 0, -strlen('.' . $plyrParentDomain));
@@ -97,6 +97,7 @@
           'plyrcard.com',
           'www.plyrcard.com',
           'dev.plyrcard.com',
+          'test.plyrcard.com',
           parse_url(config('app.url'), PHP_URL_HOST),
           '127.0.0.1',
           'localhost',
