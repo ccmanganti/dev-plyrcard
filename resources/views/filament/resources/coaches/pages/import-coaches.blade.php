@@ -61,11 +61,16 @@
             </div>
 
             <label class="coach-drop-zone" x-bind:class="uploading ? 'is-uploading' : ''">
-                <input type="file" wire:model="upload" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+                <input type="file" wire:model="upload" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" x-bind:disabled="batchLoopRunning">
                 <span class="coach-drop-icon"><x-filament::icon icon="heroicon-o-arrow-up-tray" /></span>
-                <strong x-show="!uploading">Choose a CSV or Excel file</strong>
+                @if($stagedUploadName && $storedImportPath)
+                    <strong x-show="!uploading">{{ $stagedUploadName }}</strong>
+                    <small x-show="!uploading">{{ number_format($stagedUploadBytes / 1048576, 2) }} MB · ready to analyze · click to replace</small>
+                @else
+                    <strong x-show="!uploading">Choose a CSV or Excel file</strong>
+                    <small x-show="!uploading">Maximum file size: 20 MB</small>
+                @endif
                 <strong x-show="uploading">Uploading… <span x-text="uploadProgress + '%' "></span></strong>
-                <small>Maximum file size: 20 MB</small>
                 <div class="coach-progress" x-show="uploading || uploadProgress === 100" x-transition>
                     <i x-bind:style="`width:${uploadProgress}%`"></i>
                 </div>
@@ -73,7 +78,7 @@
             @error('upload') <div class="coach-errors">{{ $message }}</div> @enderror
 
             <div class="coach-import-actions">
-                <button class="coach-import-btn coach-import-btn-primary" type="button" x-on:click="begin('Analyzing columns and preview rows…')" wire:click="analyzeUpload" wire:loading.attr="disabled" wire:target="analyzeUpload,upload">
+                <button class="coach-import-btn coach-import-btn-primary" type="button" x-on:click="begin('Analyzing columns and preview rows…')" wire:click="analyzeUpload" wire:loading.attr="disabled" wire:target="analyzeUpload,upload" @disabled(! $storedImportPath)>
                     <span wire:loading.remove wire:target="analyzeUpload">Analyze file</span>
                     <span class="coach-btn-loading" wire:loading wire:target="analyzeUpload"><i></i> Analyzing…</span>
                 </button>

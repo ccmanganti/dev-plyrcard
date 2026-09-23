@@ -8,6 +8,7 @@ use App\Services\CoachSpreadsheetService;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -20,6 +21,9 @@ class ImportCoaches extends Page
     protected static string $resource = CoachResource::class;
     protected string $view = 'filament.resources.coaches.pages.import-coaches';
 
+    private const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
+    private const ALLOWED_UPLOAD_EXTENSIONS = ['csv', 'txt', 'xlsx'];
+
     #[Url(as: 'sport')]
     public ?string $selectedSport = null;
 
@@ -27,6 +31,8 @@ class ImportCoaches extends Page
     public ?string $selectedGender = null;
 
     public TemporaryUploadedFile|string|null $upload = null;
+    public ?string $stagedUploadName = null;
+    public int $stagedUploadBytes = 0;
     public array $headers = [];
     public array $previewRows = [];
     public array $mapping = [];
@@ -60,17 +66,149 @@ class ImportCoaches extends Page
         return 'Import ' . (CoachResource::sportOptions()[$this->selectedSport] ?? 'Sport') . ' Coaches';
     }
 
+    /**
+     * Stage the Livewire temporary upload immediately while the temp file is still
+     * available. This deliberately avoids Laravel's `file|max` validation rules on
+     * TemporaryUploadedFile because those rules call Flysystem fileSize(), which is
+     * the source of the UnableToRetrieveMetadata exception on this server.
+     */
+    public function updatedUpload(): void
+    {
+        $this->resetErrorBag('upload');
+
+        if (! $this->upload instanceof TemporaryUploadedFile) {
+            return;
+        }
+
+        $temporaryUpload = $this->upload;
+        $originalName = trim((string) $temporaryUpload->getClientOriginalName());
+        $extension = strtolower((string) pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if (! in_array($extension, self::ALLOWED_UPLOAD_EXTENSIONS, true)) {
+            $this->addError('upload', 'Please choose a CSV or Excel (.xlsx) file.');
+            $this->upload = null;
+            return;
+        }
+
+        $localDisk = Storage::disk('local');
+        $newStoredPath = 'coach-imports/' . Str::uuid() . '.' . $extension;
+        $destinationPath = $localDisk->path($newStoredPath);
+        $destinationDirectory = dirname($destinationPath);
+
+        if (! is_dir($destinationDirectory) && ! @mkdir($destinationDirectory, 0775, true) && ! is_dir($destinationDirectory)) {
+            $this->addError('upload', 'The coach import staging directory could not be created.');
+            $this->upload = null;
+            return;
+        }
+
+        $source = null;
+        $destination = null;
+
+        try {
+            // getRealPath() resolves the local temp path without asking Flysystem for
+            // file-size metadata. Copying immediately prevents the later Analyze
+            // request from depending on a livewire-tmp file that may have disappeared.
+            $temporaryPath = $temporaryUpload->getRealPath();
+
+            if (! is_string($temporaryPath) || $temporaryPath === '' || ! is_file($temporaryPath)) {
+                throw new \RuntimeException('The temporary upload is no longer available. Please choose the file again.');
+            }
+
+            $source = @fopen($temporaryPath, 'rb');
+            $destination = @fopen($destinationPath, 'wb');
+
+            if (! is_resource($source) || ! is_resource($destination)) {
+                throw new \RuntimeException('The uploaded file could not be staged for import.');
+            }
+
+            // Copy one byte beyond the limit so oversized files can be rejected
+            // without ever calling TemporaryUploadedFile::getSize().
+            $copiedBytes = stream_copy_to_stream($source, $destination, self::MAX_UPLOAD_BYTES + 1);
+
+            if ($copiedBytes === false) {
+                throw new \RuntimeException('The uploaded file could not be copied for import.');
+            }
+
+            if ($copiedBytes > self::MAX_UPLOAD_BYTES) {
+                @unlink($destinationPath);
+                $this->addError('upload', 'The file must not be larger than 20 MB.');
+                $this->upload = null;
+                return;
+            }
+
+            if ($copiedBytes <= 0) {
+                @unlink($destinationPath);
+                $this->addError('upload', 'The selected file is empty.');
+                $this->upload = null;
+                return;
+            }
+
+            if ($this->storedImportPath && $this->storedImportPath !== $newStoredPath) {
+                $localDisk->delete($this->storedImportPath);
+            }
+
+            $this->storedImportPath = $newStoredPath;
+            $this->stagedUploadName = $originalName !== '' ? $originalName : basename($newStoredPath);
+            $this->stagedUploadBytes = (int) $copiedBytes;
+
+            // A newly selected file invalidates any previous analysis/import preview.
+            $this->headers = [];
+            $this->previewRows = [];
+            $this->totalRows = 0;
+            $this->lastImportErrors = [];
+            $this->mapping = array_fill_keys(array_keys(CoachSpreadsheetService::IMPORT_FIELDS), '');
+            $this->importRunning = false;
+            $this->importProcessed = 0;
+            $this->importTotal = 0;
+            $this->importCreated = 0;
+            $this->importUpdated = 0;
+            $this->importSkipped = 0;
+            $this->importFailed = 0;
+
+            // Do not keep the TemporaryUploadedFile around for future Livewire
+            // requests. From here forward we only use the staged local file.
+            $this->upload = null;
+        } catch (Throwable $exception) {
+            if (is_file($destinationPath)) {
+                @unlink($destinationPath);
+            }
+
+            $this->storedImportPath = null;
+            $this->stagedUploadName = null;
+            $this->stagedUploadBytes = 0;
+            $this->upload = null;
+
+            $this->addError('upload', $exception->getMessage());
+        } finally {
+            if (is_resource($source)) {
+                fclose($source);
+            }
+
+            if (is_resource($destination)) {
+                fclose($destination);
+            }
+        }
+    }
+
     public function analyzeUpload(CoachSpreadsheetService $service): void
     {
-        $this->validate(['upload' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:20480']]);
+        $this->resetErrorBag('upload');
 
-        $this->storedImportPath = $this->upload->store('coach-imports', 'local');
-        $analysis = $service->analyze(Storage::disk('local')->path($this->storedImportPath));
+        if (! $this->storedImportPath || ! Storage::disk('local')->exists($this->storedImportPath)) {
+            $this->addError('upload', 'Choose the CSV or Excel file again before analyzing it.');
+            return;
+        }
 
-        $this->headers = $analysis['headers'];
-        $this->previewRows = $analysis['preview'];
-        $this->totalRows = $analysis['total_rows'];
-        $this->mapping = $service->suggestMapping($this->headers);
+        try {
+            $analysis = $service->analyze(Storage::disk('local')->path($this->storedImportPath));
+
+            $this->headers = $analysis['headers'];
+            $this->previewRows = $analysis['preview'];
+            $this->totalRows = $analysis['total_rows'];
+            $this->mapping = $service->suggestMapping($this->headers);
+        } catch (Throwable $exception) {
+            $this->addError('upload', 'The file could not be analyzed: ' . $exception->getMessage());
+        }
     }
 
     public function startImport(CoachSpreadsheetService $service): void
@@ -167,9 +305,9 @@ class ImportCoaches extends Page
         if ($this->storedImportPath) Storage::disk('local')->delete($this->storedImportPath);
 
         $this->reset([
-            'upload', 'headers', 'previewRows', 'totalRows', 'storedImportPath', 'lastImportErrors',
-            'importRunning', 'importProcessed', 'importTotal', 'importCreated', 'importUpdated',
-            'importSkipped', 'importFailed', 'importJobPath',
+            'upload', 'stagedUploadName', 'stagedUploadBytes', 'headers', 'previewRows', 'totalRows',
+            'storedImportPath', 'lastImportErrors', 'importRunning', 'importProcessed', 'importTotal',
+            'importCreated', 'importUpdated', 'importSkipped', 'importFailed', 'importJobPath',
         ]);
         $this->mapping = array_fill_keys(array_keys(CoachSpreadsheetService::IMPORT_FIELDS), '');
     }
