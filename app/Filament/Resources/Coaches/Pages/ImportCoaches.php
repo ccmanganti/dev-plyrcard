@@ -9,6 +9,10 @@ namespace App\Filament\Resources\Coaches\Pages;
 use App\Filament\Resources\Coaches\CoachResource;
 
 use App\Models\Coach;
+use App\Models\Club;
+use App\Models\League;
+use App\Models\School;
+use App\Models\User;
 
 use App\Services\CoachSpreadsheetService;
 
@@ -17,7 +21,10 @@ use App\Services\SportAvailabilityService;
 use Filament\Notifications\Notification;
 
 use Filament\Resources\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 use Illuminate\Support\Str;
@@ -102,6 +109,14 @@ class ImportCoaches extends Page
 
     public ?string $importJobPath = null;
 
+    // Optional quick exclusivity for this upload. Public keeps the existing
+    // behavior. Other modes resolve to concrete non-admin user IDs when the
+    // import starts, then every imported coach is restricted to that audience.
+    public string $quickVisibilityType = 'public';
+    public array $quickVisibilityUserIds = [];
+    public ?string $quickVisibilityClubId = null;
+    public ?string $quickVisibilityLeagueId = null;
+
 
 
     public function mount(): void
@@ -132,6 +147,56 @@ class ImportCoaches extends Page
 
         return 'Import ' . (CoachResource::sportOptions()[$this->selectedSport] ?? 'Sport') . ' Coaches';
 
+    }
+
+    public function getQuickVisibilityUserOptionsProperty(): array
+    {
+        return $this->eligibleAudienceUserQuery()
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->limit(500)
+            ->get(['id', 'first_name', 'last_name', 'email', 'sport'])
+            ->mapWithKeys(fn (User $user): array => [
+                (string) $user->getKey() => $this->formatAudienceUserLabel($user),
+            ])
+            ->all();
+    }
+
+    public function getQuickVisibilityClubOptionsProperty(): array
+    {
+        return Club::query()
+            ->orderBy('name')
+            ->limit(500)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id): array => [(string) $id => (string) $name])
+            ->all();
+    }
+
+    public function getQuickVisibilityLeagueOptionsProperty(): array
+    {
+        return League::query()
+            ->orderBy('name')
+            ->limit(500)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id): array => [(string) $id => (string) $name])
+            ->all();
+    }
+
+    public function getQuickVisibilityReadyProperty(): bool
+    {
+        return match ($this->quickVisibilityType) {
+            'users' => collect($this->quickVisibilityUserIds)->filter()->isNotEmpty(),
+            'club' => (int) $this->quickVisibilityClubId > 0,
+            'league' => (int) $this->quickVisibilityLeagueId > 0,
+            default => true,
+        };
+    }
+
+    public function updatedQuickVisibilityType(): void
+    {
+        $this->quickVisibilityUserIds = [];
+        $this->quickVisibilityClubId = null;
+        $this->quickVisibilityLeagueId = null;
     }
 
 
@@ -492,6 +557,17 @@ class ImportCoaches extends Page
 
         }
 
+        try {
+            $quickVisibilityUserIds = $this->resolveQuickVisibilityUserIds();
+        } catch (Throwable $exception) {
+            Notification::make()
+                ->title('Choose a valid exclusivity audience')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+            return;
+        }
+
 
 
         try {
@@ -517,6 +593,11 @@ class ImportCoaches extends Page
 
 
             $this->importJobPath = $prepared['job_path'];
+
+            $this->decorateImportJobWithQuickVisibility(
+                $this->importJobPath,
+                $quickVisibilityUserIds,
+            );
 
             $this->importTotal = (int) $prepared['total'];
 
@@ -560,11 +641,12 @@ class ImportCoaches extends Page
 
         if (! $this->importRunning || ! $this->importJobPath) return;
 
-
+        $batchOffset = $this->importProcessed;
+        $batchRows = $this->importJobRows($this->importJobPath, $batchOffset, $this->importBatchSize);
 
         try {
 
-            $result = $service->processImportBatch($this->importJobPath, $this->importProcessed, $this->importBatchSize);
+            $result = $service->processImportBatch($this->importJobPath, $batchOffset, $this->importBatchSize);
 
             $this->importProcessed += (int) $result['processed'];
 
@@ -575,6 +657,10 @@ class ImportCoaches extends Page
             $this->importFailed += count($result['errors']);
 
             $this->lastImportErrors = array_slice(array_merge($this->lastImportErrors, $result['errors']), 0, 100);
+
+            if ((int) $result['processed'] > 0) {
+                $this->applyQuickVisibilityForBatch($this->importJobPath, $batchRows);
+            }
 
             if ((bool) $result['done']) $this->finishImport($service);
 
@@ -638,6 +724,8 @@ class ImportCoaches extends Page
 
             'importCreated', 'importUpdated', 'importSkipped', 'importFailed', 'importJobPath',
 
+            'quickVisibilityType', 'quickVisibilityUserIds', 'quickVisibilityClubId', 'quickVisibilityLeagueId',
+
         ]);
 
         $this->mapping = array_fill_keys(array_keys(CoachSpreadsheetService::IMPORT_FIELDS), '');
@@ -646,9 +734,310 @@ class ImportCoaches extends Page
 
 
 
+    protected function eligibleAudienceUserQuery(): Builder
+    {
+        return User::query()
+            ->whereDoesntHave('roles', fn (Builder $roles): Builder => $roles->whereIn('name', [
+                'Superadmin', 'superadmin', 'Super Admin', 'Admin', 'admin', 'Administrator',
+            ]));
+    }
+
+    protected function formatAudienceUserLabel(User $user): string
+    {
+        $name = trim((string) ($user->first_name . ' ' . $user->last_name));
+        $meta = collect([
+            $user->email,
+            filled($user->sport) ? Str::headline((string) $user->sport) : null,
+        ])->filter()->implode(' · ');
+
+        return ($name !== '' ? $name : ('User #' . $user->getKey())) . ($meta ? ' — ' . $meta : '');
+    }
+
+    protected function resolveQuickVisibilityUserIds(): array
+    {
+        $type = $this->quickVisibilityType;
+        if (! in_array($type, ['public', 'users', 'club', 'league'], true)) {
+            throw new \InvalidArgumentException('Choose a valid exclusivity option.');
+        }
+
+        if ($type === 'public') {
+            return [];
+        }
+
+        $ids = match ($type) {
+            'users' => $this->eligibleAudienceUserQuery()
+                ->whereIn('id', collect($this->quickVisibilityUserIds)
+                    ->map(fn ($id): int => (int) $id)
+                    ->filter(fn (int $id): bool => $id > 0)
+                    ->unique()
+                    ->values()
+                    ->all())
+                ->pluck('id'),
+            'club' => $this->audienceUserIdsForClub((int) $this->quickVisibilityClubId),
+            'league' => $this->audienceUserIdsForLeague((int) $this->quickVisibilityLeagueId),
+            default => collect(),
+        };
+
+        $ids = collect($ids)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            throw new \InvalidArgumentException(match ($type) {
+                'users' => 'Select at least one user.',
+                'club' => 'The selected club does not currently have any eligible users.',
+                'league' => 'The selected league does not currently have any eligible users.',
+                default => 'Choose an exclusivity audience.',
+            });
+        }
+
+        return $ids->all();
+    }
+
+    protected function audienceUserIdsForClub(int $clubId)
+    {
+        if ($clubId <= 0 || ! Club::query()->whereKey($clubId)->exists()) {
+            throw new \InvalidArgumentException('Choose a valid club.');
+        }
+
+        $ids = collect();
+
+        if (Schema::hasColumn('users', 'club_id')) {
+            $ids = $ids->merge($this->eligibleAudienceUserQuery()->where('club_id', $clubId)->pluck('id'));
+        }
+
+        if (Schema::hasColumn('users', 'legacy_club_id')) {
+            $ids = $ids->merge($this->eligibleAudienceUserQuery()->where('legacy_club_id', $clubId)->pluck('id'));
+        }
+
+        if (Schema::hasColumn('users', 'club_league_id') && Schema::hasTable('club_leagues')) {
+            $clubLeagueQuery = DB::table('club_leagues')->where('club_id', $clubId);
+            if (Schema::hasColumn('club_leagues', 'deleted_at')) {
+                $clubLeagueQuery->whereNull('deleted_at');
+            }
+            $clubLeagueIds = $clubLeagueQuery->pluck('id')->all();
+            if ($clubLeagueIds !== []) {
+                $ids = $ids->merge($this->eligibleAudienceUserQuery()->whereIn('club_league_id', $clubLeagueIds)->pluck('id'));
+            }
+        }
+
+        return $ids->unique()->values();
+    }
+
+    protected function audienceUserIdsForLeague(int $leagueId)
+    {
+        if ($leagueId <= 0 || ! League::query()->whereKey($leagueId)->exists()) {
+            throw new \InvalidArgumentException('Choose a valid league.');
+        }
+
+        $ids = collect();
+
+        if (Schema::hasColumn('users', 'league_id')) {
+            $ids = $ids->merge($this->eligibleAudienceUserQuery()->where('league_id', $leagueId)->pluck('id'));
+        }
+
+        if (Schema::hasColumn('users', 'legacy_league_id')) {
+            $ids = $ids->merge($this->eligibleAudienceUserQuery()->where('legacy_league_id', $leagueId)->pluck('id'));
+        }
+
+        if (Schema::hasColumn('users', 'club_league_id') && Schema::hasTable('club_leagues')) {
+            $clubLeagueQuery = DB::table('club_leagues')->where('league_id', $leagueId);
+            if (Schema::hasColumn('club_leagues', 'deleted_at')) {
+                $clubLeagueQuery->whereNull('deleted_at');
+            }
+            $clubLeagueIds = $clubLeagueQuery->pluck('id')->all();
+            if ($clubLeagueIds !== []) {
+                $ids = $ids->merge($this->eligibleAudienceUserQuery()->whereIn('club_league_id', $clubLeagueIds)->pluck('id'));
+            }
+        }
+
+        return $ids->unique()->values();
+    }
+
+    protected function quickVisibilityAudienceLabel(array $resolvedUserIds): string
+    {
+        return match ($this->quickVisibilityType) {
+            'users' => count($resolvedUserIds) === 1
+                ? '1 selected user'
+                : number_format(count($resolvedUserIds)) . ' selected users',
+            'club' => (string) (Club::query()->whereKey((int) $this->quickVisibilityClubId)->value('name') ?: 'selected club'),
+            'league' => (string) (League::query()->whereKey((int) $this->quickVisibilityLeagueId)->value('name') ?: 'selected league'),
+            default => 'Public',
+        };
+    }
+
+    protected function decorateImportJobWithQuickVisibility(?string $jobPath, array $resolvedUserIds): void
+    {
+        if (! $jobPath || $this->quickVisibilityType === 'public') {
+            return;
+        }
+
+        $payload = $this->importJobPayload($jobPath);
+        $rows = is_array($payload['rows'] ?? null) ? $payload['rows'] : [];
+        $schoolNames = collect($rows)
+            ->pluck('school_name')
+            ->map(fn ($name): string => $this->normalizeSchoolName((string) $name))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $preexistingSchoolNames = collect();
+        if ($schoolNames->isNotEmpty()) {
+            $preexistingSchoolNames = School::withTrashed()
+                ->whereIn(DB::raw('LOWER(TRIM(name))'), $schoolNames->all())
+                ->pluck('name')
+                ->map(fn ($name): string => $this->normalizeSchoolName((string) $name))
+                ->filter()
+                ->unique()
+                ->values();
+        }
+
+        $payload['quick_visibility'] = [
+            'type' => $this->quickVisibilityType,
+            'user_ids' => array_values($resolvedUserIds),
+            'audience_label' => $this->quickVisibilityAudienceLabel($resolvedUserIds),
+            'preexisting_school_names' => $preexistingSchoolNames->all(),
+        ];
+
+        Storage::disk('local')->put($jobPath, json_encode($payload, JSON_THROW_ON_ERROR));
+    }
+
+    protected function importJobPayload(string $jobPath): array
+    {
+        if (! Storage::disk('local')->exists($jobPath)) {
+            throw new \RuntimeException('The temporary import job could not be found.');
+        }
+
+        $payload = json_decode(Storage::disk('local')->get($jobPath), true, flags: JSON_THROW_ON_ERROR);
+        return is_array($payload) ? $payload : [];
+    }
+
+    protected function importJobRows(string $jobPath, int $offset, int $limit): array
+    {
+        $payload = $this->importJobPayload($jobPath);
+        $rows = is_array($payload['rows'] ?? null) ? $payload['rows'] : [];
+
+        return array_slice($rows, max(0, $offset), max(1, $limit));
+    }
+
+    protected function applyQuickVisibilityForBatch(string $jobPath, array $batchRows): void
+    {
+        $payload = $this->importJobPayload($jobPath);
+        $meta = is_array($payload['quick_visibility'] ?? null) ? $payload['quick_visibility'] : [];
+        $type = (string) ($meta['type'] ?? 'public');
+
+        if ($type === 'public') {
+            return;
+        }
+
+        $userIds = collect($meta['user_ids'] ?? [])
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($userIds === []) {
+            throw new \RuntimeException('Quick exclusivity has no eligible users. The import was paused so the new coaches are not intentionally left unrestricted.');
+        }
+
+        $emails = collect($batchRows)
+            ->pluck('email')
+            ->map(fn ($email): string => Str::lower(trim((string) $email)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $visibility = app(RecruitingVisibilityService::class);
+
+        if ($emails->isNotEmpty()) {
+            $coachIds = Coach::query()
+                ->whereIn('email', $emails->all())
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            $visibility->syncCoaches($coachIds, $userIds);
+        }
+
+        // Only make schools themselves exclusive when the school was created by
+        // this import. For an already-existing public school, only the imported
+        // coaches are restricted so its unrelated coaches stay visible.
+        $preexisting = collect($meta['preexisting_school_names'] ?? [])
+            ->map(fn ($name): string => $this->normalizeSchoolName((string) $name))
+            ->filter()
+            ->flip();
+
+        $newSchoolNames = collect($batchRows)
+            ->pluck('school_name')
+            ->map(fn ($name): string => $this->normalizeSchoolName((string) $name))
+            ->filter()
+            ->reject(fn (string $name): bool => $preexisting->has($name))
+            ->unique()
+            ->values();
+
+        if ($newSchoolNames->isNotEmpty()) {
+            $schoolIds = School::query()
+                ->whereIn(DB::raw('LOWER(TRIM(name))'), $newSchoolNames->all())
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->all();
+
+            $visibility->syncSchools($schoolIds, $userIds);
+        }
+    }
+
+    protected function quickVisibilitySummaryForJob(?string $jobPath): ?string
+    {
+        if (! $jobPath || ! Storage::disk('local')->exists($jobPath)) {
+            return null;
+        }
+
+        $payload = $this->importJobPayload($jobPath);
+        $meta = is_array($payload['quick_visibility'] ?? null) ? $payload['quick_visibility'] : [];
+        if (($meta['type'] ?? 'public') === 'public') {
+            return null;
+        }
+
+        $rows = is_array($payload['rows'] ?? null) ? $payload['rows'] : [];
+        $emails = collect($rows)->pluck('email')->filter()->unique()->values()->all();
+        $coachCount = $emails === [] ? 0 : Coach::query()->whereIn('email', $emails)->count();
+
+        $preexisting = collect($meta['preexisting_school_names'] ?? [])->flip();
+        $newSchoolNames = collect($rows)
+            ->pluck('school_name')
+            ->map(fn ($name): string => $this->normalizeSchoolName((string) $name))
+            ->filter()
+            ->reject(fn (string $name): bool => $preexisting->has($name))
+            ->unique()
+            ->values();
+        $schoolCount = $newSchoolNames->isEmpty()
+            ? 0
+            : School::query()->whereIn(DB::raw('LOWER(TRIM(name))'), $newSchoolNames->all())->count();
+
+        $audience = trim((string) ($meta['audience_label'] ?? 'selected audience'));
+
+        return sprintf(
+            'Quick exclusivity applied to %d coach%s%s for %s.',
+            $coachCount,
+            $coachCount === 1 ? '' : 'es',
+            $schoolCount > 0 ? ' and ' . $schoolCount . ' new school' . ($schoolCount === 1 ? '' : 's') : '',
+            $audience !== '' ? $audience : 'selected audience',
+        );
+    }
+
+    protected function normalizeSchoolName(string $name): string
+    {
+        return strtolower(trim((string) preg_replace('/\s+/', ' ', $name)));
+    }
+
     private function finishImport(CoachSpreadsheetService $service): void
 
     {
+
+        $quickVisibilitySummary = $this->quickVisibilitySummaryForJob($this->importJobPath);
 
         $this->importRunning = false;
 
@@ -658,11 +1047,16 @@ class ImportCoaches extends Page
 
 
 
+        $body = sprintf('%d created, %d updated, %d blank rows skipped, %d rows failed.',
+            $this->importCreated, $this->importUpdated, $this->importSkipped, $this->importFailed);
+
+        if ($quickVisibilitySummary) {
+            $body .= ' ' . $quickVisibilitySummary;
+        }
+
         Notification::make()->title('Coach import completed')
 
-            ->body(sprintf('%d created, %d updated, %d blank rows skipped, %d rows failed.',
-
-                $this->importCreated, $this->importUpdated, $this->importSkipped, $this->importFailed))
+            ->body($body)
 
             ->success()->persistent()->send();
 

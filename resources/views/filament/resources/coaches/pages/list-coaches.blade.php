@@ -25,6 +25,10 @@
                 <x-filament::icon icon="heroicon-o-academic-cap" />
                 <span>Schools</span>
             </a>
+            <a href="{{ \App\Filament\Resources\Coaches\CoachResource::getUrl('exclusivity') }}">
+                <x-filament::icon icon="heroicon-o-lock-closed" />
+                <span>Exclusivity</span>
+            </a>
         </nav>
 
         <section class="cd-directory-panel">
@@ -36,6 +40,8 @@
                 </div>
 
                 <div class="cd-head-actions">
+                    <livewire:coach-ghl-sync-panel />
+
                     <div class="cd-view-toggle" role="group" aria-label="Directory view">
                     <button type="button" x-on:click="activeView='list'; setBusy('Opening list view…'); $wire.setDirectoryView('list')" x-bind:class="activeView === 'list' ? 'is-active' : ''">
                         <x-filament::icon icon="heroicon-o-list-bullet" /><span>List</span>
@@ -46,8 +52,6 @@
                     </div>
                 </div>
             </div>
-
-            <livewire:coach-ghl-sync-panel />
 
             <div class="cd-scroll-nav" x-data="{ left:false,right:true, sync(){ const e=this.$refs.track; this.left=e.scrollLeft>2; this.right=e.scrollLeft+e.clientWidth<e.scrollWidth-2 }, move(d){ this.$refs.track.scrollBy({left:d*this.$refs.track.clientWidth*.72,behavior:'smooth'}); setTimeout(()=>this.sync(),260) } }" x-init="$nextTick(()=>sync())" x-on:resize.window.debounce.150ms="sync()" :class="{'has-left':left,'has-right':right}">
                 <button type="button" class="cd-scroll-button" x-on:click="move(-1)" :disabled="!left" aria-label="Previous sports"><x-filament::icon icon="heroicon-o-chevron-left" /></button>

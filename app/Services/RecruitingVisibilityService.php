@@ -126,6 +126,20 @@ class RecruitingVisibilityService
         $this->syncTarget('coach', $coachId, $userIds);
     }
 
+    /**
+     * Bulk variants are used by spreadsheet import so a 150-row batch only
+     * replaces visibility once and only bumps the visibility fingerprint once.
+     */
+    public function syncSchools(array $schoolIds, array $userIds): int
+    {
+        return $this->syncManyTargets('school', $schoolIds, $userIds);
+    }
+
+    public function syncCoaches(array $coachIds, array $userIds): int
+    {
+        return $this->syncManyTargets('coach', $coachIds, $userIds);
+    }
+
     public function makeSchoolPublic(int $schoolId): void
     {
         if ($this->ready() && DB::table(self::SCHOOL_TABLE)->where('school_id', $schoolId)->delete() > 0) {
@@ -313,6 +327,80 @@ class RecruitingVisibilityService
         });
 
         $this->touchVersion();
+    }
+
+    protected function syncManyTargets(string $type, array $targetIds, array $userIds): int
+    {
+        if (! $this->ready()) {
+            throw new \RuntimeException('Recruiting visibility tables have not been migrated yet.');
+        }
+
+        [$table, $column] = $this->targetTableAndColumn($type);
+
+        $requestedTargetIds = collect($targetIds)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($requestedTargetIds->isEmpty()) {
+            return 0;
+        }
+
+        $validTargetIds = ($type === 'school' ? School::query() : Coach::query())
+            ->whereIn('id', $requestedTargetIds->all())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        if ($validTargetIds->isEmpty()) {
+            return 0;
+        }
+
+        $validUserIds = User::query()
+            ->whereIn('id', collect($userIds)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values()
+                ->all())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        if ($validUserIds->isEmpty()) {
+            throw new \InvalidArgumentException('Choose at least one user for an exclusive rule.');
+        }
+
+        DB::transaction(function () use ($table, $column, $validTargetIds, $validUserIds): void {
+            DB::table($table)->whereIn($column, $validTargetIds->all())->delete();
+
+            $now = now();
+            $chunk = [];
+            foreach ($validTargetIds as $targetId) {
+                foreach ($validUserIds as $userId) {
+                    $chunk[] = [
+                        $column => $targetId,
+                        'user_id' => $userId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+
+                    if (count($chunk) >= 1000) {
+                        DB::table($table)->insert($chunk);
+                        $chunk = [];
+                    }
+                }
+            }
+
+            if ($chunk !== []) {
+                DB::table($table)->insert($chunk);
+            }
+        });
+
+        $this->touchVersion();
+
+        return $validTargetIds->count();
     }
 
     protected function touchVersion(): void

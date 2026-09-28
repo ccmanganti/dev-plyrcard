@@ -73,6 +73,18 @@
             </svg>
             <span>Schools</span>
         </a>
+
+        <a
+            class="coach-db-top-tab"
+            href="{{ \App\Filament\Resources\Coaches\CoachResource::getUrl('exclusivity') }}"
+            wire:navigate
+        >
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="5" y="10" width="14" height="10" rx="2" stroke-width="1.8" />
+                <path stroke-linecap="round" stroke-width="1.8" d="M8 10V7a4 4 0 0 1 8 0v3" />
+            </svg>
+            <span>Exclusivity</span>
+        </a>
     </nav>
 
     {{ $this->table }}

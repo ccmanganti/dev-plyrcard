@@ -55,6 +55,68 @@
                 </label>
             </div>
 
+            <div class="coach-import-visibility">
+                <div class="coach-import-visibility-head">
+                    <div>
+                        <strong>Quick exclusivity</strong>
+                        <span>Optional — choose who can see the coaches from this upload.</span>
+                    </div>
+                    <x-filament::icon icon="heroicon-o-lock-closed" />
+                </div>
+
+                <div class="coach-import-visibility-grid">
+                    <label class="coach-import-visibility-field">
+                        <span class="coach-import-context-label">Visibility</span>
+                        <select wire:model.live="quickVisibilityType" x-bind:disabled="batchLoopRunning">
+                            <option value="public">No quick restriction (normal visibility)</option>
+                            <option value="users">Specific user(s)</option>
+                            <option value="club">Club</option>
+                            <option value="league">League</option>
+                        </select>
+                    </label>
+
+                    @if($quickVisibilityType === 'users')
+                        <label class="coach-import-visibility-field is-wide">
+                            <span class="coach-import-context-label">User(s)</span>
+                            <select multiple size="6" wire:model.live="quickVisibilityUserIds" x-bind:disabled="batchLoopRunning">
+                                @foreach($this->quickVisibilityUserOptions as $userId => $userLabel)
+                                    <option value="{{ $userId }}">{{ $userLabel }}</option>
+                                @endforeach
+                            </select>
+                            <small>Select one user for single-user access, or select multiple users. Use Ctrl/Cmd to select more than one.</small>
+                        </label>
+                    @elseif($quickVisibilityType === 'club')
+                        <label class="coach-import-visibility-field is-wide">
+                            <span class="coach-import-context-label">Club</span>
+                            <select wire:model.live="quickVisibilityClubId" x-bind:disabled="batchLoopRunning">
+                                <option value="">Select club</option>
+                                @foreach($this->quickVisibilityClubOptions as $clubId => $clubLabel)
+                                    <option value="{{ $clubId }}">{{ $clubLabel }}</option>
+                                @endforeach
+                            </select>
+                            <small>Access is assigned to the club's current non-admin users when the import starts.</small>
+                        </label>
+                    @elseif($quickVisibilityType === 'league')
+                        <label class="coach-import-visibility-field is-wide">
+                            <span class="coach-import-context-label">League</span>
+                            <select wire:model.live="quickVisibilityLeagueId" x-bind:disabled="batchLoopRunning">
+                                <option value="">Select league</option>
+                                @foreach($this->quickVisibilityLeagueOptions as $leagueId => $leagueLabel)
+                                    <option value="{{ $leagueId }}">{{ $leagueLabel }}</option>
+                                @endforeach
+                            </select>
+                            <small>Access is assigned to the league's current non-admin users when the import starts.</small>
+                        </label>
+                    @endif
+                </div>
+
+                @if($quickVisibilityType !== 'public')
+                    <p class="coach-import-visibility-note">
+                        Every successfully imported coach gets this exclusivity rule. If the import creates a brand-new school, that school is restricted too. Existing schools stay public so unrelated coaches at that school are not hidden.
+                    </p>
+                @endif
+            </div>
+
             <div class="coach-import-actions">
                 <button class="coach-import-btn" type="button" wire:click="downloadTemplate('xlsx')" wire:loading.attr="disabled">Download Excel template</button>
                 <button class="coach-import-btn" type="button" wire:click="downloadTemplate('csv')" wire:loading.attr="disabled">Download CSV template</button>
@@ -108,7 +170,7 @@
                 </div>
 
                 <div class="coach-import-actions">
-                    <button class="coach-import-btn coach-import-btn-primary" type="button" x-on:click="runBatchImport()" x-bind:disabled="batchLoopRunning || !@js((bool) $selectedGender)">
+                    <button class="coach-import-btn coach-import-btn-primary" type="button" x-on:click="runBatchImport()" x-bind:disabled="batchLoopRunning || !@js((bool) $selectedGender) || !@js((bool) $this->quickVisibilityReady)">
                         <span x-show="!batchLoopRunning">Import {{ number_format($totalRows) }} coaches</span>
                         <span class="coach-btn-loading" x-show="batchLoopRunning" x-cloak><i></i> Importing and preparing GHL checks…</span>
                     </button>
@@ -158,6 +220,6 @@
     </div>
 
     <style>
-        [x-cloak]{display:none!important}.coach-import-stack{display:grid;gap:18px;--ci-accent:#ff6338;--ci-border:rgba(148,163,184,.28);--ci-muted:rgb(100 116 139)}.coach-import-card{background:var(--fi-color-white);border:1px solid var(--ci-border);border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(15,23,42,.04)}.dark .coach-import-card{background:rgb(24 24 27);border-color:rgba(148,163,184,.2)}.coach-import-title{font-size:18px;font-weight:800}.coach-import-muted{color:var(--ci-muted);font-size:14px}.coach-import-context{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-top:10px}.coach-import-context-label{display:block;margin-bottom:5px;font-size:11px;font-weight:800;color:var(--ci-muted);text-transform:uppercase;letter-spacing:.08em}.coach-import-sport{display:inline-flex;border-radius:10px;padding:9px 12px;background:rgba(255,99,56,.10);color:var(--ci-accent);font-weight:800;min-height:40px;align-items:center}.coach-import-gender{display:block;min-width:220px}.coach-import-gender select{width:100%;min-height:40px;border:1px solid rgba(148,163,184,.45);border-radius:10px;padding:8px 10px;background:transparent}.coach-import-gender small{display:block;margin-top:4px;color:var(--ci-muted);font-size:11px}.coach-import-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.coach-import-btn{border:1px solid rgba(148,163,184,.4);border-radius:10px;padding:9px 14px;font-weight:700;background:white;cursor:pointer;transition:.14s ease}.dark .coach-import-btn{background:rgb(39 39 42)}.coach-import-btn:hover{transform:translateY(-1px);border-color:var(--ci-accent)}.coach-import-btn:disabled{opacity:.58;cursor:wait;transform:none}.coach-import-btn-primary{background:var(--ci-accent);color:white;border-color:var(--ci-accent)}.coach-btn-loading{display:inline-flex;align-items:center;gap:7px}.coach-btn-loading i{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:ci-spin .65s linear infinite}.coach-drop-zone{margin-top:16px;min-height:150px;border:1.5px dashed rgba(148,163,184,.65);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center;cursor:pointer;transition:.18s ease}.coach-drop-zone:hover,.coach-drop-zone.is-uploading{border-color:var(--ci-accent);background:rgba(255,99,56,.04)}.coach-drop-zone input{position:absolute;width:1px;height:1px;opacity:0}.coach-drop-icon{width:42px;height:42px;border-radius:12px;background:rgba(255,99,56,.1);color:var(--ci-accent);display:grid;place-items:center}.coach-drop-icon svg{width:22px;height:22px}.coach-drop-zone small{color:var(--ci-muted)}.coach-progress{height:8px;width:min(460px,100%);border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden;margin-top:8px}.coach-progress i{display:block;height:100%;border-radius:inherit;background:var(--ci-accent);transition:width .18s ease}.coach-map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.coach-map-field label{display:block;font-size:12px;font-weight:800;margin-bottom:5px}.coach-map-field select{width:100%;border:1px solid rgba(148,163,184,.45);border-radius:10px;padding:9px;background:transparent}.coach-preview{overflow:auto;margin-top:16px;border:1px solid var(--ci-border);border-radius:12px}.coach-preview table{width:100%;border-collapse:collapse;font-size:12px}.coach-preview th,.coach-preview td{padding:8px 10px;border-bottom:1px solid rgba(148,163,184,.18);white-space:nowrap;text-align:left}.coach-preview th{font-weight:800;background:rgba(148,163,184,.08)}.coach-errors{margin-top:12px;padding:12px;border-radius:12px;background:rgba(239,68,68,.08);color:rgb(185 28 28);max-height:260px;overflow:auto;font-size:13px}.coach-process-box{margin-top:14px;border:1px solid rgba(255,99,56,.25);background:rgba(255,99,56,.05);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}.coach-process-copy{display:flex;justify-content:space-between;gap:12px;font-size:13px}.coach-process-copy span{color:var(--ci-muted)}.coach-process-bar{height:9px;border-radius:999px;background:rgba(255,99,56,.15);overflow:hidden}.coach-process-bar.is-real i{display:block;height:100%;background:var(--ci-accent);border-radius:inherit;transition:width .25s ease}.coach-import-stats{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--ci-muted)}.coach-import-stats strong{color:inherit}.coach-import-global{position:fixed;z-index:9999;top:0;left:0;right:0;height:4px;background:rgba(255,99,56,.15)}.coach-import-global span{display:block;width:38%;height:100%;background:var(--ci-accent);animation:ci-progress 1s ease-in-out infinite}.coach-import-global strong{position:fixed;top:14px;right:18px;background:#111827;color:#fff;border-radius:999px;padding:7px 11px;font-size:11px;box-shadow:0 8px 24px rgba(15,23,42,.2)}@keyframes ci-spin{to{transform:rotate(360deg)}}@keyframes ci-progress{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}@media(max-width:800px){.coach-map-grid{grid-template-columns:1fr}.coach-process-copy{flex-direction:column}}
+        [x-cloak]{display:none!important}.coach-import-stack{display:grid;gap:18px;--ci-accent:#ff6338;--ci-border:rgba(148,163,184,.28);--ci-muted:rgb(100 116 139)}.coach-import-card{background:var(--fi-color-white);border:1px solid var(--ci-border);border-radius:16px;padding:20px;box-shadow:0 1px 2px rgba(15,23,42,.04)}.dark .coach-import-card{background:rgb(24 24 27);border-color:rgba(148,163,184,.2)}.coach-import-title{font-size:18px;font-weight:800}.coach-import-muted{color:var(--ci-muted);font-size:14px}.coach-import-context{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-top:10px}.coach-import-context-label{display:block;margin-bottom:5px;font-size:11px;font-weight:800;color:var(--ci-muted);text-transform:uppercase;letter-spacing:.08em}.coach-import-sport{display:inline-flex;border-radius:10px;padding:9px 12px;background:rgba(255,99,56,.10);color:var(--ci-accent);font-weight:800;min-height:40px;align-items:center}.coach-import-gender{display:block;min-width:220px}.coach-import-gender select{width:100%;min-height:40px;border:1px solid rgba(148,163,184,.45);border-radius:10px;padding:8px 10px;background:transparent}.coach-import-gender small{display:block;margin-top:4px;color:var(--ci-muted);font-size:11px}.coach-import-visibility{margin-top:14px;padding:13px;border:1px solid var(--ci-border);border-radius:12px;background:rgba(148,163,184,.04)}.coach-import-visibility-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.coach-import-visibility-head>div{display:grid;gap:2px}.coach-import-visibility-head strong{font-size:13px}.coach-import-visibility-head span{color:var(--ci-muted);font-size:11px}.coach-import-visibility-head>svg{width:18px;height:18px;color:var(--ci-accent);flex:none}.coach-import-visibility-grid{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(320px,1.2fr);gap:12px;margin-top:10px}.coach-import-visibility-field{display:block}.coach-import-visibility-field select{width:100%;min-height:40px;border:1px solid rgba(148,163,184,.45);border-radius:10px;padding:8px 10px;background:transparent}.coach-import-visibility-field select[multiple]{min-height:124px}.coach-import-visibility-field small{display:block;margin-top:4px;color:var(--ci-muted);font-size:11px}.coach-import-visibility-note{margin:9px 0 0;color:var(--ci-muted);font-size:11px;line-height:1.5}.coach-import-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.coach-import-btn{border:1px solid rgba(148,163,184,.4);border-radius:10px;padding:9px 14px;font-weight:700;background:white;cursor:pointer;transition:.14s ease}.dark .coach-import-btn{background:rgb(39 39 42)}.coach-import-btn:hover{transform:translateY(-1px);border-color:var(--ci-accent)}.coach-import-btn:disabled{opacity:.58;cursor:wait;transform:none}.coach-import-btn-primary{background:var(--ci-accent);color:white;border-color:var(--ci-accent)}.coach-btn-loading{display:inline-flex;align-items:center;gap:7px}.coach-btn-loading i{width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:ci-spin .65s linear infinite}.coach-drop-zone{margin-top:16px;min-height:150px;border:1.5px dashed rgba(148,163,184,.65);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center;cursor:pointer;transition:.18s ease}.coach-drop-zone:hover,.coach-drop-zone.is-uploading{border-color:var(--ci-accent);background:rgba(255,99,56,.04)}.coach-drop-zone input{position:absolute;width:1px;height:1px;opacity:0}.coach-drop-icon{width:42px;height:42px;border-radius:12px;background:rgba(255,99,56,.1);color:var(--ci-accent);display:grid;place-items:center}.coach-drop-icon svg{width:22px;height:22px}.coach-drop-zone small{color:var(--ci-muted)}.coach-progress{height:8px;width:min(460px,100%);border-radius:999px;background:rgba(148,163,184,.2);overflow:hidden;margin-top:8px}.coach-progress i{display:block;height:100%;border-radius:inherit;background:var(--ci-accent);transition:width .18s ease}.coach-map-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.coach-map-field label{display:block;font-size:12px;font-weight:800;margin-bottom:5px}.coach-map-field select{width:100%;border:1px solid rgba(148,163,184,.45);border-radius:10px;padding:9px;background:transparent}.coach-preview{overflow:auto;margin-top:16px;border:1px solid var(--ci-border);border-radius:12px}.coach-preview table{width:100%;border-collapse:collapse;font-size:12px}.coach-preview th,.coach-preview td{padding:8px 10px;border-bottom:1px solid rgba(148,163,184,.18);white-space:nowrap;text-align:left}.coach-preview th{font-weight:800;background:rgba(148,163,184,.08)}.coach-errors{margin-top:12px;padding:12px;border-radius:12px;background:rgba(239,68,68,.08);color:rgb(185 28 28);max-height:260px;overflow:auto;font-size:13px}.coach-process-box{margin-top:14px;border:1px solid rgba(255,99,56,.25);background:rgba(255,99,56,.05);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}.coach-process-copy{display:flex;justify-content:space-between;gap:12px;font-size:13px}.coach-process-copy span{color:var(--ci-muted)}.coach-process-bar{height:9px;border-radius:999px;background:rgba(255,99,56,.15);overflow:hidden}.coach-process-bar.is-real i{display:block;height:100%;background:var(--ci-accent);border-radius:inherit;transition:width .25s ease}.coach-import-stats{display:flex;flex-wrap:wrap;gap:16px;font-size:12px;color:var(--ci-muted)}.coach-import-stats strong{color:inherit}.coach-import-global{position:fixed;z-index:9999;top:0;left:0;right:0;height:4px;background:rgba(255,99,56,.15)}.coach-import-global span{display:block;width:38%;height:100%;background:var(--ci-accent);animation:ci-progress 1s ease-in-out infinite}.coach-import-global strong{position:fixed;top:14px;right:18px;background:#111827;color:#fff;border-radius:999px;padding:7px 11px;font-size:11px;box-shadow:0 8px 24px rgba(15,23,42,.2)}@keyframes ci-spin{to{transform:rotate(360deg)}}@keyframes ci-progress{0%{transform:translateX(-120%)}100%{transform:translateX(360%)}}@media(max-width:800px){.coach-map-grid,.coach-import-visibility-grid{grid-template-columns:1fr}.coach-process-copy{flex-direction:column}}
     </style>
 </x-filament-panels::page>
