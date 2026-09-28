@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use STS\FilamentImpersonate\Facades\Impersonation;
 use Throwable;
 
 class SuperadminOverviewWidget extends Widget
@@ -54,6 +55,40 @@ class SuperadminOverviewWidget extends Widget
                 || $user->hasRole('superadmin')
                 || $user->hasRole('Super Admin')
             ));
+    }
+
+    public function impersonateAthlete(int $userId)
+    {
+        $impersonator = auth()->user();
+
+        abort_unless(
+            $impersonator
+            && method_exists($impersonator, 'hasRole')
+            && (
+                $impersonator->hasRole('Superadmin')
+                || $impersonator->hasRole('superadmin')
+                || $impersonator->hasRole('Super Admin')
+            ),
+            403,
+        );
+
+        abort_if(Impersonation::isImpersonating(), 403);
+        abort_if((int) $impersonator->getKey() === $userId, 422);
+
+        // Restrict dashboard impersonation to the same athlete population that
+        // is shown by this widget. A forged Livewire call cannot target an
+        // operator/admin account that is excluded from athleteQuery().
+        $target = $this->athleteQuery()->whereKey($userId)->firstOrFail();
+
+        if (method_exists($target, 'canBeImpersonated')) {
+            abort_unless((bool) $target->canBeImpersonated(), 403);
+        }
+
+        abort_unless(Impersonation::enter($impersonator, $target), 500);
+
+        // Full redirect is intentional: after enter() the authenticated user has
+        // changed, so the Superadmin-only widget must not attempt another render.
+        return redirect('/admin');
     }
 
     public function getViewData(): array
