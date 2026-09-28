@@ -8091,7 +8091,7 @@ discoverSelectedIds: [],
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Recent Activity</h2>
-                            <a href="#">View All</a>
+                            <a href="#" x-on:click.prevent.stop="window.__rcCoachEngagementFilter=''; dashboardDetail='coach-engagement'; $nextTick(() => window.rcApplyCoachEngagementFilter && window.rcApplyCoachEngagementFilter())">View All</a>
                         </div>
 
                         <div class="rc-home-activity-list-v2">
