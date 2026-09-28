@@ -8,9 +8,20 @@
     $rcCatalogGender = $rcCatalogUser
         ? (\App\Models\Coach::normalizeGender($rcCatalogUser->gender ?? null) ?: 'unassigned')
         : 'guest';
-    $rcCatalogUserKey = (string) ($rcCatalogUser?->getKey() ?? 'guest') . ':' . $rcCatalogGender . ':drawer-v101123';
+    $rcCatalogVisibilityVersion = $rcCatalogUser
+        ? app(\App\Services\RecruitingVisibilityService::class)->fingerprint()
+        : 'guest';
+    $rcCatalogUserKey = implode(':', [
+        (string) ($rcCatalogUser?->getKey() ?? 'guest'),
+        $rcCatalogGender,
+        $rcCatalogVisibilityVersion,
+        'drawer-v101124',
+    ]);
     $shouldSeedSchoolCatalog = in_array($rcActiveSectionForSeed, $rcCatalogHeavySections, true)
-        && ! ($this->browserSchoolCatalogSeeded ?? false)
+        && (
+            ! ($this->browserSchoolCatalogSeeded ?? false)
+            || (string) ($this->browserSchoolCatalogVisibilityVersion ?? '') !== $rcCatalogVisibilityVersion
+        )
         && ($this->allowed ?? false)
         && ! ($this->locked ?? false)
         && ! ($this->isFreePlanAccount ?? false);

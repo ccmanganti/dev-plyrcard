@@ -79,6 +79,7 @@ trait InteractsWithCoachDatabase
 
     public string $section = 'dashboard';
     public bool $browserSchoolCatalogSeeded = false;
+    public string $browserSchoolCatalogVisibilityVersion = '';
     public int $dashboardVisitVersion = 0;
     public bool $isFetchingDashboardEmailsSent = false;
     public ?string $dashboardEmailFetchError = null;
@@ -458,6 +459,7 @@ trait InteractsWithCoachDatabase
     {
         if ($this->allowed && ! $this->locked && ! $this->isFreePlanAccount) {
             $this->browserSchoolCatalogSeeded = true;
+            $this->browserSchoolCatalogVisibilityVersion = app(\App\Services\RecruitingVisibilityService::class)->fingerprint();
         }
     }
 
@@ -15385,11 +15387,27 @@ HTML;
 
     public function getFilteredConversationsProperty(): array
     {
-        // Browser-only status filters need the matching rows already present in the DOM.
-        // Render a larger lightweight list so Incoming/Unread/Starred rows outside the
-        // first 10 still appear instantly without a Livewire filter request.
-        return collect($this->filteredConversationsWithoutLimit())
-            ->take(max(80, (int) $this->inboxConversationDisplayLimit))
+        $rows = collect($this->filteredConversationsWithoutLimit())->values();
+        $allWindowLimit = max(10, (int) $this->inboxConversationDisplayLimit);
+
+        /*
+         * Keep the normal "All" inbox lightweight (10 rows, then Load 10 more),
+         * but always render every conversation needed by the browser-only quick
+         * filters. This keeps Unread / Incoming / Starred complete even when a
+         * matching conversation lives outside the current All window.
+         */
+        $visibleAllRows = $rows->take($allWindowLimit);
+        $quickFilterRows = $rows->filter(function (array $conversation): bool {
+            $unread = (int) ($conversation['unread_count'] ?? 0) > 0;
+            $incoming = (bool) ($conversation['awaiting_reply'] ?? false) || $unread;
+            $starred = (bool) ($conversation['starred'] ?? $conversation['is_starred'] ?? false);
+
+            return $unread || $incoming || $starred;
+        });
+
+        return $visibleAllRows
+            ->concat($quickFilterRows)
+            ->unique(fn (array $conversation): string => (string) ($conversation['id'] ?? ''))
             ->values()
             ->all();
     }
@@ -15405,7 +15423,13 @@ HTML;
     protected function instantDiscoverCatalogCacheKey($user): string
     {
         $gender = \App\Models\Coach::normalizeGender($user->gender ?? null) ?: 'unassigned';
-        return 'recruiting:instant-school-catalog:v1034:' . (int) $user->getKey() . ':' . $gender;
+        $visibilityVersion = app(\App\Services\RecruitingVisibilityService::class)->fingerprint();
+
+        return 'recruiting:instant-school-catalog:v1035:' . sha1(implode('|', [
+            (string) $user->getKey(),
+            $gender,
+            $visibilityVersion,
+        ]));
     }
 
     protected function forgetInstantDiscoverCatalogCache($user = null): void
