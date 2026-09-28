@@ -8,6 +8,7 @@ use App\Filament\Resources\Coaches\Pages\EditCoach;
 use App\Filament\Resources\Coaches\Pages\ImportCoaches;
 use App\Filament\Resources\Coaches\Pages\ListCoaches;
 use App\Models\Coach;
+use App\Services\SportAvailabilityService;
 use BackedEnum;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -38,19 +39,14 @@ class CoachResource extends Resource
     protected static ?string $recordTitleAttribute = 'display_name';
     protected static ?int $navigationSort = 1;
 
-    public static function sportOptions(): array
+    public static function allSportOptions(): array
     {
-        return [
-            'basketball' => 'Basketball', 'volleyball' => 'Volleyball', 'football' => 'Football',
-            'baseball' => 'Baseball', 'softball' => 'Softball', 'soccer' => 'Soccer',
-            'tennis' => 'Tennis', 'badminton' => 'Badminton', 'table_tennis' => 'Table Tennis',
-            'track_and_field' => 'Track and Field', 'swimming' => 'Swimming', 'golf' => 'Golf',
-            'lacrosse' => 'Lacrosse', 'field_hockey' => 'Field Hockey', 'ice_hockey' => 'Ice Hockey',
-            'wrestling' => 'Wrestling', 'cross_country' => 'Cross Country', 'gymnastics' => 'Gymnastics',
-            'water_polo' => 'Water Polo', 'rowing' => 'Rowing', 'bowling' => 'Bowling',
-            'beach_volleyball' => 'Beach Volleyball', 'fencing' => 'Fencing', 'rugby' => 'Rugby',
-            'boxing' => 'Boxing', 'martial_arts' => 'Martial Arts', 'other' => 'Other',
-        ];
+        return SportAvailabilityService::COACH_OPTIONS;
+    }
+
+    public static function sportOptions(?string $includeCurrent = null): array
+    {
+        return app(SportAvailabilityService::class)->coachOptions($includeCurrent);
     }
 
     public static function genderOptions(): array
@@ -83,7 +79,7 @@ class CoachResource extends Resource
                     TextInput::make('secondary_email')->email()->maxLength(255),
                     TextInput::make('phone')->tel()->maxLength(50),
                     TextInput::make('title')->maxLength(255),
-                    Select::make('sport')->options(static::sportOptions())->searchable()->required(),
+                    Select::make('sport')->options(fn (?Coach $record): array => static::sportOptions($record?->sport))->searchable()->required(),
                     Select::make('gender')
                         ->options(static::genderOptions())
                         ->native(false)
@@ -126,7 +122,7 @@ class CoachResource extends Resource
                 TextColumn::make('display_name')->label('Coach')->searchable(['display_name', 'first_name', 'last_name'])->sortable(),
                 TextColumn::make('school.name')->label('School')->searchable()->sortable(),
                 TextColumn::make('title')->searchable()->toggleable(),
-                TextColumn::make('sport')->formatStateUsing(fn (?string $state): string => static::sportOptions()[$state] ?? str($state)->headline()->toString())->badge()->sortable(),
+                TextColumn::make('sport')->formatStateUsing(fn (?string $state): string => static::allSportOptions()[$state] ?? str($state)->headline()->toString())->badge()->sortable(),
                 TextColumn::make('gender')->formatStateUsing(fn (?string $state): string => static::genderOptions()[$state] ?? 'Unassigned')->badge()->sortable(),
                 TextColumn::make('division')->searchable()->sortable()->toggleable(),
                 TextColumn::make('conference')->searchable()->sortable()->toggleable(),
@@ -137,7 +133,7 @@ class CoachResource extends Resource
                 TextColumn::make('updated_at')->since()->label('Updated')->toggleable(),
             ])
             ->filters([
-                SelectFilter::make('sport')->options(static::sportOptions()),
+                SelectFilter::make('sport')->options(static::allSportOptions()),
                 SelectFilter::make('gender')->options(static::genderOptions()),
                 SelectFilter::make('division')->options(static::divisionOptions()),
                 SelectFilter::make('school_id')->relationship('school', 'name')->searchable()->preload(),

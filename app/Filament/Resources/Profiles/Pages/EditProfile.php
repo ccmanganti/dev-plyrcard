@@ -609,7 +609,7 @@ class EditProfile extends Page implements HasForms
                                             ->prefixIcon('heroicon-m-trophy')
                                             ->label('Sport')
                                             ->placeholder('Select sport')
-                                            ->options(UserResource::getSportOptions())
+                                            ->options(fn (): array => UserResource::getSportOptions($this->user?->sport))
                                             ->required()
                                             ->searchable()
                                             ->live()

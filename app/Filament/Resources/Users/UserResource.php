@@ -12,6 +12,7 @@ use App\Models\League;
 use App\Models\NationalTeam;
 use App\Models\School;
 use App\Models\User;
+use App\Services\SportAvailabilityService;
 use App\Services\WebsitePublishedEmailService;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -166,23 +167,14 @@ class UserResource extends Resource
         );
     }
 
-    public static function getSportOptions(): array
+    public static function getAllSportOptions(): array
     {
-        return [
-            'basketball' => 'Basketball',
-            'volleyball' => 'Volleyball',
-            'football' => 'Football',
-            'baseball' => 'Baseball',
-            'softball' => 'Softball',
-            'soccer' => 'Soccer',
-            'tennis' => 'Tennis',
-            'badminton' => 'Badminton',
-            'table_tennis' => 'Table Tennis',
-            'track_and_field' => 'Track and Field',
-            'swimming' => 'Swimming',
-            'boxing' => 'Boxing',
-            'martial_arts' => 'Martial Arts',
-        ];
+        return SportAvailabilityService::ATHLETE_OPTIONS;
+    }
+
+    public static function getSportOptions(?string $includeCurrent = null): array
+    {
+        return app(SportAvailabilityService::class)->athleteOptions($includeCurrent);
     }
 
     public static function getGenderOptions(): array
@@ -680,7 +672,7 @@ class UserResource extends Resource
                                         ->prefixIcon('heroicon-m-trophy')
                                         ->label('Sport')
                                         ->placeholder('Select sport')
-                                        ->options(static::getSportOptions())
+                                        ->options(fn (?User $record): array => static::getSportOptions($record?->sport))
                                         ->required()
                                         ->searchable()
                                         ->live()
@@ -1960,7 +1952,7 @@ class UserResource extends Resource
 
             SelectFilter::make('sport')
                 ->label('Sport')
-                ->options(static::getSportOptions())
+                ->options(static::getAllSportOptions())
                 ->multiple()
                 ->searchable()
                 ->preload(),
