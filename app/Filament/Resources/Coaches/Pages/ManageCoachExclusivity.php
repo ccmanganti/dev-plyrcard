@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Coaches\Pages;
 
 use App\Filament\Resources\Coaches\CoachResource;
 use App\Models\Coach;
+use App\Models\Club;
+use App\Models\League;
 use App\Models\School;
 use App\Models\User;
 use App\Services\RecruitingVisibilityService;
@@ -17,6 +19,8 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema as SchemaFacade;
 use Illuminate\Support\Str;
 
 class ManageCoachExclusivity extends Page implements HasForms
@@ -27,6 +31,12 @@ class ManageCoachExclusivity extends Page implements HasForms
     protected string $view = 'filament.resources.coaches.pages.manage-coach-exclusivity';
 
     public ?array $data = [];
+
+    public string $visibilityType = 'users';
+    public array|string|null $visibilityUserIds = [];
+    public string $visibilityUserSearch = '';
+    public ?string $visibilityClubId = null;
+    public ?string $visibilityLeagueId = null;
 
     public function getTitle(): string
     {
@@ -41,7 +51,6 @@ class ManageCoachExclusivity extends Page implements HasForms
             'target_type' => 'school',
             'school_id' => null,
             'coach_id' => null,
-            'user_ids' => [],
         ]);
     }
 
@@ -66,7 +75,6 @@ class ManageCoachExclusivity extends Page implements HasForms
                             ->afterStateUpdated(function (Set $set): void {
                                 $set('school_id', null);
                                 $set('coach_id', null);
-                                $set('user_ids', []);
                             }),
 
                         Select::make('school_id')
@@ -88,19 +96,6 @@ class ManageCoachExclusivity extends Page implements HasForms
                             ->visible(fn (Get $get): bool => $get('target_type') === 'coach')
                             ->getSearchResultsUsing(fn (string $search): array => $this->coachOptions($search))
                             ->getOptionLabelUsing(fn ($value): ?string => $this->coachLabel($value)),
-
-                        Select::make('user_ids')
-                            ->label('Users who can see it')
-                            ->placeholder('Search users by name or email')
-                            ->multiple()
-                            ->searchable()
-                            ->preload(false)
-                            ->required()
-                            ->minItems(1)
-                            ->helperText('If a target has an exclusivity rule, every user not selected here will not see it in Recruiting Center.')
-                            ->getSearchResultsUsing(fn (string $search): array => $this->userOptions($search))
-                            ->getOptionLabelsUsing(fn (array $values): array => $this->userLabels($values))
-                            ->columnSpanFull(),
                     ]),
             ]);
     }
@@ -111,28 +106,40 @@ class ManageCoachExclusivity extends Page implements HasForms
 
         $data = $this->form->getState();
         $type = (string) ($data['target_type'] ?? 'school');
-        $userIds = (array) ($data['user_ids'] ?? []);
         $service = app(RecruitingVisibilityService::class);
 
         try {
-            if ($type === 'coach') {
-                $coachId = (int) ($data['coach_id'] ?? 0);
-                if ($coachId <= 0) {
-                    $this->addError('data.coach_id', 'Choose a coach.');
-                    return;
+            $targetId = $type === 'coach'
+                ? (int) ($data['coach_id'] ?? 0)
+                : (int) ($data['school_id'] ?? 0);
+
+            if ($targetId <= 0) {
+                $this->addError($type === 'coach' ? 'data.coach_id' : 'data.school_id', $type === 'coach' ? 'Choose a coach.' : 'Choose a school.');
+                return;
+            }
+
+            $targetLabel = $type === 'coach'
+                ? ($this->coachLabel($targetId) ?: 'Coach')
+                : ($this->schoolLabel($targetId) ?: 'School');
+
+            if ($this->visibilityType === 'public') {
+                if ($type === 'coach') {
+                    $service->makeCoachPublic($targetId);
+                } else {
+                    $service->makeSchoolPublic($targetId);
                 }
 
-                $service->syncCoach($coachId, $userIds);
-                $targetLabel = $this->coachLabel($coachId) ?: 'Coach';
+                $message = $targetLabel . ' is now visible to every eligible Recruiting Center user.';
             } else {
-                $schoolId = (int) ($data['school_id'] ?? 0);
-                if ($schoolId <= 0) {
-                    $this->addError('data.school_id', 'Choose a school.');
-                    return;
+                $userIds = $this->resolveVisibilityUserIds();
+
+                if ($type === 'coach') {
+                    $service->syncCoach($targetId, $userIds);
+                } else {
+                    $service->syncSchool($targetId, $userIds);
                 }
 
-                $service->syncSchool($schoolId, $userIds);
-                $targetLabel = $this->schoolLabel($schoolId) ?: 'School';
+                $message = $targetLabel . ' is now limited to ' . $this->visibilityAudienceLabel($userIds) . '.';
             }
         } catch (\Throwable $exception) {
             Notification::make()
@@ -144,8 +151,8 @@ class ManageCoachExclusivity extends Page implements HasForms
         }
 
         Notification::make()
-            ->title('Exclusivity saved')
-            ->body($targetLabel . ' is now only visible to the selected users.')
+            ->title($this->visibilityType === 'public' ? 'Made public' : 'Exclusivity saved')
+            ->body($message)
             ->success()
             ->send();
 
@@ -153,8 +160,8 @@ class ManageCoachExclusivity extends Page implements HasForms
             'target_type' => $type,
             'school_id' => null,
             'coach_id' => null,
-            'user_ids' => [],
         ]);
+        $this->resetVisibilityAudience();
     }
 
     public function editRule(string $type, int $targetId): void
@@ -168,8 +175,13 @@ class ManageCoachExclusivity extends Page implements HasForms
             'target_type' => $type,
             'school_id' => $type === 'school' ? $targetId : null,
             'coach_id' => $type === 'coach' ? $targetId : null,
-            'user_ids' => $service->assignedUserIds($type, $targetId),
         ]);
+
+        $this->visibilityType = 'users';
+        $this->visibilityUserIds = $service->assignedUserIds($type, $targetId);
+        $this->visibilityUserSearch = '';
+        $this->visibilityClubId = null;
+        $this->visibilityLeagueId = null;
 
         $this->dispatch('scroll-to-exclusivity-form');
     }
@@ -193,6 +205,226 @@ class ManageCoachExclusivity extends Page implements HasForms
             ->body($label . ' is now visible to every eligible Recruiting Center user.')
             ->success()
             ->send();
+    }
+
+    public function setVisibilityType(string $type): void
+    {
+        if (! in_array($type, ['public', 'users', 'club', 'league'], true)) {
+            return;
+        }
+
+        $this->visibilityType = $type;
+        $this->visibilityUserIds = [];
+        $this->visibilityUserSearch = '';
+        $this->visibilityClubId = null;
+        $this->visibilityLeagueId = null;
+    }
+
+    public function toggleVisibilityUser(int $userId): void
+    {
+        if ($userId <= 0 || ! $this->userQuery()->whereKey($userId)->exists()) {
+            return;
+        }
+
+        $ids = collect($this->normalizedVisibilityUserIds());
+        if ($ids->contains($userId)) {
+            $ids = $ids->reject(fn (int $id): bool => $id === $userId);
+        } else {
+            $ids->push($userId);
+        }
+
+        $this->visibilityUserIds = $ids->unique()->values()->all();
+    }
+
+    public function removeVisibilityUser(int $userId): void
+    {
+        $this->visibilityUserIds = collect($this->normalizedVisibilityUserIds())
+            ->reject(fn (int $id): bool => $id === $userId)
+            ->values()
+            ->all();
+    }
+
+    public function getVisibilityUserOptionsProperty(): array
+    {
+        $search = trim($this->visibilityUserSearch);
+
+        return $this->userQuery($search)
+            ->limit($search === '' ? 20 : 50)
+            ->get(['id', 'first_name', 'last_name', 'email', 'sport'])
+            ->mapWithKeys(fn (User $user): array => [
+                (string) $user->getKey() => $this->formatUserLabel($user),
+            ])
+            ->all();
+    }
+
+    public function getVisibilitySelectedUsersProperty(): array
+    {
+        $ids = $this->normalizedVisibilityUserIds();
+        if ($ids === []) {
+            return [];
+        }
+
+        return $this->userQuery()
+            ->whereIn('id', $ids)
+            ->get(['id', 'first_name', 'last_name', 'email', 'sport'])
+            ->map(fn (User $user): array => [
+                'id' => (int) $user->getKey(),
+                'label' => $this->formatUserLabel($user),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function getVisibilityClubOptionsProperty(): array
+    {
+        return Club::query()
+            ->orderBy('name')
+            ->limit(500)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id): array => [(string) $id => (string) $name])
+            ->all();
+    }
+
+    public function getVisibilityLeagueOptionsProperty(): array
+    {
+        return League::query()
+            ->orderBy('name')
+            ->limit(500)
+            ->pluck('name', 'id')
+            ->mapWithKeys(fn ($name, $id): array => [(string) $id => (string) $name])
+            ->all();
+    }
+
+    public function getVisibilityReadyProperty(): bool
+    {
+        return match ($this->visibilityType) {
+            'users' => $this->normalizedVisibilityUserIds() !== [],
+            'club' => (int) $this->visibilityClubId > 0,
+            'league' => (int) $this->visibilityLeagueId > 0,
+            default => true,
+        };
+    }
+
+    protected function resetVisibilityAudience(): void
+    {
+        $this->visibilityType = 'users';
+        $this->visibilityUserIds = [];
+        $this->visibilityUserSearch = '';
+        $this->visibilityClubId = null;
+        $this->visibilityLeagueId = null;
+    }
+
+    protected function normalizedVisibilityUserIds(): array
+    {
+        $value = $this->visibilityUserIds;
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $values = is_array($value) ? $value : [$value];
+
+        return collect($values)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    protected function resolveVisibilityUserIds(): array
+    {
+        $type = $this->visibilityType;
+        if (! in_array($type, ['users', 'club', 'league'], true)) {
+            throw new \InvalidArgumentException('Choose a valid exclusivity audience.');
+        }
+
+        $ids = match ($type) {
+            'users' => $this->userQuery()->whereIn('id', $this->normalizedVisibilityUserIds())->pluck('id'),
+            'club' => $this->audienceUserIdsForClub((int) $this->visibilityClubId),
+            'league' => $this->audienceUserIdsForLeague((int) $this->visibilityLeagueId),
+        };
+
+        $ids = collect($ids)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            throw new \InvalidArgumentException(match ($type) {
+                'users' => 'Select at least one user.',
+                'club' => 'The selected club does not currently have any eligible users.',
+                'league' => 'The selected league does not currently have any eligible users.',
+            });
+        }
+
+        return $ids->all();
+    }
+
+    protected function audienceUserIdsForClub(int $clubId)
+    {
+        if ($clubId <= 0 || ! Club::query()->whereKey($clubId)->exists()) {
+            throw new \InvalidArgumentException('Choose a valid club.');
+        }
+
+        $ids = collect();
+
+        if (SchemaFacade::hasColumn('users', 'club_id')) {
+            $ids = $ids->merge($this->userQuery()->where('club_id', $clubId)->pluck('id'));
+        }
+        if (SchemaFacade::hasColumn('users', 'legacy_club_id')) {
+            $ids = $ids->merge($this->userQuery()->where('legacy_club_id', $clubId)->pluck('id'));
+        }
+        if (SchemaFacade::hasColumn('users', 'club_league_id') && SchemaFacade::hasTable('club_leagues')) {
+            $clubLeagueQuery = DB::table('club_leagues')->where('club_id', $clubId);
+            if (SchemaFacade::hasColumn('club_leagues', 'deleted_at')) {
+                $clubLeagueQuery->whereNull('deleted_at');
+            }
+            $clubLeagueIds = $clubLeagueQuery->pluck('id')->all();
+            if ($clubLeagueIds !== []) {
+                $ids = $ids->merge($this->userQuery()->whereIn('club_league_id', $clubLeagueIds)->pluck('id'));
+            }
+        }
+
+        return $ids->unique()->values();
+    }
+
+    protected function audienceUserIdsForLeague(int $leagueId)
+    {
+        if ($leagueId <= 0 || ! League::query()->whereKey($leagueId)->exists()) {
+            throw new \InvalidArgumentException('Choose a valid league.');
+        }
+
+        $ids = collect();
+
+        if (SchemaFacade::hasColumn('users', 'league_id')) {
+            $ids = $ids->merge($this->userQuery()->where('league_id', $leagueId)->pluck('id'));
+        }
+        if (SchemaFacade::hasColumn('users', 'legacy_league_id')) {
+            $ids = $ids->merge($this->userQuery()->where('legacy_league_id', $leagueId)->pluck('id'));
+        }
+        if (SchemaFacade::hasColumn('users', 'club_league_id') && SchemaFacade::hasTable('club_leagues')) {
+            $clubLeagueQuery = DB::table('club_leagues')->where('league_id', $leagueId);
+            if (SchemaFacade::hasColumn('club_leagues', 'deleted_at')) {
+                $clubLeagueQuery->whereNull('deleted_at');
+            }
+            $clubLeagueIds = $clubLeagueQuery->pluck('id')->all();
+            if ($clubLeagueIds !== []) {
+                $ids = $ids->merge($this->userQuery()->whereIn('club_league_id', $clubLeagueIds)->pluck('id'));
+            }
+        }
+
+        return $ids->unique()->values();
+    }
+
+    protected function visibilityAudienceLabel(array $userIds): string
+    {
+        return match ($this->visibilityType) {
+            'users' => count($userIds) . ' selected user' . (count($userIds) === 1 ? '' : 's'),
+            'club' => (string) (Club::query()->whereKey((int) $this->visibilityClubId)->value('name') ?: 'the selected club'),
+            'league' => (string) (League::query()->whereKey((int) $this->visibilityLeagueId)->value('name') ?: 'the selected league'),
+            default => 'the selected audience',
+        };
     }
 
     public function getRulesProperty(): array
