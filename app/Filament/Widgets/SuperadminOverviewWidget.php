@@ -7,17 +7,24 @@ use App\Models\CoachDatabaseEmailMessage;
 use App\Models\User;
 use App\Services\ProfileCompletionService;
 use Carbon\CarbonInterface;
+use Filament\Actions\Concerns\InteractsWithActions;
+use Filament\Actions\Contracts\HasActions;
+use Filament\Schemas\Concerns\InteractsWithSchemas;
+use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use STS\FilamentImpersonate\Facades\Impersonation;
+use STS\FilamentImpersonate\Actions\Impersonate;
 use Throwable;
 
-class SuperadminOverviewWidget extends Widget
+class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
 {
+    use InteractsWithActions;
+    use InteractsWithSchemas;
+
     protected string $view = 'filament.widgets.superadmin-overview-widget';
 
     protected static ?int $sort = 1;
@@ -57,38 +64,27 @@ class SuperadminOverviewWidget extends Widget
             ));
     }
 
-    public function impersonateAthlete(int $userId)
+    public function impersonateAction(): Impersonate
     {
-        $impersonator = auth()->user();
+        return Impersonate::make()
+            ->record(fn (array $arguments): User => $this->resolveDashboardImpersonationTarget($arguments))
+            ->iconButton()
+            ->tooltip('Impersonate')
+            ->redirectTo('/admin');
+    }
 
-        abort_unless(
-            $impersonator
-            && method_exists($impersonator, 'hasRole')
-            && (
-                $impersonator->hasRole('Superadmin')
-                || $impersonator->hasRole('superadmin')
-                || $impersonator->hasRole('Super Admin')
-            ),
-            403,
-        );
+    protected function resolveDashboardImpersonationTarget(array $arguments): User
+    {
+        $userId = (int) ($arguments['userId'] ?? 0);
 
-        abort_if(Impersonation::isImpersonating(), 403);
-        abort_if((int) $impersonator->getKey() === $userId, 422);
+        abort_if($userId <= 0, 404);
 
-        // Restrict dashboard impersonation to the same athlete population that
-        // is shown by this widget. A forged Livewire call cannot target an
-        // operator/admin account that is excluded from athleteQuery().
-        $target = $this->athleteQuery()->whereKey($userId)->firstOrFail();
-
-        if (method_exists($target, 'canBeImpersonated')) {
-            abort_unless((bool) $target->canBeImpersonated(), 403);
-        }
-
-        abort_unless(Impersonation::enter($impersonator, $target), 500);
-
-        // Full redirect is intentional: after enter() the authenticated user has
-        // changed, so the Superadmin-only widget must not attempt another render.
-        return redirect('/admin');
+        // The STS Filament Impersonate action owns the impersonation session.
+        // This resolver only constrains the target to the same athlete population
+        // shown by this Superadmin widget.
+        return $this->athleteQuery()
+            ->whereKey($userId)
+            ->firstOrFail();
     }
 
     public function getViewData(): array
