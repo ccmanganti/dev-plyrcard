@@ -1,100 +1,109 @@
 <x-filament-panels::page>
-    <div class="pc-admin-settings-v1">
-        <section class="pc-admin-settings-card-v1">
-            <div class="pc-admin-settings-heading-v1">
-                <div>
-                    <span class="pc-admin-settings-kicker-v1">Platform controls</span>
+    <div class="pc-admin-settings-v2">
+        <section class="pc-setting-section-v2">
+            <div class="pc-setting-head-v2">
+                <div class="pc-setting-title-v2">
                     <h2>Sports availability</h2>
-                    <p>
-                        Turn sports on or off for new selections across athlete registration,
-                        athlete profile editing, and Coach Database management/imports.
-                        Existing records keep their current sport even when that sport is disabled.
-                    </p>
+                    <span>{{ count($enabledSports) }} enabled</span>
+                    <p>Choose which sports can be selected across PLYRCARD. Existing records are not changed.</p>
                 </div>
-                <div class="pc-admin-settings-count-v1">
-                    <strong>{{ count($enabledSports) }}</strong>
-                    <span>enabled</span>
+
+                <div class="pc-setting-actions-v2">
+                    <button type="button" class="secondary" wire:click="enableAllSports">Enable all</button>
+                    <button type="button" class="secondary" wire:click="disableAllSports">Disable all</button>
+                    <button type="button" class="primary" wire:click="saveSports" wire:loading.attr="disabled" wire:target="saveSports">
+                        <span wire:loading.remove wire:target="saveSports">Save</span>
+                        <span wire:loading wire:target="saveSports">Saving...</span>
+                    </button>
                 </div>
             </div>
 
-            <div class="pc-admin-settings-toolbar-v1">
-                <button type="button" wire:click="enableAllSports">Enable all</button>
-                <button type="button" wire:click="disableAllSports">Disable all</button>
-            </div>
-
-            <div class="pc-admin-settings-grid-v1">
+            <div class="pc-sport-grid-v2">
                 @foreach($this->sports as $sport)
                     @php($isEnabled = in_array($sport['key'], $enabledSports, true))
-                    <label class="pc-admin-sport-v1 {{ $isEnabled ? 'is-enabled' : '' }}" wire:key="admin-sport-{{ $sport['key'] }}">
+                    <label
+                        class="pc-sport-row-v2 {{ $isEnabled ? 'is-enabled' : '' }}"
+                        wire:key="admin-sport-{{ $sport['key'] }}"
+                    >
+                        <span class="pc-sport-name-v2">
+                            <strong>{{ $sport['label'] }}</strong>
+                            @if(! $sport['athlete'])
+                                <small>Coach only</small>
+                            @endif
+                        </span>
+
                         <input
                             type="checkbox"
                             wire:model.live="enabledSports"
                             value="{{ $sport['key'] }}"
                         >
-                        <span class="pc-admin-sport-switch-v1" aria-hidden="true"><i></i></span>
-                        <span class="pc-admin-sport-copy-v1">
-                            <strong>{{ $sport['label'] }}</strong>
-                            <small>
-                                @if($sport['athlete'])
-                                    Athlete registration/profile + Coach Database
-                                @else
-                                    Coach Database only
-                                @endif
-                            </small>
-                        </span>
-                        <span class="pc-admin-sport-status-v1">{{ $isEnabled ? 'On' : 'Off' }}</span>
+
+                        <span class="pc-switch-v2" aria-hidden="true"><i></i></span>
                     </label>
                 @endforeach
-            </div>
-
-            <div class="pc-admin-settings-note-v1">
-                <x-filament::icon icon="heroicon-o-information-circle" />
-                <span>
-                    Disabling a sport hides it from new choices. Existing athletes and coaches assigned to it remain unchanged and can still be viewed.
-                </span>
-            </div>
-
-            <div class="pc-admin-settings-actions-v1">
-                <button type="button" class="primary" wire:click="saveSports" wire:loading.attr="disabled" wire:target="saveSports">
-                    <span wire:loading.remove wire:target="saveSports">Save Sports</span>
-                    <span wire:loading wire:target="saveSports">Saving...</span>
-                </button>
             </div>
         </section>
     </div>
 
     <style>
-        .pc-admin-settings-v1{max-width:1180px;margin:0 auto;padding:.5rem 0 2rem}
-        .pc-admin-settings-card-v1{border:1px solid #e5e7eb;border-radius:1.1rem;background:#fff;box-shadow:0 14px 36px rgba(15,23,42,.05);overflow:hidden}
-        .dark .pc-admin-settings-card-v1{background:#111318;border-color:#2c313b}
-        .pc-admin-settings-heading-v1{display:flex;gap:1rem;align-items:flex-start;justify-content:space-between;padding:1.4rem 1.5rem 1.1rem;border-bottom:1px solid #eaecf0}
-        .dark .pc-admin-settings-heading-v1{border-color:#2c313b}
-        .pc-admin-settings-heading-v1 h2{margin:.12rem 0 .3rem;font-size:1.35rem;font-weight:850;letter-spacing:-.025em}
-        .pc-admin-settings-heading-v1 p{margin:0;max-width:760px;color:#667085;line-height:1.55;font-size:.9rem}
-        .dark .pc-admin-settings-heading-v1 p{color:#98a2b3}
-        .pc-admin-settings-kicker-v1{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;font-weight:850;color:#ff6338}
-        .pc-admin-settings-count-v1{min-width:86px;padding:.65rem .8rem;border:1px solid #ffd2c6;border-radius:.9rem;background:#fff7f4;text-align:center;color:#c4320a}
-        .pc-admin-settings-count-v1 strong{display:block;font-size:1.25rem;line-height:1}.pc-admin-settings-count-v1 span{display:block;margin-top:.2rem;font-size:.7rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
-        .dark .pc-admin-settings-count-v1{background:#261712;border-color:#5b2b20;color:#ff8b6b}
-        .pc-admin-settings-toolbar-v1{display:flex;justify-content:flex-end;gap:.5rem;padding:.85rem 1.5rem 0}
-        .pc-admin-settings-toolbar-v1 button{border:1px solid #d0d5dd;border-radius:.7rem;background:#fff;color:#344054;padding:.5rem .7rem;font-weight:750;font-size:.78rem;cursor:pointer}
-        .dark .pc-admin-settings-toolbar-v1 button{background:#17191f;border-color:#343943;color:#e5e7eb}
-        .pc-admin-settings-grid-v1{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;padding:1rem 1.5rem 1.35rem}
-        .pc-admin-sport-v1{position:relative;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.75rem;padding:.82rem .9rem;border:1px solid #e4e7ec;border-radius:.9rem;background:#fff;cursor:pointer;transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
-        .pc-admin-sport-v1:hover{border-color:#ffb49f;box-shadow:0 6px 18px rgba(16,24,40,.05)}
-        .pc-admin-sport-v1.is-enabled{border-color:#ffc0ae;background:#fffaf8}
-        .dark .pc-admin-sport-v1{background:#15181e;border-color:#303641}.dark .pc-admin-sport-v1.is-enabled{background:#211713;border-color:#6e3628}
-        .pc-admin-sport-v1 input{position:absolute;opacity:0;pointer-events:none}
-        .pc-admin-sport-switch-v1{width:2.25rem;height:1.25rem;border-radius:999px;background:#d0d5dd;padding:.15rem;transition:.18s ease;display:flex;align-items:center}
-        .pc-admin-sport-switch-v1 i{display:block;width:.95rem;height:.95rem;border-radius:999px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:.18s ease}
-        .pc-admin-sport-v1.is-enabled .pc-admin-sport-switch-v1{background:#ff6338}.pc-admin-sport-v1.is-enabled .pc-admin-sport-switch-v1 i{transform:translateX(1rem)}
-        .pc-admin-sport-copy-v1{min-width:0}.pc-admin-sport-copy-v1 strong{display:block;font-size:.88rem;font-weight:820;color:#101828}.dark .pc-admin-sport-copy-v1 strong{color:#f3f4f6}
-        .pc-admin-sport-copy-v1 small{display:block;margin-top:.15rem;font-size:.7rem;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dark .pc-admin-sport-copy-v1 small{color:#98a2b3}
-        .pc-admin-sport-status-v1{font-size:.68rem;font-weight:850;text-transform:uppercase;letter-spacing:.06em;color:#98a2b3}.pc-admin-sport-v1.is-enabled .pc-admin-sport-status-v1{color:#e2461e}
-        .pc-admin-settings-note-v1{display:flex;align-items:flex-start;gap:.55rem;margin:0 1.5rem 1.1rem;padding:.75rem .85rem;border-radius:.8rem;background:#f8fafc;color:#475467;font-size:.78rem;line-height:1.45}.pc-admin-settings-note-v1 svg{width:1.05rem;height:1.05rem;flex:none;margin-top:.05rem}.dark .pc-admin-settings-note-v1{background:#171a20;color:#aeb7c5}
-        .pc-admin-settings-actions-v1{display:flex;justify-content:flex-end;padding:1rem 1.5rem;border-top:1px solid #eaecf0}.dark .pc-admin-settings-actions-v1{border-color:#2c313b}
-        .pc-admin-settings-actions-v1 .primary{border:0;border-radius:.8rem;background:#ff6338;color:#fff;font-weight:850;padding:.7rem 1.05rem;min-width:9rem;cursor:pointer;box-shadow:0 8px 20px rgba(255,99,56,.2)}.pc-admin-settings-actions-v1 .primary:disabled{opacity:.65;cursor:wait}
-        @media(max-width:1000px){.pc-admin-settings-grid-v1{grid-template-columns:repeat(2,minmax(0,1fr))}}
-        @media(max-width:680px){.pc-admin-settings-heading-v1{flex-direction:column}.pc-admin-settings-count-v1{align-self:flex-start}.pc-admin-settings-grid-v1{grid-template-columns:1fr;padding-left:1rem;padding-right:1rem}.pc-admin-settings-toolbar-v1,.pc-admin-settings-actions-v1{padding-left:1rem;padding-right:1rem}.pc-admin-settings-note-v1{margin-left:1rem;margin-right:1rem}.pc-admin-settings-actions-v1 .primary{width:100%}}
+        .pc-admin-settings-v2{max-width:1180px;margin:0 auto;padding:.25rem 0 1.5rem}
+        .pc-setting-section-v2{background:#fff;border:1px solid #e5e7eb;border-radius:.85rem;overflow:hidden}
+        .dark .pc-setting-section-v2{background:#111318;border-color:#2c313b}
+
+        .pc-setting-head-v2{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;border-bottom:1px solid #eaecf0}
+        .dark .pc-setting-head-v2{border-color:#2c313b}
+        .pc-setting-title-v2{min-width:0}
+        .pc-setting-title-v2 h2{display:inline;margin:0;font-size:1rem;font-weight:800;color:#101828}
+        .dark .pc-setting-title-v2 h2{color:#f3f4f6}
+        .pc-setting-title-v2>span{display:inline-block;margin-left:.45rem;padding:.14rem .42rem;border-radius:999px;background:#f2f4f7;color:#667085;font-size:.68rem;font-weight:700;vertical-align:2px}
+        .dark .pc-setting-title-v2>span{background:#20242c;color:#aeb7c5}
+        .pc-setting-title-v2 p{margin:.2rem 0 0;color:#667085;font-size:.76rem;line-height:1.35}
+        .dark .pc-setting-title-v2 p{color:#98a2b3}
+
+        .pc-setting-actions-v2{display:flex;align-items:center;gap:.4rem;flex:none}
+        .pc-setting-actions-v2 button{height:2rem;border-radius:.55rem;padding:0 .65rem;font-size:.73rem;font-weight:750;cursor:pointer;white-space:nowrap}
+        .pc-setting-actions-v2 .secondary{border:1px solid #d0d5dd;background:#fff;color:#344054}
+        .dark .pc-setting-actions-v2 .secondary{background:#17191f;border-color:#343943;color:#e5e7eb}
+        .pc-setting-actions-v2 .primary{border:1px solid #ff6338;background:#ff6338;color:#fff;min-width:4.4rem}
+        .pc-setting-actions-v2 .primary:disabled{opacity:.6;cursor:wait}
+
+        .pc-sport-grid-v2{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border-top:0}
+        .pc-sport-row-v2{position:relative;display:flex;align-items:center;justify-content:space-between;gap:.7rem;min-height:3rem;padding:.55rem .8rem;border-right:1px solid #f0f1f3;border-bottom:1px solid #f0f1f3;cursor:pointer;background:#fff}
+        .pc-sport-row-v2:nth-child(4n){border-right:0}
+        .dark .pc-sport-row-v2{background:#111318;border-color:#252a33}
+        .pc-sport-row-v2:hover{background:#fafafa}
+        .dark .pc-sport-row-v2:hover{background:#15181e}
+        .pc-sport-row-v2 input{position:absolute;opacity:0;pointer-events:none}
+
+        .pc-sport-name-v2{min-width:0;display:flex;align-items:center;gap:.35rem}
+        .pc-sport-name-v2 strong{font-size:.78rem;font-weight:750;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .dark .pc-sport-name-v2 strong{color:#e5e7eb}
+        .pc-sport-name-v2 small{flex:none;padding:.1rem .3rem;border-radius:.35rem;background:#f2f4f7;color:#98a2b3;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.025em}
+        .dark .pc-sport-name-v2 small{background:#20242c;color:#8d98a8}
+
+        .pc-switch-v2{flex:none;width:1.85rem;height:1.05rem;border-radius:999px;background:#d0d5dd;padding:.12rem;display:flex;align-items:center;transition:.16s ease}
+        .pc-switch-v2 i{display:block;width:.81rem;height:.81rem;border-radius:999px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.18);transition:.16s ease}
+        .pc-sport-row-v2.is-enabled .pc-switch-v2{background:#ff6338}
+        .pc-sport-row-v2.is-enabled .pc-switch-v2 i{transform:translateX(.8rem)}
+
+        @media(max-width:1050px){
+            .pc-sport-grid-v2{grid-template-columns:repeat(3,minmax(0,1fr))}
+            .pc-sport-row-v2:nth-child(4n){border-right:1px solid #f0f1f3}
+            .pc-sport-row-v2:nth-child(3n){border-right:0}
+        }
+        @media(max-width:760px){
+            .pc-setting-head-v2{align-items:flex-start;flex-direction:column}
+            .pc-setting-actions-v2{width:100%}
+            .pc-setting-actions-v2 .primary{margin-left:auto}
+            .pc-sport-grid-v2{grid-template-columns:repeat(2,minmax(0,1fr))}
+            .pc-sport-row-v2:nth-child(3n){border-right:1px solid #f0f1f3}
+            .pc-sport-row-v2:nth-child(2n){border-right:0}
+        }
+        @media(max-width:480px){
+            .pc-setting-actions-v2{display:grid;grid-template-columns:1fr 1fr auto}
+            .pc-setting-actions-v2 .primary{margin-left:0}
+            .pc-sport-grid-v2{grid-template-columns:1fr}
+            .pc-sport-row-v2{border-right:0!important}
+        }
     </style>
 </x-filament-panels::page>
