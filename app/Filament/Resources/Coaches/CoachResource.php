@@ -7,6 +7,7 @@ use App\Filament\Resources\Coaches\Pages\CreateCoach;
 use App\Filament\Resources\Coaches\Pages\EditCoach;
 use App\Filament\Resources\Coaches\Pages\ImportCoaches;
 use App\Filament\Resources\Coaches\Pages\ListCoaches;
+use App\Filament\Resources\Coaches\Pages\ManageCoachExclusivity;
 use App\Models\Coach;
 use App\Services\SportAvailabilityService;
 use BackedEnum;
@@ -146,8 +147,11 @@ class CoachResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListCoaches::route('/'), 'import' => ImportCoaches::route('/import'),
-            'create' => CreateCoach::route('/create'), 'edit' => EditCoach::route('/{record}/edit'),
+            'index' => ListCoaches::route('/'),
+            'import' => ImportCoaches::route('/import'),
+            'exclusivity' => ManageCoachExclusivity::route('/exclusivity'),
+            'create' => CreateCoach::route('/create'),
+            'edit' => EditCoach::route('/{record}/edit'),
         ];
     }
 

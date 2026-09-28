@@ -50,6 +50,12 @@ class ListCoaches extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('exclusivity')
+                ->label('Exclusivity')
+                ->icon('heroicon-o-lock-closed')
+                ->color('gray')
+                ->url(fn (): string => CoachResource::getUrl('exclusivity')),
+
             Action::make('import')
                 ->label('Import CSV / Excel')
                 ->icon('heroicon-o-arrow-up-tray')
