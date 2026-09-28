@@ -113,7 +113,11 @@ class ImportCoaches extends Page
     // behavior. Other modes resolve to concrete non-admin user IDs when the
     // import starts, then every imported coach is restricted to that audience.
     public string $quickVisibilityType = 'public';
-    public array $quickVisibilityUserIds = [];
+    // Accept the old single-string Livewire payload as well as arrays so a stale
+    // browser snapshot cannot crash hydration. New UI changes this value only
+    // through toggleQuickVisibilityUser(), which normalizes it back to an array.
+    public array|string|null $quickVisibilityUserIds = [];
+    public string $quickVisibilityUserSearch = '';
     public ?string $quickVisibilityClubId = null;
     public ?string $quickVisibilityLeagueId = null;
 
@@ -151,14 +155,82 @@ class ImportCoaches extends Page
 
     public function getQuickVisibilityUserOptionsProperty(): array
     {
+        $search = trim($this->quickVisibilityUserSearch);
+
         return $this->eligibleAudienceUserQuery()
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $query) use ($search): void {
+                    $query->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            })
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->limit(500)
+            ->limit($search === '' ? 20 : 50)
             ->get(['id', 'first_name', 'last_name', 'email', 'sport'])
             ->mapWithKeys(fn (User $user): array => [
                 (string) $user->getKey() => $this->formatAudienceUserLabel($user),
             ])
+            ->all();
+    }
+
+    public function getQuickVisibilitySelectedUsersProperty(): array
+    {
+        $ids = $this->normalizedQuickVisibilityUserIds();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return $this->eligibleAudienceUserQuery()
+            ->whereIn('id', $ids)
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'email', 'sport'])
+            ->map(fn (User $user): array => [
+                'id' => (int) $user->getKey(),
+                'label' => $this->formatAudienceUserLabel($user),
+            ])
+            ->values()
+            ->all();
+    }
+
+    public function setQuickVisibilityType(string $type): void
+    {
+        if (! in_array($type, ['public', 'users', 'club', 'league'], true)) {
+            return;
+        }
+
+        $this->quickVisibilityType = $type;
+        $this->quickVisibilityUserIds = [];
+        $this->quickVisibilityUserSearch = '';
+        $this->quickVisibilityClubId = null;
+        $this->quickVisibilityLeagueId = null;
+    }
+
+    public function toggleQuickVisibilityUser(int $userId): void
+    {
+        if ($userId <= 0 || ! $this->eligibleAudienceUserQuery()->whereKey($userId)->exists()) {
+            return;
+        }
+
+        $ids = collect($this->normalizedQuickVisibilityUserIds());
+
+        if ($ids->contains($userId)) {
+            $ids = $ids->reject(fn (int $id): bool => $id === $userId);
+        } else {
+            $ids->push($userId);
+        }
+
+        $this->quickVisibilityUserIds = $ids->unique()->values()->all();
+    }
+
+    public function removeQuickVisibilityUser(int $userId): void
+    {
+        $this->quickVisibilityUserIds = collect($this->normalizedQuickVisibilityUserIds())
+            ->reject(fn (int $id): bool => $id === $userId)
+            ->values()
             ->all();
     }
 
@@ -185,7 +257,7 @@ class ImportCoaches extends Page
     public function getQuickVisibilityReadyProperty(): bool
     {
         return match ($this->quickVisibilityType) {
-            'users' => collect($this->quickVisibilityUserIds)->filter()->isNotEmpty(),
+            'users' => $this->normalizedQuickVisibilityUserIds() !== [],
             'club' => (int) $this->quickVisibilityClubId > 0,
             'league' => (int) $this->quickVisibilityLeagueId > 0,
             default => true,
@@ -195,6 +267,7 @@ class ImportCoaches extends Page
     public function updatedQuickVisibilityType(): void
     {
         $this->quickVisibilityUserIds = [];
+        $this->quickVisibilityUserSearch = '';
         $this->quickVisibilityClubId = null;
         $this->quickVisibilityLeagueId = null;
     }
@@ -724,7 +797,7 @@ class ImportCoaches extends Page
 
             'importCreated', 'importUpdated', 'importSkipped', 'importFailed', 'importJobPath',
 
-            'quickVisibilityType', 'quickVisibilityUserIds', 'quickVisibilityClubId', 'quickVisibilityLeagueId',
+            'quickVisibilityType', 'quickVisibilityUserIds', 'quickVisibilityUserSearch', 'quickVisibilityClubId', 'quickVisibilityLeagueId',
 
         ]);
 
@@ -733,6 +806,25 @@ class ImportCoaches extends Page
     }
 
 
+
+
+    protected function normalizedQuickVisibilityUserIds(): array
+    {
+        $value = $this->quickVisibilityUserIds;
+
+        if ($value === null || $value === '') {
+            return [];
+        }
+
+        $values = is_array($value) ? $value : [$value];
+
+        return collect($values)
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
 
     protected function eligibleAudienceUserQuery(): Builder
     {
@@ -766,12 +858,7 @@ class ImportCoaches extends Page
 
         $ids = match ($type) {
             'users' => $this->eligibleAudienceUserQuery()
-                ->whereIn('id', collect($this->quickVisibilityUserIds)
-                    ->map(fn ($id): int => (int) $id)
-                    ->filter(fn (int $id): bool => $id > 0)
-                    ->unique()
-                    ->values()
-                    ->all())
+                ->whereIn('id', $this->normalizedQuickVisibilityUserIds())
                 ->pluck('id'),
             'club' => $this->audienceUserIdsForClub((int) $this->quickVisibilityClubId),
             'league' => $this->audienceUserIdsForLeague((int) $this->quickVisibilityLeagueId),
