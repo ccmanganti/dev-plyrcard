@@ -39,6 +39,19 @@ return [
         'key' => env('YOUTUBE_API_KEY'),
     ],
 
+    'stripe' => [
+        // Secret key: server only. Publishable key: safe for Stripe.js.
+        'secret' => env('STRIPE_SECRET'),
+        'key' => env('STRIPE_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'webhook_tolerance' => (int) env('STRIPE_WEBHOOK_TOLERANCE', 300),
+        'api_base' => env('STRIPE_API_BASE', 'https://api.stripe.com'),
+        // Leave blank to use the Stripe account's default API version.
+        'version' => env('STRIPE_API_VERSION'),
+        'connect_timeout' => (int) env('STRIPE_CONNECT_TIMEOUT', 5),
+        'timeout' => (int) env('STRIPE_TIMEOUT', 20),
+    ],
+
     'ghl' => [
         'token' => env('GHL_API_TOKEN'),
         'location_id' => env('GHL_LOCATION_ID'),
@@ -54,6 +67,5 @@ return [
     'tracking' => [
         'base_url' => env('TRACKING_BASE_URL', env('APP_URL', 'https://plyrcard.com')),
     ],
-
 
 ];

@@ -46,7 +46,20 @@ class BillingInformation extends Model
         'requested_handle',
         'registration_meta',
 
-        // HighLevel identifiers and sync state.
+        // Stripe identifiers and sync state.
+        'stripe_customer_id',
+        'stripe_subscription_id',
+        'stripe_invoice_id',
+        'stripe_payment_intent_id',
+        'stripe_payment_method_id',
+        'stripe_recurring_price_id',
+        'stripe_setup_price_id',
+        'stripe_last_event_id',
+        'stripe_last_event_at',
+        'stripe_synced_at',
+
+        // HighLevel identifiers and sync state. These remain for CRM/contact
+        // syncing and the legacy authenticated upgrade flows until those are migrated.
         'ghl_contact_id',
         'ghl_location_id',
         'ghl_invoice_id',
@@ -73,6 +86,8 @@ class BillingInformation extends Model
         'amount_refunded_cents' => 'integer',
         'payment_live_mode' => 'boolean',
         'registration_meta' => 'array',
+        'stripe_last_event_at' => 'datetime',
+        'stripe_synced_at' => 'datetime',
         'ghl_sync_response' => 'array',
         'ghl_synced_at' => 'datetime',
         'ghl_payment_completed_at' => 'datetime',

@@ -36,7 +36,7 @@
 .browser{border:1px solid var(--line);border-radius:12px 12px 0 0;background:var(--raised);padding:11px 13px;display:flex;align-items:center;gap:11px;border-bottom:0}.tl{display:flex;gap:6px;flex:0 0 auto}.tl i{width:9px;height:9px;border-radius:50%;background:#2E353D;display:block}.bar{flex:1;background:var(--ink);border:1px solid var(--line-soft);border-radius:100px;padding:6px 13px;overflow:hidden}.bar .txt{font-family:"JetBrains Mono",monospace;font-size:12.5px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bar .txt b{color:var(--paper);font-weight:500}.browser-body{border:1px solid var(--line);border-radius:0 0 12px 12px;background:var(--surface);padding:26px 24px 24px;position:relative;overflow:hidden}.browser-body.live{box-shadow:inset 0 1px 0 rgba(74,222,155,.08)}.dsearch{display:flex;gap:9px}.dsearch input{flex:1}.dsearch button{background:var(--paper);color:#0C0E11;border:0;border-radius:var(--r);padding:0 22px;font-family:Archivo;font-weight:700;font-size:14.5px;cursor:pointer}.results{margin-top:18px;display:none;flex-direction:column;gap:9px}.results.show{display:flex}.dom{border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;background:var(--ink);display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;text-align:left;font-family:inherit;width:100%}.dom[aria-pressed=true]{border-color:var(--coral);background:rgba(255,90,60,.07)}.dom.dead{cursor:not-allowed;opacity:.44}.dom .n{font-family:Archivo;font-weight:700;font-size:16.5px;letter-spacing:-.02em;color:var(--paper);word-break:break-all}.dom .tag{font-family:"JetBrains Mono",monospace;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;flex:0 0 auto}.tag.ok{color:var(--good)}.tag.warn{color:var(--warn)}.tag.no{color:var(--dim)}.tag.sel{color:var(--coral)}.loading-line{display:none;align-items:center;gap:9px;margin-top:18px;font-size:13.5px;color:var(--mute)}.loading-line.show{display:flex}.loading-line i{width:7px;height:7px;border-radius:50%;background:var(--warn);animation:blink 1s infinite}@keyframes blink{50%{opacity:.25}}.own{margin-top:16px;font-size:12.5px;color:var(--mute);line-height:1.55;border-top:1px solid var(--line-soft);padding-top:14px}.own b{color:var(--paper);font-weight:600}.domain-review-note{display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:12px 13px;border:1px solid rgba(255,184,77,.28);border-radius:var(--r);background:rgba(255,184,77,.06);color:#CFAE72;font-size:12.5px;line-height:1.5}.domain-review-note i{width:7px;height:7px;flex:0 0 7px;margin-top:6px;border-radius:50%;background:var(--warn)}.domain-review-note strong{color:var(--paper);font-weight:650}
 .claim{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:26px 24px;margin-top:30px;position:relative;overflow:hidden}.claim.live{border-color:rgba(74,222,155,.38)}.claim .k{font-family:"JetBrains Mono",monospace;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);font-weight:700}.url{font-family:Archivo;font-weight:800;letter-spacing:-.028em;font-size:clamp(21px,4.4vw,30px);margin-top:12px;word-break:break-all;line-height:1.15}.url .d{color:#5A6169}.url .h{color:var(--coral);border-bottom:2px solid rgba(255,90,60,.35)}.status{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;font-weight:500;color:var(--mute);min-height:19px}.pip{width:7px;height:7px;border-radius:50%;background:var(--mute)}.status.ok{color:var(--good)}.status.ok .pip{background:var(--good)}.status.no{color:var(--danger)}.status.no .pip{background:var(--danger)}.status.wait .pip{background:var(--warn);animation:blink 1s infinite}
 .order{border:1px solid var(--line);border-radius:12px;margin-top:22px;overflow:hidden}.order-h{padding:14px 17px;background:var(--raised);border-bottom:1px solid var(--line);font-family:Archivo;font-weight:700;font-size:15px}.order ul{list-style:none;padding:15px 17px;display:flex;flex-direction:column;gap:10px}.order li{font-size:13.5px;color:var(--mute);display:flex;justify-content:space-between;gap:12px}.order li b{color:var(--good);font-weight:600;font-family:"JetBrains Mono",monospace;font-size:11.5px;white-space:nowrap}.total{padding:15px 17px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;background:var(--raised)}.total .l{font-family:Archivo;font-weight:700;font-size:14px}.total .l small{display:block;font-family:Inter;font-weight:400;font-size:12px;color:var(--mute);margin-top:3px}.total .r{font-family:Archivo;font-weight:800;font-size:26px;letter-spacing:-.03em}.pay-note{display:flex;gap:10px;padding:13px 14px;border:1px solid var(--line);border-radius:var(--r);background:rgba(74,222,155,.04);font-size:12.5px;color:var(--mute);line-height:1.5}.pay-note strong{color:var(--paper)}
-.ghl-pay{display:none;margin-top:20px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}.ghl-pay.show{display:block}.ghl-pay-head{background:var(--raised);color:var(--paper);padding:13px 16px;border-bottom:1px solid var(--line);font-family:Archivo;font-size:14px;font-weight:700}.ghl-pay iframe{display:block;width:100%;min-height:760px;border:0;background:#fff}.payment-ready{border:1px dashed var(--line);border-radius:var(--r);padding:16px;color:var(--mute);font-size:13px;line-height:1.5;background:var(--surface)}.payment-watch{display:none;align-items:flex-start;gap:10px;border:1px solid rgba(74,222,155,.28);border-radius:var(--r);padding:13px 14px;background:rgba(74,222,155,.06);color:var(--mute);font-size:12.5px;line-height:1.5}.payment-watch.show{display:flex}.payment-watch strong{display:block;color:var(--paper);font-size:13px;margin-bottom:2px}.payment-spinner{width:16px;height:16px;flex:0 0 16px;margin-top:2px;border:2px solid rgba(74,222,155,.28);border-top-color:var(--good);border-radius:999px;animation:paySpin .75s linear infinite}@keyframes paySpin{to{transform:rotate(360deg)}}
+.stripe-pay{display:none;margin-top:18px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}.stripe-pay.show{display:block}.stripe-pay-head{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--raised);color:var(--paper);padding:13px 16px;border-bottom:1px solid var(--line);font-family:Archivo;font-size:14px;font-weight:700}.stripe-pay-head small{font-family:Inter;font-size:11px;color:var(--mute);font-weight:500}.stripe-element-shell{padding:18px;background:var(--surface)}.stripe-error{display:none;margin:0 18px 16px;padding:11px 12px;border:1px solid rgba(255,122,99,.32);border-radius:8px;background:rgba(255,122,99,.07);color:#ffc1b7;font-size:12.5px;line-height:1.45}.stripe-error.show{display:block}.stripe-pay-action{padding:0 18px 18px}.stripe-pay-action .btn{width:100%}.stripe-security{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:10px;color:var(--mute);font-size:11.5px}.stripe-security strong{color:var(--paper);font-weight:600}.payment-ready{border:1px dashed var(--line);border-radius:var(--r);padding:16px;color:var(--mute);font-size:13px;line-height:1.5;background:var(--surface)}.payment-watch{display:none;align-items:flex-start;gap:10px;border:1px solid rgba(74,222,155,.28);border-radius:var(--r);padding:13px 14px;background:rgba(74,222,155,.06);color:var(--mute);font-size:12.5px;line-height:1.5}.payment-watch.show{display:flex}.payment-watch strong{display:block;color:var(--paper);font-size:13px;margin-bottom:2px}.payment-spinner{width:16px;height:16px;flex:0 0 16px;margin-top:2px;border:2px solid rgba(74,222,155,.28);border-top-color:var(--good);border-radius:999px;animation:paySpin .75s linear infinite}@keyframes paySpin{to{transform:rotate(360deg)}}
 .sum{border:1px solid var(--line);border-radius:var(--r);margin-top:22px;overflow:hidden}.sum-h{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--raised);border-bottom:1px solid var(--line)}.sum-h .t{font-family:Archivo;font-weight:700;font-size:15px}.sum-h .p{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--coral);font-weight:700}.sum ul{list-style:none;padding:14px 16px;display:flex;flex-direction:column;gap:9px}.sum li{font-size:13.5px;color:var(--mute);display:flex;gap:9px}.sum li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--coral);margin-top:7px;flex:0 0 5px}.sum .up{padding:13px 16px;border-top:1px solid var(--line);font-size:13px;color:var(--mute);line-height:1.5}.sum .up b{color:var(--paper)}
 .nav{display:flex;gap:11px;margin-top:30px;align-items:center}.step-nav{position:sticky;bottom:0;z-index:40;margin-top:24px;padding:14px 0 calc(14px + env(safe-area-inset-bottom,0px));background:rgba(12,14,17,.98);border-top:1px solid var(--line-soft);box-shadow:0 -18px 28px rgba(12,14,17,.88)}.btn{font-family:Archivo;font-weight:700;font-size:15px;border-radius:var(--r);padding:14px 26px;cursor:pointer;border:1px solid transparent;letter-spacing:-.01em}.btn.pri{background:var(--coral);color:#0C0E11;flex:1}.btn.pri:hover{background:var(--coral-hi)}.btn.pri:disabled{background:var(--line);color:var(--dim);cursor:not-allowed}.btn.gho{background:transparent;border-color:var(--line);color:var(--mute)}.tiny{font-size:12.5px;color:var(--mute);margin-top:15px;line-height:1.55;text-align:center}.tiny a{color:var(--paper)}
 .form-alert{display:none;margin:0 0 22px;padding:13px 15px;border:1px solid rgba(255,122,99,.32);background:rgba(255,122,99,.07);border-radius:var(--r);color:#ffc1b7;font-size:13px;line-height:1.5}.form-alert.show{display:block}.done-wrap{text-align:center;padding-top:12px}.ring{width:64px;height:64px;margin:0 auto 22px;border-radius:18px;background:rgba(255,90,60,.12);border:1px solid rgba(255,90,60,.3);display:grid;place-items:center}.done-mail,.live-dom{font-family:"JetBrains Mono",monospace;color:var(--paper);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 15px;display:inline-block;margin-top:12px;word-break:break-all}.live-dom{font-family:Archivo;font-weight:800;font-size:22px;color:var(--coral)}.prov{display:inline-flex;align-items:center;gap:8px;margin-top:13px;border:1px solid var(--line);border-radius:100px;padding:7px 15px;font-size:12.5px;color:var(--mute)}.prov i{width:7px;height:7px;border-radius:50%;background:var(--warn);animation:blink 1.4s infinite}.prov.paid{color:var(--good);border-color:rgba(74,222,155,.3)}.prov.paid i{background:var(--good);animation:none}.next{margin-top:30px;border-top:1px solid var(--line-soft);padding-top:22px}.next h3{font-family:Archivo;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:700;margin-bottom:15px}.next ol{list-style:none;display:flex;flex-direction:column;gap:14px;counter-reset:n}.next li{display:flex;gap:13px;counter-increment:n;font-size:14px;line-height:1.5;color:var(--mute)}.next li::before{content:counter(n,decimal-leading-zero);font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:700;color:var(--coral);padding-top:2px;flex:0 0 20px}.next li b{color:var(--paper);font-weight:600;font-family:Archivo;display:block;margin-bottom:2px}
@@ -45,6 +45,9 @@
 @media(max-width:560px){.step-nav{margin-left:-20px;margin-right:-20px;padding-left:20px;padding-right:20px}.row,.row3{grid-template-columns:1fr}.dsearch{flex-direction:column}.dsearch button{padding:13px}.browser-body{padding:20px 16px}.nav{align-items:stretch}.btn{padding-left:18px;padding-right:18px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+@if($isPaid)
+<script src="https://js.stripe.com/v3/"></script>
+@endif
 </head>
 <body class="plyrcard-registration-page registration-ui-updated">
 @include('partials.navigation')
@@ -165,20 +168,19 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
     <div class="row3"><div class="f"><label>City</label><input name="billing_city" id="bcity" type="text" autocomplete="address-level2" placeholder="City"><div class="msg">Enter city.</div></div><div class="f"><label>State</label><input name="billing_state" id="bstate" type="text" autocomplete="address-level1" maxlength="40" placeholder="State / Province"><div class="msg">Enter state.</div></div><div class="f"><label>ZIP</label><input name="billing_postal_code" id="bzip" class="mono" type="text" autocomplete="postal-code" inputmode="text" maxlength="10" placeholder="22079" data-postal-mask><div class="msg">Enter ZIP.</div></div></div>
     <div class="f"><label>Country</label><select name="billing_country" id="bcountry" data-suggest-placeholder="Type or choose a country"><option value="US">United States</option><option value="CA">Canada</option><option value="GB">United Kingdom</option><option value="AU">Australia</option><option value="PH">Philippines</option></select></div>
     <div class="divider"><span>Card information</span></div>
-    <div class="payment-ready" id="paymentReady">Complete the billing information above and accept the terms. Continue once to open HighLevel’s secure card form. After that, its payment button is the only checkout action and PLYRCARD will continue automatically when the charge is confirmed.</div>
-    <div class="ghl-pay" id="ghlPaymentWrap">
-      <div class="ghl-pay-head">Secure payment · HighLevel</div>
-      <iframe id="ghlPaymentFrame"
-        title="Secure HighLevel card payment"
-        scrolling="no"
-        allow="payment *; clipboard-write *"
-        sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        referrerpolicy="strict-origin-when-cross-origin"
-        data-plyrcard-ghl-payment="1"></iframe>
+    <div class="payment-ready" id="paymentReady">Complete the billing information above and accept the terms. Continue once to securely load the Stripe card fields. Your full card number and CVC are sent directly to Stripe and never pass through PLYRCARD’s server.</div>
+    <div class="stripe-pay" id="stripePaymentWrap">
+      <div class="stripe-pay-head"><span>Secure card payment</span><small>Powered by Stripe</small></div>
+      <div class="stripe-element-shell"><div id="stripePaymentElement"></div></div>
+      <div class="stripe-error" id="stripePaymentError" role="alert"></div>
+      <div class="stripe-pay-action">
+        <button type="button" class="btn pri" id="confirmStripePayment">Pay ${{ $initialDollars }}</button>
+        <div class="stripe-security"><span aria-hidden="true">🔒</span><span>Payment details are securely handled by <strong>Stripe</strong>.</span></div>
+      </div>
     </div>
     <div class="payment-watch" id="paymentWatch" aria-live="polite">
       <span class="payment-spinner" aria-hidden="true"></span>
-      <span><strong>Waiting for payment confirmation</strong>Complete the secure payment inside the HighLevel form above. You do not need to click Continue again — PLYRCARD will advance automatically after HighLevel confirms the charge.</span>
+      <span><strong>Processing payment</strong>Stripe is confirming your payment. PLYRCARD will activate your plan as soon as the first invoice is paid.</span>
     </div>
     <div class="f"><label class="check"><input type="checkbox" name="terms" id="terms" value="1"><span>I agree to the Terms, Privacy Policy{{ $requiresDomain ? ', and applicable domain terms' : '' }}.</span></label><div class="msg">Please accept the terms.</div></div>
   </div>
@@ -189,8 +191,8 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 </section>
 
 <section class="panel" data-step="5">
-  <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1>@if($requiresDomain)<div class="live-dom" id="final-dom">yourname.com</div>@endif @if($requiresDomain)<div class="domain-review-note" style="max-width:520px;margin-left:auto;margin-right:auto;text-align:left"><i aria-hidden="true"></i><span><strong>Pending PLYRCARD team review.</strong> This domain will not be publicly visible yet. It will become available after the team reviews and approves your domain request.</span></div>@endif<div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Continue to payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
-  <div class="next"><h3>What happens next</h3><ol><li><div><b>Complete your payment</b>Your selected paid plan activates after payment is completed.</div></li>@if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
+  <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1>@if($requiresDomain)<div class="live-dom" id="final-dom">yourname.com</div>@endif @if($requiresDomain)<div class="domain-review-note" style="max-width:520px;margin-left:auto;margin-right:auto;text-align:left"><i aria-hidden="true"></i><span><strong>Pending PLYRCARD team review.</strong> This domain will not be publicly visible yet. It will become available after the team reviews and approves your domain request.</span></div>@endif<div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Complete your secure Stripe payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
+  <div class="next"><h3>What happens next</h3><ol><li><div><b>Payment confirmation</b>Your selected paid plan activates after Stripe confirms the first invoice.</div></li>@if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
 </section>
 @else
 <section class="panel active" data-step="1">
@@ -219,11 +221,11 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 <script>
 (function(){
 'use strict';
-const PAID=@json($isPaid), DOMAIN_REQUIRED=@json($requiresDomain), PLAN=@json($planKey), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status'));
+const PAID=@json($isPaid), DOMAIN_REQUIRED=@json($requiresDomain), PLAN=@json($planKey), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status')), STRIPE_START_URL=@json(route('marketing.registration.stripe-start')), STRIPE_KEY=@json($stripePublishableKey ?? config('services.stripe.key'));
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const form=$('#registrationForm'), alertBox=$('#formAlert'), loader=$('#pageLoader'), maxStep=4, successStep=5;
-const CACHE_KEY='plyrcard:registration:'+window.location.pathname+':'+PLAN+':v10.23';
-let cur=1, division='', pickedPositions=[], chosenDomain='', statusPoll=null, registrationSubmitted=false, paymentFormUrl='', paymentConfirmed=false, cacheTimer=null;
+const CACHE_KEY='plyrcard:registration:'+window.location.pathname+':'+PLAN+':v11-stripe';
+let cur=1, division='', pickedPositions=[], chosenDomain='', statusPoll=null, registrationSubmitted=false, paymentConfirmed=false, cacheTimer=null, stripeClientSecret='', stripeInstance=null, stripeElements=null, stripePaymentElement=null, csrfToken=document.querySelector('meta[name=\"csrf-token\"]')?.content||'';
 const suggestStates=new Map();
 
 function showAlert(message){alertBox.textContent=message||'Please review the form and try again.';alertBox.classList.add('show');window.scrollTo({top:0,behavior:'smooth'})}
@@ -362,51 +364,101 @@ if(PAID&&DOMAIN_REQUIRED){
  const updateAutoLink=()=>{const value=slug((($('#fn')?.value||'')+' '+($('#ln')?.value||'')).trim(),true)||'first-last-name';if($('#preview'))$('#preview').textContent=value;saveFormCache()};$('#fn')?.addEventListener('input',updateAutoLink);$('#ln')?.addEventListener('input',updateAutoLink);updateAutoLink();
 }
 function rebuildDynamicInputs(){const box=$('#dynamicInputs');box.innerHTML='';const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=value;box.appendChild(i)};pickedPositions.forEach(v=>add('position[]',v))}
-let ghlEmbedScriptPromise=null;
-function ensureGhlEmbedScript(){
-  if(window.__PLYRCARD_GHL_EMBED_READY__)return Promise.resolve();
-  if(ghlEmbedScriptPromise)return ghlEmbedScriptPromise;
-  ghlEmbedScriptPromise=new Promise(resolve=>{
-    const existing=document.querySelector('script[data-plyrcard-ghl-embed="1"]');
-    if(existing){
-      if(existing.dataset.loaded==='1'){window.__PLYRCARD_GHL_EMBED_READY__=true;resolve();return}
-      existing.addEventListener('load',()=>{existing.dataset.loaded='1';window.__PLYRCARD_GHL_EMBED_READY__=true;resolve()},{once:true});
-      existing.addEventListener('error',()=>resolve(),{once:true});
-      return;
+function updateCsrf(token){
+  if(!token)return;
+  csrfToken=token;
+  const meta=document.querySelector('meta[name="csrf-token"]');
+  if(meta)meta.setAttribute('content',token);
+}
+function stripeBillingDetails(){
+  return {
+    name:($('#billingName')?.value||'').trim(),
+    email:($('#billingEmail')?.value||'').trim(),
+    phone:($('#billingPhone')?.value||'').trim(),
+    address:{
+      line1:($('#ba1')?.value||'').trim(),
+      city:($('#bcity')?.value||'').trim(),
+      state:($('#bstate')?.value||'').trim(),
+      postal_code:($('#bzip')?.value||'').trim(),
+      country:($('#bcountry')?.value||'US').trim().toUpperCase()
     }
-    const script=document.createElement('script');
-    script.src='https://link.msgsndr.com/js/form_embed.js';
-    script.async=true;
-    script.dataset.plyrcardGhlEmbed='1';
-    script.addEventListener('load',()=>{script.dataset.loaded='1';window.__PLYRCARD_GHL_EMBED_READY__=true;resolve()},{once:true});
-    script.addEventListener('error',()=>resolve(),{once:true});
-    document.body.appendChild(script);
+  };
+}
+function showStripeError(message){
+  const box=$('#stripePaymentError');
+  if(!box)return;
+  box.textContent=message||'Stripe could not complete the payment. Please review your card details and try again.';
+  box.classList.add('show');
+}
+function clearStripeError(){const box=$('#stripePaymentError');if(box){box.textContent='';box.classList.remove('show')}}
+async function mountStripePayment(data){
+  const key=data?.stripe_publishable_key||STRIPE_KEY;
+  const secret=data?.stripe_client_secret||'';
+  updateCsrf(data?.csrf_token);
+  if(data?.paid){applyPaidStatus({paid:true});return}
+  if(!key||!secret){showAlert(data?.message||data?.stripe_error||'Stripe checkout is not ready. Click Retry secure payment.');const b=$('#submitRegistration');if(b){b.style.display='inline-flex';b.disabled=false;b.textContent='Retry secure payment'}return}
+  if(!window.Stripe){showAlert('Stripe.js could not load. Refresh the page and try again.');return}
+
+  stripeClientSecret=secret;
+  stripeInstance=Stripe(key);
+  try{stripePaymentElement?.unmount?.()}catch(e){}
+  stripeElements=stripeInstance.elements({
+    clientSecret:stripeClientSecret,
+    appearance:{
+      theme:'night',
+      variables:{colorPrimary:'#FF5A3C',colorBackground:'#131619',colorText:'#F2F0ED',colorDanger:'#FF7A63',fontFamily:'Inter, system-ui, sans-serif',borderRadius:'10px'},
+      rules:{'.Input':{border:'1px solid #262C33',boxShadow:'none'},'.Input:focus':{border:'1px solid #FF5A3C',boxShadow:'0 0 0 3px rgba(255,90,60,.08)'}}
+    }
   });
-  return ghlEmbedScriptPromise;
+  stripePaymentElement=stripeElements.create('payment',{
+    layout:'tabs',
+    fields:{billingDetails:{name:'never',email:'never',phone:'never',address:'never'}}
+  });
+  stripePaymentElement.mount('#stripePaymentElement');
+  clearStripeError();
+  $('#stripePaymentWrap')?.classList.add('show');
+  if($('#paymentReady'))$('#paymentReady').style.display='none';
+  if($('#submitRegistration')){$('#submitRegistration').style.display='none';$('#submitRegistration').disabled=true}
+  if($('#paymentBackButton'))$('#paymentBackButton').style.display='none';
+  window.scrollTo({top:$('#stripePaymentWrap').getBoundingClientRect().top+window.scrollY-90,behavior:'smooth'});
 }
-async function showPaymentForm(url){
-  paymentFormUrl=url||paymentFormUrl;
-  if(!paymentFormUrl)return;
-  const frame=$('#ghlPaymentFrame'),wrap=$('#ghlPaymentWrap'),ready=$('#paymentReady'),nav=$('#paymentStartNav'),submit=$('#submitRegistration'),watch=$('#paymentWatch');
-  if(!frame||!wrap)return;
-
-  // HighLevel surveys are not just standalone URLs. Their supported embed uses
-  // the survey iframe together with form_embed.js. Load the iframe first so the
-  // helper can discover it when the script initializes.
-  const current=frame.getAttribute('src')||'';
-  if(current!==paymentFormUrl)frame.setAttribute('src',paymentFormUrl);
-  ensureGhlEmbedScript();
-
-  wrap.classList.add('show');
-  watch?.classList.add('show');
-  if(ready)ready.style.display='none';
-  if(nav)nav.style.display='flex';
-  // The GHL survey owns the actual card charge. Once it is visible, remove the
-  // competing outer Continue button so the user sees only one payment action.
-  if(submit){submit.style.display='none';submit.disabled=true}
-  window.scrollTo({top:wrap.getBoundingClientRect().top+window.scrollY-90,behavior:'smooth'});
-  startPaymentPolling();
+async function retryStripeCheckout(){
+  if(!PAID||paymentConfirmed)return;
+  clearAlert();clearStripeError();setLoading(true);
+  try{
+    const r=await fetch(STRIPE_START_URL,{method:'POST',headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrfToken}});
+    const data=await r.json().catch(()=>({}));
+    updateCsrf(data.csrf_token);
+    if(!r.ok){showAlert(data.message||'Stripe checkout could not be started.');return}
+    await mountStripePayment(data);
+  }catch(e){showAlert('Stripe checkout could not be started. Check your connection and try again.')}finally{setLoading(false)}
 }
+async function confirmStripePayment(){
+  if(!stripeInstance||!stripeElements||!stripeClientSecret){showStripeError('Secure card fields are not ready yet.');return}
+  const button=$('#confirmStripePayment');
+  clearStripeError();
+  if(button){button.disabled=true;button.textContent='Processing…'}
+  try{
+    const submitted=await stripeElements.submit();
+    if(submitted.error){showStripeError(submitted.error.message);return}
+    const result=await stripeInstance.confirmPayment({
+      elements:stripeElements,
+      clientSecret:stripeClientSecret,
+      confirmParams:{
+        return_url:window.location.origin+'/admin/my-profile?registration_payment=return',
+        payment_method_data:{billing_details:stripeBillingDetails()}
+      },
+      redirect:'if_required'
+    });
+    if(result.error){showStripeError(result.error.message);return}
+    $('#paymentWatch')?.classList.add('show');
+    $('#stripePaymentWrap')?.classList.remove('show');
+    startPaymentPolling();
+    const data=await paymentStatus();
+    applyPaidStatus(data);
+  }catch(e){showStripeError(e?.message||'Stripe could not complete the payment. Please try again.')}finally{if(!paymentConfirmed&&button){button.disabled=false;button.textContent='Pay ${{ $initialDollars }}'}}
+}
+$('#confirmStripePayment')?.addEventListener('click',confirmStripePayment);
 async function paymentStatus(){
   try{
     const url=new URL(STATUS_URL,window.location.origin);
@@ -430,7 +482,24 @@ function applyPaidStatus(data){
   setTimeout(()=>goto(successStep,false),450);
   return true;
 }
-async function submitRegistration(){if(!validateAllBeforeSubmit())return;if(registrationSubmitted&&paymentFormUrl){showPaymentForm(paymentFormUrl);return}clearAlert();rebuildDynamicInputs();setLoading(true);const fd=new FormData(form);try{const r=await fetch(form.action,{method:'POST',body:fd,headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}});const data=await r.json().catch(()=>({}));if(!r.ok){const errors=data.errors||{};const first=Object.values(errors).flat()[0]||data.message||'Registration could not be completed.';showAlert(first);return}registrationSubmitted=true;clearFormCache();if(PAID){paymentFormUrl=data.payment_form_url||data.payment_url||'';if(paymentFormUrl){showPaymentForm(paymentFormUrl);return}showAlert(data.message||'The secure HighLevel payment form could not be opened. Please try again.');return}else{$('#sent-to').textContent=$('#em').value;$('#doneMessage').textContent=data.message||'Your account is ready.';goto(successStep,false)}}catch(e){showAlert('We could not complete registration. Check your connection and try again.')}finally{setLoading(false)}}
+async function submitRegistration(){
+  if(!validateAllBeforeSubmit())return;
+  if(registrationSubmitted){if(PAID)await retryStripeCheckout();return}
+  clearAlert();rebuildDynamicInputs();setLoading(true);const fd=new FormData(form);
+  try{
+    const r=await fetch(form.action,{method:'POST',body:fd,headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){const errors=data.errors||{};const first=Object.values(errors).flat()[0]||data.message||'Registration could not be completed.';showAlert(first);return}
+    registrationSubmitted=true;updateCsrf(data.csrf_token);clearFormCache();
+    if(PAID){
+      if(data.payment_status==='paid'){applyPaidStatus({paid:true});return}
+      if(data.stripe_client_secret){await mountStripePayment(data);return}
+      const b=$('#submitRegistration');if(b){b.style.display='inline-flex';b.disabled=false;b.textContent='Retry secure payment'}
+      showAlert(data.stripe_error||data.message||'Your account was created, but Stripe checkout could not be initialized. Click Retry secure payment.');return
+    }
+    $('#sent-to').textContent=$('#em').value;$('#doneMessage').textContent=data.message||'Your account is ready.';goto(successStep,false)
+  }catch(e){showAlert('We could not complete registration. Check your connection and try again.')}finally{setLoading(false)}
+}
 $('#submitRegistration')?.addEventListener('click',submitRegistration);
 function startPaymentPolling(){
   if(!PAID||paymentConfirmed)return;
