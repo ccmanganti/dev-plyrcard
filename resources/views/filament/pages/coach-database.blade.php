@@ -28,7 +28,6 @@
         ? $this->discoverClientSchools
         : [];
 @endphp
-<div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
     <script data-navigate-once>
         (() => {
@@ -16188,97 +16187,246 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     })();
 </script>
 
-<style id="rc-sidebar-credit-balance-v1" data-navigate-once>
-    /* Recruiting Center: show the athlete's current PLYRCARD credit balance
-       inside the existing Filament profile card, directly above Edit Profile. */
-    body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 {
+<style id="rc-sidebar-credit-balance-v2" data-navigate-once>
+    /* Recruiting Center credit card — intentionally separate from Filament's
+       profile trigger so the user-menu/dropdown layout is never disturbed. */
+    .rc-sidebar-credit-card-v2 {
+        width: 100%;
+        margin: .55rem 0;
+        padding: .72rem .78rem;
+        border: 1px solid rgba(255, 99, 56, .26);
+        border-radius: .9rem;
+        background: #ffffff;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, .045);
+        color: #111827;
+        box-sizing: border-box;
+    }
+    .rc-sidebar-credit-head-v2 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .55rem;
+        margin-bottom: .62rem;
+    }
+    .rc-sidebar-credit-title-v2 {
         display: inline-flex;
         align-items: center;
-        gap: .28rem;
-        margin: .12rem 0 .05rem;
-        color: #ff6338;
-        font-size: .66rem;
+        gap: .42rem;
+        min-width: 0;
+        font-size: .73rem;
         font-weight: 800;
-        line-height: 1.2;
-        white-space: nowrap;
+        color: #111827;
+        line-height: 1.15;
     }
-    body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 svg {
-        width: .72rem;
-        height: .72rem;
+    .rc-sidebar-credit-mark-v2 {
+        width: 1.55rem;
+        height: 1.55rem;
+        border-radius: .52rem;
+        display: grid;
+        place-items: center;
         flex: 0 0 auto;
-        color: currentColor;
+        background: rgba(255, 99, 56, .12);
+        color: #ff6338;
     }
-    .dark body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1,
-    html.dark body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 {
-        color: #ff7a5c;
+    .rc-sidebar-credit-mark-v2 svg {
+        width: .82rem;
+        height: .82rem;
+    }
+    .rc-sidebar-credit-action-v2 {
+        border: 0;
+        border-radius: .5rem;
+        background: #ff6338;
+        color: #fff;
+        padding: .34rem .52rem;
+        font-size: .61rem;
+        line-height: 1;
+        font-weight: 850;
+        white-space: nowrap;
+        cursor: pointer;
+        text-decoration: none;
+        box-shadow: 0 4px 10px rgba(255, 99, 56, .18);
+    }
+    .rc-sidebar-credit-action-v2:hover {
+        background: #f0522b;
+        color: #fff;
+    }
+    .rc-sidebar-credit-row-v2 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .7rem;
+        padding-top: .48rem;
+        border-top: 1px solid #eef0f3;
+    }
+    .rc-sidebar-credit-label-v2 {
+        color: #667085;
+        font-size: .67rem;
+        font-weight: 650;
+    }
+    .rc-sidebar-credit-value-v2 {
+        color: #101828;
+        font-size: .76rem;
+        font-weight: 850;
+        white-space: nowrap;
+        text-align: right;
+    }
+    .rc-sidebar-credit-note-v2 {
+        margin-top: .33rem;
+        color: #98a2b3;
+        font-size: .58rem;
+        line-height: 1.25;
+    }
+    html.dark .rc-sidebar-credit-card-v2,
+    .dark .rc-sidebar-credit-card-v2 {
+        background: #18181b;
+        border-color: rgba(255, 99, 56, .32);
+        color: #f4f4f5;
+        box-shadow: 0 5px 16px rgba(0,0,0,.18);
+    }
+    html.dark .rc-sidebar-credit-title-v2,
+    html.dark .rc-sidebar-credit-value-v2,
+    .dark .rc-sidebar-credit-title-v2,
+    .dark .rc-sidebar-credit-value-v2 {
+        color: #f4f4f5;
+    }
+    html.dark .rc-sidebar-credit-row-v2,
+    .dark .rc-sidebar-credit-row-v2 {
+        border-top-color: rgba(255,255,255,.08);
     }
 </style>
-<script id="rc-sidebar-credit-balance-script-v1" data-navigate-once>
+<script id="rc-sidebar-credit-balance-script-v2" data-navigate-once>
 (() => {
-    if (window.__plyrRcSidebarCreditsInstalled) return;
-    window.__plyrRcSidebarCreditsInstalled = true;
+    if (window.__plyrRcSidebarCreditsV2Installed) return;
+    window.__plyrRcSidebarCreditsV2Installed = true;
 
     const creditBalance = @js((int) ($rcCatalogUser?->points_available ?? 0));
     const formattedBalance = () => Number(creditBalance || 0).toLocaleString();
 
-    const findEditProfileElement = (sidebar) => {
-        if (!sidebar) return null;
-        const walker = document.createTreeWalker(sidebar, NodeFilter.SHOW_TEXT);
+    const visible = el => {
+        if (!el) return false;
+        const rect = el.getBoundingClientRect();
+        const style = window.getComputedStyle(el);
+        return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+    };
+
+    const textParents = (root, wanted) => {
+        const found = [];
+        if (!root) return found;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
-            const value = String(walker.currentNode?.nodeValue || '').trim().toLowerCase();
-            if (value === 'edit profile') {
-                return walker.currentNode.parentElement || null;
+            const node = walker.currentNode;
+            if (String(node?.nodeValue || '').trim().toLowerCase() === wanted) {
+                const el = node.parentElement;
+                if (el && visible(el)) found.push(el);
             }
         }
-        return null;
+        return found;
+    };
+
+    const clickableRoot = el => el?.closest?.('a,button,[role="button"]') || el;
+
+    const nearestEditProfileBefore = (sidebar, manageEl) => {
+        const manageTop = manageEl?.getBoundingClientRect?.().top ?? Number.POSITIVE_INFINITY;
+        return textParents(sidebar, 'edit profile')
+            .filter(el => el.getBoundingClientRect().top < manageTop)
+            .sort((a,b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0] || null;
+    };
+
+    const directChildUnder = (el, parent) => {
+        let current = el;
+        while (current && current.parentElement && current.parentElement !== parent) {
+            current = current.parentElement;
+        }
+        return current && current.parentElement === parent ? current : null;
+    };
+
+    const createCard = manageClickTarget => {
+        const card = document.createElement('div');
+        card.className = 'rc-sidebar-credit-card-v2';
+        card.setAttribute('data-rc-sidebar-credit-card', '1');
+        card.innerHTML = `
+            <div class="rc-sidebar-credit-head-v2">
+                <div class="rc-sidebar-credit-title-v2">
+                    <span class="rc-sidebar-credit-mark-v2" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 2.25 5.25 13.5h5.25l-1.5 8.25L18.75 10.5H13.5V2.25Z"></path></svg>
+                    </span>
+                    <span>PLYRCARD Credits</span>
+                </div>
+                <button type="button" class="rc-sidebar-credit-action-v2" data-rc-sidebar-credit-manage>Get More</button>
+            </div>
+            <div class="rc-sidebar-credit-row-v2">
+                <span class="rc-sidebar-credit-label-v2">Available</span>
+                <strong class="rc-sidebar-credit-value-v2" data-rc-sidebar-credit-value>${formattedBalance()} credits</strong>
+            </div>
+            <div class="rc-sidebar-credit-note-v2">Purchased credits do not expire.</div>
+        `;
+        card.querySelector('[data-rc-sidebar-credit-manage]')?.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (manageClickTarget && typeof manageClickTarget.click === 'function') {
+                manageClickTarget.click();
+            }
+        });
+        return card;
     };
 
     const syncSidebarCredits = () => {
         const sidebar = document.querySelector('.fi-sidebar');
         if (!sidebar) return;
 
-        const existing = sidebar.querySelector('[data-rc-sidebar-credits]');
+        const existing = sidebar.querySelector('[data-rc-sidebar-credit-card]');
         if (existing) {
             const value = existing.querySelector('[data-rc-sidebar-credit-value]');
-            if (value) value.textContent = `${formattedBalance()} Credits`;
+            if (value) value.textContent = `${formattedBalance()} credits`;
             return;
         }
 
-        const editProfile = findEditProfileElement(sidebar);
-        if (!editProfile || !editProfile.parentElement) return;
+        const manageText = textParents(sidebar, 'manage plan')
+            .sort((a,b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
+        if (!manageText) return;
 
-        const credit = document.createElement('div');
-        credit.className = 'rc-sidebar-credit-balance-v1';
-        credit.setAttribute('data-rc-sidebar-credits', '1');
-        credit.setAttribute('title', `${formattedBalance()} PLYRCARD credits available`);
-        credit.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M13.5 2.25 5.25 13.5h5.25l-1.5 8.25L18.75 10.5H13.5l0-8.25Z"></path>
-            </svg>
-            <span data-rc-sidebar-credit-value>${formattedBalance()} Credits</span>
-        `;
+        const manageClickTarget = clickableRoot(manageText);
+        const editProfile = nearestEditProfileBefore(sidebar, manageText);
+        if (!editProfile) return;
 
-        editProfile.parentElement.insertBefore(credit, editProfile);
+        // Prefer inserting between the profile trigger and the Manage Plan card.
+        // Find a shared wrapper first so the new card follows the existing sidebar flow.
+        let container = manageClickTarget?.parentElement || manageText.parentElement;
+        let manageBlock = manageClickTarget;
+        let profileBlock = null;
+
+        for (let depth = 0; depth < 5 && container; depth++) {
+            const maybeManage = directChildUnder(manageClickTarget, container);
+            const maybeProfile = directChildUnder(clickableRoot(editProfile), container);
+            if (maybeManage && maybeProfile && maybeManage !== maybeProfile) {
+                manageBlock = maybeManage;
+                profileBlock = maybeProfile;
+                break;
+            }
+            container = container.parentElement;
+        }
+
+        const card = createCard(manageClickTarget);
+        if (container && manageBlock && manageBlock.parentElement === container) {
+            container.insertBefore(card, manageBlock);
+            return;
+        }
+
+        // Fallback: place after the correct bottom Edit Profile trigger, never the opened user menu.
+        const profileClickTarget = clickableRoot(editProfile);
+        profileClickTarget?.insertAdjacentElement?.('afterend', card);
     };
 
     const queueSync = () => window.requestAnimationFrame(syncSidebarCredits);
-
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', queueSync, { once: true });
     } else {
         queueSync();
     }
-
-    // Filament keeps the sidebar persistent, but navigation can rebuild parts of
-    // its chrome. Re-apply the small credit line only on navigation lifecycle events.
     document.addEventListener('livewire:navigated', queueSync);
     window.addEventListener('pageshow', queueSync);
-
-    // One delayed pass covers the initial Filament sidebar hydration without using
-    // a permanent MutationObserver on this already-large Recruiting Center page.
     window.setTimeout(syncSidebarCredits, 350);
     window.setTimeout(syncSidebarCredits, 1200);
 })();
 </script>
 </x-filament-panels::page>
-</div>
