@@ -595,7 +595,20 @@ class StripeBillingService
         if (in_array($plan, ['jumpstart','amplify'], true)) {
             $this->activateServiceEntitlement($billing->fresh(), $plan, (string) ($intent['id'] ?? ''));
         }
-        $this->persistStripePayment($billing->fresh(), $intent, 'succeeded');
+        // Payment history is auxiliary. Never turn a successfully charged and
+        // credited upgrade into a checkout failure just because the legacy
+        // payment_transactions table cannot accept a Stripe-only row yet.
+        try {
+            $this->persistStripePayment($billing->fresh(), $intent, 'succeeded');
+        } catch (\Throwable $exception) {
+            Log::error('Stripe payment succeeded but payment ledger persistence failed.', [
+                'billing_id' => $billing->getKey(),
+                'user_id' => $billing->user_id,
+                'payment_intent_id' => $intent['id'] ?? null,
+                'error' => $exception->getMessage(),
+            ]);
+            report($exception);
+        }
         $this->syncPaymentMethodMetadata($billing->fresh());
     }
     protected function handleSetupIntentSucceeded(BillingInformation $billing, array $intent): void
