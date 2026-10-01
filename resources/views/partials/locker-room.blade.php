@@ -1994,7 +1994,7 @@
                 if (billing.card_expiration) detailBits.push(`Expires ${esc(billing.card_expiration)}`);
                 if (billing.cardholder_name) detailBits.push(esc(billing.cardholder_name));
                 const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Change Payment Method</button><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
-                method.innerHTML = `<div class="lr-payment-card"><div class="lr-payment-icon"><i class="fa-solid fa-credit-card"></i></div><div class="lr-payment-main"><strong>${esc(brand)} ending in ${esc(billing.card_last_four)}</strong><span>${detailBits.join(' · ') || 'Secure payment method on file'}</span></div></div>${changeButton}<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${billing.last_transaction_amount_cents ? money(billing.last_transaction_amount_cents) : (billing.amount_paid_cents ? money(billing.amount_paid_cents) : '—')}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div><p class="lr-card-copy" style="margin-top:10px;">For security, PLYRCARD only shows limited card metadata. Full card numbers and security codes are never displayed or stored here.</p>`;
+                method.innerHTML = `<div class="lr-payment-card"><div class="lr-payment-icon"><i class="fa-solid fa-credit-card"></i></div><div class="lr-payment-main"><strong>${esc(brand)} •••• ${esc(billing.card_last_four)}</strong><span>${detailBits.join(' · ') || 'Secure payment method on file'}</span></div></div>${changeButton}<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${billing.last_transaction_amount_cents ? money(billing.last_transaction_amount_cents) : (billing.amount_paid_cents ? money(billing.amount_paid_cents) : '—')}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div><p class="lr-card-copy" style="margin-top:10px;">For security, PLYRCARD only shows limited card metadata. Full card numbers and security codes are never displayed or stored here.</p>`;
             } else {
                 const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Add / Change Payment Method</button><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
                 method.innerHTML = `<div class="lr-preparing" style="border-color:#e5e7eb;background:#f8fafc;"><i class="fa-solid fa-shield-halved" style="color:#667085;"></i><div><strong>No saved payment method is available yet.</strong><span>Use the secure payment-method flow to add or replace the card used for future billing.</span></div></div>${changeButton}${billing.last_transaction_amount_cents ? `<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${money(billing.last_transaction_amount_cents)}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div>` : ''}`;
@@ -2014,14 +2014,26 @@
         setView('checkout', true);
         q('[data-lr-checkout-eyebrow]').textContent = 'Billing';
         q('[data-lr-checkout-heading]').textContent = 'Update payment method';
-        q('[data-lr-checkout-copy]').textContent = 'Your card details are handled securely by Stripe and are never stored by PLYRCARD.';
+        const currentBilling = state?.billing || {};
+        const currentBrand = String(currentBilling.payment_brand || 'CARD').toUpperCase();
+        const currentLast4 = String(currentBilling.card_last_four || '').trim();
+        const currentExpiration = String(currentBilling.card_expiration || '').trim();
+        const currentHint = currentLast4
+            ? `${currentBrand} •••• ${currentLast4}${currentExpiration ? ` · expires ${currentExpiration}` : ''}`
+            : '';
+        q('[data-lr-checkout-copy]').textContent = currentHint
+            ? `Current saved card: ${currentHint}. Enter a replacement card below. Stripe handles the full card details securely.`
+            : 'No saved card hint is available yet. Enter the card you want Stripe to use for future billing.';
         showLockerCheckoutPart(q('[data-lr-checkout-loading]'));
         const data = await request(drawer.dataset.paymentMethodSetupUrl,{method:'POST',body:{}});
         if (!data.client_secret || !data.publishable_key) throw new Error(data.message||'Unable to prepare card update.');
         const mount=q('#lr-stripe-payment-element'); if(mount) mount.innerHTML='';
         lockerStripe=window.Stripe(data.publishable_key); lockerStripeElements=lockerStripe.elements({clientSecret:data.client_secret}); lockerStripeElements.create('payment').mount('#lr-stripe-payment-element'); lockerStripeMode='setup';
         const btn=q('[data-lr-stripe-confirm]'); if(btn) btn.textContent='Save card';
-        showLockerCheckoutPart(q('[data-lr-checkout-frame]')); q('[data-lr-checkout-status]').textContent='Enter the card you want to use for future My Journey billing.';
+        showLockerCheckoutPart(q('[data-lr-checkout-frame]'));
+        q('[data-lr-checkout-status]').textContent = currentHint
+            ? `Replacing ${currentHint}. The old card remains active until you save the new one.`
+            : 'Enter the card you want to use for future My Journey billing.';
     }
     function renderShare() {
         const box=q('[data-lr-share-card]'); if(!box) return;

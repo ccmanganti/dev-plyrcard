@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 class StripeBillingService
@@ -268,6 +269,7 @@ class StripeBillingService
             'checkout_mode' => $planKey . '_service_only',
             'saved_payment_method' => (bool) $savedPaymentMethodId,
             'saved_payment_method_id' => $savedPaymentMethodId,
+            'saved_card' => $this->savedCardPayload($billing->fresh()),
             'requires_action' => $intentStatus === 'requires_action',
             'message' => $savedPaymentMethodId
                 ? 'Confirm the saved card charge if Stripe asks for additional verification.'
@@ -286,15 +288,19 @@ class StripeBillingService
             if ($intentId !== '') {
                 try {
                     $intent = $this->get('/v1/payment_intents/' . rawurlencode($intentId));
-                    $completed = (string) ($intent['status'] ?? '') === 'succeeded';
-                    if ($completed) {
+                    $stripeSucceeded = (string) ($intent['status'] ?? '') === 'succeeded';
+                    $completed = false;
+                    if ($stripeSucceeded) {
                         $this->handleOneTimePaymentSucceeded($billing, $intent);
                         $user->refresh()->loadMissing('roles');
+                        $completed = app(CreditPointService::class)->hasPackageGrant($user, $planKey, $intentId);
                     }
                     return array_merge($this->billingSummary($user), [
                         'success' => true,
                         'completed' => $completed,
-                        'message' => $completed ? ucfirst($planKey) . ' credits were added to your account.' : 'Waiting for Stripe payment confirmation…',
+                        'message' => $completed
+                            ? ucfirst($planKey) . ' credits were added to your account.'
+                            : ($stripeSucceeded ? 'Stripe payment succeeded. Finishing your credit grant…' : 'Waiting for Stripe payment confirmation…'),
                     ]);
                 } catch (\Throwable $exception) {
                     Log::info('Stripe one-time upgrade status refresh delayed.', [
@@ -313,10 +319,15 @@ class StripeBillingService
                 $billing->refresh();
                 $user->refresh()->loadMissing('roles');
                 if (($sync['paid'] ?? false) === true) {
+                    $grantSourceId = (string) ($billing->fresh()->stripe_invoice_id ?? '');
                     $completed = match ($planKey) {
                         'my-journey' => method_exists($user, 'hasRole') && $user->hasRole('My Journey'),
-                        'jumpstart' => method_exists($user, 'hasRole') && $user->hasRole('Jumpstart'),
-                        'amplify' => method_exists($user, 'hasRole') && $user->hasRole('Amplify'),
+                        'jumpstart' => method_exists($user, 'hasRole')
+                            && $user->hasRole('Jumpstart')
+                            && app(CreditPointService::class)->hasPackageGrant($user, 'jumpstart', $grantSourceId),
+                        'amplify' => method_exists($user, 'hasRole')
+                            && $user->hasRole('Amplify')
+                            && app(CreditPointService::class)->hasPackageGrant($user, 'amplify', $grantSourceId),
                         default => false,
                     };
                     if ($completed) {
@@ -338,10 +349,17 @@ class StripeBillingService
                 ]);
             }
         }
+        $fallbackSourceId = in_array($planKey, ['jumpstart', 'amplify'], true)
+            ? (string) (data_get($billing->registration_meta ?? [], 'stripe_upgrade.' . $planKey . '.payment_intent_id') ?: $billing->stripe_invoice_id ?: '')
+            : '';
         $active = match ($planKey) {
             'my-journey' => method_exists($user, 'hasRole') && $user->hasRole('My Journey'),
-            'jumpstart' => method_exists($user, 'hasRole') && $user->hasRole('Jumpstart'),
-            'amplify' => method_exists($user, 'hasRole') && $user->hasRole('Amplify'),
+            'jumpstart' => method_exists($user, 'hasRole')
+                && $user->hasRole('Jumpstart')
+                && app(CreditPointService::class)->hasPackageGrant($user, 'jumpstart', $fallbackSourceId),
+            'amplify' => method_exists($user, 'hasRole')
+                && $user->hasRole('Amplify')
+                && app(CreditPointService::class)->hasPackageGrant($user, 'amplify', $fallbackSourceId),
             default => false,
         };
         return array_merge($this->billingSummary($user), [
@@ -357,10 +375,29 @@ class StripeBillingService
             'billing_email' => $user->email,
             'currency' => 'USD',
         ]);
+
         if (filled($billing->stripe_subscription_id)) {
-            try { $subscription = $this->retrieveSubscription((string) $billing->stripe_subscription_id); $this->syncSubscription($billing, $subscription); $this->syncSubscriptionDefaultPaymentMethod($billing->fresh(), $subscription); }
-            catch (\Throwable $e) { Log::info('Stripe billing refresh delayed.', ['billing_id'=>$billing->getKey(),'error'=>$e->getMessage()]); }
+            try {
+                $subscription = $this->retrieveSubscription((string) $billing->stripe_subscription_id);
+                $this->syncSubscription($billing, $subscription);
+                $this->syncSubscriptionDefaultPaymentMethod($billing->fresh(), $subscription);
+            } catch (\Throwable $e) {
+                Log::info('Stripe billing refresh delayed.', ['billing_id'=>$billing->getKey(),'error'=>$e->getMessage()]);
+            }
         }
+
+        // A subscription can have no explicit default while the Stripe customer does.
+        // Always resolve the effective saved card so Billing Settings can show a hint.
+        try {
+            $fresh = $billing->fresh();
+            $paymentMethodId = $this->resolveSavedPaymentMethodId($fresh);
+            if ($paymentMethodId) {
+                $this->syncPaymentMethodById($fresh, $paymentMethodId);
+            }
+        } catch (\Throwable $e) {
+            Log::info('Stripe saved payment method refresh delayed.', ['billing_id'=>$billing->getKey(),'error'=>$e->getMessage()]);
+        }
+
         return $billing->fresh();
     }
     public function billingSummary(User $user): array
@@ -564,35 +601,47 @@ class StripeBillingService
     protected function handleSetupIntentSucceeded(BillingInformation $billing, array $intent): void
     {
         $paymentMethodId = $this->idValue($intent['payment_method'] ?? null);
-        if (! $paymentMethodId) return;
+        if (! $paymentMethodId) {
+            return;
+        }
+
         if (filled($billing->stripe_subscription_id)) {
-            $this->post('/v1/subscriptions/' . rawurlencode((string) $billing->stripe_subscription_id), ['default_payment_method' => $paymentMethodId]);
+            $this->post('/v1/subscriptions/' . rawurlencode((string) $billing->stripe_subscription_id), [
+                'default_payment_method' => $paymentMethodId,
+            ]);
         }
         if (filled($billing->stripe_customer_id)) {
-            $this->post('/v1/customers/' . rawurlencode((string) $billing->stripe_customer_id), ['invoice_settings' => ['default_payment_method' => $paymentMethodId]]);
+            $this->post('/v1/customers/' . rawurlencode((string) $billing->stripe_customer_id), [
+                'invoice_settings' => ['default_payment_method' => $paymentMethodId],
+            ]);
         }
-        $billing->forceFill(['stripe_payment_method_id'=>$paymentMethodId,'stripe_synced_at'=>now()])->save();
-        try {
-            $pm = $this->get('/v1/payment_methods/' . rawurlencode($paymentMethodId));
-            $card = (array) ($pm['card'] ?? []);
-            $billing->forceFill([
-                'payment_brand'=>$card['brand'] ?? $billing->payment_brand,
-                'card_last_four'=>$card['last4'] ?? $billing->card_last_four,
-                'card_expiration'=>isset($card['exp_month'],$card['exp_year']) ? sprintf('%02d/%d',(int)$card['exp_month'],(int)$card['exp_year']) : $billing->card_expiration,
-                'cardholder_name'=>data_get($pm,'billing_details.name') ?: $billing->cardholder_name,
-            ])->save();
-        } catch (\Throwable) {}
+
+        $this->syncPaymentMethodById($billing, $paymentMethodId);
     }
     protected function activateServiceEntitlement(BillingInformation $billing, string $plan, string $sourceId): void
     {
         $user = $billing->user;
-        if (! $user) return;
-        if (method_exists($user,'assignRole') && ! $user->hasRole($plan === 'jumpstart' ? 'Jumpstart' : 'Amplify')) {
-            $user->assignRole($plan === 'jumpstart' ? 'Jumpstart' : 'Amplify');
+        $plan = strtolower(trim($plan));
+        $sourceId = trim($sourceId);
+        if (! $user || ! in_array($plan, ['jumpstart', 'amplify'], true) || $sourceId === '') {
+            return;
         }
-        if ($sourceId !== '') {
-            app(CreditPointService::class)->grantPackage($user, $plan, $sourceId, ['stripe_billing_id'=>$billing->getKey()]);
-        }
+
+        // Credits and the role are one entitlement. Commit them together so we can
+        // never end up with the add-on role present while the credit grant failed.
+        DB::transaction(function () use ($billing, $user, $plan, $sourceId): void {
+            app(CreditPointService::class)->grantPackage(
+                $user,
+                $plan,
+                $sourceId,
+                ['stripe_billing_id' => $billing->getKey()]
+            );
+
+            $role = $plan === 'jumpstart' ? 'Jumpstart' : 'Amplify';
+            if (method_exists($user, 'assignRole') && ! $user->hasRole($role)) {
+                $user->assignRole($role);
+            }
+        });
     }
     protected function downgradeAfterSubscriptionEnd(BillingInformation $billing): void
     {
@@ -755,21 +804,35 @@ class StripeBillingService
     }
     protected function syncSubscriptionDefaultPaymentMethod(BillingInformation $billing, array $subscription): void
     {
-        $paymentMethodId = $this->idValue($subscription['default_payment_method'] ?? null)
-            ?: $this->idValue(data_get($subscription, 'payment_settings.default_mandate'));
-        if (! $paymentMethodId) return;
-        try {
-            $paymentMethod = $this->get('/v1/payment_methods/' . rawurlencode($paymentMethodId));
-            $card = (array) ($paymentMethod['card'] ?? []);
-            $billing->forceFill([
-                'stripe_payment_method_id' => $paymentMethodId,
-                'cardholder_name' => data_get($paymentMethod, 'billing_details.name') ?: $billing->cardholder_name,
-                'card_last_four' => $card['last4'] ?? $billing->card_last_four,
-                'card_expiration' => isset($card['exp_month'], $card['exp_year']) ? sprintf('%02d/%d', (int) $card['exp_month'], (int) $card['exp_year']) : $billing->card_expiration,
-                'payment_brand' => $card['brand'] ?? $billing->payment_brand,
-                'payment_type' => $paymentMethod['type'] ?? $billing->payment_type,
-            ])->save();
-        } catch (\Throwable) {}
+        $paymentMethodId = $this->idValue($subscription['default_payment_method'] ?? null);
+        if (! $paymentMethodId) {
+            $paymentMethodId = $this->resolveSavedPaymentMethodId($billing);
+        }
+        if ($paymentMethodId) {
+            $this->syncPaymentMethodById($billing, $paymentMethodId);
+        }
+    }
+
+    protected function syncPaymentMethodById(BillingInformation $billing, string $paymentMethodId): void
+    {
+        $paymentMethodId = trim($paymentMethodId);
+        if ($paymentMethodId === '') {
+            return;
+        }
+
+        $paymentMethod = $this->get('/v1/payment_methods/' . rawurlencode($paymentMethodId));
+        $card = (array) ($paymentMethod['card'] ?? []);
+        $billing->forceFill([
+            'stripe_payment_method_id' => $paymentMethodId,
+            'cardholder_name' => data_get($paymentMethod, 'billing_details.name') ?: $billing->cardholder_name,
+            'card_last_four' => $card['last4'] ?? $billing->card_last_four,
+            'card_expiration' => isset($card['exp_month'], $card['exp_year'])
+                ? sprintf('%02d/%d', (int) $card['exp_month'], (int) $card['exp_year'])
+                : $billing->card_expiration,
+            'payment_brand' => $card['brand'] ?? $billing->payment_brand,
+            'payment_type' => $paymentMethod['type'] ?? $billing->payment_type,
+            'stripe_synced_at' => now(),
+        ])->save();
     }
     protected function syncPaymentMethodMetadata(BillingInformation $billing): void
     {
@@ -788,17 +851,10 @@ class StripeBillingService
             if (! is_array($paymentMethod)) {
                 return;
             }
-            $card = (array) ($paymentMethod['card'] ?? []);
-            $billing->forceFill([
-                'stripe_payment_method_id' => $paymentMethod['id'] ?? $billing->stripe_payment_method_id,
-                'cardholder_name' => data_get($paymentMethod, 'billing_details.name') ?: $billing->cardholder_name,
-                'card_last_four' => $card['last4'] ?? $billing->card_last_four,
-                'card_expiration' => isset($card['exp_month'], $card['exp_year'])
-                    ? sprintf('%02d/%d', (int) $card['exp_month'], (int) $card['exp_year'])
-                    : $billing->card_expiration,
-                'payment_brand' => $card['brand'] ?? $billing->payment_brand,
-                'payment_type' => $paymentMethod['type'] ?? $billing->payment_type,
-            ])->save();
+            $paymentMethodId = $this->idValue($paymentMethod);
+            if ($paymentMethodId) {
+                $this->syncPaymentMethodById($billing, $paymentMethodId);
+            }
         } catch (\Throwable $exception) {
             Log::info('Stripe payment method metadata could not be refreshed.', [
                 'billing_id' => $billing->getKey(),
@@ -819,6 +875,7 @@ class StripeBillingService
                 $paymentMethodId = trim((string) $this->idValue($subscription['default_payment_method'] ?? null));
                 if ($paymentMethodId !== '') {
                     $billing->forceFill(['stripe_payment_method_id' => $paymentMethodId])->save();
+                    $this->syncPaymentMethodById($billing->fresh(), $paymentMethodId);
                     return $paymentMethodId;
                 }
             } catch (\Throwable) {
@@ -840,6 +897,7 @@ class StripeBillingService
                 }
                 if ($paymentMethodId !== '') {
                     $billing->forceFill(['stripe_payment_method_id' => $paymentMethodId])->save();
+                    $this->syncPaymentMethodById($billing->fresh(), $paymentMethodId);
                     return $paymentMethodId;
                 }
             } catch (\Throwable) {
@@ -1039,6 +1097,21 @@ class StripeBillingService
             'subscription_status' => $billing->subscription_status,
             'amount_due_cents' => (int) $billing->initial_amount_cents,
             'currency' => strtolower((string) ($billing->currency ?: 'USD')),
+            'saved_card' => $this->savedCardPayload($billing),
+        ];
+    }
+
+    protected function savedCardPayload(BillingInformation $billing): ?array
+    {
+        if (blank($billing->card_last_four)) {
+            return null;
+        }
+
+        return [
+            'brand' => strtolower((string) ($billing->payment_brand ?: 'card')),
+            'last_four' => (string) $billing->card_last_four,
+            'expiration' => (string) ($billing->card_expiration ?: ''),
+            'cardholder_name' => (string) ($billing->cardholder_name ?: ''),
         ];
     }
     protected function assertConfigured(): void

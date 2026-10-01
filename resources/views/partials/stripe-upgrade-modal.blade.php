@@ -29,6 +29,12 @@
     const q = s => modal.querySelector(s);
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
     const setStatus = (text, tone='') => { const el=q('[data-stripe-status]'); el.textContent=text||''; el.className='plyr-stripe-status '+tone; };
+    const cardHint = card => {
+        if(!card || !card.last_four) return '';
+        const brand=String(card.brand||'card').toUpperCase();
+        const expiration=String(card.expiration||'').trim();
+        return `${brand} •••• ${card.last_four}${expiration ? ` · expires ${expiration}` : ''}`;
+    };
     const setConfirmBusy = (busy, label='Pay securely') => {
         confirming = busy;
         const btn=q('[data-stripe-confirm]');
@@ -89,7 +95,8 @@
         setConfirmBusy(true,'Confirming saved card…');
         q('[data-stripe-loading]').hidden=false;
         q('[data-stripe-payment-shell]').hidden=true;
-        setStatus('Using your saved Stripe payment method…');
+        const hint=cardHint(data.saved_card);
+        setStatus(hint ? `Using saved ${hint}…` : 'Using your saved Stripe payment method…');
         try {
             const result=await stripe.confirmCardPayment(data.client_secret);
             if(result.error) throw result.error;
@@ -128,7 +135,10 @@
             }
             if(!data.client_secret||!data.publishable_key) throw new Error(data.message||'Stripe did not return a payment session.');
             stripe=window.Stripe(data.publishable_key);
-            q('[data-stripe-summary]').textContent=data.message||'Confirm your payment below.';
+            const savedHint=cardHint(data.saved_card);
+            q('[data-stripe-summary]').textContent=savedHint
+                ? `Saved payment method: ${savedHint}. ${data.message||'Confirm your payment below.'}`
+                : (data.message||'Confirm your payment below.');
             if(data.saved_payment_method){
                 await confirmSavedCard(data);
                 return;

@@ -3,6 +3,7 @@ namespace App\Services;
 use App\Models\CreditPointTransaction;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 class CreditPointService
 {
@@ -12,10 +13,35 @@ class CreditPointService
     }
     public function packagePoints(string $package): int
     {
-        return max(0, (int) config('plyrcard-points.packages.' . $package, 0));
+        $package = strtolower(trim($package));
+        $configured = config('plyrcard-points.packages.' . $package);
+
+        // Keep the paid package amounts safe even when the config file/key has not
+        // been deployed yet. These values match the product UI and checkout copy.
+        if ($configured === null) {
+            $configured = match ($package) {
+                'jumpstart' => 100,
+                'amplify' => 600,
+                default => 0,
+            };
+        }
+
+        return max(0, (int) $configured);
     }
     public function grantPackage(User $user, string $package, string $sourceId, array $meta = []): CreditPointTransaction
     {
+        $package = strtolower(trim($package));
+        $sourceId = trim($sourceId);
+        if ($sourceId === '') {
+            throw ValidationException::withMessages(['credits' => 'A payment source ID is required before credits can be granted.']);
+        }
+
+        if (! Schema::hasTable('credit_point_transactions') || ! Schema::hasColumn('users', 'points_available')) {
+            throw ValidationException::withMessages([
+                'credits' => 'The credit ledger is not installed. Run the credit-points migration before processing package purchases.',
+            ]);
+        }
+
         $points = $this->packagePoints($package);
         if ($points <= 0) {
             throw ValidationException::withMessages(['credits' => 'This package does not include credit points.']);
@@ -35,6 +61,20 @@ class CreditPointService
             ],
         );
     }
+    public function hasPackageGrant(User $user, string $package, string $sourceId): bool
+    {
+        $package = strtolower(trim($package));
+        $sourceId = trim($sourceId);
+        if ($sourceId === '') {
+            return false;
+        }
+
+        return CreditPointTransaction::query()
+            ->where('user_id', $user->getKey())
+            ->where('idempotency_key', 'package:' . $package . ':' . $sourceId)
+            ->exists();
+    }
+
     public function grant(User $user, int $points, string $idempotencyKey, array $attributes = []): CreditPointTransaction
     {
         return $this->write($user, 'grant', $points, $idempotencyKey, $attributes);

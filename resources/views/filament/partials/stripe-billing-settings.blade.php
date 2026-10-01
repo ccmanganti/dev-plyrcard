@@ -19,12 +19,18 @@
     $settingsHistory = collect($settingsSummary['history'] ?? []);
     $settingsPeriodEnd = filled($settingsSummary['current_period_end'] ?? null) ? \Illuminate\Support\Carbon::parse($settingsSummary['current_period_end']) : null;
 @endphp
+<style>
+    [data-stripe-card-modal][hidden]{display:none!important;}
+</style>
 <div class="rc-settings-card-v72" id="billing-payments" data-stripe-billing-settings
      data-summary-url="{{ route('billing.stripe.summary') }}"
      data-card-url="{{ route('billing.stripe.payment-method.setup') }}"
      data-card-complete-url="{{ route('billing.stripe.payment-method.complete') }}"
      data-cancel-url="{{ route('billing.cancel-request') }}"
-     data-resume-url="{{ route('billing.stripe.resume') }}">
+     data-resume-url="{{ route('billing.stripe.resume') }}"
+     data-card-brand="{{ e($settingsBilling->payment_brand ?: '') }}"
+     data-card-last-four="{{ e($settingsBilling->card_last_four ?: '') }}"
+     data-card-expiration="{{ e($settingsBilling->card_expiration ?: '') }}">
     <div class="rc-settings-head-v72">
         <div class="rc-settings-icon-v72">💳</div>
         <div>
@@ -44,16 +50,25 @@
             My Journey is scheduled to cancel on {{ $settingsPeriodEnd->format('M j, Y') }}. Your purchased credits will remain available and will not expire.
         </div>
     @endif
-    <div class="rc-row" style="align-items:flex-start;">
-        <div>
+    <div class="rc-row" style="align-items:center;gap:1rem;">
+        <div style="min-width:0;flex:1;">
             <div class="rc-row-title">Payment Method</div>
             @if($settingsBilling->card_last_four)
-                <p class="rc-subtle" style="margin:.25rem 0 0;">{{ $settingsBrand }} ending in {{ $settingsBilling->card_last_four }}{{ $settingsBilling->card_expiration ? ' · Expires '.$settingsBilling->card_expiration : '' }}</p>
+                <div style="display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin-top:.45rem;">
+                    <span style="display:inline-flex;align-items:center;gap:.4rem;padding:.42rem .65rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);font-size:.78rem;font-weight:800;letter-spacing:.01em;">
+                        <span aria-hidden="true">💳</span>
+                        {{ $settingsBrand }} •••• {{ $settingsBilling->card_last_four }}
+                    </span>
+                    @if($settingsBilling->card_expiration)
+                        <span class="rc-subtle">Expires {{ $settingsBilling->card_expiration }}</span>
+                    @endif
+                </div>
+                <p class="rc-subtle" style="margin:.4rem 0 0;">This is the saved Stripe card used for future My Journey billing and eligible add-on purchases.</p>
             @else
-                <p class="rc-subtle" style="margin:.25rem 0 0;">No Stripe payment method is saved yet.</p>
+                <p class="rc-subtle" style="margin:.25rem 0 0;">No saved card details are available yet. Stripe will securely store the card after you add or update it.</p>
             @endif
         </div>
-        <button class="rc-btn rc-btn-primary" type="button" data-stripe-card-update>{{ $settingsBilling->card_last_four ? 'Update Card' : 'Add Payment Method' }}</button>
+        <button class="rc-btn rc-btn-primary" type="button" data-stripe-card-update>{{ $settingsBilling->card_last_four ? 'Change Card' : 'Add Payment Method' }}</button>
     </div>
     <form method="POST" action="{{ route('locker-room.billing.update') }}" style="margin-top:1rem;">
         @csrf
@@ -95,12 +110,30 @@
             </div>
         @endif
     </div>
-    <div data-stripe-card-panel hidden style="margin-top:1rem;padding:1rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface);">
-        <div class="rc-row-title">Secure Card Update</div>
-        <p class="rc-subtle">Card details go directly to Stripe and are never stored by PLYRCARD.</p>
-        <div id="rc-stripe-card-element" style="margin-top:.75rem;"></div>
-        <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.8rem;"><button class="rc-btn" type="button" data-stripe-card-close>Cancel</button><button class="rc-btn rc-btn-primary" type="button" data-stripe-card-save>Save Card</button></div>
-        <div class="rc-subtle" data-stripe-card-status style="margin-top:.5rem;"></div>
+    <div data-stripe-card-modal hidden wire:ignore style="position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:1rem;">
+        <div data-stripe-card-backdrop style="position:absolute;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(4px);"></div>
+        <div role="dialog" aria-modal="true" aria-labelledby="rc-stripe-card-title" style="position:relative;width:min(34rem,100%);max-height:92vh;overflow:auto;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface,#fff);box-shadow:0 28px 80px rgba(15,23,42,.28);padding:1.15rem;">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;">
+                <div>
+                    <div style="font-size:.68rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase;color:#ff6338;">Secure Stripe card update</div>
+                    <h3 id="rc-stripe-card-title" style="margin:.25rem 0 0;font-size:1.15rem;">{{ $settingsBilling->card_last_four ? 'Change payment method' : 'Add payment method' }}</h3>
+                </div>
+                <button class="rc-btn" style="padding:.4rem .65rem;" type="button" data-stripe-card-close aria-label="Close card update">×</button>
+            </div>
+            @if($settingsBilling->card_last_four)
+                <div style="margin-top:.9rem;padding:.7rem .8rem;border:1px solid var(--rc-border);border-radius:.75rem;background:rgba(148,163,184,.08);">
+                    <div class="rc-subtle" style="font-size:.68rem;text-transform:uppercase;font-weight:800;letter-spacing:.05em;">Current saved card</div>
+                    <strong style="display:block;margin-top:.25rem;font-size:.88rem;">{{ $settingsBrand }} •••• {{ $settingsBilling->card_last_four }}{{ $settingsBilling->card_expiration ? ' · expires '.$settingsBilling->card_expiration : '' }}</strong>
+                </div>
+            @endif
+            <p class="rc-subtle" style="margin:.85rem 0 0;">Enter the replacement card below. Card details go directly to Stripe and are never stored by PLYRCARD.</p>
+            <div id="rc-stripe-card-element" style="margin-top:.85rem;min-height:82px;"></div>
+            <div class="rc-subtle" data-stripe-card-status style="min-height:1.2rem;margin-top:.65rem;"></div>
+            <div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.9rem;">
+                <button class="rc-btn" type="button" data-stripe-card-close>Cancel</button>
+                <button class="rc-btn rc-btn-primary" type="button" data-stripe-card-save>Save Card</button>
+            </div>
+        </div>
     </div>
 </div>
 <script src="https://js.stripe.com/v3/"></script>
@@ -124,10 +157,11 @@
     const rootFor = target => target?.closest?.('[data-stripe-billing-settings]') || document.querySelector('[data-stripe-billing-settings]');
     const cardStatus = root => root?.querySelector('[data-stripe-card-status]');
     const closeCardPanel = root => {
-        const panel=root?.querySelector('[data-stripe-card-panel]');
-        if(panel) panel.hidden=true;
+        const modal=root?.querySelector('[data-stripe-card-modal]');
+        if(modal) modal.hidden=true;
         const mount=root?.querySelector('#rc-stripe-card-element');
         if(mount) mount.innerHTML='';
+        document.documentElement.style.removeProperty('overflow');
         stripe=null; elements=null; activeRoot=null; setupIntentId=null;
     };
     document.addEventListener('click', async event => {
@@ -135,9 +169,10 @@
         if(updateButton){
             event.preventDefault();
             const root=rootFor(updateButton); if(!root)return;
-            const panel=root.querySelector('[data-stripe-card-panel]');
+            const modal=root.querySelector('[data-stripe-card-modal]');
             const status=cardStatus(root);
-            panel.hidden=false;
+            modal.hidden=false;
+            document.documentElement.style.overflow='hidden';
             updateButton.disabled=true;
             if(status) status.textContent='Preparing secure card update…';
             try{
@@ -151,7 +186,6 @@
                 if(mount) mount.innerHTML='';
                 elements.create('payment').mount(mount);
                 if(status) status.textContent='Enter the card you want to use for future My Journey billing.';
-                panel.scrollIntoView({behavior:'smooth',block:'nearest'});
             }catch(error){
                 if(status) status.textContent=error.message||'Unable to prepare card update.';
             }finally{
@@ -159,6 +193,13 @@
             }
             return;
         }
+        const cardBackdrop=event.target.closest('[data-stripe-card-backdrop]');
+        if(cardBackdrop){
+            event.preventDefault();
+            closeCardPanel(rootFor(cardBackdrop));
+            return;
+        }
+
         const closeButton=event.target.closest('[data-stripe-card-close]');
         if(closeButton){
             event.preventDefault();
