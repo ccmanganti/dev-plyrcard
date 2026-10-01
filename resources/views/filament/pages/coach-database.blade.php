@@ -16187,5 +16187,98 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(removeGlobalReloadControls));
     })();
 </script>
+
+<style id="rc-sidebar-credit-balance-v1" data-navigate-once>
+    /* Recruiting Center: show the athlete's current PLYRCARD credit balance
+       inside the existing Filament profile card, directly above Edit Profile. */
+    body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 {
+        display: inline-flex;
+        align-items: center;
+        gap: .28rem;
+        margin: .12rem 0 .05rem;
+        color: #ff6338;
+        font-size: .66rem;
+        font-weight: 800;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+    body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 svg {
+        width: .72rem;
+        height: .72rem;
+        flex: 0 0 auto;
+        color: currentColor;
+    }
+    .dark body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1,
+    html.dark body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 {
+        color: #ff7a5c;
+    }
+</style>
+<script id="rc-sidebar-credit-balance-script-v1" data-navigate-once>
+(() => {
+    if (window.__plyrRcSidebarCreditsInstalled) return;
+    window.__plyrRcSidebarCreditsInstalled = true;
+
+    const creditBalance = @js((int) ($rcCatalogUser?->points_available ?? 0));
+    const formattedBalance = () => Number(creditBalance || 0).toLocaleString();
+
+    const findEditProfileElement = (sidebar) => {
+        if (!sidebar) return null;
+        const walker = document.createTreeWalker(sidebar, NodeFilter.SHOW_TEXT);
+        while (walker.nextNode()) {
+            const value = String(walker.currentNode?.nodeValue || '').trim().toLowerCase();
+            if (value === 'edit profile') {
+                return walker.currentNode.parentElement || null;
+            }
+        }
+        return null;
+    };
+
+    const syncSidebarCredits = () => {
+        const sidebar = document.querySelector('.fi-sidebar');
+        if (!sidebar) return;
+
+        const existing = sidebar.querySelector('[data-rc-sidebar-credits]');
+        if (existing) {
+            const value = existing.querySelector('[data-rc-sidebar-credit-value]');
+            if (value) value.textContent = `${formattedBalance()} Credits`;
+            return;
+        }
+
+        const editProfile = findEditProfileElement(sidebar);
+        if (!editProfile || !editProfile.parentElement) return;
+
+        const credit = document.createElement('div');
+        credit.className = 'rc-sidebar-credit-balance-v1';
+        credit.setAttribute('data-rc-sidebar-credits', '1');
+        credit.setAttribute('title', `${formattedBalance()} PLYRCARD credits available`);
+        credit.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M13.5 2.25 5.25 13.5h5.25l-1.5 8.25L18.75 10.5H13.5l0-8.25Z"></path>
+            </svg>
+            <span data-rc-sidebar-credit-value>${formattedBalance()} Credits</span>
+        `;
+
+        editProfile.parentElement.insertBefore(credit, editProfile);
+    };
+
+    const queueSync = () => window.requestAnimationFrame(syncSidebarCredits);
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', queueSync, { once: true });
+    } else {
+        queueSync();
+    }
+
+    // Filament keeps the sidebar persistent, but navigation can rebuild parts of
+    // its chrome. Re-apply the small credit line only on navigation lifecycle events.
+    document.addEventListener('livewire:navigated', queueSync);
+    window.addEventListener('pageshow', queueSync);
+
+    // One delayed pass covers the initial Filament sidebar hydration without using
+    // a permanent MutationObserver on this already-large Recruiting Center page.
+    window.setTimeout(syncSidebarCredits, 350);
+    window.setTimeout(syncSidebarCredits, 1200);
+})();
+</script>
 </x-filament-panels::page>
 </div>
