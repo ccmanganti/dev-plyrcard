@@ -3,7 +3,6 @@
     // The catalog is only seeded on sections that can actually open/search schools.
     $rcActiveSectionForSeed = (string) ($section ?? 'dashboard');
     $rcCatalogHeavySections = ['dashboard', 'schools', 'favorites', 'lists', 'compose', 'campaigns'];
-
     $rcCatalogUser = auth()->user();
     $rcCatalogGender = $rcCatalogUser
         ? (\App\Models\Coach::normalizeGender($rcCatalogUser->gender ?? null) ?: 'unassigned')
@@ -29,7 +28,6 @@
         ? $this->discoverClientSchools
         : [];
 @endphp
-
 <div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
     <script data-navigate-once>
@@ -44,11 +42,9 @@
                 document.documentElement.setAttribute('data-plyrcard-recruiting-center', '1');
                 try { localStorage.setItem('plyrcard:onboarding-disabled:coach-database', '1'); } catch (_) {}
             };
-
             disableNoisyAdminHooks();
             document.addEventListener('livewire:navigated', disableNoisyAdminHooks);
             window.addEventListener('popstate', disableNoisyAdminHooks);
-
             // The SuperPWA service worker shown in the console can reject admin Livewire
             // requests. Recruiting Center is an authenticated app screen, so bypass that
             // public-site service worker here instead of letting it intercept /admin traffic.
@@ -173,7 +169,6 @@ discoverSelectedIds: [],
                 const cachedRows = Array.isArray(window.__plyrRcSchoolCatalogByUser[userKey])
                     ? window.__plyrRcSchoolCatalogByUser[userKey]
                     : [];
-
                 // v10.112.3: never replace a richer browser roster with a lighter/stale
                 // server row during a Livewire/SPA re-render. The canonical server row wins
                 // for identity/metadata, while a previously hydrated roster is retained only
@@ -184,7 +179,6 @@ discoverSelectedIds: [],
                         const id = String(row?.id ?? row?.school_id ?? '').trim();
                         if (id) cachedById.set(id, row);
                     });
-
                     const mergedRows = serverRows.map(serverRow => {
                         const id = String(serverRow?.id ?? serverRow?.school_id ?? '').trim();
                         const cachedRow = id ? cachedById.get(id) : null;
@@ -194,7 +188,6 @@ discoverSelectedIds: [],
                         const coaches = serverCoaches.length
                             ? serverCoaches
                             : (declaredCount > 0 && cachedCoaches.length ? cachedCoaches : []);
-
                         return {
                             ...(cachedRow || {}),
                             ...serverRow,
@@ -203,11 +196,9 @@ discoverSelectedIds: [],
                             coaches_count: Math.max(Number(serverRow?.coaches_count ?? declaredCount), coaches.length),
                         };
                     });
-
                     window.__plyrRcSchoolCatalogByUser[userKey] = mergedRows;
                     return mergedRows;
                 }
-
                 return cachedRows;
             })(),
             init() {
@@ -222,7 +213,6 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesLoading = false;
                 this.discoverSchoolCoachesLoadedFor = '';
                 document.documentElement.removeAttribute('data-rc-inbox-loading');
-
                 // v10.113.12: selected Inbox threads auto-load through a detached cache
                 // worker. The browser shows the loading state immediately, while the
                 // large Livewire page is not blocked by the remote message request.
@@ -232,21 +222,17 @@ discoverSelectedIds: [],
             },
             isValidOpenSchool() {
                 if (!this.schoolDrawerOpen || !this.optimisticSchool) return false;
-
                 const source = this.optimisticSchool;
                 const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
                 const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
                 if ((!sourceId && !sourceName) || !sourceName || sourceName === 'school') return false;
-
                 const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
                 return rows.some(row => {
                     const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
                     if (!rowName || rowName === 'school') return false;
-
                     const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
                         .map(value => String(value ?? '').trim())
                         .filter(Boolean);
-
                     if (sourceId && ids.includes(sourceId)) return true;
                     return sourceName === rowName;
                 });
@@ -263,26 +249,20 @@ discoverSelectedIds: [],
             async refreshDiscoverSchoolScore(schoolId) {
                 const id = String(schoolId || '').trim();
                 if (!id) return;
-
                 const requestToken = id + ':' + Date.now() + ':' + Math.random();
                 this.discoverSchoolScoreRequest = requestToken;
                 this.discoverSchoolScoreLoading = true;
-
                 try {
                     const score = await this.$wire.call('schoolEngagementScoreForClient', id);
                     if (this.discoverSchoolScoreRequest !== requestToken) return;
-
                     const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (currentId !== id || !this.optimisticSchool) return;
-
                     const numericScore = Math.max(0, Math.min(100, Number(score ?? 0)));
                     this.discoverSchoolScoreLoadedFor = id;
                     this.optimisticSchool = { ...this.optimisticSchool, engagement_score: numericScore };
-
                     const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
                         .find(item => String(item?.id ?? item?.school_id ?? '').trim() === id);
                     if (row) row.engagement_score = numericScore;
-
                     const userKey = String(this.rcCatalogUserKey || 'guest');
                     const bucket = window.__plyrRcSchoolDrawerDetailsByUser?.[userKey];
                     if (bucket?.[id]) {
@@ -299,16 +279,13 @@ discoverSelectedIds: [],
             async hydrateDiscoverSchoolDetails(schoolId, force = false) {
                 const id = String(schoolId || '').trim();
                 if (!id) return;
-
                 const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                 if (currentId !== id || !this.optimisticSchool) return;
-
                 // Every refresh gets its own token, even for the same school. This prevents
                 // an older request from a close/reopen cycle from applying over the newest one.
                 const requestToken = `${id}:${++this.discoverSchoolDetailRequestSeq}:${Date.now()}`;
                 this.discoverSchoolDetailRequestToken = requestToken;
                 this.discoverSchoolCoachesError = '';
-
                 const userKey = String(this.rcCatalogUserKey || 'guest');
                 window.__plyrRcSchoolDrawerDetailsByUser = window.__plyrRcSchoolDrawerDetailsByUser || {};
                 window.__plyrRcSchoolDrawerDetailsByUser[userKey] = window.__plyrRcSchoolDrawerDetailsByUser[userKey] || {};
@@ -317,14 +294,11 @@ discoverSelectedIds: [],
                 const cached = cachedEntry?.data && typeof cachedEntry.data === 'object' ? cachedEntry.data : cachedEntry;
                 const cachedAt = Number(cachedEntry?.cachedAt || 0);
                 const cacheFresh = !!cached && (!cachedAt || (Date.now() - cachedAt) < 120000);
-
                 const applyDetails = (detail) => {
                     if (!detail || typeof detail !== 'object' || !this.optimisticSchool) return false;
                     if (this.discoverSchoolDetailRequestToken !== requestToken) return false;
-
                     const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (stillOpenId !== id) return false;
-
                     // Never blank an already-visible roster because a refresh returned an
                     // incomplete payload. A non-empty incoming roster wins; otherwise keep
                     // the current browser-local roster intact.
@@ -333,7 +307,6 @@ discoverSelectedIds: [],
                     const currentCoaches = Array.isArray(current.coaches) ? current.coaches : [];
                     const coaches = incomingCoaches.length ? incomingCoaches : currentCoaches;
                     const nextScore = Math.max(0, Math.min(100, Number(current.engagement_score ?? 0)));
-
                     this.optimisticSchool = {
                         ...current,
                         logo_url: detail.logo_url || current.logo_url || '',
@@ -355,7 +328,6 @@ discoverSelectedIds: [],
                         company_id: current.company_id,
                         ghl_business_id: current.ghl_business_id,
                     };
-
                     const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [])
                         .find(item => String(item?.id ?? item?.school_id ?? '').trim() === id);
                     if (row) {
@@ -367,10 +339,8 @@ discoverSelectedIds: [],
                         row.engagement_score = nextScore;
                         if (detail.logo_url) row.logo_url = detail.logo_url;
                     }
-
                     return true;
                 };
-
                 // Paint a recent cached roster instantly. We still refresh once in the
                 // background, but the drawer never waits on Livewire when data is available.
                 if (!force && cacheFresh) {
@@ -382,11 +352,9 @@ discoverSelectedIds: [],
                         return;
                     }
                 }
-
                 const hasVisibleCoaches = Array.isArray(this.optimisticSchool?.coaches) && this.optimisticSchool.coaches.length > 0;
                 this.discoverSchoolCoachesLoading = !hasVisibleCoaches;
                 this.discoverSchoolCoachesLoadedFor = hasVisibleCoaches ? id : '';
-
                 const slowTimer = window.setTimeout(() => {
                     const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     const stillEmpty = !Array.isArray(this.optimisticSchool?.coaches) || this.optimisticSchool.coaches.length === 0;
@@ -394,26 +362,20 @@ discoverSelectedIds: [],
                         this.discoverSchoolCoachesError = 'This is taking longer than expected. You can retry without reloading the page.';
                     }
                 }, 6000);
-
                 let requestSucceeded = false;
                 let authoritativeEmpty = false;
-
                 try {
                     const result = await this.$wire.call('schoolDrawerDataForClient', id);
                     if (this.discoverSchoolDetailRequestToken !== requestToken) return;
-
                     const stillOpenId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (stillOpenId !== id) return;
-
                     const detail = result?.school;
                     if (result?.success === false || !detail || typeof detail !== 'object') {
                         throw new Error('School detail request did not return a valid school.');
                     }
-
                     const incomingCoaches = Array.isArray(detail.coaches) ? detail.coaches.filter(Boolean) : [];
                     authoritativeEmpty = incomingCoaches.length === 0 && Number(detail.coach_count ?? detail.coaches_count ?? 0) === 0;
                     requestSucceeded = applyDetails(detail);
-
                     if (requestSucceeded) {
                         // Cache only a successful server response. Failed/partial responses
                         // must never poison the browser cache until a full page reload.
@@ -445,19 +407,16 @@ discoverSelectedIds: [],
                     }
                 }
             },
-
             openGlobalSchool(reference) {
                 const source = (reference && typeof reference === 'object') ? reference : { id: reference };
                 const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
                 const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
                 const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
-
                 // Never open from a generic/placeholder payload.
                 if ((!sourceId && !sourceName) || sourceName === 'school') {
                     this.closeDiscoverSchool();
                     return;
                 }
-
                 const local = rows.find(row => {
                     const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
                         .map(value => String(value ?? '').trim())
@@ -466,14 +425,12 @@ discoverSelectedIds: [],
                     const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
                     return !!sourceName && sourceName !== 'school' && rowName === sourceName;
                 }) || null;
-
                 // Critical: do not fall back to rendering the incoming object. The
                 // canonical catalog is the only valid source for an Admin school drawer.
                 if (!local) {
                     this.closeDiscoverSchool();
                     return;
                 }
-
                 const merged = { ...source, ...local };
                 merged.id = local.id;
                 merged.school_id = local.school_id ?? local.id;
@@ -487,7 +444,6 @@ discoverSelectedIds: [],
                 merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coaches.length ?? 0);
                 merged.is_favorite = !!local.is_favorite;
                 merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
-
                 // Invalidate any in-flight detail request from a previous open before
                 // exposing this school. This also covers close -> reopen of the same school.
                 this.discoverSchoolDetailRequestToken = '';
@@ -499,7 +455,6 @@ discoverSelectedIds: [],
                 const hasCatalogRoster = Array.isArray(merged.coaches) && merged.coaches.length > 0;
                 const declaredCoachCount = Math.max(0, Number(merged.coach_count ?? merged.coaches_count ?? 0));
                 const needsRosterFetch = !hasCatalogRoster && declaredCoachCount > 0;
-
                 // v10.112.3: the canonical Discover catalog already contains the complete
                 // gender-scoped local roster. If it is present, opening the school is 100%
                 // browser-local: no Livewire request, no queue wait, and no chance for a
@@ -516,7 +471,6 @@ discoverSelectedIds: [],
                 this.discoverSchoolCommsLoadedFor = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
-
                 // Only fall back to the one-school endpoint when a stale/legacy catalog row
                 // says coaches exist but does not actually carry the roster array.
                 if (needsRosterFetch) {
@@ -527,14 +481,12 @@ discoverSelectedIds: [],
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                 if (!id || this.discoverSchoolCommsLoading) return;
                 if (!force && this.discoverSchoolCommsLoadedFor === id && this.discoverSchoolComms.length > 0) return;
-
                 this.discoverSchoolCommsLoading = true;
                 try {
                     const rows = await this.$wire.call('schoolCommunicationHistoryForClient', id);
                     // Ignore a late response if the user already opened a different school.
                     const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (currentId !== id) return;
-
                     // Normalize the returned Livewire payload into fresh plain objects and
                     // give every row a guaranteed unique browser render key. This changes
                     // only the school-drawer Communications renderer.
@@ -546,7 +498,6 @@ discoverSelectedIds: [],
                                 __renderKey: `${id}:${String(row.id || 'row')}:${index}`,
                             }))
                         : [];
-
                     this.discoverSchoolComms = [...normalizedRows];
                     this.discoverSchoolCommsLoadedFor = id;
                 } catch (error) {
@@ -650,11 +601,9 @@ discoverSelectedIds: [],
                 const fallbackSchool = this.optimisticSchool || {};
                 const id = String(schoolId || fallbackSchool.id || fallbackSchool.school_id || fallbackSchool.business_id || '').trim();
                 if (!id) return;
-
                 const href = @js($this->pageUrl('compose')) + '?school=' + encodeURIComponent(id);
                 let targetPath = '';
                 try { targetPath = new URL(href, window.location.href).pathname; } catch (_) { targetPath = String(window.location?.pathname || ''); }
-
                 window.__rcComposeRecipientStateV101 = {
                     path: targetPath || String(window.location?.pathname || ''),
                     schoolId: id,
@@ -663,27 +612,21 @@ discoverSelectedIds: [],
                     headCoachOnly: true,
                     chooserOpen: false,
                 };
-
                 this.closeDiscoverSchool();
-
                 const activated = typeof window.__plyrRcActivateSectionClientOnly === 'function'
                     ? window.__plyrRcActivateSectionClientOnly('compose', href, false)
                     : false;
-
                 const notifyCompose = () => window.dispatchEvent(new CustomEvent('rc-compose-select-school', {
                     detail: { schoolId: id, source: 'school-drawer' },
                 }));
-
                 if (!activated) {
                     window.location.assign(href);
                     return;
                 }
-
                 this.$nextTick(() => {
                     notifyCompose();
                     window.requestAnimationFrame(notifyCompose);
                 });
-
                 const wire = this.$wire;
                 if (wire && typeof wire.composeEmailSchool === 'function') return Promise.resolve(wire.composeEmailSchool(id));
                 if (wire && typeof wire.call === 'function') return Promise.resolve(wire.call('composeEmailSchool', id)).catch(() => {});
@@ -774,7 +717,6 @@ discoverSelectedIds: [],
             --rc-soft: rgb(249 250 251);
             --rc-text: rgb(17 24 39);
         }
-
         .dark {
             --rc-border: rgb(63 63 70);
             --rc-muted: rgb(161 161 170);
@@ -782,44 +724,36 @@ discoverSelectedIds: [],
             --rc-soft: rgb(39 39 42);
             --rc-text: rgb(244 244 245);
         }
-
         [x-cloak] { display: none !important; }
-
         .rc-wrap {
             display: grid;
             gap: 1rem;
             color: var(--rc-text);
         }
-
         .rc-subtle {
             color: var(--rc-muted);
             font-size: .8125rem;
             line-height: 1.35;
         }
-
         .rc-top {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
             gap: .875rem;
         }
-
         .rc-title {
             font-size: 1.125rem;
             font-weight: 500;
             letter-spacing: -.02em;
             line-height: 1.2;
         }
-
         .rc-grid {
             display: grid;
             gap: .875rem;
         }
-
         .rc-stats {
             grid-template-columns: repeat(4, minmax(0, 1fr));
         }
-
         .rc-card {
             border: 1px solid var(--rc-border);
             background: var(--rc-surface);
@@ -827,25 +761,21 @@ discoverSelectedIds: [],
             padding: .875rem;
             box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
         }
-
         .rc-card.is-flat {
             box-shadow: none;
         }
-
         .rc-stat-number {
             font-size: 1.35rem;
             font-weight: 500;
             letter-spacing: -.025em;
             line-height: 1;
         }
-
         .rc-toolbar {
             display: flex;
             gap: .5rem;
             flex-wrap: wrap;
             align-items: center;
         }
-
         .rc-input,
         .rc-select,
         .rc-textarea {
@@ -860,26 +790,22 @@ discoverSelectedIds: [],
             outline: none;
             transition: border-color .15s ease, box-shadow .15s ease;
         }
-
         .rc-input:focus,
         .rc-select:focus,
         .rc-textarea:focus {
             border-color: var(--rc-accent);
             box-shadow: 0 0 0 3px var(--rc-accent-soft);
         }
-
         .rc-textarea {
             width: 100%;
             line-height: 1.45;
         }
-
         .rc-rich-toolbar {
             display: flex;
             flex-wrap: wrap;
             gap: .375rem;
             margin-top: .5rem;
         }
-
         .rc-rich-editor {
             width: 100%;
             min-height: 12rem;
@@ -893,24 +819,20 @@ discoverSelectedIds: [],
             outline: none;
             margin-top: .5rem;
         }
-
         .rc-rich-editor:focus {
             border-color: var(--rc-accent);
             box-shadow: 0 0 0 3px var(--rc-accent-soft);
         }
-
         .rc-rich-editor:empty:before {
             content: attr(data-placeholder);
             color: var(--rc-muted);
         }
-
         .rc-mini-list {
             display: grid;
             gap: .5rem;
             max-height: 22rem;
             overflow: auto;
         }
-
         .rc-btn {
             display: inline-flex;
             align-items: center;
@@ -926,31 +848,25 @@ discoverSelectedIds: [],
             color: var(--rc-text);
             transition: background .15s ease, border-color .15s ease, transform .15s ease;
         }
-
         .rc-btn:hover {
             background: var(--rc-soft);
         }
-
         .rc-btn:active {
             transform: translateY(1px);
         }
-
         .rc-btn-primary {
             background: var(--rc-accent);
             border-color: var(--rc-accent);
             color: white;
         }
-
         .rc-btn-primary:hover {
             background: #f0522b;
             border-color: #f0522b;
         }
-
         .rc-btn[disabled] {
             opacity: .55;
             cursor: not-allowed;
         }
-
         .rc-row {
             display: flex;
             align-items: center;
@@ -959,23 +875,17 @@ discoverSelectedIds: [],
             padding: .7rem 0;
             border-top: 1px solid var(--rc-border);
         }
-
         .rc-row:first-child {
             border-top: 0;
             padding-top: 0;
         }
-
         .rc-row:last-child {
             padding-bottom: 0;
         }
-
         .rc-row-title {
             font-weight: 650;
             font-size: .875rem;
         }
-
-
-
         .rc-coach-row {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -987,12 +897,10 @@ discoverSelectedIds: [],
             border-radius: .78rem;
             box-shadow: 0 1px 2px rgba(15, 23, 42, .035);
         }
-
         .rc-card > .rc-coach-row + .rc-coach-row,
         .rc-drawer-panel > .rc-coach-row + .rc-coach-row {
             margin-top: .5rem;
         }
-
         .rc-coach-main {
             display: grid;
             grid-template-columns: 2.35rem minmax(0, 1fr);
@@ -1000,7 +908,6 @@ discoverSelectedIds: [],
             align-items: center;
             min-width: 0;
         }
-
         .rc-coach-avatar {
             width: 2.35rem;
             height: 2.35rem;
@@ -1013,20 +920,17 @@ discoverSelectedIds: [],
             font-weight: 600;
             font-size: .9rem;
         }
-
         .rc-coach-copy {
             min-width: 0;
             display: grid;
             gap: .28rem;
         }
-
         .rc-coach-heading {
             display: flex;
             align-items: center;
             gap: .5rem;
             min-width: 0;
         }
-
         .rc-coach-heading h3 {
             margin: 0;
             font-size: .93rem;
@@ -1037,14 +941,12 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
         .rc-coach-badges {
             display: inline-flex;
             gap: .3rem;
             flex-wrap: wrap;
             flex: 0 0 auto;
         }
-
         .rc-coach-meta {
             display: flex;
             flex-wrap: wrap;
@@ -1053,7 +955,6 @@ discoverSelectedIds: [],
             font-size: .78rem;
             line-height: 1.35;
         }
-
         .rc-coach-meta span {
             min-width: 0;
             max-width: 100%;
@@ -1061,7 +962,6 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
         .rc-coach-meta span:not(:last-child)::after {
             content: "";
             display: inline-block;
@@ -1073,7 +973,6 @@ discoverSelectedIds: [],
             opacity: .45;
             vertical-align: middle;
         }
-
         .rc-coach-actions {
             display: inline-flex;
             align-items: center;
@@ -1082,35 +981,28 @@ discoverSelectedIds: [],
             flex-wrap: nowrap;
             max-width: 14rem;
         }
-
         .rc-coach-list-actions {
             display: none;
         }
-
         .rc-action-menu {
             position: relative;
             display: inline-flex;
             flex: 0 0 auto;
         }
-
         .rc-action-trigger {
             font-weight: 650;
             letter-spacing: .08em;
         }
-
-
         .rc-school-list-picker {
             position: relative;
             display: inline-flex;
             flex: 0 0 auto;
         }
-
         .rc-school-list-trigger {
             min-width: 4.25rem;
             padding-inline: .55rem;
             gap: .3rem;
         }
-
         .rc-school-list-menu {
             position: absolute;
             z-index: 45;
@@ -1127,7 +1019,6 @@ discoverSelectedIds: [],
             box-shadow: 0 12px 28px rgba(15, 23, 42, .16);
             padding: .25rem;
         }
-
         .rc-school-list-option {
             width: 100%;
             border: 0;
@@ -1145,24 +1036,20 @@ discoverSelectedIds: [],
             line-height: 1.2;
             cursor: pointer;
         }
-
         .rc-school-list-option:hover,
         .rc-school-list-option.is-active {
             background: var(--rc-accent-soft);
             color: var(--rc-accent);
         }
-
         .rc-school-list-check {
             font-size: .72rem;
             font-weight: 650;
         }
-
         .rc-school-list-empty {
             color: var(--rc-muted);
             font-size: .72rem;
             padding: .38rem .48rem;
         }
-
         .rc-menu-panel {
             position: absolute;
             z-index: 40;
@@ -1177,7 +1064,6 @@ discoverSelectedIds: [],
             box-shadow: 0 18px 45px rgba(15, 23, 42, .18);
             padding: .35rem;
         }
-
         .rc-menu-item {
             width: 100%;
             border: 0;
@@ -1194,11 +1080,9 @@ discoverSelectedIds: [],
             font-weight: 650;
             cursor: pointer;
         }
-
         .rc-menu-item:hover {
             background: var(--rc-soft);
         }
-
         .rc-menu-label {
             padding: .65rem .65rem .32rem;
             color: var(--rc-muted);
@@ -1207,14 +1091,11 @@ discoverSelectedIds: [],
             text-transform: uppercase;
             letter-spacing: .05em;
         }
-
         .rc-btn-compact {
             min-height: 1.95rem;
             padding: .36rem .55rem;
             font-size: .72rem;
         }
-
-
         .rc-pill {
             display: inline-flex;
             align-items: center;
@@ -1228,48 +1109,40 @@ discoverSelectedIds: [],
             color: var(--rc-muted);
             line-height: 1.2;
         }
-
         .rc-pill-accent {
             background: var(--rc-accent-soft);
             color: var(--rc-accent);
         }
-
         .rc-progress {
             height: .38rem;
             background: var(--rc-soft);
             border-radius: 999px;
             overflow: hidden;
         }
-
         .rc-progress span {
             display: block;
             height: 100%;
             background: var(--rc-accent);
             transition: width .35s ease;
         }
-
         .rc-pulse {
             animation: rcFade .35s ease-in;
         }
-
         @keyframes rcFade {
             from { opacity: .2; transform: translateY(4px); }
             to { opacity: 1; transform: none; }
         }
-
         .rc-chat {
             display: grid;
             grid-template-columns: minmax(250px, 340px) minmax(0, 1fr);
             gap: .875rem;
             align-items: start;
         }
-
         .rc-thread {
             max-height: 620px;
             overflow: auto;
             padding: .25rem;
         }
-
         .rc-message {
             max-width: 82%;
             border: 1px solid var(--rc-border);
@@ -1280,13 +1153,11 @@ discoverSelectedIds: [],
             font-size: .8375rem;
             line-height: 1.45;
         }
-
         .rc-message.out {
             margin-left: auto;
             background: var(--rc-accent-soft);
             border-color: rgba(255, 99, 56, .25);
         }
-
         .rc-thread-button {
             width: 100%;
             text-align: left;
@@ -1296,7 +1167,6 @@ discoverSelectedIds: [],
             border-bottom: 0;
             border-radius: 0;
         }
-
         .rc-thread-button:hover {
             background: var(--rc-soft);
             margin-left: -.5rem;
@@ -1305,7 +1175,6 @@ discoverSelectedIds: [],
             padding-right: .5rem;
             width: calc(100% + 1rem);
         }
-
         .rc-drawer {
             position: fixed;
             inset: 0;
@@ -1315,7 +1184,6 @@ discoverSelectedIds: [],
             justify-content: flex-end;
             backdrop-filter: blur(2px);
         }
-
         .rc-drawer-panel {
             width: min(560px, 100%);
             height: 100%;
@@ -1324,7 +1192,6 @@ discoverSelectedIds: [],
             overflow: auto;
             box-shadow: -20px 0 40px rgba(15, 23, 42, .16);
         }
-
         .rc-empty {
             border: 1px dashed var(--rc-border);
             border-radius: .875rem;
@@ -1334,13 +1201,11 @@ discoverSelectedIds: [],
             display: grid;
             gap: .2rem;
         }
-
         .rc-school-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
             gap: .65rem;
         }
-
         .rc-school-view-toggle {
             display:inline-flex;
             gap:.25rem;
@@ -1349,25 +1214,21 @@ discoverSelectedIds: [],
             border-radius:.75rem;
             background:var(--rc-surface);
         }
-
         .rc-school-view-toggle .rc-btn {
             min-height:1.9rem;
             padding:.32rem .5rem;
             border-radius:.55rem;
             border-color:transparent;
         }
-
         .rc-school-view-toggle .rc-btn.is-active {
             border-color:rgba(255,99,56,.28);
             background:var(--rc-accent-soft);
             color:var(--rc-accent);
         }
-
         .rc-school-list-table {
             display:grid;
             gap:.4rem;
         }
-
         .rc-school-list-head,
         .rc-school-list-row {
             display:grid;
@@ -1375,7 +1236,6 @@ discoverSelectedIds: [],
             gap:.65rem;
             align-items:center;
         }
-
         .rc-school-list-head {
             color:var(--rc-muted);
             font-size:.68rem;
@@ -1384,7 +1244,6 @@ discoverSelectedIds: [],
             letter-spacing:.05em;
             padding:.2rem .75rem;
         }
-
         .rc-school-list-row {
             border:1px solid var(--rc-border);
             border-radius:.78rem;
@@ -1392,12 +1251,10 @@ discoverSelectedIds: [],
             padding:.58rem .75rem;
             box-shadow:0 1px 2px rgba(15,23,42,.035);
         }
-
         .rc-school-list-row:hover {
             border-color:rgba(255,99,56,.35);
             background:var(--rc-soft);
         }
-
         .rc-school-list-name {
             border:0;
             background:transparent;
@@ -1411,7 +1268,6 @@ discoverSelectedIds: [],
             font-weight:750;
             font-size:.82rem;
         }
-
         .rc-school-list-logo-box,
         .rc-school-card-logo-box,
         .rc-coach-school-logo-wrap {
@@ -1430,13 +1286,11 @@ discoverSelectedIds: [],
             font-weight:900;
             letter-spacing:.02em;
         }
-
         .rc-school-card-logo-box {
             width:2.45rem;
             height:2.45rem;
             border-radius:.7rem;
         }
-
         .rc-school-list-logo,
         .rc-school-card-logo,
         .rc-coach-school-logo {
@@ -1447,7 +1301,6 @@ discoverSelectedIds: [],
             display:block;
             background:#fff;
         }
-
         .rc-school-logo-placeholder,
         .rc-logo-initials {
             color:#111827;
@@ -1456,11 +1309,9 @@ discoverSelectedIds: [],
             font-weight:900;
             letter-spacing:.02em;
         }
-
         .rc-logo-fallback-text {
             display:none;
         }
-
         .is-missing-logo .rc-logo-fallback-text {
             display:inline-flex;
             align-items:center;
@@ -1468,11 +1319,9 @@ discoverSelectedIds: [],
             width:100%;
             height:100%;
         }
-
         .is-missing-logo img {
             display:none !important;
         }
-
         .rc-school-card-title {
             min-width:0;
             display:flex;
@@ -1486,21 +1335,18 @@ discoverSelectedIds: [],
             cursor:pointer;
             font-weight:750;
         }
-
         .rc-school-card-title span:last-child {
             display:-webkit-box;
             -webkit-line-clamp:2;
             -webkit-box-orient:vertical;
             overflow:hidden;
         }
-
         .rc-school-list-actions {
             display:flex;
             justify-content:flex-end;
             align-items:center;
             gap:.35rem;
         }
-
         .rc-school-list-picker { position:relative; display:inline-flex; }
         .rc-school-list-trigger { min-height:1.95rem; padding:.35rem .55rem; font-size:.72rem; white-space:nowrap; }
         .rc-school-list-menu { position:absolute; z-index:60; right:0; bottom:calc(100% + .35rem); width:10.5rem; max-height:12rem; overflow:auto; padding:.25rem; border:1px solid var(--rc-border); border-radius:.7rem; background:var(--rc-surface); box-shadow:0 16px 35px rgba(15,23,42,.16); }
@@ -1508,14 +1354,11 @@ discoverSelectedIds: [],
         .rc-school-list-option:hover, .rc-school-list-option.is-active { background:var(--rc-accent-soft); color:var(--rc-accent); }
         .rc-school-list-empty { padding:.45rem .5rem; color:var(--rc-muted); font-size:.72rem; }
         .rc-school-list-check { font-size:.72rem; font-weight:900; }
-
         @media (max-width: 980px) {
             .rc-school-list-head { display:none; }
             .rc-school-list-row { grid-template-columns:1fr auto; gap:.45rem; }
             .rc-school-list-row > :nth-child(n+2):nth-child(-n+6) { display:none; }
         }
-
-
         .rc-school-card {
             border: 1px solid var(--rc-border);
             background: var(--rc-surface);
@@ -1527,13 +1370,11 @@ discoverSelectedIds: [],
             gap: .5rem;
             transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
         }
-
         .rc-school-card:hover {
             border-color: rgba(255, 99, 56, .55);
             box-shadow: 0 8px 20px rgba(15, 23, 42, .08);
             transform: translateY(-1px);
         }
-
         .rc-school-topline,
         .rc-school-actions,
         .rc-school-meta {
@@ -1542,7 +1383,6 @@ discoverSelectedIds: [],
             justify-content: space-between;
             gap: .5rem;
         }
-
         .rc-school-card h3 {
             margin: 0;
             font-size: .88rem;
@@ -1554,7 +1394,6 @@ discoverSelectedIds: [],
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-
         .rc-school-conference {
             margin: -.2rem 0 0;
             color: var(--rc-muted);
@@ -1566,14 +1405,12 @@ discoverSelectedIds: [],
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-
         .rc-school-meta {
             margin-top: auto;
             color: var(--rc-muted);
             font-size: .72rem;
             line-height: 1.25;
         }
-
         .rc-badge {
             display: inline-flex;
             align-items: center;
@@ -1585,7 +1422,6 @@ discoverSelectedIds: [],
             font-weight: 500;
             line-height: 1.2;
         }
-
         .rc-icon-button {
             width: 1.85rem;
             height: 1.85rem;
@@ -1598,13 +1434,11 @@ discoverSelectedIds: [],
             background: var(--rc-surface);
             font-size: .9rem;
         }
-
         .rc-icon-button.is-active {
             color: var(--rc-accent);
             border-color: rgba(255, 99, 56, .35);
             background: var(--rc-accent-soft);
         }
-
         .rc-spinner-mini {
             width: .8rem;
             height: .8rem;
@@ -1613,11 +1447,9 @@ discoverSelectedIds: [],
             border-radius: 999px;
             animation: rcSpin .65s linear infinite;
         }
-
         @keyframes rcSpin {
             to { transform: rotate(360deg); }
         }
-
         .rc-section-title {
             font-size: .82rem;
             font-weight: 500;
@@ -1626,47 +1458,37 @@ discoverSelectedIds: [],
             letter-spacing: .04em;
             margin-bottom: .65rem;
         }
-
         .rc-list-button {
             width: 100%;
             text-align: left;
             justify-content: space-between;
         }
-
         .rc-favorites-layout {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
             gap: .6rem;
             align-items: start;
         }
-
         .rc-favorites-panel .rc-school-grid {
             grid-template-columns: 1fr;
         }
-
         .rc-favorites-panel .rc-school-card {
             min-height: 8rem;
             gap: .45rem;
         }
-
         .rc-school-flags {
             min-height: 1.35rem;
             gap: .3rem;
         }
-
         .rc-favorites-panel .rc-school-actions {
             justify-content: flex-start;
         }
-
         .rc-favorites-panel .rc-school-actions .rc-btn-primary {
             min-width: 7.5rem;
         }
-
         .rc-coach-panel {
             min-height: 5.25rem;
         }
-
-
         .rc-sr-only {
             position: absolute;
             width: 1px;
@@ -1678,94 +1500,76 @@ discoverSelectedIds: [],
             white-space: nowrap;
             border: 0;
         }
-
         .rc-format-btn {
             min-width: 2.15rem;
             padding-inline: .55rem;
         }
-
         .rc-rich-toolbar {
             gap: .35rem;
             flex-wrap: wrap;
         }
-
         .rc-rich-editor {
             min-height: 11rem;
             line-height: 1.55;
         }
-
         .rc-rich-editor p {
             margin: 0 0 .75rem;
         }
-
         .rc-rich-editor ul,
         .rc-rich-editor ol {
             margin: .5rem 0 .75rem 1.25rem;
             padding: 0;
         }
-
         .rc-school-grid.is-compact {
             display: grid;
             grid-template-columns: 1fr;
             gap: .5rem;
         }
-
         .rc-school-grid.is-compact .rc-school-card {
             min-height: 0;
             padding: .7rem;
             gap: .35rem;
             border-radius: .75rem;
         }
-
         .rc-school-grid.is-compact .rc-school-topline {
             margin-bottom: .1rem;
         }
-
         .rc-school-grid.is-compact .rc-school-card h3 {
             font-size: .88rem;
             line-height: 1.2;
             margin: 0;
         }
-
         .rc-school-grid.is-compact .rc-school-conference {
             font-size: .72rem;
             -webkit-line-clamp: 1;
             margin: 0;
         }
-
         .rc-school-grid.is-compact .rc-school-meta {
             font-size: .7rem;
             margin-top: .15rem;
         }
-
         .rc-school-grid.is-compact .rc-school-flags {
             min-height: 0;
             margin-top: .15rem;
         }
-
         .rc-school-grid.is-compact .rc-school-actions {
             margin-top: .2rem;
         }
-
         .rc-school-grid.is-compact .rc-btn-primary {
             min-height: 2.1rem;
             padding: .45rem .65rem;
         }
-
         .rc-list-button {
             min-height: 2.35rem;
             padding: .45rem .65rem;
             font-size: .78rem;
         }
-
-
         .rc-campaign-shell {
             display: grid;
             grid-template-columns: minmax(240px, 320px) minmax(520px, 1fr);
             gap: 1rem;
             align-items: start;
         }
-
         .rc-campaign-panel {
             position: relative;
             border: 1px solid rgba(148, 163, 184, .16);
@@ -1775,11 +1579,9 @@ discoverSelectedIds: [],
             overflow: hidden;
             transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
         }
-
         .rc-campaign-panel:hover {
             border-color: rgba(255, 91, 50, .22);
         }
-
         .rc-campaign-panel-header {
             padding: 1.05rem 1rem .85rem;
             border-bottom: 1px solid rgba(148, 163, 184, .12);
@@ -1788,7 +1590,6 @@ discoverSelectedIds: [],
             justify-content: space-between;
             gap: .6rem;
         }
-
         .rc-template-list,
         .rc-picker-list {
             display: grid;
@@ -1798,7 +1599,6 @@ discoverSelectedIds: [],
             padding: .85rem;
             scroll-behavior: smooth;
         }
-
         .rc-template-item,
         .rc-picker-row {
             position: relative;
@@ -1812,7 +1612,6 @@ discoverSelectedIds: [],
             background: rgba(255,255,255,.032);
             transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease;
         }
-
         .rc-template-item:hover,
         .rc-picker-row:hover {
             border-color: rgba(255, 91, 50, .42);
@@ -1820,7 +1619,6 @@ discoverSelectedIds: [],
             transform: translateY(-1px);
             box-shadow: 0 12px 30px rgba(0,0,0,.18);
         }
-
         .rc-template-item.is-selected {
             border-color: rgba(255, 91, 50, .9);
             background: linear-gradient(135deg, rgba(255, 91, 50, .95), rgba(255, 91, 50, .72));
@@ -1830,7 +1628,6 @@ discoverSelectedIds: [],
         .rc-template-item.is-selected .rc-template-main span,
         .rc-template-item.is-selected .rc-template-icon { color:#fff; }
         .rc-template-item.is-selected .rc-template-icon { background:rgba(255,255,255,.16); }
-
         .rc-template-icon {
             width: 2.15rem;
             height: 2.15rem;
@@ -1842,7 +1639,6 @@ discoverSelectedIds: [],
             color: var(--rc-accent);
             font-weight: 600;
         }
-
         .rc-template-main {
             min-width: 0;
             flex: 1;
@@ -1850,7 +1646,6 @@ discoverSelectedIds: [],
             gap: .15rem;
             text-align: left;
         }
-
         .rc-template-main strong,
         .rc-picker-row strong {
             color: var(--rc-text);
@@ -1859,30 +1654,24 @@ discoverSelectedIds: [],
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .rc-template-main span,
         .rc-picker-row small {
             color: var(--rc-muted);
             font-size: .75rem;
             line-height: 1.35;
         }
-
         .rc-picker-row {
             justify-content: flex-start;
             cursor: pointer;
         }
-
         .rc-picker-row input {
             accent-color: var(--rc-accent);
         }
-
         .rc-campaign-fields {
             display: grid;
             gap: .6rem;
             padding: .82rem;
         }
-
-
         .rc-campaign-compose {
             display: grid;
             gap: .82rem;
@@ -1903,14 +1692,12 @@ discoverSelectedIds: [],
             border-radius:1rem;
             background:rgba(255,255,255,.024);
         }
-
         .rc-rich-editor-shell {
             border: 1px solid rgba(148,163,184,.2);
             border-radius: 1.1rem;
             overflow: hidden;
             background: rgba(2,6,23,.32);
         }
-
         .rc-rich-editor-toolbar {
             display:flex;
             flex-wrap:wrap;
@@ -1919,7 +1706,6 @@ discoverSelectedIds: [],
             border-bottom:1px solid rgba(148,163,184,.14);
             background:rgba(255,255,255,.025);
         }
-
         .rc-rich-tool {
             min-width:2.15rem;
             height:2.15rem;
@@ -1935,13 +1721,11 @@ discoverSelectedIds: [],
             font-weight:800;
             transition:.15s ease;
         }
-
         .rc-rich-tool:hover {
             border-color:rgba(255,91,50,.42);
             color:#fff;
             background:rgba(255,91,50,.11);
         }
-
         .rc-rich-editor {
             min-height:34rem;
             padding:1.1rem;
@@ -1952,12 +1736,10 @@ discoverSelectedIds: [],
             line-height:1.7;
             outline:none;
         }
-
         .rc-rich-editor:empty:before {
             content: attr(data-placeholder);
             color:rgba(148,163,184,.72);
         }
-
         .rc-rich-editor img {
             width:100%;
             max-width:100%;
@@ -1965,7 +1747,6 @@ discoverSelectedIds: [],
             border-radius:.75rem;
             margin:.7rem 0;
         }
-
         .rc-rich-editor a.rc-email-button {
             display:inline-block;
             margin:.75rem 0;
@@ -1976,15 +1757,12 @@ discoverSelectedIds: [],
             font-weight:800;
             text-decoration:none;
         }
-
-
         .rc-quill-editor {
             min-height: 34rem;
             background: #ffffff;
             color: #111827;
             font-family: Arial, Helvetica, sans-serif;
         }
-
         .rc-rich-editor-shell .ql-toolbar.ql-snow {
             border: 0;
             border-bottom: 1px solid rgba(148,163,184,.18);
@@ -1992,7 +1770,6 @@ discoverSelectedIds: [],
             padding: .65rem .75rem;
             border-radius: 1.1rem 1.1rem 0 0;
         }
-
         .rc-rich-editor-shell .ql-container.ql-snow {
             border: 0;
             min-height: 34rem;
@@ -2000,7 +1777,6 @@ discoverSelectedIds: [],
             border-radius: 0 0 1.1rem 1.1rem;
             font-size: 1rem;
         }
-
         .rc-rich-editor-shell .ql-editor {
             min-height: 34rem;
             padding: 1.35rem;
@@ -2008,21 +1784,18 @@ discoverSelectedIds: [],
             font-family: Arial, Helvetica, sans-serif;
             line-height: 1.7;
         }
-
         .rc-rich-editor-shell .ql-editor.ql-blank::before {
             color: #94a3b8;
             font-style: normal;
             left: 1.35rem;
             right: 1.35rem;
         }
-
         .rc-rich-editor-shell .ql-editor img {
             width: 100%;
             max-width: 100%;
             border-radius: .75rem;
             margin: .65rem 0;
         }
-
         .rc-rich-editor-shell .ql-editor .rc-email-button {
             display: inline-block;
             margin: .75rem 0;
@@ -2033,7 +1806,6 @@ discoverSelectedIds: [],
             font-weight: 600;
             text-decoration: none;
         }
-
         .rc-preview-modal-backdrop {
             position:fixed;
             inset:0;
@@ -2044,7 +1816,6 @@ discoverSelectedIds: [],
             place-items:center;
             padding:1.5rem;
         }
-
         .rc-preview-modal {
             width:min(820px,96vw);
             max-height:88vh;
@@ -2055,7 +1826,6 @@ discoverSelectedIds: [],
             color:#111827;
             box-shadow:0 30px 90px rgba(0,0,0,.45);
         }
-
         .rc-preview-modal-head {
             position:sticky;
             top:0;
@@ -2068,14 +1838,11 @@ discoverSelectedIds: [],
             border-bottom:1px solid #e5e7eb;
             background:#fff;
         }
-
         .rc-preview-modal-body {
             padding:1.35rem;
             font-family:Arial,Helvetica,sans-serif;
             line-height:1.7;
         }
-
-
         /* Compose Email preview: emulate a real email canvas instead of inheriting
            Filament's global/reset spacing rules. */
         .rc-compose-preview-shell-v46 {
@@ -2152,14 +1919,12 @@ discoverSelectedIds: [],
             .rc-compose-preview-stage-v46 { padding:.75rem; }
             .rc-compose-preview-email-v46 { padding:1.25rem; border-radius:.8rem; }
         }
-
         .rc-campaign-toolbar {
             display: flex;
             flex-wrap: wrap;
             gap: .45rem;
             align-items: center;
         }
-
         .rc-token-chip {
             border: 1px solid rgba(255, 91, 50, .24);
             background: rgba(255, 91, 50, .08);
@@ -2169,7 +1934,6 @@ discoverSelectedIds: [],
             font-size: .72rem;
             font-weight: 600;
         }
-
         .rc-campaign-editor {
             width: 100%;
             min-height: 17rem;
@@ -2184,20 +1948,17 @@ discoverSelectedIds: [],
             resize: vertical;
             transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
         }
-
         .rc-campaign-editor:focus {
             outline: none;
             border-color: rgba(255, 91, 50, .62);
             box-shadow: 0 0 0 3px rgba(255, 91, 50, .12);
         }
-
         .rc-mini-preview-card {
             border: 1px solid rgba(148, 163, 184, .16);
             border-radius: .85rem;
             background: rgba(255,255,255,.026);
             padding: .75rem;
         }
-
         .rc-campaign-loading {
             border: 1px dashed rgba(148, 163, 184, .28);
             border-radius: .9rem;
@@ -2208,13 +1969,11 @@ discoverSelectedIds: [],
             align-items: center;
             justify-content: center;
         }
-
         .rc-campaign-preview-wrap {
             padding: .82rem;
             display: grid;
             gap: .6rem;
         }
-
         .rc-email-preview {
             border: 1px solid rgba(148, 163, 184, .22);
             border-radius: .85rem;
@@ -2223,7 +1982,6 @@ discoverSelectedIds: [],
             color: #111827;
             box-shadow: 0 18px 45px rgba(0,0,0,.18);
         }
-
         .rc-email-subject {
             padding: .8rem 1rem;
             border-bottom: 1px solid #e5e7eb;
@@ -2233,12 +1991,10 @@ discoverSelectedIds: [],
             display: grid;
             gap: .2rem;
         }
-
         .rc-email-subject small {
             color: #6b7280;
             font-weight: 500;
         }
-
         .rc-preview-frame {
             width: 100%;
             min-height: 30rem;
@@ -2246,7 +2002,6 @@ discoverSelectedIds: [],
             display: block;
             background: #fff;
         }
-
         .rc-template-saving-overlay,
         .rc-template-loading-overlay {
             position: absolute;
@@ -2259,7 +2014,6 @@ discoverSelectedIds: [],
             color: var(--rc-text);
             font-weight: 600;
         }
-
         .rc-template-loading-card {
             display: inline-flex;
             align-items: center;
@@ -2288,14 +2042,12 @@ discoverSelectedIds: [],
             font-weight:800;
             box-shadow:0 12px 28px rgba(15,23,42,.16);
         }
-
         .rc-skeleton {
             position: relative;
             overflow: hidden;
             border-radius: .75rem;
             background: rgba(148, 163, 184, .11);
         }
-
         .rc-skeleton::after {
             content: "";
             position: absolute;
@@ -2304,9 +2056,7 @@ discoverSelectedIds: [],
             background: linear-gradient(90deg, transparent, rgba(255,255,255,.14), transparent);
             animation: rc-shimmer 1.15s infinite;
         }
-
         @keyframes rc-shimmer { 100% { transform: translateX(100%); } }
-
         .rc-preview-card-soft {
             background: #f8fafc;
             color: #111827;
@@ -2315,12 +2065,10 @@ discoverSelectedIds: [],
             border: 1px solid rgba(148,163,184,.18);
             box-shadow: 0 18px 50px rgba(0,0,0,.20);
         }
-
         .rc-preview-content-font {
             font-family: Arial, Helvetica, sans-serif;
             letter-spacing: normal;
         }
-
         .rc-email-body-fallback {
             padding: .82rem;
             min-height: 18rem;
@@ -2328,33 +2076,28 @@ discoverSelectedIds: [],
             font-size: 14px;
             line-height: 1.5;
         }
-
         .rc-email-body-fallback img {
             width: 100%;
             max-width: 100%;
             height: auto;
         }
-
         .rc-target-card {
             display: grid;
             gap: .6rem;
             padding: .82rem;
         }
-
         .rc-recipient-stat {
             border: 1px solid rgba(255, 91, 50, .28);
             border-radius: .9rem;
             padding: .85rem;
             background: rgba(255, 91, 50, .08);
         }
-
         .rc-recipient-stat strong {
             color: var(--rc-text);
             font-size: 1.6rem;
             display: block;
             line-height: 1;
         }
-
         .rc-template-pill {
             display: inline-flex;
             align-items: center;
@@ -2367,16 +2110,12 @@ discoverSelectedIds: [],
             background: rgba(255, 91, 50, .14);
             border: 1px solid rgba(255, 91, 50, .24);
         }
-
         .rc-empty.is-small {
             min-height: 0;
             padding: .75rem;
             align-items: flex-start;
             text-align: left;
         }
-
-
-    
         .rc-visual-editor-toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -2388,7 +2127,6 @@ discoverSelectedIds: [],
             border-radius: 1rem 1rem 0 0;
             background: rgba(15, 23, 42, .8);
         }
-
         .rc-visual-tool {
             height: 2rem;
             min-width: 2rem;
@@ -2402,9 +2140,7 @@ discoverSelectedIds: [],
             font-size: .78rem;
             font-weight: 650;
         }
-
         .rc-visual-tool:hover { border-color: rgba(255,91,50,.55); color:#fed7aa; }
-
         .rc-template-live-editor-wrap{
             border:1px solid rgba(255,255,255,.14);
             border-radius:0 0 1rem 1rem;
@@ -2453,13 +2189,11 @@ discoverSelectedIds: [],
             object-fit:cover;
             display:block;
         }
-
         @media (max-width: 1180px) {
             .rc-school-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .rc-campaign-shell { grid-template-columns: minmax(240px, 320px) minmax(0, 1fr); }
             .rc-campaign-shell > .rc-campaign-panel:last-child { grid-column: 1 / -1; }
         }
-
         @media (max-width: 900px) {
             .rc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .rc-chat { grid-template-columns: 1fr; }
@@ -2474,7 +2208,6 @@ discoverSelectedIds: [],
             .rc-campaign-shell > .rc-campaign-panel:last-child { grid-column: auto; }
             .rc-preview-frame { min-height: 24rem; }
         }
-
         @media (max-width: 640px) {
             .rc-coach-main { grid-template-columns: 2rem minmax(0, 1fr); }
             .rc-coach-avatar { width: 2rem; height: 2rem; border-radius: .65rem; }
@@ -2482,8 +2215,6 @@ discoverSelectedIds: [],
             .rc-coach-heading h3 { white-space: normal; }
             .rc-coach-actions .rc-btn-primary { flex: 1 1 auto; }
         }
-
-
         /* v58 compact controls + inbox thread polish */
         .rc-page-heading { display:grid; gap:.35rem; margin: .25rem 0 1.25rem; }
         .rc-page-heading h1 { margin:0; font-size: clamp(1.55rem, 3vw, 2.15rem); line-height:1.05; font-weight:850; letter-spacing:-.04em; color:var(--rc-text); }
@@ -2540,7 +2271,6 @@ discoverSelectedIds: [],
         .rc-school-card { min-height:unset; padding:1rem; border-radius:1rem; transition:transform .15s ease, border-color .15s ease, background .15s ease; }
         .rc-school-card:hover { transform:translateY(-2px); border-color:rgba(255,99,56,.5); }
         .rc-school-actions .rc-btn { min-width:5rem; }
-
         /* v62 compose/template quick actions */
         .rc-loading-spin { display:inline-block; width:1rem; height:1rem; border:2px solid currentColor; border-right-color:transparent; border-radius:999px; animation:rcSpin .7s linear infinite; vertical-align:-.16em; }
         @keyframes rcSpin { to { transform:rotate(360deg); } }
@@ -2551,9 +2281,6 @@ discoverSelectedIds: [],
         .rc-rich-toolbar button { min-width:2.1rem; justify-content:center; }
         .rc-search-slim { margin:.75rem 0 1rem; }
         .rc-school-modal-actions { display:flex; flex-wrap:wrap; gap:.55rem; margin:1rem 0; }
-
-
-
         /* v56 Inbox redesign */
         .rc-inbox-page-v56 { display:grid; gap:1rem; }
         .rc-inbox-shell-v56 { display:grid; grid-template-columns: 23rem minmax(0,1fr) 22rem; min-height:42rem; border:1px solid var(--rc-border); border-radius:1.15rem; background:var(--rc-surface); box-shadow:0 16px 40px rgba(15,23,42,.07); overflow:hidden; }
@@ -2671,10 +2398,7 @@ discoverSelectedIds: [],
         .rc-inbox-empty-v56 { min-height:20rem; display:grid; place-items:center; color:var(--rc-muted); text-align:center; padding:2rem; }
         @media (max-width: 1320px) { .rc-inbox-shell-v56 { grid-template-columns:20rem minmax(0,1fr); } .rc-inbox-right-v56 { display:none; } }
         @media (max-width: 900px) { .rc-inbox-shell-v56 { grid-template-columns:1fr; } .rc-inbox-left-v56 { border-right:0; } .rc-inbox-mid-v56 { min-height:34rem; } }
-
         @media (max-width: 1100px) { .rc-compose-compact-grid,.rc-inbox-layout,.rc-school-filter-box { grid-template-columns:1fr; } .rc-recipient-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-
-
         /* v60 dashboard refresh */
         .rc-dashboard { display:grid; gap:1.45rem; }
         .rc-dashboard-hero { display:grid; gap:.45rem; margin:.35rem 0 .45rem; }
@@ -2730,9 +2454,6 @@ discoverSelectedIds: [],
         .rc-list-count { min-width:1.55rem; height:1.25rem; border-radius:999px; background:var(--rc-accent); color:white; display:inline-flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:950; padding:0 .4rem; }
         @media (max-width:1180px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement { grid-template-columns:repeat(2,minmax(0,1fr)); } .rc-dashboard-bottom { grid-template-columns:1fr; } .rc-engaged-row { grid-template-columns:2.6rem minmax(0,1fr) auto; } .rc-lead-bar,.rc-lead-score { display:none; } }
         @media (max-width:640px) { .rc-dashboard-stat-grid,.rc-dashboard-engagement { grid-template-columns:1fr; } .rc-step-row { grid-template-columns:2.35rem minmax(0,1fr); } .rc-step-row .rc-btn { grid-column:2; justify-self:start; } }
-
-
-
         /* v61 dashboard polish: compact text, png icons, scrollable activity, school slider */
         .rc-dashboard { gap: 1.25rem; }
         .rc-dashboard-hero h1 { max-width: 58rem; }
@@ -2827,7 +2548,6 @@ discoverSelectedIds: [],
         }
         .rc-dashboard-section-title { margin-top: .35rem; }
         .rc-dashboard-section-title .rc-subtle { max-width: 34rem; text-align: right; line-height: 1.25; }
-
         /* v63 stat layout: top-left content, no stat subtext */
         .rc-dashboard-stat-grid { align-items: stretch; }
         .rc-dashboard-card.rc-dashboard-stat.is-centered {
@@ -2864,7 +2584,6 @@ discoverSelectedIds: [],
         .rc-dashboard-subline, .rc-metric-caption { display: none !important; }
         .rc-metric-card { min-height: 8.6rem; }
         .rc-metric-card .rc-metric-head { margin-bottom: .7rem; }
-
         /* v64 engagement metrics: keep icons top-left, never centered */
         .rc-dashboard-engagement .rc-dashboard-card.rc-metric-card {
             display: flex !important;
@@ -2903,8 +2622,6 @@ discoverSelectedIds: [],
         .rc-dashboard-engagement .rc-spark {
             margin-top: auto !important;
         }
-
-
         /* v65 dashboard final alignment + readable activity */
         .rc-load-status { display:flex; align-items:center; gap:.45rem; color:#b7c5d9; font-size:.88rem; font-weight:760; letter-spacing:.01em; }
         .rc-load-status-icon { color:var(--rc-accent); font-weight:950; font-size:1.15rem; line-height:1; }
@@ -2928,7 +2645,6 @@ discoverSelectedIds: [],
         .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon { margin:0 !important; display:inline-flex !important; }
         .rc-dashboard-engagement .rc-metric-card > div:nth-child(2) { align-self:start !important; justify-self:start !important; width:100% !important; }
         .rc-dashboard-engagement .rc-spark { align-self:end !important; justify-self:stretch !important; width:100% !important; margin-top:.55rem !important; }
-
         /* v66 dashboard stat alignment: all stat icons/content stay top-left */
         .rc-dashboard-card,
         .rc-dashboard-card.rc-dashboard-stat,
@@ -2994,10 +2710,8 @@ discoverSelectedIds: [],
             align-self: stretch !important;
         }
         .rc-engaged-row { cursor: pointer; }
-
         .rc-activity-card.has-asset .rc-activity-copy { -webkit-line-clamp:2; }
         .rc-activity-asset { display:inline-flex; align-items:center; gap:.28rem; margin-top:.35rem; width:max-content; max-width:100%; border:1px solid rgba(148,163,184,.18); border-radius:999px; padding:.2rem .48rem; color:#dbeafe; background:rgba(59,130,246,.12); font-size:.68rem; font-weight:850; }
-
         /* v68 console-safe top school clicks + locked icon alignment */
         .rc-dashboard-stat-grid .rc-dashboard-card,
         .rc-dashboard-engagement .rc-dashboard-card {
@@ -3035,8 +2749,6 @@ discoverSelectedIds: [],
             justify-self:flex-start !important;
             margin:0 0 .72rem 0 !important;
         }
-
-
         /* v69 centered PNG stat icons: content stays top-left, icon artwork stays centered inside its badge */
         .rc-dashboard-card .rc-dashboard-icon,
         .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
@@ -3066,9 +2778,6 @@ discoverSelectedIds: [],
             align-items:flex-start !important;
             justify-content:flex-start !important;
         }
-
-
-
         /* FINAL CLEAN DASHBOARD ICON RULES: one badge size, one artwork size, centered artwork */
         .rc-dashboard-stat-grid .rc-dashboard-icon,
         .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
@@ -3089,7 +2798,6 @@ discoverSelectedIds: [],
             box-sizing: border-box !important;
             flex: 0 0 3rem !important;
         }
-
         .rc-dashboard-stat-grid .rc-dashboard-icon > img.rc-png-icon,
         .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon > img.rc-png-icon {
             width: 1.42rem !important;
@@ -3110,7 +2818,6 @@ discoverSelectedIds: [],
             translate: none !important;
             vertical-align: middle !important;
         }
-
         .rc-dashboard-engagement .rc-metric-card {
             display: flex !important;
             flex-direction: column !important;
@@ -3118,7 +2825,6 @@ discoverSelectedIds: [],
             justify-content: flex-start !important;
             text-align: left !important;
         }
-
         .rc-dashboard-engagement .rc-metric-head {
             width: auto !important;
             height: auto !important;
@@ -3135,7 +2841,6 @@ discoverSelectedIds: [],
             padding: 0 !important;
             line-height: 0 !important;
         }
-
         /* FINAL OVERRIDE: truly center engagement icons inside their colored badges */
         .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon {
             position: relative !important;
@@ -3143,7 +2848,6 @@ discoverSelectedIds: [],
             align-items: center !important;
             justify-content: center !important;
         }
-
         .rc-dashboard-engagement .rc-metric-head .rc-dashboard-icon > img.rc-png-icon {
             position: absolute !important;
             top: 50% !important;
@@ -3154,7 +2858,6 @@ discoverSelectedIds: [],
             object-fit: contain !important;
             object-position: 50% 50% !important;
         }
-
         /* Top engaged school dialog */
         .rc-school-modal-backdrop {
             justify-content: center !important;
@@ -3163,7 +2866,6 @@ discoverSelectedIds: [],
             background: rgba(0,0,0,.72) !important;
             backdrop-filter: blur(10px) !important;
         }
-
         .rc-school-modal-panel {
             position: relative !important;
             width: min(720px, 92vw) !important;
@@ -3177,7 +2879,6 @@ discoverSelectedIds: [],
             padding: 1.55rem !important;
             color: #f8fafc !important;
         }
-
         /* v106: optimistic local drawer must never blur/lock the whole Discover page. */
         .rc-school-optimistic-shell-v106 {
             justify-content: flex-end !important;
@@ -3188,7 +2889,6 @@ discoverSelectedIds: [],
             -webkit-backdrop-filter: none !important;
             pointer-events: none;
         }
-
         .rc-school-optimistic-panel-v106 {
             width: min(560px, 100vw) !important;
             height: 100vh !important;
@@ -3197,13 +2897,10 @@ discoverSelectedIds: [],
             pointer-events: auto;
             animation: rcOptimisticSchoolInV106 .16s ease-out both;
         }
-
         @keyframes rcOptimisticSchoolInV106 {
             from { transform: translateX(24px); opacity: .65; }
             to { transform: translateX(0); opacity: 1; }
         }
-
-
         .rc-school-modal-close {
             position: absolute;
             top: 1rem;
@@ -3222,13 +2919,11 @@ discoverSelectedIds: [],
             transition: .15s ease;
             z-index: 3;
         }
-
         .rc-school-modal-close:hover {
             color: #fff;
             border-color: rgba(255,99,56,.35);
             background: rgba(255,99,56,.12);
         }
-
         .rc-school-modal-hero {
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
@@ -3236,7 +2931,6 @@ discoverSelectedIds: [],
             align-items: start;
             padding-right: 3.25rem;
         }
-
         .rc-school-modal-main h2 {
             margin: .65rem 0 .35rem;
             font-size: clamp(1.45rem, 3vw, 1.95rem);
@@ -3245,7 +2939,6 @@ discoverSelectedIds: [],
             font-weight: 500;
             color: #fff;
         }
-
         .rc-school-division-pill {
             display: inline-flex;
             width: max-content;
@@ -3257,7 +2950,6 @@ discoverSelectedIds: [],
             font-weight: 500;
             letter-spacing: .035em;
         }
-
         .rc-school-modal-meta {
             display: flex;
             flex-wrap: wrap;
@@ -3266,14 +2958,12 @@ discoverSelectedIds: [],
             font-size: .86rem;
             line-height: 1.35;
         }
-
         .rc-school-score-wrap {
             display: grid;
             justify-items: center;
             gap: .28rem;
             padding-top: .25rem;
         }
-
         .rc-school-score-ring {
             width: 4.55rem !important;
             height: 4.55rem !important;
@@ -3287,14 +2977,12 @@ discoverSelectedIds: [],
             line-height: 1 !important;
             box-shadow: 0 0 0 .22rem rgba(255,99,56,.10), inset 0 0 0 1px rgba(255,255,255,.10) !important;
         }
-
         .rc-school-score-label {
             color: #ff6b50;
             font-size: .78rem;
             font-weight: 500;
             letter-spacing: .04em;
         }
-
         .rc-school-modal-actions {
             display: flex !important;
             align-items: center;
@@ -3302,7 +2990,6 @@ discoverSelectedIds: [],
             gap: .6rem;
             margin: 1.25rem 0 0 !important;
         }
-
         .rc-school-action {
             border: 1px solid rgba(148,163,184,.18);
             background: rgba(15,18,24,.36);
@@ -3318,35 +3005,29 @@ discoverSelectedIds: [],
             font-weight: 650;
             transition: .15s ease;
         }
-
         .rc-school-action:hover {
             border-color: rgba(255,99,56,.40);
             background: rgba(255,99,56,.10);
         }
-
         .rc-school-action-primary {
             background: #ff6b50;
             border-color: #ff6b50;
             color: #fff;
         }
-
         .rc-school-action-primary:hover {
             background: #ff5837;
             border-color: #ff5837;
         }
-
         .rc-school-modal-rule {
             height: 1px;
             margin: 1.35rem 0 1.2rem;
             background: rgba(148,163,184,.18);
         }
-
         .rc-school-modal-section {
             display: grid;
             gap: .78rem;
             margin-top: 1.25rem;
         }
-
         .rc-school-section-title {
             color: #fff;
             font-size: 1rem;
@@ -3354,7 +3035,6 @@ discoverSelectedIds: [],
             font-weight: 500;
             letter-spacing: -.02em;
         }
-
         .rc-school-modal-coaches {
             display: grid;
             gap: .65rem;
@@ -3362,7 +3042,6 @@ discoverSelectedIds: [],
             overflow: auto;
             padding-right: .15rem;
         }
-
         .rc-school-coach-card {
             display: grid;
             grid-template-columns: 2.75rem minmax(0, 1fr) auto;
@@ -3373,7 +3052,6 @@ discoverSelectedIds: [],
             border: 1px solid rgba(148,163,184,.08);
             padding: .78rem;
         }
-
         .rc-school-coach-avatar {
             width: 2.5rem;
             height: 2.5rem;
@@ -3385,13 +3063,11 @@ discoverSelectedIds: [],
             font-size: .78rem;
             font-weight: 500;
         }
-
         .rc-school-coach-info {
             display: grid;
             gap: .12rem;
             min-width: 0;
         }
-
         .rc-school-coach-info strong {
             color: #fff;
             font-size: .86rem;
@@ -3400,13 +3076,11 @@ discoverSelectedIds: [],
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .rc-school-coach-info span {
             color: #aab7c8;
             font-size: .78rem;
             line-height: 1.25;
         }
-
         .rc-school-coach-info a {
             color: #4ea3ff;
             font-size: .8rem;
@@ -3415,7 +3089,6 @@ discoverSelectedIds: [],
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .rc-school-copy-btn {
             width: 2.15rem;
             height: 2.15rem;
@@ -3426,18 +3099,15 @@ discoverSelectedIds: [],
             background: rgba(15,18,24,.32);
             color: #9fb0c5;
         }
-
         .rc-school-copy-btn:hover {
             color: #fff;
             border-color: rgba(255,99,56,.35);
         }
-
         .rc-school-stat-grid {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: .6rem;
         }
-
         .rc-school-stat-card {
             display: grid;
             grid-template-columns: 2.35rem minmax(0, 1fr);
@@ -3449,7 +3119,6 @@ discoverSelectedIds: [],
             border: 1px solid rgba(148,163,184,.08);
             padding: .78rem;
         }
-
         .rc-school-stat-card span {
             grid-row: 1 / span 2;
             width: 2.15rem;
@@ -3462,52 +3131,41 @@ discoverSelectedIds: [],
             font-weight: 500;
             line-height: 1;
         }
-
         .rc-school-stat-card strong {
             color: #fff;
             font-size: 1.35rem;
             line-height: 1;
             font-weight: 500;
         }
-
         .rc-school-stat-card small {
             color: #9fb0c5;
             font-size: .78rem;
             line-height: 1.2;
         }
-
         @media (max-width: 680px) {
             .rc-school-modal-panel {
                 width: min(94vw, 720px) !important;
                 height: min(86vh, 760px) !important;
                 padding: 1rem !important;
             }
-
             .rc-school-modal-hero {
                 grid-template-columns: 1fr;
                 padding-right: 2.75rem;
             }
-
             .rc-school-score-wrap {
                 justify-items: start;
             }
-
             .rc-school-stat-grid {
                 grid-template-columns: 1fr;
             }
-
             .rc-school-coach-card {
                 grid-template-columns: 2.75rem minmax(0, 1fr);
             }
-
             .rc-school-copy-btn {
                 grid-column: 2;
                 justify-self: start;
             }
         }
-
-
-
         /* v80 PLYRCard recruiting dashboard redesign: Filament light/dark aware */
         .rc-home-dashboard {
             display: grid;
@@ -3795,9 +3453,6 @@ discoverSelectedIds: [],
             .rc-home-stats, .rc-radar-schools { grid-template-columns: 1fr; }
             .rc-progress-layout { grid-template-columns: 1fr; }
         }
-
-
-
         /* FINAL v90 light recruiting dashboard */
         .rc-home-dashboard-v2 {
             display: grid;
@@ -3806,9 +3461,7 @@ discoverSelectedIds: [],
             color: #101827;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         }
-
         .rc-home-dashboard-v2 * { box-sizing: border-box; }
-
         .rc-home-header-v2 {
             display: flex;
             align-items: flex-start;
@@ -3816,7 +3469,6 @@ discoverSelectedIds: [],
             gap: 1rem;
             margin-bottom: 1.1rem;
         }
-
         .rc-home-header-v2 h1 {
             margin: 0;
             white-space: nowrap;
@@ -3826,13 +3478,11 @@ discoverSelectedIds: [],
             font-weight: 650;
             letter-spacing: -.035em;
         }
-
         .rc-home-header-v2 p {
             margin: .5rem 0 0;
             color: #7d8798;
             font-size: .88rem;
         }
-
         .rc-home-actions-v2 {
             display: flex;
             align-items: center;
@@ -3840,7 +3490,6 @@ discoverSelectedIds: [],
             flex-wrap: wrap;
             gap: .72rem;
         }
-
         .rc-home-search-v2 {
             width: min(28rem, 42vw);
             height: 2.75rem;
@@ -3854,13 +3503,11 @@ discoverSelectedIds: [],
             color: #9aa4b5;
             box-shadow: 0 8px 20px rgba(15,23,42,.07);
         }
-
         .rc-home-search-v2 svg {
             width: 1.05rem;
             height: 1.05rem;
             flex: 0 0 auto;
         }
-
         .rc-home-search-v2 input {
             border: 0 !important;
             outline: 0 !important;
@@ -3871,7 +3518,6 @@ discoverSelectedIds: [],
             flex: 1;
             font-size: .84rem;
         }
-
         .rc-home-search-v2 kbd {
             border: 1px solid #e5e7eb;
             border-radius: .42rem;
@@ -3880,7 +3526,6 @@ discoverSelectedIds: [],
             font-weight: 650;
             padding: .08rem .35rem;
         }
-
         .rc-home-new-email-v2 {
             height: 2.75rem;
             display: inline-flex;
@@ -3897,19 +3542,16 @@ discoverSelectedIds: [],
             text-decoration: none;
             box-shadow: 0 12px 22px rgba(255,99,56,.24);
         }
-
         .rc-home-new-email-v2 span {
             font-size: 1.15rem;
             line-height: 1;
             font-weight: 500;
         }
-
         .rc-home-stats-v2 {
             display: grid;
             grid-template-columns: repeat(5, minmax(0, 1fr));
             gap: 1rem;
         }
-
         .rc-home-stat-v2,
         .rc-home-panel-v2 {
             border: 1px solid #e8ebf0;
@@ -3917,7 +3559,6 @@ discoverSelectedIds: [],
             border-radius: 1.05rem;
             box-shadow: 0 8px 22px rgba(15,23,42,.07);
         }
-
         .rc-home-stat-v2 {
             min-height: 7.75rem;
             padding: 1.05rem;
@@ -3926,7 +3567,6 @@ discoverSelectedIds: [],
             gap: .45rem .85rem;
             align-content: start;
         }
-
         .rc-home-stat-icon-v2 {
             width: 2.65rem;
             height: 2.65rem;
@@ -3935,30 +3575,25 @@ discoverSelectedIds: [],
             place-items: center;
             flex: 0 0 auto;
         }
-
         .rc-home-stat-icon-v2 svg {
             width: 1.22rem;
             height: 1.22rem;
         }
-
         .rc-home-stat-v2.is-coral .rc-home-stat-icon-v2 { background: rgba(255,99,56,.13); color: #ff6338; }
         .rc-home-stat-v2.is-blue .rc-home-stat-icon-v2 { background: rgba(59,130,246,.13); color: #3b82f6; }
         .rc-home-stat-v2.is-gold .rc-home-stat-icon-v2 { background: rgba(245,158,11,.14); color: #f59e0b; }
         .rc-home-stat-v2.is-green .rc-home-stat-icon-v2 { background: rgba(16,185,129,.13); color: #10b981; }
         .rc-home-stat-v2.is-indigo .rc-home-stat-icon-v2 { background: rgba(96,165,250,.14); color: #60a5fa; }
-
         .rc-home-stat-copy-v2 {
             min-width: 0;
             align-self: center;
         }
-
         .rc-home-stat-label-v2 {
             color: #7d8798;
             font-size: .78rem;
             line-height: 1.1;
             font-weight: 750;
         }
-
         .rc-home-stat-value-v2 {
             margin-top: .18rem;
             color: #0f172a;
@@ -3967,7 +3602,6 @@ discoverSelectedIds: [],
             font-weight: 650;
             letter-spacing: -.04em;
         }
-
         .rc-home-progress-v2 {
             grid-column: 1 / -1;
             height: .42rem;
@@ -3976,36 +3610,30 @@ discoverSelectedIds: [],
             overflow: hidden;
             margin-top: .15rem;
         }
-
         .rc-home-progress-v2 span {
             display: block;
             height: 100%;
             border-radius: inherit;
             background: #ff6338;
         }
-
         .rc-home-stat-sub-v2 {
             grid-column: 1 / -1;
             color: #7d8798;
             font-size: .76rem;
             line-height: 1.25;
         }
-
         .rc-home-stat-v2.is-blue .rc-home-stat-sub-v2,
         .rc-home-stat-v2.is-green .rc-home-stat-sub-v2 {
             color: #059669;
             font-weight: 750;
         }
-
         .rc-home-grid-v2,
         .rc-home-lower-grid-v2 {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(320px, .82fr);
             gap: 1rem;
         }
-
         .rc-home-panel-v2 { padding: 1.2rem; }
-
         .rc-home-panel-head-v2 {
             display: flex;
             align-items: flex-start;
@@ -4013,7 +3641,6 @@ discoverSelectedIds: [],
             gap: 1rem;
             margin-bottom: 1.05rem;
         }
-
         .rc-home-panel-head-v2 h2 {
             margin: 0;
             color: #0f172a;
@@ -4022,13 +3649,11 @@ discoverSelectedIds: [],
             font-weight: 650;
             letter-spacing: -.02em;
         }
-
         .rc-home-panel-head-v2 p {
             margin: .35rem 0 0;
             color: #7d8798;
             font-size: .78rem;
         }
-
         .rc-home-panel-head-v2 a,
         .rc-home-panel-head-v2 span {
             display: inline-flex;
@@ -4044,14 +3669,12 @@ discoverSelectedIds: [],
             font-weight: 500;
             text-decoration: none;
         }
-
         .rc-home-progress-layout-v2 {
             display: grid;
             grid-template-columns: 12rem minmax(0,1fr);
             gap: 1.35rem;
             align-items: center;
         }
-
         .rc-readiness-ring-v2 {
             width: 9.7rem;
             height: 9.7rem;
@@ -4062,7 +3685,6 @@ discoverSelectedIds: [],
             background: conic-gradient(#ff6338 calc(var(--ready) * 1%), #edf0f5 0);
             position: relative;
         }
-
         .rc-readiness-ring-v2:before {
             content: "";
             position: absolute;
@@ -4070,7 +3692,6 @@ discoverSelectedIds: [],
             border-radius: inherit;
             background: #fff;
         }
-
         .rc-readiness-ring-v2 div {
             position: relative;
             display: grid;
@@ -4078,28 +3699,23 @@ discoverSelectedIds: [],
             gap: .25rem;
             text-align: center;
         }
-
         .rc-readiness-ring-v2 strong {
             color: #0f172a;
             font-size: 1.75rem;
             line-height: 1;
             font-weight: 650;
         }
-
         .rc-readiness-ring-v2 span {
             color: #7d8798;
             font-size: .75rem;
         }
-
         .rc-check-list-v2 { display: grid; gap: .78rem; }
-
         .rc-check-row-v2 {
             display: grid;
             grid-template-columns: 1.35rem minmax(0,1fr);
             align-items: start;
             gap: .65rem;
         }
-
         .rc-check-dot-v2 {
             width: 1.05rem;
             height: 1.05rem;
@@ -4112,9 +3728,7 @@ discoverSelectedIds: [],
             line-height: 1;
             font-weight: 650;
         }
-
         .rc-check-row-v2.is-done .rc-check-dot-v2 { border-color: #10b981; }
-
         .rc-check-row-v2 strong {
             display: block;
             color: #0f172a;
@@ -4122,14 +3736,12 @@ discoverSelectedIds: [],
             line-height: 1.15;
             font-weight: 780;
         }
-
         .rc-check-row-v2 small {
             display: block;
             color: #7d8798;
             font-size: .78rem;
             margin-top: .15rem;
         }
-
         .rc-home-outline-btn-v2 {
             width: 100%;
             min-height: 2.35rem;
@@ -4145,14 +3757,12 @@ discoverSelectedIds: [],
             text-decoration: none;
             margin-top: .25rem;
         }
-
         .rc-profile-milestones-v2 {
             display: flex;
             flex-wrap: wrap;
             gap: .42rem;
             margin-top: .2rem;
         }
-
         .rc-profile-milestones-v2 span {
             display: inline-flex;
             align-items: center;
@@ -4166,25 +3776,21 @@ discoverSelectedIds: [],
             font-weight: 750;
             white-space: nowrap;
         }
-
         .rc-profile-milestones-v2 span.is-unlocked {
             border-color: rgba(255, 99, 56, .24);
             background: rgba(255, 99, 56, .1);
             color: #ff6338;
         }
-
         .dark .rc-profile-milestones-v2 span {
             border-color: rgba(148, 163, 184, .16);
             background: rgba(148, 163, 184, .08);
             color: #94a3b8;
         }
-
         .dark .rc-profile-milestones-v2 span.is-unlocked {
             border-color: rgba(255, 99, 56, .28);
             background: rgba(255, 99, 56, .12);
             color: #ff8a70;
         }
-
         .rc-home-activity-list-v2 {
             display: grid;
             gap: .82rem;
@@ -4192,7 +3798,6 @@ discoverSelectedIds: [],
             overflow: auto;
             padding-right: .25rem;
         }
-
         .rc-home-activity-v2 {
             display: grid;
             grid-template-columns: 2.35rem minmax(0,1fr) auto;
@@ -4201,7 +3806,6 @@ discoverSelectedIds: [],
             text-decoration: none;
             color: inherit;
         }
-
         .rc-home-activity-icon-v2 {
             width: 2.05rem;
             height: 2.05rem;
@@ -4211,15 +3815,12 @@ discoverSelectedIds: [],
             font-size: .78rem;
             font-weight: 600;
         }
-
         .rc-home-activity-icon-v2.is-blue { background: rgba(59,130,246,.13); color: #3b82f6; }
         .rc-home-activity-icon-v2.is-coral { background: rgba(255,99,56,.13); color: #ff6338; }
         .rc-home-activity-icon-v2.is-gold { background: rgba(245,158,11,.14); color: #f59e0b; }
         .rc-home-activity-icon-v2.is-green { background: rgba(16,185,129,.13); color: #10b981; }
         .rc-home-activity-icon-v2.is-purple { background: rgba(139,92,246,.13); color: #8b5cf6; }
-
         .rc-home-activity-copy-v2 { display: grid; gap: .12rem; min-width: 0; }
-
         .rc-home-activity-copy-v2 strong {
             color: #0f172a;
             font-size: .84rem;
@@ -4229,7 +3830,6 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             font-weight: 600;
         }
-
         .rc-home-activity-copy-v2 small {
             color: #7d8798;
             font-size: .76rem;
@@ -4237,21 +3837,17 @@ discoverSelectedIds: [],
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .rc-home-activity-time-v2 {
             color: #94a3b8;
             font-size: .74rem;
             white-space: nowrap;
         }
-
         .rc-radar-panel-v2 { grid-column: 1; }
-
         .rc-radar-schools-v2 {
             display: grid;
             grid-template-columns: repeat(4, minmax(0,1fr));
             gap: .6rem;
         }
-
         .rc-radar-card-v2 {
             border: 1px solid #e8ebf0;
             background: #fff;
@@ -4264,7 +3860,6 @@ discoverSelectedIds: [],
             color: #0f172a;
             cursor: pointer;
         }
-
         .rc-radar-logo-v2 {
             height: 5.25rem;
             display: flex;
@@ -4279,7 +3874,6 @@ discoverSelectedIds: [],
             padding: .75rem;
             box-sizing: border-box;
         }
-
         .rc-radar-logo-v2 img {
             width: auto !important;
             height: auto !important;
@@ -4292,20 +3886,16 @@ discoverSelectedIds: [],
             box-sizing: border-box;
             flex: 0 1 auto;
         }
-
         .rc-radar-card-v2 strong,
         .rc-radar-card-v2 small,
         .rc-radar-card-v2 em { margin-inline: .8rem; }
-
         .rc-radar-card-v2 strong {
             color: #0f172a;
             font-size: .84rem;
             line-height: 1.15;
             font-weight: 600;
         }
-
         .rc-radar-card-v2 small { color: #7d8798; font-size: .73rem; }
-
         .rc-radar-card-v2 em {
             width: max-content;
             border-radius: 999px;
@@ -4317,28 +3907,23 @@ discoverSelectedIds: [],
             font-weight: 650;
             margin-top: .25rem;
         }
-
         .rc-home-dots-v2 {
             display: flex;
             justify-content: center;
             gap: .32rem;
             margin-top: .8rem;
         }
-
         .rc-home-dots-v2 span {
             width: .35rem;
             height: .35rem;
             border-radius: 999px;
             background: #d9dde5;
         }
-
         .rc-home-dots-v2 span:first-child {
             width: .75rem;
             background: #ff6338;
         }
-
         .rc-interested-list-v2 { display: grid; gap: .6rem; }
-
         .rc-interested-row-v2 {
             display: grid;
             grid-template-columns: 1.1rem 2.35rem minmax(0,1fr) auto;
@@ -4351,13 +3936,11 @@ discoverSelectedIds: [],
             padding: 0;
             cursor: pointer;
         }
-
         .rc-interested-rank-v2 {
             color: #94a3b8;
             font-weight: 650;
             font-size: .82rem;
         }
-
         .rc-interested-logo-v2 {
             width: 2.35rem;
             height: 2.35rem;
@@ -4372,7 +3955,6 @@ discoverSelectedIds: [],
             overflow: hidden;
             flex: 0 0 auto;
         }
-
         .rc-interested-logo-v2 img {
             width: 100%;
             height: 100%;
@@ -4380,7 +3962,6 @@ discoverSelectedIds: [],
             display: block;
             padding: .18rem;
         }
-
         .rc-interested-row-v2 strong {
             display: block;
             color: #0f172a;
@@ -4388,13 +3969,10 @@ discoverSelectedIds: [],
             line-height: 1.2;
             font-weight: 600;
         }
-
         .rc-interested-row-v2 small { color: #7d8798; font-size: .73rem; }
         .rc-interested-row-v2 b { color: #ff6338; font-weight: 650; }
         .rc-home-empty-v2 { color: #7d8798; font-size: .82rem; padding: .82rem; }
-
         .dark .rc-home-dashboard-v2 { color: #f8fafc; }
-
         .dark .rc-home-header-v2 h1,
         .dark .rc-home-panel-head-v2 h2,
         .dark .rc-home-stat-value-v2,
@@ -4403,7 +3981,6 @@ discoverSelectedIds: [],
         .dark .rc-home-activity-copy-v2 strong,
         .dark .rc-interested-row-v2 strong,
         .dark .rc-radar-card-v2 strong { color: #fff; }
-
         .dark .rc-home-stat-v2,
         .dark .rc-home-panel-v2,
         .dark .rc-home-search-v2,
@@ -4414,25 +3991,20 @@ discoverSelectedIds: [],
             box-shadow: none;
             color: #e5e7eb;
         }
-
         .dark .rc-readiness-ring-v2:before { background: #181d27; }
-
         .dark .rc-radar-card-v2 {
             border-color: rgba(148,163,184,.16);
             background: rgba(17,24,39,.72);
         }
-
         .dark .rc-radar-logo-v2 {
             background: #fff;
             color: #111827;
         }
-
         @media (max-width: 1180px) {
             .rc-home-stats-v2 { grid-template-columns: repeat(2, minmax(0,1fr)); }
             .rc-home-grid-v2,
             .rc-home-lower-grid-v2 { grid-template-columns: 1fr; }
         }
-
         @media (max-width: 760px) {
             .rc-home-welcome-copy-v2 h1,
             .rc-home-welcome-copy-v2 p { white-space: normal !important; }
@@ -4443,8 +4015,6 @@ discoverSelectedIds: [],
             .rc-radar-schools-v2 { grid-template-columns: 1fr; }
             .rc-home-progress-layout-v2 { grid-template-columns: 1fr; }
         }
-
-
         /* Dashboard functional-card + detail page fixes */
         .rc-home-header-v2 {
             display: grid !important;
@@ -4452,22 +4022,18 @@ discoverSelectedIds: [],
             align-items: start !important;
             column-gap: 1rem !important;
         }
-
         .rc-home-welcome-copy-v2 {
             min-width: 0 !important;
             max-width: none !important;
         }
-
         .rc-home-welcome-copy-v2 h1,
         .rc-home-welcome-copy-v2 p {
             white-space: nowrap !important;
             max-width: none !important;
         }
-
         .rc-home-welcome-copy-v2 p {
             overflow: visible !important;
         }
-
         .rc-home-actions-v2 {
             display: grid !important;
             grid-template-columns: minmax(21rem, 27rem) auto !important;
@@ -4476,12 +4042,10 @@ discoverSelectedIds: [],
             gap: .75rem !important;
             width: auto !important;
         }
-
         .rc-home-search-v2 {
             width: 100% !important;
             min-width: 0 !important;
         }
-
         .rc-home-new-email-v2 {
             width: auto !important;
             min-width: 7.6rem !important;
@@ -4489,14 +4053,10 @@ discoverSelectedIds: [],
             padding-inline: 1rem !important;
             white-space: nowrap !important;
         }
-
-
-
         /* Header action fix: search + dark mode row, New Email on the next line. */
         .rc-home-header-v2 {
             align-items: start !important;
         }
-
         .rc-home-actions-v2 {
             display: grid !important;
             grid-template-columns: minmax(22rem, 30rem) auto auto !important;
@@ -4508,13 +4068,11 @@ discoverSelectedIds: [],
             gap: .75rem !important;
             width: auto !important;
         }
-
         .rc-home-search-v2 {
             grid-area: search !important;
             width: 100% !important;
             min-width: 0 !important;
         }
-
         .rc-home-dark-toggle-v2 {
             grid-area: dark !important;
             width: 2.75rem !important;
@@ -4536,38 +4094,29 @@ discoverSelectedIds: [],
             cursor: pointer !important;
             transition: transform .18s ease, border-color .18s ease, background .18s ease !important;
         }
-
         .rc-home-dark-toggle-v2:hover {
             transform: translateY(-1px) !important;
             border-color: rgba(255, 99, 56, .35) !important;
         }
-
         .rc-home-dark-toggle-v2 svg {
             width: 1.1rem !important;
             height: 1.1rem !important;
         }
-
         .rc-home-dark-toggle-v2 .rc-dark-icon-sun {
             display: none !important;
         }
-
         .dark .rc-home-dark-toggle-v2 {
             border-color: rgba(148,163,184,.18) !important;
             background: rgba(17,24,39,.82) !important;
             color: #f8fafc !important;
             box-shadow: none !important;
         }
-
         .dark .rc-home-dark-toggle-v2 .rc-dark-icon-moon {
             display: none !important;
         }
-
         .dark .rc-home-dark-toggle-v2 .rc-dark-icon-sun {
             display: block !important;
         }
-
-
-
         .rc-home-refresh-v2 {
             grid-area: refresh !important;
             width: 3rem !important;
@@ -4591,35 +4140,28 @@ discoverSelectedIds: [],
             cursor: pointer !important;
             transition: transform .18s ease, border-color .18s ease, background .18s ease, opacity .18s ease !important;
         }
-
         .rc-home-refresh-v2:hover {
             transform: translateY(-1px) !important;
             border-color: rgba(255, 99, 56, .35) !important;
         }
-
         .rc-home-refresh-v2 svg {
             width: 1.12rem !important;
             height: 1.12rem !important;
         }
-
         .rc-home-refresh-v2[disabled] {
             opacity: .62 !important;
             cursor: wait !important;
             transform: none !important;
         }
-
         .rc-home-refresh-v2[disabled] svg {
             animation: rcSpin .75s linear infinite;
         }
-
         .dark .rc-home-refresh-v2 {
             border-color: rgba(148,163,184,.18) !important;
             background: rgba(17,24,39,.82) !important;
             color: #f8fafc !important;
             box-shadow: none !important;
         }
-
-
         .rc-refresh-dropdown-v2 {
             position: relative !important;
             grid-area: refresh !important;
@@ -4627,7 +4169,6 @@ discoverSelectedIds: [],
             flex: 0 0 auto !important;
             z-index: 35 !important;
         }
-
         .rc-refresh-menu-v2 {
             position: absolute !important;
             top: calc(100% + .55rem) !important;
@@ -4641,7 +4182,6 @@ discoverSelectedIds: [],
             padding: .42rem !important;
             z-index: 80 !important;
         }
-
         .rc-refresh-menu-item-v2 {
             width: 100% !important;
             border: 0 !important;
@@ -4656,16 +4196,13 @@ discoverSelectedIds: [],
             border-radius: .78rem !important;
             cursor: pointer !important;
         }
-
         .rc-refresh-menu-item-v2:hover {
             background: rgba(255,99,56,.09) !important;
         }
-
         .rc-refresh-menu-item-v2 svg {
             width: 1rem !important;
             height: 1rem !important;
         }
-
         .rc-refresh-menu-icon-v2 {
             width: 2.15rem !important;
             height: 2.15rem !important;
@@ -4675,41 +4212,34 @@ discoverSelectedIds: [],
             background: rgba(255,99,56,.1) !important;
             color: #ff6338 !important;
         }
-
         .rc-refresh-menu-copy-v2 {
             min-width: 0 !important;
             display: grid !important;
             gap: .12rem !important;
         }
-
         .rc-refresh-menu-copy-v2 strong {
             font-size: .82rem !important;
             line-height: 1.2 !important;
             font-weight: 800 !important;
             color: inherit !important;
         }
-
         .rc-refresh-menu-copy-v2 small {
             font-size: .72rem !important;
             line-height: 1.3 !important;
             color: #64748b !important;
         }
-
         .dark .rc-refresh-menu-v2 {
             border-color: rgba(148,163,184,.18) !important;
             background: rgba(15,23,42,.98) !important;
             color: #f8fafc !important;
             box-shadow: 0 18px 46px rgba(0,0,0,.32) !important;
         }
-
         .dark .rc-refresh-menu-item-v2:hover {
             background: rgba(255,99,56,.15) !important;
         }
-
         .dark .rc-refresh-menu-copy-v2 small {
             color: rgba(203,213,225,.72) !important;
         }
-
         .rc-home-new-email-v2 {
             grid-area: email !important;
             justify-self: end !important;
@@ -4719,7 +4249,6 @@ discoverSelectedIds: [],
             padding-inline: 1rem !important;
             white-space: nowrap !important;
         }
-
         @media (max-width: 760px) {
             .rc-home-actions-v2 {
                 grid-template-columns: 1fr auto !important;
@@ -4729,50 +4258,41 @@ discoverSelectedIds: [],
                 justify-content: stretch !important;
                 width: 100% !important;
             }
-
             .rc-home-new-email-v2 {
                 justify-self: stretch !important;
                 width: 100% !important;
             }
         }
-
-
         .rc-home-stat-v2 {
             border: 1px solid #e8ebf0;
             text-align: left;
             color: inherit;
         }
-
         button.rc-home-stat-v2 {
             cursor: default;
             appearance: none;
         }
-
         .rc-home-stat-v2.is-clickable {
             cursor: pointer;
             transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
         }
-
         .rc-home-stat-v2.is-clickable:hover {
             border-color: #ff6338 !important;
             box-shadow: 0 0 0 3px rgba(255, 99, 56, .12), 0 12px 28px rgba(15, 23, 42, .08) !important;
             transform: translateY(-1px);
         }
-
         .rc-detail-page-v2 {
             display: grid;
             gap: 1rem;
             color: #101827;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
         }
-
         .rc-detail-header-v2 {
             display: grid;
             grid-template-columns: minmax(0, 1fr) minmax(22rem, 28rem);
             gap: 1rem;
             align-items: start;
         }
-
         .rc-detail-header-v2 h1 {
             margin: 0;
             color: #0f172a;
@@ -4781,13 +4301,11 @@ discoverSelectedIds: [],
             font-weight: 650;
             letter-spacing: -.035em;
         }
-
         .rc-detail-header-v2 p {
             margin: .45rem 0 0;
             color: #7d8798;
             font-size: .95rem;
         }
-
         .rc-detail-search-v2 {
             height: 2.8rem;
             display: flex;
@@ -4800,7 +4318,6 @@ discoverSelectedIds: [],
             color: #94a3b8;
             box-shadow: 0 8px 20px rgba(15,23,42,.06);
         }
-
         .rc-detail-search-v2 svg { width: 1rem; height: 1rem; flex: 0 0 auto; }
         .rc-detail-search-v2 input {
             min-width: 0;
@@ -4812,13 +4329,11 @@ discoverSelectedIds: [],
             font-size: .85rem;
             color: #475569;
         }
-
         .rc-detail-stats-v2 {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
             gap: 1rem;
         }
-
         .rc-detail-stat-v2,
         .rc-detail-table-v2 {
             border: 1px solid #e8ebf0;
@@ -4826,7 +4341,6 @@ discoverSelectedIds: [],
             border-radius: 1.05rem;
             box-shadow: 0 8px 22px rgba(15,23,42,.06);
         }
-
         .rc-detail-stat-v2 {
             min-height: 7.5rem;
             padding: 1.05rem;
@@ -4835,7 +4349,6 @@ discoverSelectedIds: [],
             gap: .8rem;
             align-items: start;
         }
-
         .rc-detail-stat-v2 > span {
             width: 2.75rem;
             height: 2.75rem;
@@ -4844,14 +4357,12 @@ discoverSelectedIds: [],
             place-items: center;
             font-weight: 650;
         }
-
         .rc-detail-stat-v2 small {
             display: block;
             color: #64748b;
             font-size: .84rem;
             font-weight: 500;
         }
-
         .rc-detail-stat-v2 strong {
             display: block;
             margin-top: .2rem;
@@ -4861,7 +4372,6 @@ discoverSelectedIds: [],
             font-weight: 650;
             letter-spacing: -.04em;
         }
-
         .rc-detail-stat-v2 em {
             display: block;
             margin-top: .55rem;
@@ -4869,7 +4379,6 @@ discoverSelectedIds: [],
             font-size: .82rem;
             font-style: normal;
         }
-
         .rc-detail-stat-v2.is-blue > span { background: rgba(59,130,246,.13); color: #3b82f6; }
         .rc-detail-stat-v2.is-coral > span { background: rgba(255,99,56,.13); color: #ff6338; }
         .rc-detail-stat-v2.is-purple > span { background: rgba(139,92,246,.13); color: #8b5cf6; }
@@ -4877,7 +4386,6 @@ discoverSelectedIds: [],
         .rc-detail-stat-v2.is-neutral > span { background: #eceef3; color: #111827; }
         .rc-detail-stat-v2.is-pink > span { background: rgba(236,72,153,.14); color: #ec4899; }
         .rc-detail-stat-v2.is-red > span { background: rgba(239,68,68,.13); color: #ef4444; }
-
         .rc-detail-table-v2 { overflow: hidden; }
         .rc-detail-table-v2 header {
             min-height: 3.55rem;
@@ -4888,20 +4396,17 @@ discoverSelectedIds: [],
             padding: 0 1.15rem;
             border-bottom: 1px solid #edf0f5;
         }
-
         .rc-detail-table-v2 h2 {
             margin: 0;
             color: #0f172a;
             font-size: 1rem;
             font-weight: 650;
         }
-
         .rc-detail-table-v2 header span {
             color: #10b981;
             font-size: .78rem;
             font-weight: 750;
         }
-
         .rc-detail-rows-v2 { display: grid; }
         .rc-detail-row-v2 {
             width: 100%;
@@ -4918,7 +4423,6 @@ discoverSelectedIds: [],
             color: inherit;
             cursor: pointer;
         }
-
         .rc-detail-row-v2:hover { background: #fafafa; }
         .rc-detail-row-v2:last-child { border-bottom: 0; }
         .rc-detail-rank-v2 { color: #94a3b8; font-size: .8rem; font-weight: 600; }
@@ -4935,12 +4439,10 @@ discoverSelectedIds: [],
             font-weight: 600;
             overflow: hidden;
         }
-
         .rc-detail-avatar-v2 img { width: 100%; height: 100%; object-fit: contain; }
         .rc-detail-platform-icon-v2.is-red { background: rgba(239,68,68,.12); color: #ef4444; }
         .rc-detail-platform-icon-v2.is-pink { background: rgba(236,72,153,.14); color: #ec4899; }
         .rc-detail-platform-icon-v2.is-neutral { background: #eceef3; color: #111827; }
-
         .rc-detail-person-v2 { min-width: 0; display: grid; gap: .15rem; }
         .rc-detail-person-v2 strong {
             color: #0f172a;
@@ -4951,7 +4453,6 @@ discoverSelectedIds: [],
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .rc-detail-person-v2 strong em {
             margin-left: .35rem;
             border-radius: .35rem;
@@ -4963,7 +4464,6 @@ discoverSelectedIds: [],
             font-weight: 600;
             vertical-align: middle;
         }
-
         .rc-detail-person-v2 small {
             color: #7d8798;
             font-size: .78rem;
@@ -4971,7 +4471,6 @@ discoverSelectedIds: [],
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
         .rc-detail-pill-v2 {
             border-radius: 999px;
             background: rgba(255,99,56,.12);
@@ -4981,18 +4480,14 @@ discoverSelectedIds: [],
             font-weight: 600;
             white-space: nowrap;
         }
-
         .rc-detail-pill-v2.is-pink { background: rgba(236,72,153,.14); color: #ec4899; }
         .rc-detail-pill-v2.is-red { background: rgba(239,68,68,.13); color: #ef4444; }
         .rc-detail-pill-v2.is-neutral { background: #eceef3; color: #111827; }
-
         .rc-detail-count-v2 { display: grid; justify-items: center; color: #7d8798; }
         .rc-detail-count-v2 b { color: #ff6338; font-size: 1.1rem; line-height: 1; font-weight: 650; }
         .rc-detail-count-v2 small { font-size: .68rem; }
         .rc-detail-time-v2 { color: #94a3b8; font-size: .78rem; white-space: nowrap; }
         .rc-detail-chevron-v2 { color: #94a3b8; font-size: 1.35rem; }
-
-
         .rc-stats-drawer-backdrop {
             position: fixed;
             inset: 0;
@@ -5004,11 +4499,9 @@ discoverSelectedIds: [],
             -webkit-backdrop-filter: blur(10px);
             animation: rcDrawerBackdropIn .18s ease both;
         }
-
         .dark .rc-stats-drawer-backdrop {
             background: rgba(2, 6, 23, .52);
         }
-
         .rc-stats-drawer-panel {
             width: min(760px, calc(100vw - 1.25rem));
             height: 100vh;
@@ -5019,18 +4512,15 @@ discoverSelectedIds: [],
             padding: 1.2rem;
             animation: rcStatsDrawerIn .24s cubic-bezier(.22, 1, .36, 1) both;
         }
-
         .dark .rc-stats-drawer-panel {
             box-shadow: -24px 0 70px rgba(0, 0, 0, .45);
         }
-
         .rc-stats-drawer-panel .rc-detail-page-v2 {
             max-width: none;
             margin: 0;
             padding: 0;
             min-height: auto;
         }
-
         .rc-stats-drawer-close {
             position: sticky;
             top: .2rem;
@@ -5051,65 +4541,52 @@ discoverSelectedIds: [],
             box-shadow: 0 12px 30px rgba(15, 23, 42, .08);
             transition: transform .18s ease, border-color .18s ease, color .18s ease;
         }
-
         .rc-stats-drawer-close:hover {
             transform: translateY(-1px);
             border-color: rgba(255, 99, 56, .35);
             color: #ff6338;
         }
-
         .rc-stats-drawer-panel .rc-detail-header-v2 {
             grid-template-columns: 1fr;
             gap: .6rem;
             margin-bottom: 1rem;
         }
-
         .rc-stats-drawer-panel .rc-detail-search-v2 {
             display: none;
         }
-
         .rc-stats-drawer-panel .rc-detail-stats-v2 {
             grid-template-columns: repeat(3, minmax(0, 1fr));
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2 {
             grid-template-columns: 2.4rem minmax(0, 1fr) auto auto;
         }
-
         .rc-stats-drawer-panel .rc-detail-chevron-v2 {
             display: none;
         }
-
         @keyframes rcStatsDrawerIn {
             from { transform: translateX(100%); opacity: .6; }
             to { transform: translateX(0); opacity: 1; }
         }
-
         @keyframes rcDrawerBackdropIn {
             from { opacity: 0; }
             to { opacity: 1; }
         }
-
         @media (max-width: 760px) {
             .rc-stats-drawer-panel {
                 width: 100vw;
                 padding: .82rem;
             }
-
             .rc-stats-drawer-panel .rc-detail-stats-v2 {
                 grid-template-columns: 1fr;
             }
-
             .rc-stats-drawer-panel .rc-detail-row-v2 {
                 grid-template-columns: 2.35rem minmax(0, 1fr) auto;
             }
-
             .rc-stats-drawer-panel .rc-detail-rank-v2,
             .rc-stats-drawer-panel .rc-detail-time-v2 {
                 display: none;
             }
         }
-
         @media (max-width: 1180px) {
             .rc-home-header-v2,
             .rc-detail-header-v2 { grid-template-columns: 1fr !important; }
@@ -5118,15 +4595,9 @@ discoverSelectedIds: [],
             .rc-detail-row-v2 { grid-template-columns: 2.35rem minmax(0, 1fr) auto; }
             .rc-detail-rank-v2, .rc-detail-time-v2, .rc-detail-chevron-v2 { display: none; }
         }
-
-
-
         /* Coach dashboard top meta cleanup. */
         .rc-load-status { display: none !important; }
         .rc-home-dashboard-v2 .rc-top:empty { display: none !important; }
-
-    
-
         /* Final header alignment: search + square dark toggle sit on the right edge. */
         .rc-home-header-v2 {
             display: grid !important;
@@ -5134,7 +4605,6 @@ discoverSelectedIds: [],
             column-gap: 1.25rem !important;
             align-items: start !important;
         }
-
         .rc-home-actions-v2 {
             justify-self: end !important;
             width: 100% !important;
@@ -5148,13 +4618,11 @@ discoverSelectedIds: [],
             align-items: center !important;
             gap: .75rem !important;
         }
-
         .rc-home-search-v2 {
             grid-area: search !important;
             width: 100% !important;
             min-width: 0 !important;
         }
-
         .rc-home-dark-toggle-v2,
         button.rc-home-dark-toggle-v2,
         [data-plyr-dark-toggle].rc-home-dark-toggle-v2 {
@@ -5174,25 +4642,21 @@ discoverSelectedIds: [],
             flex: 0 0 3rem !important;
             box-sizing: border-box !important;
         }
-
         .rc-home-new-email-v2 {
             grid-area: email !important;
             justify-self: end !important;
             margin-top: .2rem !important;
         }
-
         @media (max-width: 1100px) {
             .rc-home-header-v2 {
                 grid-template-columns: 1fr !important;
             }
-
             .rc-home-actions-v2 {
                 justify-self: stretch !important;
                 max-width: none !important;
                 grid-template-columns: minmax(0, 1fr) 3rem !important;
             }
         }
-
         /* v72 stat drawer: keep background blur on page only, panel itself stays solid */
         .rc-stats-drawer-panel {
             background: #ffffff !important;
@@ -5201,12 +4665,10 @@ discoverSelectedIds: [],
             -webkit-backdrop-filter: none !important;
             isolation: isolate;
         }
-
         .dark .rc-stats-drawer-panel {
             background: #0f172a !important;
             background-color: #0f172a !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-page-v2,
         .rc-stats-drawer-panel .rc-detail-header-v2,
         .rc-stats-drawer-panel .rc-detail-search-v2,
@@ -5216,30 +4678,24 @@ discoverSelectedIds: [],
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-page-v2 {
             background: #ffffff !important;
         }
-
         .dark .rc-stats-drawer-panel .rc-detail-page-v2 {
             background: #0f172a !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2,
         .rc-stats-drawer-panel .rc-detail-search-v2,
         .rc-stats-drawer-panel .rc-detail-stat-card-v2,
         .rc-stats-drawer-panel .rc-detail-card-v2 {
             background-color: #ffffff !important;
         }
-
         .dark .rc-stats-drawer-panel .rc-detail-row-v2,
         .dark .rc-stats-drawer-panel .rc-detail-search-v2,
         .dark .rc-stats-drawer-panel .rc-detail-stat-card-v2,
         .dark .rc-stats-drawer-panel .rc-detail-card-v2 {
             background-color: #111827 !important;
         }
-
-
         /* v73 stat drawer: responsive panel, proper close button, faster slide animations */
         .rc-stats-drawer-backdrop {
             align-items: stretch !important;
@@ -5247,7 +4703,6 @@ discoverSelectedIds: [],
             overflow: hidden !important;
             will-change: opacity !important;
         }
-
         .rc-stats-drawer-panel {
             width: min(780px, 92vw) !important;
             max-width: 100vw !important;
@@ -5259,12 +4714,10 @@ discoverSelectedIds: [],
             transform: translateX(0);
             will-change: transform, opacity !important;
         }
-
         .rc-stats-drawer-panel[x-cloak],
         .rc-stats-drawer-backdrop[x-cloak] {
             display: none !important;
         }
-
         .rc-stats-drawer-close {
             position: sticky !important;
             top: .75rem !important;
@@ -5273,32 +4726,26 @@ discoverSelectedIds: [],
             user-select: none !important;
             transition: transform .12s ease, background-color .12s ease, border-color .12s ease, color .12s ease !important;
         }
-
         .rc-stats-drawer-close:active {
             transform: scale(.94) !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-table-v2 {
             overflow: visible !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-rows-v2 {
             display: grid !important;
             gap: .75rem !important;
         }
-
         @media (max-width: 900px) {
             .rc-stats-drawer-panel {
                 width: min(620px, 94vw) !important;
                 padding: 1rem !important;
             }
         }
-
         @media (max-width: 640px) {
             .rc-stats-drawer-backdrop {
                 justify-content: stretch !important;
             }
-
             .rc-stats-drawer-panel {
                 width: 100vw !important;
                 height: 100dvh !important;
@@ -5307,59 +4754,47 @@ discoverSelectedIds: [],
                 border-radius: 0 !important;
                 padding: .9rem !important;
             }
-
             .rc-stats-drawer-close {
                 top: .5rem !important;
                 width: 2.45rem !important;
                 height: 2.45rem !important;
                 border-radius: .85rem !important;
             }
-
             .rc-stats-drawer-panel .rc-detail-header-v2 h1 {
                 font-size: 1.45rem !important;
             }
-
             .rc-stats-drawer-panel .rc-detail-stat-v2 {
                 min-width: 0 !important;
             }
         }
-
-
-
         /* v74 stat drawer detail layout: match reference detail pages while keeping blur slider. */
         .rc-stats-drawer-panel {
             width: min(1120px, calc(100vw - 4rem)) !important;
             padding: 2rem 2.2rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-page-v2 {
             gap: 1.25rem !important;
             background: transparent !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-header-v2 {
             display: block !important;
             margin-bottom: .55rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-header-v2 h1 {
             font-size: 1.65rem !important;
             line-height: 1.12 !important;
             letter-spacing: -.04em !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-header-v2 p {
             font-size: .95rem !important;
             color: #7b879b !important;
             margin-top: .45rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-stats-v2 {
             display: grid !important;
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             gap: 1.05rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-stat-v2 {
             min-height: 8rem !important;
             border-radius: 1.05rem !important;
@@ -5370,25 +4805,21 @@ discoverSelectedIds: [],
             grid-template-columns: 3rem minmax(0, 1fr) !important;
             align-items: start !important;
         }
-
         .dark .rc-stats-drawer-panel .rc-detail-stat-v2 {
             background: #111827 !important;
             border-color: rgba(148, 163, 184, .16) !important;
             box-shadow: none !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-stat-v2 > span {
             width: 2.85rem !important;
             height: 2.85rem !important;
             border-radius: .85rem !important;
             font-size: 1.1rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-stat-v2 strong {
             margin-top: .15rem !important;
             font-size: 1.85rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-table-v2 {
             overflow: hidden !important;
             border-radius: 1.05rem !important;
@@ -5396,28 +4827,23 @@ discoverSelectedIds: [],
             border: 1px solid #e8ebf0 !important;
             box-shadow: 0 12px 30px rgba(15, 23, 42, .07) !important;
         }
-
         .dark .rc-stats-drawer-panel .rc-detail-table-v2 {
             background: #111827 !important;
             border-color: rgba(148, 163, 184, .16) !important;
             box-shadow: none !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-table-v2 header {
             min-height: 3.75rem !important;
             background: inherit !important;
             padding: 0 1.25rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-table-v2 header span {
             color: #10b981 !important;
             font-weight: 800 !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-rows-v2 {
             gap: 0 !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2 {
             min-height: 4.65rem !important;
             display: grid !important;
@@ -5428,79 +4854,63 @@ discoverSelectedIds: [],
             background: #ffffff !important;
             border-radius: 0 !important;
         }
-
         .dark .rc-stats-drawer-panel .rc-detail-row-v2 {
             background: #111827 !important;
             border-bottom-color: rgba(148, 163, 184, .13) !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2:hover {
             background: #fafafa !important;
         }
-
         .dark .rc-stats-drawer-panel .rc-detail-row-v2:hover {
             background: #0f172a !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-chevron-v2,
         .rc-stats-drawer-panel .rc-detail-rank-v2,
         .rc-stats-drawer-panel .rc-detail-time-v2 {
             display: inline-flex !important;
             align-items: center !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-platform-icon-v2,
         .rc-stats-drawer-panel .rc-detail-avatar-v2 {
             width: 2.45rem !important;
             height: 2.45rem !important;
             border-radius: .72rem !important;
         }
-
         .rc-home-stat-v2:not(.is-clickable) {
             cursor: default !important;
         }
-
-
         /* Engagement drawer rows have no rank column, so keep them aligned like the reference layout. */
         .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement {
             grid-template-columns: 2.6rem minmax(0, 1fr) auto 4.1rem 5.3rem 1rem !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-person-v2 {
             min-width: 0 !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-person-v2 strong,
         .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-person-v2 small {
             max-width: 100% !important;
         }
-
         .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement .rc-detail-pill-v2 {
             width: auto !important;
             max-width: max-content !important;
             justify-self: end !important;
         }
-
         @media (max-width: 980px) {
             .rc-stats-drawer-panel .rc-detail-row-v2.is-engagement {
                 grid-template-columns: 2.45rem minmax(0, 1fr) auto !important;
             }
         }
-
         @media (max-width: 980px) {
             .rc-stats-drawer-panel {
                 width: 100vw !important;
                 padding: 1rem !important;
             }
-
             .rc-stats-drawer-panel .rc-detail-stats-v2 {
                 grid-template-columns: 1fr !important;
             }
-
             .rc-stats-drawer-panel .rc-detail-row-v2 {
                 grid-template-columns: 2.45rem minmax(0, 1fr) auto !important;
             }
-
             .rc-stats-drawer-panel .rc-detail-rank-v2,
             .rc-stats-drawer-panel .rc-detail-pill-v2,
             .rc-stats-drawer-panel .rc-detail-time-v2,
@@ -5508,16 +4918,12 @@ discoverSelectedIds: [],
                 display: none !important;
             }
         }
-
-
-
         .rc-global-search-wrapper,
         .rc-home-search-v2,
         .rc-detail-search-v2,
         .rc-discover-search {
             position: relative;
         }
-
         .rc-global-search-bar {
             display: grid;
             grid-template-columns: minmax(18rem, 1fr) auto auto;
@@ -5525,7 +4931,6 @@ discoverSelectedIds: [],
             align-items: center;
             margin-bottom: .9rem;
         }
-
         .rc-global-search-shell {
             position: relative;
             display: flex;
@@ -5538,14 +4943,12 @@ discoverSelectedIds: [],
             padding: .55rem .65rem;
             box-shadow: 0 10px 26px rgba(15, 23, 42, .06);
         }
-
         .rc-global-search-shell svg {
             width: 1.08rem;
             height: 1.08rem;
             color: var(--rc-muted);
             flex: 0 0 auto;
         }
-
         .rc-global-search-shell input {
             width: 100%;
             border: 0 !important;
@@ -5556,7 +4959,6 @@ discoverSelectedIds: [],
             min-height: 2.35rem;
             font-size: .86rem;
         }
-
         .rc-global-search-clear {
             border: 0;
             background: transparent;
@@ -5568,12 +4970,10 @@ discoverSelectedIds: [],
             border-radius: 999px;
             font-weight: 650;
         }
-
         .rc-global-search-clear:hover {
             color: var(--rc-accent);
             background: var(--rc-accent-soft);
         }
-
         .rc-global-suggestions {
             position: absolute;
             z-index: 80;
@@ -5591,12 +4991,10 @@ discoverSelectedIds: [],
             max-height: 28rem;
             overflow: auto;
         }
-
         .rc-global-suggestion-group {
             display: grid;
             gap: .25rem;
         }
-
         .rc-global-suggestion-heading {
             color: var(--rc-muted);
             font-size: .66rem;
@@ -5605,7 +5003,6 @@ discoverSelectedIds: [],
             text-transform: uppercase;
             padding: .5rem .55rem .2rem;
         }
-
         .rc-global-suggestion-item {
             width: 100%;
             border: 0;
@@ -5620,11 +5017,9 @@ discoverSelectedIds: [],
             padding: .52rem .55rem;
             cursor: pointer;
         }
-
         .rc-global-suggestion-item:hover {
             background: var(--rc-accent-soft);
         }
-
         .rc-global-suggestion-icon {
             width: 2.2rem;
             height: 2.2rem;
@@ -5639,20 +5034,17 @@ discoverSelectedIds: [],
             border: 1px solid rgba(148, 163, 184, .2);
             overflow: hidden;
         }
-
         .rc-global-suggestion-icon img {
             width: 100%;
             height: 100%;
             object-fit: contain;
             display: block;
         }
-
         .rc-global-suggestion-copy {
             min-width: 0;
             display: grid;
             gap: .1rem;
         }
-
         .rc-global-suggestion-copy strong {
             font-size: .82rem;
             line-height: 1.2;
@@ -5660,7 +5052,6 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
         .rc-global-suggestion-copy small {
             color: var(--rc-muted);
             font-size: .72rem;
@@ -5669,7 +5060,6 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
         .rc-global-suggestion-category {
             border-radius: 999px;
             background: var(--rc-soft);
@@ -5679,13 +5069,11 @@ discoverSelectedIds: [],
             font-weight: 650;
             white-space: nowrap;
         }
-
         .rc-global-search-empty {
             color: var(--rc-muted);
             font-size: .78rem;
             padding: .75rem;
         }
-
         @media (max-width: 760px) {
             .rc-global-search-bar {
                 grid-template-columns: 1fr auto auto;
@@ -5694,58 +5082,47 @@ discoverSelectedIds: [],
                 min-width: 0;
             }
         }
-
-
         /* v9 header/search refinements. Keeps the dashboard top tighter and prevents the search from dominating the header. */
         .rc-home-dashboard-v2 {
             padding-top: 0 !important;
             margin-top: -1rem !important;
         }
-
         .rc-home-header-v2 {
             margin-top: -.35rem !important;
             margin-bottom: .85rem !important;
             grid-template-columns: minmax(0, 1fr) minmax(28rem, 39rem) !important;
         }
-
         .rc-home-actions-v2 {
             max-width: 39rem !important;
             grid-template-columns: minmax(22rem, 33rem) 3rem 3rem !important;
             gap: .65rem !important;
         }
-
         .rc-home-search-v2,
         .rc-global-search-shell {
             max-width: 33rem !important;
         }
-
         .rc-global-suggestions {
             z-index: 95 !important;
         }
-
         @media (max-width: 1180px) {
             .rc-home-dashboard-v2 {
                 margin-top: -.35rem !important;
             }
-
             .rc-home-header-v2 {
                 grid-template-columns: 1fr !important;
                 row-gap: .85rem !important;
             }
-
             .rc-home-actions-v2 {
                 justify-self: stretch !important;
                 width: 100% !important;
                 max-width: none !important;
                 grid-template-columns: minmax(0, 1fr) 3rem 3rem !important;
             }
-
             .rc-home-search-v2,
             .rc-global-search-shell {
                 max-width: none !important;
             }
         }
-
         /* v25: right-side school drawer and Discover Schools UI matched to new reference. */
         .rc-school-modal-backdrop,
         .rc-drawer.rc-school-modal-backdrop {
@@ -5759,7 +5136,6 @@ discoverSelectedIds: [],
             background: rgba(15, 23, 42, .34) !important;
             backdrop-filter: blur(3px) !important;
         }
-
         .rc-school-modal-panel,
         .rc-drawer-panel.rc-school-modal-panel {
             width: min(520px, 100vw) !important;
@@ -5777,7 +5153,6 @@ discoverSelectedIds: [],
             transform: translateX(0) !important;
             animation: rcSlideInRight .22s ease-out both !important;
         }
-
         .dark .rc-school-modal-panel,
         .dark .rc-drawer-panel.rc-school-modal-panel {
             background: rgb(18 18 22) !important;
@@ -5785,41 +5160,34 @@ discoverSelectedIds: [],
             border-left-color: rgba(148, 163, 184, .16) !important;
             box-shadow: -28px 0 80px rgba(0, 0, 0, .45) !important;
         }
-
         @keyframes rcSlideInRight {
             from { transform: translateX(100%); opacity: .7; }
             to { transform: translateX(0); opacity: 1; }
         }
-
         .rc-school-modal-close {
             background: var(--rc-soft) !important;
             border-color: var(--rc-border) !important;
             color: var(--rc-muted) !important;
         }
-
         .rc-school-modal-close:hover {
             color: var(--rc-accent) !important;
             border-color: rgba(255, 99, 56, .36) !important;
             background: var(--rc-accent-soft) !important;
         }
-
         .rc-school-modal-main h2,
         .rc-school-section-title,
         .rc-school-coach-info strong,
         .rc-school-stat-card strong {
             color: var(--rc-text) !important;
         }
-
         .rc-school-modal-meta,
         .rc-school-coach-info span,
         .rc-school-stat-card small {
             color: var(--rc-muted) !important;
         }
-
         .rc-school-modal-rule {
             background: var(--rc-border) !important;
         }
-
         .rc-school-action,
         .rc-school-coach-card,
         .rc-school-stat-card,
@@ -5828,39 +5196,30 @@ discoverSelectedIds: [],
             color: var(--rc-text) !important;
             border-color: var(--rc-border) !important;
         }
-
         .rc-school-action-primary {
             background: var(--rc-accent) !important;
             border-color: var(--rc-accent) !important;
             color: #fff !important;
         }
-
         .rc-school-score-ring {
             color: var(--rc-text) !important;
             background: var(--rc-surface) !important;
         }
-
         .rc-school-score-label { color: var(--rc-accent) !important; }
-
         .rc-school-division-pill,
         .rc-school-stat-card span,
         .rc-school-coach-avatar {
             background: var(--rc-accent-soft) !important;
             color: var(--rc-accent) !important;
         }
-
-
-
         /* v81: polished animated school drawer + list/favorite interactions */
         .rc-school-modal-backdrop {
             animation: rcBackdropInV81 .18s ease-out both !important;
         }
-
         @keyframes rcBackdropInV81 {
             from { background: rgba(15, 23, 42, 0); backdrop-filter: blur(0); }
             to { background: rgba(15, 23, 42, .38); backdrop-filter: blur(4px); }
         }
-
         .rc-school-modal-panel,
         .rc-drawer-panel.rc-school-modal-panel {
             width: min(640px, 100vw) !important;
@@ -5868,12 +5227,10 @@ discoverSelectedIds: [],
             overflow-x: hidden !important;
             animation: rcSchoolDrawerInV81 .24s cubic-bezier(.2,.8,.2,1) both !important;
         }
-
         @keyframes rcSchoolDrawerInV81 {
             from { transform: translateX(42px); opacity: .15; }
             to { transform: translateX(0); opacity: 1; }
         }
-
         .rc-school-modal-close {
             position: absolute !important;
             top: .85rem !important;
@@ -5887,7 +5244,6 @@ discoverSelectedIds: [],
             z-index: 8 !important;
             font-size: 0 !important;
         }
-
         .rc-school-modal-close::before,
         .rc-school-modal-close::after {
             content: '' !important;
@@ -5897,10 +5253,8 @@ discoverSelectedIds: [],
             background: currentColor !important;
             border-radius: 999px !important;
         }
-
         .rc-school-modal-close::before { transform: rotate(45deg); }
         .rc-school-modal-close::after { transform: rotate(-45deg); }
-
         .rc-school-modal-hero-v72 {
             display: grid !important;
             grid-template-columns: 4rem minmax(0, 1fr) 4.35rem !important;
@@ -5908,7 +5262,6 @@ discoverSelectedIds: [],
             align-items: start !important;
             padding: .45rem 3.15rem 0 0 !important;
         }
-
         .rc-school-logo-large-v72 {
             width: 4rem !important;
             height: 4rem !important;
@@ -5921,7 +5274,6 @@ discoverSelectedIds: [],
             padding: .45rem !important;
             box-shadow: 0 8px 20px rgba(15, 23, 42, .06) !important;
         }
-
         .rc-school-logo-large-v72 img {
             width: auto !important;
             height: auto !important;
@@ -5929,21 +5281,17 @@ discoverSelectedIds: [],
             max-height: 100% !important;
             object-fit: contain !important;
         }
-
         .rc-school-logo-large-v72 span {
             color: #0f172a !important;
             font-size: .85rem !important;
             font-weight: 700 !important;
         }
-
         .dark .rc-school-logo-large-v72 { background: rgba(148, 163, 184, .12) !important; }
         .dark .rc-school-logo-large-v72 span { color: #e5e7eb !important; }
-
         .rc-school-modal-main {
             min-width: 0 !important;
             padding-top: .08rem !important;
         }
-
         .rc-school-modal-main h2 {
             font-size: 1.28rem !important;
             line-height: 1.08 !important;
@@ -5951,7 +5299,6 @@ discoverSelectedIds: [],
             margin: .35rem 0 .28rem !important;
             padding-right: .35rem !important;
         }
-
         .rc-school-modal-meta {
             display: flex !important;
             flex-wrap: wrap !important;
@@ -5959,7 +5306,6 @@ discoverSelectedIds: [],
             font-size: .85rem !important;
             line-height: 1.25 !important;
         }
-
         .rc-school-division-pill {
             display: inline-flex !important;
             align-items: center !important;
@@ -5968,7 +5314,6 @@ discoverSelectedIds: [],
             font-size: .72rem !important;
             font-weight: 700 !important;
         }
-
         .rc-school-score-wrap {
             align-self: start !important;
             justify-self: end !important;
@@ -5977,7 +5322,6 @@ discoverSelectedIds: [],
             justify-items: center !important;
             padding-top: .05rem !important;
         }
-
         .rc-school-score-ring {
             width: 3.8rem !important;
             height: 3.8rem !important;
@@ -5990,12 +5334,10 @@ discoverSelectedIds: [],
             border: .42rem solid #ff6338 !important;
             box-shadow: inset 0 0 0 4px var(--rc-surface), 0 8px 20px rgba(255, 99, 56, .14) !important;
         }
-
         .rc-school-score-label {
             font-size: .72rem !important;
             font-weight: 800 !important;
         }
-
         .rc-school-modal-actions-v72 {
             display: flex !important;
             flex-wrap: wrap !important;
@@ -6003,7 +5345,6 @@ discoverSelectedIds: [],
             align-items: center !important;
             margin-top: 1.25rem !important;
         }
-
         .rc-school-action {
             height: 2.85rem !important;
             border-radius: .8rem !important;
@@ -6017,10 +5358,8 @@ discoverSelectedIds: [],
             border: 1px solid var(--rc-border) !important;
             transition: transform .16s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease !important;
         }
-
         .rc-school-action:hover { transform: translateY(-1px) !important; }
         .rc-school-action svg { width: 1rem !important; height: 1rem !important; flex: 0 0 auto !important; }
-
         .rc-school-action.is-in-list,
         .rc-school-action.is-favorited {
             background: var(--rc-accent) !important;
@@ -6028,12 +5367,10 @@ discoverSelectedIds: [],
             color: #fff !important;
             box-shadow: 0 12px 25px rgba(255, 99, 56, .22) !important;
         }
-
         .rc-school-action.is-loading {
             opacity: .78 !important;
             pointer-events: none !important;
         }
-
         .rc-action-spinner-v81 {
             width: .95rem !important;
             height: .95rem !important;
@@ -6042,11 +5379,8 @@ discoverSelectedIds: [],
             border-radius: 999px !important;
             animation: rcSpinV81 .7s linear infinite !important;
         }
-
         @keyframes rcSpinV81 { to { transform: rotate(360deg); } }
-
         .rc-school-list-dropdown-v72 { position: relative !important; }
-
         .rc-school-list-menu-v72 {
             width: min(29rem, calc(100vw - 2rem)) !important;
             max-height: 26rem !important;
@@ -6057,12 +5391,10 @@ discoverSelectedIds: [],
             padding: .8rem !important;
             animation: rcMenuInV81 .16s ease-out both !important;
         }
-
         @keyframes rcMenuInV81 {
             from { transform: translateY(-6px) scale(.98); opacity: 0; }
             to { transform: translateY(0) scale(1); opacity: 1; }
         }
-
         .rc-school-list-menu-v72 h4 {
             margin: 0 0 .55rem !important;
             padding: 0 .3rem !important;
@@ -6071,7 +5403,6 @@ discoverSelectedIds: [],
             letter-spacing: .08em !important;
             color: var(--rc-muted) !important;
         }
-
         .rc-school-list-menu-v72 button {
             width: 100% !important;
             min-height: 2.6rem !important;
@@ -6084,20 +5415,16 @@ discoverSelectedIds: [],
             color: var(--rc-text) !important;
             transition: background .15s ease, transform .15s ease !important;
         }
-
         .rc-school-list-menu-v72 button:hover {
             background: var(--rc-soft) !important;
             transform: translateX(2px) !important;
         }
-
         .rc-school-list-menu-v72 button.is-active {
             background: color-mix(in srgb, var(--list-color, #ff6338) 13%, white) !important;
         }
-
         .dark .rc-school-list-menu-v72 button.is-active {
             background: color-mix(in srgb, var(--list-color, #ff6338) 22%, transparent) !important;
         }
-
         .rc-list-check-v81 {
             width: 1.05rem !important;
             height: 1.05rem !important;
@@ -6109,15 +5436,12 @@ discoverSelectedIds: [],
             color: transparent !important;
             background: var(--rc-surface) !important;
         }
-
         .rc-school-list-menu-v72 button.is-active .rc-list-check-v81 {
             border-color: var(--list-color, #ff6338) !important;
             background: var(--list-color, #ff6338) !important;
             color: #fff !important;
         }
-
         .rc-list-check-v81 svg { width: .75rem !important; height: .75rem !important; }
-
         .rc-school-list-dot-v72 {
             width: .65rem !important;
             height: .65rem !important;
@@ -6127,7 +5451,6 @@ discoverSelectedIds: [],
             margin-right: .45rem !important;
             box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot, #ff6338) 16%, transparent) !important;
         }
-
         .rc-list-count-v81 {
             min-width: 1.5rem !important;
             height: 1.5rem !important;
@@ -6140,18 +5463,14 @@ discoverSelectedIds: [],
             color: var(--rc-muted) !important;
             font-size: .78rem !important;
         }
-
-
         /* v87: wider school drawer + readable colored list dropdown */
         .rc-drawer-panel.rc-school-modal-panel {
             width: min(660px, 100vw) !important;
         }
-
         .rc-school-list-dropdown-v72 {
             position: relative !important;
             flex: 0 0 auto !important;
         }
-
         .rc-school-list-menu-v72 {
             width: min(30rem, calc(100vw - 2rem)) !important;
             max-width: calc(100vw - 2rem) !important;
@@ -6159,13 +5478,11 @@ discoverSelectedIds: [],
             left: auto !important;
             z-index: 40 !important;
         }
-
         .rc-school-list-menu-v72 button {
             grid-template-columns: 1.25rem minmax(15rem, 1fr) auto !important;
             min-height: 3rem !important;
             padding: .52rem .65rem !important;
         }
-
         .rc-school-list-label-v87 {
             display: flex !important;
             align-items: center !important;
@@ -6179,30 +5496,24 @@ discoverSelectedIds: [],
             overflow: visible !important;
             word-break: break-word !important;
         }
-
         .rc-school-list-menu-v72 button.is-active {
             background: color-mix(in srgb, var(--list-color, #ff6338) 18%, white) !important;
             box-shadow: inset 3px 0 0 var(--list-color, #ff6338) !important;
         }
-
         .dark .rc-school-list-menu-v72 button.is-active {
             background: color-mix(in srgb, var(--list-color, #ff6338) 24%, #111827) !important;
         }
-
         .rc-school-action.is-favorited[disabled],
         .rc-school-action[disabled] {
             opacity: .78 !important;
             cursor: wait !important;
         }
-
         .rc-school-action .rc-action-spinner-v81 {
             flex: 0 0 auto !important;
         }
-
         @media (min-width: 780px) {
             .rc-school-modal-actions-v72 { flex-wrap: nowrap !important; }
         }
-
         .rc-school-tabbar-v72 {
             border-radius: .9rem !important;
             padding: .25rem !important;
@@ -6211,7 +5522,6 @@ discoverSelectedIds: [],
             grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
             gap: .2rem !important;
         }
-
         .rc-school-tab-v72 {
             min-height: 2.75rem !important;
             border-radius: .72rem !important;
@@ -6220,32 +5530,26 @@ discoverSelectedIds: [],
             color: var(--rc-muted) !important;
             transition: background .15s ease, box-shadow .15s ease, color .15s ease !important;
         }
-
         .rc-school-tab-v72.is-active {
             background: var(--rc-surface) !important;
             color: var(--rc-text) !important;
             box-shadow: 0 6px 16px rgba(15,23,42,.08) !important;
         }
-
         .rc-school-modal-coaches,
         .rc-school-list-menu-v72 {
             scrollbar-width: thin !important;
             scrollbar-color: rgba(255,99,56,.48) transparent !important;
         }
-
         .rc-school-modal-coaches::-webkit-scrollbar,
         .rc-school-list-menu-v72::-webkit-scrollbar { width: .45rem !important; }
         .rc-school-modal-coaches::-webkit-scrollbar-thumb,
         .rc-school-list-menu-v72::-webkit-scrollbar-thumb { background: rgba(255,99,56,.42) !important; border-radius: 999px !important; }
         .rc-school-modal-coaches::-webkit-scrollbar-track,
         .rc-school-list-menu-v72::-webkit-scrollbar-track { background: transparent !important; }
-
         /* School drawer no longer uses a global wire:loading overlay.
            The previous overlay could stay visible when any Livewire request was active,
            blocking the entire dashboard. Keep school opening cache-only and let the drawer
            animation handle the transition. */
-
-
         @media (max-width: 680px) {
             .rc-school-modal-panel,
             .rc-drawer-panel.rc-school-modal-panel {
@@ -6254,13 +5558,11 @@ discoverSelectedIds: [],
                 padding: 1rem !important;
             }
         }
-
         .rc-school-grid.rc-discover-school-grid {
             display: grid !important;
             grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
             gap: 1rem !important;
         }
-
         .rc-school-card.rc-discover-school-card {
             min-height: 0 !important;
             border: 1px solid var(--rc-border) !important;
@@ -6271,20 +5573,17 @@ discoverSelectedIds: [],
             gap: 0 !important;
             transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease !important;
         }
-
         .rc-school-card.rc-discover-school-card:hover {
             transform: translateY(-1px) !important;
             border-color: rgba(255, 99, 56, .28) !important;
             box-shadow: 0 14px 34px rgba(15, 23, 42, .09) !important;
         }
-
         .rc-discover-card-main {
             display: grid;
             grid-template-columns: minmax(0, 1fr) 1.7rem;
             gap: .6rem;
             align-items: start;
         }
-
         .rc-discover-card-title {
             border: 0;
             background: transparent;
@@ -6298,7 +5597,6 @@ discoverSelectedIds: [],
             text-align: left !important;
             cursor: pointer;
         }
-
         .rc-school-card-logo-box,
         .rc-school-list-logo-box {
             display: inline-flex !important;
@@ -6310,21 +5608,18 @@ discoverSelectedIds: [],
             flex: 0 0 auto !important;
             position: relative !important;
         }
-
         .rc-school-card-logo-box {
             width: 3.2rem !important;
             height: 3.2rem !important;
             border-radius: .75rem !important;
             padding: .35rem !important;
         }
-
         .rc-school-list-logo-box {
             width: 2.15rem !important;
             height: 2.15rem !important;
             border-radius: .55rem !important;
             padding: .25rem !important;
         }
-
         .rc-school-card-logo,
         .rc-school-list-logo {
             width: auto !important;
@@ -6334,7 +5629,6 @@ discoverSelectedIds: [],
             object-fit: contain !important;
             display: block !important;
         }
-
         .rc-logo-fallback-text {
             position: absolute;
             inset: 0;
@@ -6347,17 +5641,14 @@ discoverSelectedIds: [],
             letter-spacing: -.02em;
             background: #f3f4f6;
         }
-
         .dark .rc-logo-fallback-text { color: #e5e7eb; background: rgba(148, 163, 184, .12); }
         .is-missing-logo .rc-logo-fallback-text { display: flex; }
         .is-missing-logo img { display: none !important; }
-
         .rc-discover-card-copy {
             min-width: 0;
             display: grid;
             gap: .18rem;
         }
-
         .rc-discover-card-copy strong {
             color: var(--rc-text);
             font-size: .98rem;
@@ -6368,7 +5659,6 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
         .rc-discover-card-copy small {
             color: var(--rc-muted);
             font-size: .82rem;
@@ -6378,7 +5668,6 @@ discoverSelectedIds: [],
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
-
         .rc-discover-card-check,
         .rc-discover-row-check {
             display: inline-flex;
@@ -6394,21 +5683,18 @@ discoverSelectedIds: [],
             font-weight: 650;
             box-shadow: 0 1px 3px rgba(15, 23, 42, .04);
         }
-
         .rc-discover-card-rule {
             height: 1px;
             background: var(--rc-border);
             margin: .9rem 0 .85rem;
             opacity: .72;
         }
-
         .rc-discover-card-footer {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: .6rem;
         }
-
         .rc-discover-division-pill {
             display: inline-flex;
             align-items: center;
@@ -6421,14 +5707,12 @@ discoverSelectedIds: [],
             font-weight: 650;
             white-space: nowrap;
         }
-
         .rc-discover-coach-count {
             color: var(--rc-muted);
             font-size: .82rem;
             line-height: 1.1;
             white-space: nowrap;
         }
-
         .rc-school-list-table.rc-discover-school-list {
             display: grid !important;
             gap: 0 !important;
@@ -6438,7 +5722,6 @@ discoverSelectedIds: [],
             overflow: hidden !important;
             box-shadow: 0 8px 28px rgba(15, 23, 42, .045) !important;
         }
-
         .rc-discover-school-list-head,
         .rc-discover-school-list-row {
             display: grid !important;
@@ -6446,7 +5729,6 @@ discoverSelectedIds: [],
             gap: 1rem !important;
             align-items: center !important;
         }
-
         .rc-discover-school-list-head {
             padding: .9rem 1.25rem !important;
             background: var(--rc-soft) !important;
@@ -6456,7 +5738,6 @@ discoverSelectedIds: [],
             text-transform: uppercase !important;
             letter-spacing: .06em !important;
         }
-
         .rc-discover-school-list-row {
             border: 0 !important;
             border-top: 1px solid var(--rc-border) !important;
@@ -6465,9 +5746,7 @@ discoverSelectedIds: [],
             padding: .88rem 1.25rem !important;
             box-shadow: none !important;
         }
-
         .rc-discover-school-list-row:hover { background: var(--rc-soft) !important; }
-
         .rc-discover-school-list-school {
             display: grid !important;
             grid-template-columns: 2.15rem minmax(0, 1fr) !important;
@@ -6476,7 +5755,6 @@ discoverSelectedIds: [],
             font-size: .9rem !important;
             font-weight: 850 !important;
         }
-
         .rc-discover-school-list-name-copy,
         .rc-discover-list-coach,
         .rc-discover-list-muted,
@@ -6486,34 +5764,25 @@ discoverSelectedIds: [],
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-
         .rc-discover-list-coach { color: var(--rc-text); font-weight: 600; font-size: .82rem; }
         .rc-discover-list-muted { color: var(--rc-muted); font-size: .82rem; }
         .rc-discover-list-email a { color: #3b82f6; text-decoration: none; font-size: .82rem; }
         .rc-discover-list-division { color: var(--rc-accent); font-size: .76rem; font-weight: 650; }
         .rc-head-coach-chip { display:inline-flex; margin-left:.28rem; border-radius:.35rem; padding:.12rem .28rem; background:rgba(255,99,56,.13); color:var(--rc-accent); font-size:.62rem; font-weight:950; vertical-align:middle; }
-
         .rc-discover-list-actions { justify-content: flex-end !important; }
-
         @media (max-width: 1320px) {
             .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(3, minmax(0,1fr)) !important; }
         }
-
         @media (max-width: 1024px) {
             .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
             .rc-discover-school-list-head { display: none !important; }
             .rc-discover-school-list-row { grid-template-columns: 1fr auto !important; gap: .5rem !important; }
             .rc-discover-school-list-row > :nth-child(n+2):nth-child(-n+5) { display: none !important; }
         }
-
         @media (max-width: 640px) {
             .rc-school-grid.rc-discover-school-grid { grid-template-columns: 1fr !important; }
         }
-
-
-
         /* v72: school drawer tabs, stronger checkboxes, inbox scrollers, schedule/settings views */
-
         /* v73: compact schedule/inbox/drawer refinements */
         .rc-school-modal-panel { max-width: 30rem; }
         .rc-school-modal-hero-v72 { gap:.75rem!important; padding-bottom:.85rem!important; }
@@ -6581,14 +5850,12 @@ discoverSelectedIds: [],
         .rc-coming-soon-v72 { min-height:13rem;border:1px dashed var(--rc-border);border-radius:1rem;display:grid;place-items:center;text-align:center;color:var(--rc-muted);background:var(--rc-soft); }
         .rc-coming-soon-v72 strong { display:block;color:var(--rc-text);font-size:1.15rem;margin-bottom:.25rem; }
         @keyframes rcFadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-
         .rc-discover-card-check,
         .rc-discover-row-check { width:1.65rem!important;height:1.65rem!important;border:2px solid #cbd5e1!important;background:#fff!important;color:#fff!important;border-radius:.5rem!important;display:inline-grid!important;place-items:center!important;box-shadow:0 2px 8px rgba(15,23,42,.10)!important;font-weight:900!important; }
         .rc-discover-card-check:hover,
         .rc-discover-row-check:hover { border-color:#ff6338!important; box-shadow:0 0 0 4px rgba(255,99,56,.12)!important; }
         .rc-discover-card-check.is-selected,
         .rc-discover-row-check.is-selected { background:#ff6338!important;border-color:#ff6338!important;color:#fff!important; }
-
         .rc-inbox-page-v56 { max-height:calc(100vh - 11rem); min-height:35rem; overflow:hidden; }
         .rc-inbox-shell-v56 { height:calc(100vh - 12rem); min-height:34rem; max-height:48rem; }
         .rc-inbox-left-v56,
@@ -6598,7 +5865,6 @@ discoverSelectedIds: [],
         .rc-inbox-messages-v56 { overflow:auto; max-height:calc(100% - 6.25rem); padding-right:.25rem; }
         .rc-inbox-right-v56 { overflow:auto; scrollbar-width:thin; }
         .rc-about-grid-v56 { grid-template-columns:1fr!important; }
-
         .rc-schedule-page-v72 { display:grid; gap:1.15rem; }
         .rc-schedule-titlebar-v72 { display:flex;align-items:flex-end;justify-content:space-between;gap:1rem; }
         .rc-schedule-titlebar-v72 h1 { margin:0;font-size:1.35rem;letter-spacing:-.03em; }
@@ -6633,9 +5899,6 @@ discoverSelectedIds: [],
         .rc-toggle-v72 span { width:1.4rem;height:1.4rem;border-radius:999px;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.18);transition:.15s ease; }
         .rc-toggle-v72.is-on { background:#ff6338;justify-content:flex-end; }
         @media (max-width:900px){ .rc-schedule-grid-v72{grid-template-columns:1fr}.rc-schedule-row-v72{grid-template-columns:1fr}.rc-schedule-date-v72{text-align:left;border-right:0;border-bottom:1px solid var(--rc-border);padding-bottom:.65rem} }
-
-
-
         /* v87 final overrides: keep list dropdown readable after later compact rules */
         .rc-drawer-panel.rc-school-modal-panel { width: min(680px, 100vw) !important; }
         .rc-school-list-menu-v72 {
@@ -6672,29 +5935,23 @@ discoverSelectedIds: [],
         .dark .rc-school-list-menu-v72 button.is-active {
             background: color-mix(in srgb, var(--list-color, #ff6338) 24%, #111827) !important;
         }
-
-
-
         /* v90: keep the list menu under the In Lists button, shifted right so the left edge is never clipped. */
         .rc-drawer-panel.rc-school-modal-panel {
             width: min(760px, 100vw) !important;
             max-width: 100vw !important;
             overflow-x: visible !important;
         }
-
         .rc-school-modal-actions-v72 {
             position: relative !important;
             z-index: 40 !important;
             overflow: visible !important;
         }
-
         .rc-school-list-dropdown-v72 {
             position: relative !important;
             display: inline-flex !important;
             overflow: visible !important;
             z-index: 90 !important;
         }
-
         .rc-school-list-menu-v72 {
             position: absolute !important;
             top: calc(100% + .55rem) !important;
@@ -6709,13 +5966,11 @@ discoverSelectedIds: [],
             overflow-y: auto !important;
             transform-origin: top center !important;
         }
-
         .rc-school-list-menu-v72 button {
             grid-template-columns: 1.45rem minmax(0, 1fr) auto !important;
             width: 100% !important;
             overflow: visible !important;
         }
-
         @media (max-width: 900px) {
             .rc-school-list-menu-v72 {
                 right: 0 !important;
@@ -6723,7 +5978,6 @@ discoverSelectedIds: [],
                 min-width: min(19rem, calc(100vw - 2rem)) !important;
             }
         }
-
         .rc-school-list-label-v87 {
             min-width: 0 !important;
             width: 100% !important;
@@ -6733,7 +5987,6 @@ discoverSelectedIds: [],
             word-break: normal !important;
             overflow-wrap: anywhere !important;
         }
-
         .rc-school-list-label-v87 > span:last-child {
             display: block !important;
             min-width: 0 !important;
@@ -6741,12 +5994,10 @@ discoverSelectedIds: [],
             overflow: visible !important;
             text-overflow: clip !important;
         }
-
         .rc-school-list-menu-v72 h4 {
             white-space: nowrap !important;
             overflow: visible !important;
         }
-
         @media (max-width: 760px) {
             .rc-school-list-menu-v72 {
                 right: auto !important;
@@ -6756,8 +6007,6 @@ discoverSelectedIds: [],
                 transform-origin: top left !important;
             }
         }
-
-
         /* v93 Inbox scroll fix: use the actual inbox markup class names */
         .rc-inbox-page-v56 {
             height: calc(100vh - 9.75rem) !important;
@@ -6833,7 +6082,6 @@ discoverSelectedIds: [],
             background: rgba(255,99,56,.55);
             border-radius: 999px;
         }
-
         /* v94: keep dashboard first visit pinned to the top and avoid stale loading panels covering content. */
         .rc-wrap { min-height: 0 !important; }
         .rc-livewire-root [data-stale-school-loader],
@@ -6843,7 +6091,6 @@ discoverSelectedIds: [],
             display: none !important;
             pointer-events: none !important;
         }
-
         @media (max-width: 900px) {
             .rc-inbox-page-v56 { height: auto !important; min-height: 0 !important; overflow: visible !important; }
             .rc-inbox-shell-v56 { height: auto !important; overflow: visible !important; }
@@ -6853,9 +6100,6 @@ discoverSelectedIds: [],
             .rc-inbox-list-v56 { max-height: 24rem !important; }
             .rc-message-stream-v56 { max-height: 36rem !important; }
         }
-
-
-
         /* v102 non-overlay Recruiting Center sync status */
         .rc-reload-status-v101 {
             position: static !important;
@@ -6871,39 +6115,33 @@ discoverSelectedIds: [],
             box-shadow: 0 8px 22px rgba(15, 23, 42, .06);
             backdrop-filter: none;
         }
-
         .dark .rc-reload-status-v101 {
             background: linear-gradient(135deg, rgba(255, 99, 56, .12), rgba(24, 24, 27, .92));
             box-shadow: 0 10px 24px rgba(0, 0, 0, .18);
         }
-
         .rc-reload-main-v101 {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: .75rem;
         }
-
         .rc-reload-copy-v101 {
             display: grid;
             gap: .18rem;
             min-width: 0;
         }
-
         .rc-reload-copy-v101 strong {
             color: var(--rc-text);
             font-size: .92rem;
             font-weight: 850;
             letter-spacing: -.02em;
         }
-
         .rc-reload-copy-v101 span,
         .rc-reload-meta-v101 {
             color: var(--rc-muted);
             font-size: .78rem;
             line-height: 1.35;
         }
-
         .rc-reload-pill-v101 {
             display: inline-flex;
             align-items: center;
@@ -6916,7 +6154,6 @@ discoverSelectedIds: [],
             font-weight: 850;
             white-space: nowrap;
         }
-
         .rc-reload-pulse-v101 {
             width: .52rem;
             height: .52rem;
@@ -6925,77 +6162,61 @@ discoverSelectedIds: [],
             box-shadow: 0 0 0 rgba(255, 99, 56, .4);
             animation: rcReloadPulse 1.4s infinite;
         }
-
         @keyframes rcReloadPulse {
             0% { box-shadow: 0 0 0 0 rgba(255, 99, 56, .34); }
             70% { box-shadow: 0 0 0 .55rem rgba(255, 99, 56, 0); }
             100% { box-shadow: 0 0 0 0 rgba(255, 99, 56, 0); }
         }
-
         .rc-reload-stats-v101 {
             display: flex;
             flex-wrap: wrap;
             gap: .45rem .85rem;
         }
-
         .rc-reload-stats-v101 span {
             color: var(--rc-muted);
             font-size: .74rem;
             font-weight: 700;
         }
-
         .rc-reload-stats-v101 b { color: var(--rc-text); }
-
         .rc-reload-copy-v101 strong { font-size: .86rem; }
         .rc-reload-copy-v101 span,
         .rc-reload-stats-v101 span { font-size: .72rem; }
         .rc-reload-pill-v101 { padding: .35rem .6rem; font-size: .72rem; }
-
         @media (max-width: 900px) {
             .rc-reload-main-v101 {
                 align-items: flex-start;
                 flex-direction: column;
             }
-
             .rc-reload-status-v101 { padding: .7rem; }
         }
 </style>
-
     @php
         $formatRecruitingTimestamp = function ($value) {
             if (blank($value)) {
                 return null;
             }
-
             try {
                 return \Carbon\Carbon::parse($value)->timezone(config('app.timezone', 'UTC'))->format('M j, Y \a\t g:i A');
             } catch (\Throwable $exception) {
                 return is_string($value) ? $value : null;
             }
         };
-
         $formattedCachedAt = $formatRecruitingTimestamp($cachedAt ?? null);
         $formattedTagUpdatedAt = $formatRecruitingTimestamp($tagUpdatedAt ?? null);
-
         $formatActivityTimeLabel = function ($time): string {
             if (! $time) {
                 return 'Recent';
             }
-
             try {
                 $timeValue = \Illuminate\Support\Carbon::parse($time);
-
                 if ($timeValue->lessThan(now()->subYears(3)) || $timeValue->greaterThan(now()->addDay())) {
                     return 'Recent';
                 }
-
                 return $timeValue->diffForHumans();
             } catch (\Throwable $exception) {
                 return 'Recent';
             }
         };
-
-
         $statDrawerSections = ['profile-views', 'coach-engagement'];
         $isStatDrawerOpen = in_array($section, $statDrawerSections, true);
         $globalSearchSuggestions = $this->globalSearchSuggestions;
@@ -7021,50 +6242,42 @@ discoverSelectedIds: [],
         }
         $firstName = $athleteName !== '' ? $athleteName : 'Player';
     @endphp
-
     <script>
         (function () {
             const isCoachDashboardRoot = function () {
                 const path = window.location.pathname.replace(/\/$/, '');
                 return path === '/admin/coach-database';
             };
-
             const resetOne = function (el) {
                 if (! el) return;
                 try { el.scrollTop = 0; } catch (error) {}
                 try { el.scrollLeft = 0; } catch (error) {}
             };
-
             window.resetCoachDatabaseDashboardScroll = function () {
                 // v10.113.21: keep this intentionally tiny. The previous version
                 // walked document.querySelectorAll('*') up to 18 times after loads,
                 // which could freeze Recruiting Center scrolling/clicks for seconds.
                 if (! isCoachDashboardRoot()) return;
-
                 try {
                     if ('scrollRestoration' in window.history) {
                         window.history.scrollRestoration = 'manual';
                     }
                 } catch (error) {}
-
                 try { window.scrollTo(0, 0); } catch (error) {}
                 resetOne(document.documentElement);
                 resetOne(document.body);
             };
-
             window.runCoachDatabaseScrollResetLoop = function () {
                 if (! isCoachDashboardRoot()) return;
                 window.requestAnimationFrame(function () {
                     window.resetCoachDatabaseDashboardScroll();
                 });
             };
-
             window.addEventListener('pageshow', window.runCoachDatabaseScrollResetLoop);
             window.addEventListener('load', window.runCoachDatabaseScrollResetLoop);
             document.addEventListener('DOMContentLoaded', window.runCoachDatabaseScrollResetLoop);
             document.addEventListener('livewire:navigated', window.runCoachDatabaseScrollResetLoop);
         })();
-
         window.initCoachDatabasePage = function () {
             // v10.113.9: This init must be UI-only. It used to start a background
             // Coach Database load 900ms after mount and also listened for load-next
@@ -7075,7 +6288,6 @@ discoverSelectedIds: [],
             window.runCoachDatabaseScrollResetLoop && window.runCoachDatabaseScrollResetLoop();
         };
     </script>
-
     <div
         class="rc-wrap"
         x-init="window.initCoachDatabasePage && window.initCoachDatabasePage()"
@@ -7092,7 +6304,6 @@ discoverSelectedIds: [],
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
-
         @if($showAccountPreparationNotice ?? false)
             <div class="rc-plyrcard-preparing-banner-v129" role="status" wire:poll.10s="checkRecruitingAccountReadiness">
                 <div class="rc-plyrcard-preparing-icon-v129" aria-hidden="true">
@@ -7105,7 +6316,6 @@ discoverSelectedIds: [],
                 <a class="rc-plyrcard-preparing-action-v129" href="{{ url('/admin/my-profile') }}">Complete My Profile</a>
             </div>
         @endif
-
         <div x-show="!['dashboard','schools','favorites','lists','compose','campaigns','conversations','schedule','settings','support','photos'].includes(activeSection)" style="{{ (! in_array($section, ['dashboard','schools','favorites','lists','compose','campaigns','conversations','schedule','settings','support','photos'], true) && ! $isStatDrawerOpen) ? '' : 'display:none;' }}">
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
@@ -7114,7 +6324,6 @@ discoverSelectedIds: [],
                     @if($search !== '')
                         <button type="button" class="rc-global-search-clear" wire:click="clearGlobalSearch" aria-label="Clear search">×</button>
                     @endif
-
                             @if($search !== '')
                                 <div class="rc-global-suggestions">
                                     @if($globalSearchHasSuggestions)
@@ -7157,9 +6366,7 @@ discoverSelectedIds: [],
                 </button>
             </div>
         </div>
-
         <div class="rc-section-host-v1033">
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="dashboard" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
@@ -7168,7 +6375,6 @@ discoverSelectedIds: [],
                 $dashboardInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(4)->values()->all();
                 $dashboardRadarSchools = collect($this->dashboardOutreachRadarSchools ?? [])->take(4)->values()->all();
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
-
                 $authUser = auth()->user();
                 $athleteName = trim((string) (method_exists($authUser, 'getFilamentName') ? $authUser?->getFilamentName() : ''));
                 if ($athleteName === '') {
@@ -7178,13 +6384,11 @@ discoverSelectedIds: [],
                     $athleteName = trim((string) ($authUser?->name ?? ''));
                 }
                 $firstName = $athleteName !== '' ? $athleteName : 'Player';
-
                 $savedSchools = (int) ($dashboardMetrics['saved_schools'] ?? 0);
                 $favoriteSchools = max(
                     (int) ($dashboardMetrics['favorite_schools'] ?? 0),
                     count($this->favoriteSchools ?? []),
                 );
-
                 $trackedWebsiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $trackedInstagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $trackedYoutubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
@@ -7200,7 +6404,6 @@ discoverSelectedIds: [],
                 // summary tied to the same authoritative rows shown in its drawer.
                 $engagementUniqueCoaches = (int) ($dashboardMetrics['engagement_unique_coaches'] ?? $dashboardMetrics['unique_link_click_contacts'] ?? 0);
                 $engagementUniqueSchools = (int) ($dashboardMetrics['engagement_unique_schools'] ?? $dashboardMetrics['schools_with_clicks'] ?? 0);
-
                 $savedEmailSentCount = max(0, (int) (auth()->user()?->total_emails_sent ?? 0));
                 $emailSentCount = $savedEmailSentCount > 0
                     ? $savedEmailSentCount
@@ -7212,18 +6415,15 @@ discoverSelectedIds: [],
                     + (int) ($dashboardMetrics['youtube_click_count'] ?? 0)
                     + (int) ($dashboardMetrics['x_click_count'] ?? 0);
                 $emailsSent = $emailSentCount;
-
                 $coachReplies = (int) ($dashboardMetrics['coach_replies'] ?? 0);
                 $engagedSchools = (int) ($dashboardMetrics['engaged_schools'] ?? count($dashboardInterestedSchools));
                 // Match the Coach Engagement drawer exactly: Instagram + YouTube + X.
                 $coachEngagementTotal = $socialClickCount;
-
                 $profileCompletion = 0;
                 $profileUrl = '#';
                 $profileMissingSections = [];
                 $profileSectionProgress = [];
                 $profileAchievements = [];
-
                 if ($authUser) {
                     try {
                         $profileCompletion = (int) app(\App\Services\ProfileCompletionService::class)->calculate($authUser);
@@ -7232,18 +6432,14 @@ discoverSelectedIds: [],
                             if (is_null($value)) {
                                 return false;
                             }
-
                             if (is_string($value)) {
                                 return trim($value) !== '';
                             }
-
                             if (is_array($value)) {
                                 return count(array_filter($value, fn ($item) => ! is_null($item) && $item !== '')) > 0;
                             }
-
                             return true;
                         };
-
                         $coreFields = [
                             'first_name',
                             'last_name',
@@ -7265,7 +6461,6 @@ discoverSelectedIds: [],
                             'featured_video_url',
                             'ig_handle',
                         ];
-
                         $sportSpecificFields = [
                             'position',
                             'dominant_foot',
@@ -7275,48 +6470,37 @@ discoverSelectedIds: [],
                             'national_team_id',
                             'national_team_period',
                         ];
-
                         $completedCore = collect($coreFields)
                             ->filter(fn ($field) => $profileHasValue($authUser->{$field} ?? null))
                             ->count();
-
                         $corePercentage = count($coreFields)
                             ? ($completedCore / count($coreFields)) * 100
                             : 0;
-
                         $completedSportSpecific = collect($sportSpecificFields)
                             ->filter(fn ($field) => $profileHasValue($authUser->{$field} ?? null))
                             ->count();
-
                         $sportBonus = count($sportSpecificFields)
                             ? ($completedSportSpecific / count($sportSpecificFields)) * 10
                             : 0;
-
                         $profileCompletion = (int) min(100, round($corePercentage + $sportBonus));
                     }
-
                     try {
                         $profileUrl = \App\Filament\Resources\Profiles\ProfileResource::getUrl('index');
                     } catch (\Throwable $exception) {
                         $profileUrl = url('/admin/profiles');
                     }
-
                     $profileHasValue = function (mixed $value): bool {
                         if (is_null($value)) {
                             return false;
                         }
-
                         if (is_string($value)) {
                             return trim($value) !== '';
                         }
-
                         if (is_array($value)) {
                             return count(array_filter($value, fn ($item) => ! is_null($item) && $item !== '')) > 0;
                         }
-
                         return true;
                     };
-
                     $profileSections = [
                         [
                             'key' => 'basic-information',
@@ -7381,7 +6565,6 @@ discoverSelectedIds: [],
                             ],
                         ],
                     ];
-
                     $profileSectionProgress = collect($profileSections)
                         ->map(function (array $section) use ($authUser, $profileUrl, $profileHasValue) {
                             $totalCount = count($section['items']);
@@ -7395,7 +6578,6 @@ discoverSelectedIds: [],
                                 })
                                 ->values()
                                 ->all();
-
                             return [
                                 'key' => $section['key'],
                                 'title' => $section['title'],
@@ -7407,12 +6589,10 @@ discoverSelectedIds: [],
                         })
                         ->values()
                         ->all();
-
                     $profileMissingSections = collect($profileSectionProgress)
                         ->filter(fn (array $section) => $section['count'] > 0)
                         ->values()
                         ->all();
-
                     $profileAchievements = collect([
                         ['label' => 'Starter', 'threshold' => 25],
                         ['label' => 'Rising Talent', 'threshold' => 50],
@@ -7426,12 +6606,10 @@ discoverSelectedIds: [],
                         ];
                     })->all();
                 }
-
                 $readinessScore = $profileCompletion;
                 $profileCompletionSubtext = empty($profileMissingSections)
                     ? 'Profile complete!'
                     : count($profileMissingSections) . ' section' . (count($profileMissingSections) === 1 ? '' : 's') . ' to finish';
-
                 $quickStats = [
                     [
                         'label' => 'Profile Completion',
@@ -7473,13 +6651,11 @@ discoverSelectedIds: [],
                         'tone' => 'indigo',
                     ],
                 ];
-
                 $progressItems = collect($profileSectionProgress)
                     ->map(function (array $section) {
                         $missingCount = (int) ($section['count'] ?? 0);
                         $totalCount = max(1, (int) ($section['total'] ?? 1));
                         $completedCount = max(0, $totalCount - $missingCount);
-
                         return [
                             'label' => $section['title'],
                             'state' => $missingCount === 0
@@ -7491,7 +6667,6 @@ discoverSelectedIds: [],
                     })
                     ->values()
                     ->all();
-
                 // v10.113.1: restore the Recent Activity presentation rows that are
                 // consumed by the dashboard markup below. v10.113 accidentally removed this
                 // mapper while replacing the lower dashboard school sections.
@@ -7499,7 +6674,6 @@ discoverSelectedIds: [],
                     $activityType = strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? 'activity'));
                     $tone = 'blue';
                     $icon = '◉';
-
                     if (str_contains($activityType, 'reply')) {
                         $tone = 'green';
                         $icon = '↩';
@@ -7519,9 +6693,7 @@ discoverSelectedIds: [],
                         $tone = 'purple';
                         $icon = '⊞';
                     }
-
                     $time = $activity['time'] ?? null;
-
                     return [
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
                         'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Recruiting update'))) ?: 'Recruiting update',
@@ -7531,7 +6703,6 @@ discoverSelectedIds: [],
                         'time_label' => $formatActivityTimeLabel($time),
                     ];
                 })->values();
-
                 // v10.113 On The Radar = real outreach coverage. Only schools with
                 // successful sent emails are shown, already scoped to the user's current gender.
                 $radarSchoolRows = collect($dashboardRadarSchools)->map(function ($school) {
@@ -7544,7 +6715,6 @@ discoverSelectedIds: [],
                         ?? $school['business_logo_url']
                         ?? ''
                     ));
-
                     return array_merge($school, [
                         'id' => $school['id'] ?? $school['school_id'] ?? $school['business_id'] ?? $schoolName,
                         'name' => $schoolName,
@@ -7556,7 +6726,6 @@ discoverSelectedIds: [],
                         'logo_url' => $logoUrl,
                     ]);
                 })->values();
-
                 // v10.113 Schools Most Interested = actual tracked engagement count,
                 // highest to lowest. Do not inject sample/zero-engagement schools.
                 $interestedSchoolRows = collect($dashboardInterestedSchools)->values()->map(function ($school, $rank) {
@@ -7565,7 +6734,6 @@ discoverSelectedIds: [],
                     $linkClicks = max(0, (int) ($school['interest_clicks'] ?? 0));
                     $engagements = max(0, (int) ($school['engagement_count'] ?? ($profileViews + $linkClicks)));
                     $initials = collect(explode(' ', $schoolName))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
-
                     return array_merge($school, [
                         'rank' => $rank + 1,
                         'id' => $school['id'] ?? $school['school_id'] ?? $school['business_id'] ?? $schoolName,
@@ -7578,26 +6746,22 @@ discoverSelectedIds: [],
                     ]);
                 })->values();
             @endphp
-
             <style id="rc-dashboard-email-live-fetch-v136">
                 .rc-email-live-fetch-value-v136{align-items:center;gap:.45rem;font-size:1.15rem!important;letter-spacing:-.02em!important}
                 .rc-email-live-fetch-status-v136{align-items:center;gap:.35rem}
                 .rc-email-live-fetch-error-v136{color:#ef4444;font-weight:700}
             </style>
-
             <style id="rc-dashboard-ui-polish-v11338">
                 .rc-home-dashboard-v2 {
                     gap: 1.05rem !important;
                     padding-bottom: 2.4rem !important;
                 }
-
                 .rc-home-stats-v2,
                 .rc-home-grid-v2,
                 .rc-home-lower-grid-v2 {
                     gap: 1.05rem !important;
                     align-items: stretch !important;
                 }
-
                 .rc-home-stat-v2 {
                     min-height: 8.25rem !important;
                     padding: 1rem 1.05rem !important;
@@ -7607,36 +6771,30 @@ discoverSelectedIds: [],
                     align-content: stretch !important;
                     overflow: hidden !important;
                 }
-
                 .rc-home-stat-icon-v2 {
                     width: 2.72rem !important;
                     height: 2.72rem !important;
                     grid-row: 1 / span 2 !important;
                     align-self: start !important;
                 }
-
                 .rc-home-stat-copy-v2 {
                     align-self: start !important;
                     padding-top: .08rem !important;
                 }
-
                 .rc-home-stat-label-v2 {
                     line-height: 1.2 !important;
                     margin-bottom: .12rem !important;
                 }
-
                 .rc-home-stat-value-v2 {
                     font-size: 1.62rem !important;
                     line-height: .98 !important;
                     margin-top: .1rem !important;
                 }
-
                 .rc-home-progress-v2 {
                     grid-column: 1 / -1 !important;
                     align-self: end !important;
                     margin-top: .15rem !important;
                 }
-
                 .rc-home-stat-sub-v2 {
                     grid-column: 1 / -1 !important;
                     display: flex !important;
@@ -7647,7 +6805,6 @@ discoverSelectedIds: [],
                     line-height: 1.28 !important;
                     overflow-wrap: anywhere !important;
                 }
-
                 .rc-home-stat-sub-v2 .rc-link {
                     appearance: none !important;
                     border: 0 !important;
@@ -7665,7 +6822,6 @@ discoverSelectedIds: [],
                     line-height: 1 !important;
                     cursor: pointer !important;
                 }
-
                 .rc-home-panel-v2 {
                     display: flex !important;
                     flex-direction: column !important;
@@ -7673,30 +6829,24 @@ discoverSelectedIds: [],
                     padding: 1.15rem !important;
                     overflow: hidden !important;
                 }
-
                 .rc-home-panel-head-v2 {
                     margin-bottom: .9rem !important;
                     align-items: center !important;
                 }
-
                 .rc-home-panel-head-v2 h2 {
                     line-height: 1.1 !important;
                 }
-
                 .rc-home-progress-layout-v2 {
                     flex: 1 1 auto !important;
                     align-items: center !important;
                     gap: 1.15rem !important;
                 }
-
                 .rc-check-list-v2 {
                     gap: .7rem !important;
                 }
-
                 .rc-profile-milestones-v2 {
                     margin-top: .65rem !important;
                 }
-
                 .rc-home-activity-list-v2 {
                     flex: 1 1 auto !important;
                     min-height: 0 !important;
@@ -7704,62 +6854,51 @@ discoverSelectedIds: [],
                     gap: .44rem !important;
                     padding-right: .35rem !important;
                 }
-
                 .rc-home-activity-v2 {
                     min-width: 0 !important;
                     padding: .42rem .38rem !important;
                     border-radius: .82rem !important;
                     transition: background .16s ease, transform .16s ease !important;
                 }
-
                 .rc-home-activity-v2:hover {
                     background: #f8fafc !important;
                     transform: translateY(-1px) !important;
                 }
-
                 .rc-home-activity-copy-v2,
                 .rc-home-activity-copy-v2 strong,
                 .rc-home-activity-copy-v2 small {
                     min-width: 0 !important;
                 }
-
                 .rc-home-lower-grid-v2 {
                     grid-template-columns: minmax(0, 1fr) minmax(320px, .82fr) !important;
                 }
-
                 .rc-home-lower-grid-v2 > .rc-home-panel-v2 {
                     min-height: 18rem !important;
                 }
-
                 .rc-radar-panel-v2 .rc-home-panel-head-v2,
                 .rc-home-lower-grid-v2 > .rc-home-panel-v2 > .rc-home-panel-head-v2 {
                     margin-bottom: 1rem !important;
                 }
-
                 .rc-radar-schools-v2 {
                     flex: 1 1 auto !important;
                     grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr)) !important;
                     gap: .75rem !important;
                     align-content: start !important;
                 }
-
                 .rc-radar-card-v2 {
                     min-height: 12.2rem !important;
                     padding-bottom: .85rem !important;
                     gap: .35rem !important;
                     transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease !important;
                 }
-
                 .rc-radar-card-v2:hover {
                     border-color: rgba(255, 99, 56, .34) !important;
                     box-shadow: 0 10px 24px rgba(15, 23, 42, .08) !important;
                     transform: translateY(-1px) !important;
                 }
-
                 .rc-radar-logo-v2 {
                     height: 5.85rem !important;
                 }
-
                 .rc-radar-card-v2 strong {
                     min-height: 2.1em !important;
                     display: -webkit-box !important;
@@ -7767,39 +6906,32 @@ discoverSelectedIds: [],
                     -webkit-box-orient: vertical !important;
                     overflow: hidden !important;
                 }
-
                 .rc-home-dots-v2 {
                     margin-top: auto !important;
                     padding-top: .8rem !important;
                 }
-
                 .rc-interested-list-v2 {
                     flex: 1 1 auto !important;
                     align-content: start !important;
                     gap: .45rem !important;
                 }
-
                 .rc-interested-row-v2 {
                     min-height: 3.45rem !important;
                     padding: .46rem .52rem !important;
                     border-radius: .78rem !important;
                     transition: background .16s ease, transform .16s ease !important;
                 }
-
                 .rc-interested-row-v2:hover {
                     background: #f8fafc !important;
                     transform: translateY(-1px) !important;
                 }
-
                 .rc-interested-logo-v2 {
                     width: 2.45rem !important;
                     height: 2.45rem !important;
                 }
-
                 .rc-interested-row-v2 span:nth-child(3) {
                     min-width: 0 !important;
                 }
-
                 .rc-interested-row-v2 small {
                     display: block !important;
                     white-space: nowrap !important;
@@ -7807,42 +6939,34 @@ discoverSelectedIds: [],
                     text-overflow: ellipsis !important;
                     max-width: 100% !important;
                 }
-
                 .rc-home-lower-grid-v2 .rc-home-outline-btn-v2 {
                     margin-top: auto !important;
                     flex: 0 0 auto !important;
                 }
-
                 .dark .rc-home-activity-v2:hover,
                 .dark .rc-interested-row-v2:hover {
                     background: rgba(148, 163, 184, .08) !important;
                 }
-
                 @media (max-width: 1180px) {
                     .rc-home-lower-grid-v2 {
                         grid-template-columns: 1fr !important;
                     }
-
                     .rc-radar-schools-v2 {
                         grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)) !important;
                     }
                 }
-
                 @media (max-width: 760px) {
                     .rc-home-stat-v2 {
                         min-height: 7.75rem !important;
                     }
-
                     .rc-home-lower-grid-v2 > .rc-home-panel-v2 {
                         min-height: auto !important;
                     }
-
                     .rc-home-activity-time-v2 {
                         display: none !important;
                     }
                 }
             </style>
-
             <div class="rc-home-dashboard-v2"
                 wire:key="rc-home-dashboard-email-fetch-{{ (int) $dashboardVisitVersion }}">
                 @include('filament.partials.coach-database-header', [
@@ -7850,24 +6974,20 @@ discoverSelectedIds: [],
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
                     'showNewEmail' => true,
                 ])
-
                 {{-- When there are zero usable schools, always expose the sync state so the user can tell whether the database is loading, completed empty, or needs attention. Once schools exist, background refreshes remain silent. --}}
                 @php
                     $hasUsableSchoolDatabase =
                         ! empty($this->filteredSchools ?? [])
                         || (int) ($this->filteredSchoolsCount ?? 0) > 0
                         || (int) ($loadedSchoolsCount ?? 0) > 0;
-
                     $hasRecruitingSyncState =
                         ($isLoadingDataset ?? false)
                         || ($isRecruitingSyncRunning ?? false)
                         || filled($recruitingSyncStatus ?? null)
                         || filled($recruitingSyncMessage ?? null)
                         || filled($cachedAt ?? null);
-
                     $shouldShowInitialSyncBanner = ! $hasUsableSchoolDatabase && $hasRecruitingSyncState;
                 @endphp
-
                 @if($shouldShowInitialSyncBanner)
                     @php
                         $reloadPercent = $isLoadingDataset
@@ -7898,8 +7018,6 @@ discoverSelectedIds: [],
                         </div>
                     </div>
                 @endif
-
-
                 <div class="rc-home-stats-v2">
                     @foreach($quickStats as $stat)
                         @if(! empty($stat['target']))
@@ -7949,7 +7067,6 @@ discoverSelectedIds: [],
                                         </svg>
                                 @endswitch
                             </div>
-
                             <div class="rc-home-stat-copy-v2">
                                 <div class="rc-home-stat-label-v2">{{ $stat['label'] }}</div>
                                 @if($stat['label'] === 'Emails Sent')
@@ -7968,13 +7085,11 @@ discoverSelectedIds: [],
                                     <div class="rc-home-stat-value-v2">{{ $stat['value'] }}</div>
                                 @endif
                             </div>
-
                             @if(isset($stat['progress']))
                                 <div class="rc-home-progress-v2">
                                     <span style="width: {{ (int) $stat['progress'] }}%"></span>
                                 </div>
                             @endif
-
                             @if($stat['label'] === 'Emails Sent')
                                 @if($hasSavedEmailSentCount)
                                     <div class="rc-home-stat-sub-v2 rc-email-saved-refresh-v148">
@@ -8010,7 +7125,6 @@ discoverSelectedIds: [],
                         </button>
                     @endforeach
                 </div>
-
                 <style>
                     .rc-email-saved-refresh-v148 { min-height: 1.05rem; }
                     .rc-email-refresh-action-v149 {
@@ -8047,13 +7161,11 @@ discoverSelectedIds: [],
                         .rc-email-saved-refresh-dot-v148 { animation: none; opacity: .72; }
                     }
                 </style>
-
                 <div class="rc-home-grid-v2">
                     <section class="rc-home-panel-v2 rc-home-progress-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Profile Progress</h2>
                         </div>
-
                         <div class="rc-home-progress-layout-v2">
                             <div class="rc-readiness-ring-v2" style="--ready: {{ $readinessScore }};">
                                 <div>
@@ -8061,7 +7173,6 @@ discoverSelectedIds: [],
                                     <span>Profile Completion</span>
                                 </div>
                             </div>
-
                             <div class="rc-check-list-v2">
                                 @foreach($progressItems as $item)
                                     <div class="rc-check-row-v2 {{ $item['done'] ? 'is-done' : '' }}">
@@ -8074,7 +7185,6 @@ discoverSelectedIds: [],
                                         </span>
                                     </div>
                                 @endforeach
-
                                 <div class="rc-profile-milestones-v2">
                                     @foreach($profileAchievements as $achievement)
                                         <span class="{{ $achievement['unlocked'] ? 'is-unlocked' : '' }}">
@@ -8082,28 +7192,23 @@ discoverSelectedIds: [],
                                         </span>
                                     @endforeach
                                 </div>
-
                                 <a class="rc-home-outline-btn-v2" href="{{ $profileUrl }}">Complete Profile</a>
                             </div>
                         </div>
                     </section>
-
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Recent Activity</h2>
                             <a href="#" x-on:click.prevent.stop="window.__rcCoachEngagementFilter=''; dashboardDetail='coach-engagement'; $nextTick(() => window.rcApplyCoachEngagementFilter && window.rcApplyCoachEngagementFilter())">View All</a>
                         </div>
-
                         <div class="rc-home-activity-list-v2">
                             @forelse($dashboardActivityRows as $activityRow)
                                 <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
                                     <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
-
                                     <span class="rc-home-activity-copy-v2">
                                         <strong>{{ $activityRow['title'] ?? 'Recruiting activity' }}</strong>
                                         <small>{{ $activityRow['copy'] ?? 'Recruiting update' }}</small>
                                     </span>
-
                                     <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
                                 </a>
                             @empty
@@ -8112,7 +7217,6 @@ discoverSelectedIds: [],
                         </div>
                     </section>
                 </div>
-
                 <div class="rc-home-lower-grid-v2">
                     <section class="rc-home-panel-v2 rc-radar-panel-v2">
                         <div class="rc-home-panel-head-v2">
@@ -8122,7 +7226,6 @@ discoverSelectedIds: [],
                             </div>
                             <a href="#" x-on:click.prevent="activeSection='conversations'; $nextTick(() => openInboxSection())">View All</a>
                         </div>
-
                         <div class="rc-radar-schools-v2">
                             @forelse($radarSchoolRows as $radarSchool)
                                 <button type="button" class="rc-radar-card-v2" x-on:click.stop="openGlobalSchool(@js($radarSchool))">
@@ -8140,7 +7243,6 @@ discoverSelectedIds: [],
                                 <div class="rc-home-empty-v2" style="grid-column:1/-1">Schools will appear here after you successfully email their coaches.</div>
                             @endforelse
                         </div>
-
                         @if($radarSchoolRows->isNotEmpty())
                             <div class="rc-home-dots-v2">
                                 <span></span>
@@ -8149,13 +7251,11 @@ discoverSelectedIds: [],
                             </div>
                         @endif
                     </section>
-
                     <section class="rc-home-panel-v2">
                         <div class="rc-home-panel-head-v2">
                             <h2>Schools Most Interested</h2>
                             <span>Highest engagement first</span>
                         </div>
-
                         <div class="rc-interested-list-v2">
                             @forelse($interestedSchoolRows as $interestedSchool)
                                 <button type="button" class="rc-interested-row-v2" x-on:click.stop="openGlobalSchool(@js($interestedSchool))">
@@ -8176,20 +7276,16 @@ discoverSelectedIds: [],
                                 <div class="rc-home-empty-v2">No tracked school engagement yet.</div>
                             @endforelse
                         </div>
-
                         <a class="rc-home-outline-btn-v2" href="#" x-on:click.prevent="dashboardDetail = 'profile-views'">View Full Analytics</a>
                     </section>
                 </div>
             </div>
         </section>
-
-
         <div class="rc-dashboard-persistent-v1033" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardTopSchools = collect($this->dashboardTopEngagedSchools ?? [])->values();
                 $dashboardRecentActivity = collect($this->getDashboardRecentActivityProperty())->values();
-
                 $websiteViews = (int) ($dashboardMetrics['view_profile_website'] ?? $dashboardMetrics['website_clicks'] ?? 0);
                 $instagramViews = (int) ($dashboardMetrics['view_profile_instagram'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $youtubeViews = (int) ($dashboardMetrics['view_profile_youtube'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
@@ -8200,7 +7296,6 @@ discoverSelectedIds: [],
                 $ghlContactClicks = max((int) ($dashboardMetrics['ghl_contact_clicks'] ?? 0), (int) ($dashboardMetrics['contact_clicks'] ?? 0), (int) ($dashboardMetrics['contact_link_clicks'] ?? 0), $profileViewsTotal + (int) ($dashboardMetrics['link_clicks'] ?? 0));
                 $profileSchoolClicks = max((int) ($dashboardMetrics['profile_view_school_click_count'] ?? 0), (int) ($dashboardMetrics['school_profile_views'] ?? 0), (int) ($dashboardMetrics['school_profile_view_count'] ?? 0), $profileViewsTotal);
                 $profilePrograms = max(0, (int) ($dashboardMetrics['profile_view_unique_school_count'] ?? 0), (int) ($dashboardMetrics['schools_with_profile_views'] ?? 0), (int) ($dashboardMetrics['schools_with_clicks'] ?? 0));
-
                 $profileBreakdownRows = collect([
                     ['title' => 'Website profile link', 'copy' => 'Website profile clicks', 'views' => $websiteViews, 'type' => 'Website', 'initials' => 'W', 'time_label' => 'Updated'],
                     ['title' => 'Instagram profile link', 'copy' => 'Instagram profile clicks', 'views' => $instagramViews, 'type' => 'Instagram', 'initials' => 'IG', 'time_label' => 'Updated'],
@@ -8208,7 +7303,6 @@ discoverSelectedIds: [],
                     ['title' => 'X profile link', 'copy' => 'X profile clicks', 'views' => $xViews, 'type' => 'X', 'initials' => 'X', 'time_label' => 'Updated'],
                     ['title' => 'Email profile link', 'copy' => 'Profile links clicked from email', 'views' => $emailLinkViews, 'type' => 'Email Link', 'initials' => 'EM', 'time_label' => 'Updated'],
                 ])->filter(fn (array $row): bool => (int) ($row['views'] ?? 0) > 0)->values();
-
                 // v126: The viewer table is coach/school activity only. Collapse repeated
                 // snapshots for the same coach and rank by the highest tracked view count.
                 // Platform summary rows are intentionally not mixed into this table.
@@ -8218,7 +7312,6 @@ discoverSelectedIds: [],
                         ->filter(fn ($activity) => is_array($activity) && str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'view'))
                         ->values();
                 }
-
                 $activityProfileRows = $profileActivitySource
                     ->map(function (array $activity) use ($formatActivityTimeLabel) {
                         $title = (string) ($activity['title'] ?? 'Coach viewed profile');
@@ -8226,19 +7319,16 @@ discoverSelectedIds: [],
                         $initials = collect(explode(' ', $title))->filter()->map(fn ($part) => substr((string) $part, 0, 1))->take(2)->implode('');
                         $time = $activity['time'] ?? $activity['created_at'] ?? null;
                         $views = max(1, (int) ($activity['views'] ?? $activity['count'] ?? 0));
-
                         // Older activity snapshots sometimes keep the rolled-up count only
                         // in the copy, e.g. "16 tracked profile views".
                         if (preg_match('/(\d[\d,]*)\s+tracked\s+profile\s+views?/i', $copy, $matches)) {
                             $views = max($views, (int) str_replace(',', '', $matches[1]));
                         }
-
                         $schoolId = trim((string) ($activity['school_id'] ?? $activity['school_business_id'] ?? $activity['business_id'] ?? ''));
                         $coachKey = trim((string) ($activity['coach_id'] ?? $activity['coach_contact_id'] ?? $activity['contact_id'] ?? ''));
                         $identityKey = $coachKey !== ''
                             ? 'coach:' . $coachKey
                             : 'viewer:' . $schoolId . '|' . strtolower(trim($title));
-
                         return [
                             'identity_key' => $identityKey,
                             'school_id' => $schoolId,
@@ -8262,12 +7352,10 @@ discoverSelectedIds: [],
                     ->sortByDesc(fn ($row) => (int) ($row['views'] ?? 0))
                     ->take(30)
                     ->values();
-
                 $profileViewRows = $activityProfileRows->values()->map(function ($row, $index) {
                     return array_merge($row, ['rank' => $index + 1]);
                 });
             @endphp
-
             <div class="rc-stats-drawer-backdrop"
                 data-rc-modal-id="profile-views"
                 x-show="dashboardDetail === 'profile-views'"
@@ -8300,7 +7388,6 @@ discoverSelectedIds: [],
                     <form class="rc-detail-search-v2" wire:submit.prevent="$set('section', 'schools')">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                         <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.350ms="search">
-
                             @if($search !== '')
                                 <div class="rc-global-suggestions">
                                     @if($globalSearchHasSuggestions)
@@ -8334,13 +7421,11 @@ discoverSelectedIds: [],
                             @endif
                     </form>
                 </div>
-
                 <div class="rc-detail-stats-v2">
                     <div class="rc-detail-stat-v2 is-blue"><span>◎</span><div><small>Total Views</small><strong>{{ number_format($profileViewsTotal) }}</strong><em>Player website/profile views</em></div></div>
                     <div class="rc-detail-stat-v2 is-coral"><span>☷</span><div><small>Unique Contacts</small><strong>{{ number_format($uniqueProfileViews) }}</strong><em>Distinct coaches who viewed your profile</em></div></div>
                     <div class="rc-detail-stat-v2 is-purple"><span>▥</span><div><small>Schools Reached</small><strong>{{ number_format($profilePrograms) }}</strong><em>Schools represented by those viewers</em></div></div>
                 </div>
-
                 <section class="rc-detail-table-v2">
                     <header>
                         <h2>Who's Viewing You</h2>
@@ -8392,7 +7477,6 @@ discoverSelectedIds: [],
                 </aside>
             </div>
         </div>
-
         <style id="rc-dashboard-sort-v141">
             .rc-detail-sort-shell-v141{display:inline-flex;align-items:center;justify-content:flex-end;gap:.45rem;flex-wrap:wrap}
             .rc-detail-sort-shell-v141 label{font-size:.64rem;font-weight:800;color:var(--rc-muted);text-transform:uppercase;letter-spacing:.06em}
@@ -8421,50 +7505,39 @@ discoverSelectedIds: [],
                     if (rank) rank.textContent = `#${index + 1}`;
                 });
             };
-
             (function () {
                 window.__rcCoachEngagementFilter = window.__rcCoachEngagementFilter || '';
-
                 window.rcApplyCoachEngagementFilter = function () {
                     const normalized = ['instagram', 'youtube', 'x'].includes(String(window.__rcCoachEngagementFilter || '').toLowerCase())
                         ? String(window.__rcCoachEngagementFilter).toLowerCase()
                         : '';
                     const drawer = document.querySelector('[data-rc-modal-id="coach-engagement"]');
-
                     if (!drawer) return;
-
                     drawer.dataset.engagementPlatform = normalized;
-
                     drawer.querySelectorAll('[data-engagement-filter]').forEach((card) => {
                         const active = card.dataset.engagementFilter === normalized;
                         card.classList.toggle('is-filter-active', active);
                         card.setAttribute('aria-pressed', active ? 'true' : 'false');
                     });
-
                     drawer.querySelectorAll('[data-engagement-row]').forEach((row) => {
                         const rowPlatform = String(row.dataset.platform || '').toLowerCase();
                         row.hidden = normalized !== '' && rowPlatform !== normalized;
                     });
-
                     const title = drawer.querySelector('[data-engagement-table-title]');
                     if (title) {
                         const labels = { instagram: 'Instagram', youtube: 'YouTube', x: 'X (Twitter)' };
                         title.textContent = normalized ? `Clicks — ${labels[normalized]}` : "Who's Clicking";
                     }
-
                     const clear = drawer.querySelector('[data-engagement-clear]');
                     if (clear) clear.hidden = normalized === '';
                 };
-
                 window.rcFilterCoachEngagement = function (source, platform) {
                     const normalized = ['instagram', 'youtube', 'x'].includes(String(platform || '').toLowerCase())
                         ? String(platform).toLowerCase()
                         : '';
-
                     window.__rcCoachEngagementFilter = normalized;
                     window.rcApplyCoachEngagementFilter();
                 };
-
                 if (!window.__rcCoachEngagementFilterObserverBound) {
                     window.__rcCoachEngagementFilterObserverBound = true;
                     let scheduled = false;
@@ -8476,7 +7549,6 @@ discoverSelectedIds: [],
                             window.rcApplyCoachEngagementFilter?.();
                         });
                     };
-
                     // v10.113.22: do not observe the entire Livewire DOM. The old
                     // MutationObserver fired on every Inbox/template morph and caused
                     // the 3-5 second freeze/unfreeze behavior. Re-apply only after
@@ -8487,11 +7559,9 @@ discoverSelectedIds: [],
                     // or when the filter itself changes.
                     document.addEventListener('livewire:navigated', scheduleApply);
                 }
-
                 window.rcApplyCoachEngagementFilter();
             })();
         </script>
-
         <style>
             [data-rc-modal-id="coach-engagement"] [data-engagement-row][hidden] { display: none !important; }
             [data-rc-modal-id="coach-engagement"] .rc-engagement-filter-card { cursor:pointer; transition:transform .14s ease, box-shadow .14s ease, border-color .14s ease; }
@@ -8533,22 +7603,18 @@ discoverSelectedIds: [],
             }
             .rc-engagement-brand-icon-v124 { width:1.7rem; height:1.7rem; object-fit:contain; display:block; }
         </style>
-
         <div class="rc-dashboard-persistent-v1033" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
-
                 $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $igClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $ytClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
-
                 $socialIconUrls = [
                     'instagram' => 'https://img.icons8.com/fluency/48/instagram-new.png',
                     'youtube' => 'https://img.icons8.com/color/48/youtube-play.png',
                     'x' => 'https://img.icons8.com/ios-filled/50/x.png',
                 ];
-
                 $normalizeSocialPlatform = function (array $row): string {
                     $raw = strtolower(trim((string) (
                         $row['platform_icon_key']
@@ -8558,7 +7624,6 @@ discoverSelectedIds: [],
                         ?? $row['title']
                         ?? ''
                     )));
-
                     return match (true) {
                         str_contains($raw, 'instagram'), $raw === 'ig' => 'instagram',
                         str_contains($raw, 'youtube'), str_contains($raw, 'you_tube'), $raw === 'yt' => 'youtube',
@@ -8566,13 +7631,11 @@ discoverSelectedIds: [],
                         default => '',
                     };
                 };
-
                 $coachEngagementRows = collect($this->coachEngagementRows ?? [])
                     ->filter(fn ($row): bool => is_array($row))
                     ->map(function (array $row) use ($normalizeSocialPlatform) {
                         $canonical = $normalizeSocialPlatform($row);
                         if ($canonical === '') return null;
-
                         return array_merge($row, [
                             'platform_key' => $canonical,
                             'platform' => match ($canonical) {
@@ -8591,7 +7654,6 @@ discoverSelectedIds: [],
                     })
                     ->filter()
                     ->values();
-
                 if ($coachEngagementRows->isEmpty()) {
                     $coachEngagementRows = $dashboardRecentActivity
                         ->filter(fn ($row): bool => is_array($row))
@@ -8599,7 +7661,6 @@ discoverSelectedIds: [],
                             $canonical = $normalizeSocialPlatform($row);
                             if ($canonical === '') return null;
                             $time = $row['time'] ?? $row['created_at'] ?? null;
-
                             return [
                                 'title' => (string) ($row['title'] ?? 'Tracked coach engagement'),
                                 'copy' => trim(strip_tags((string) ($row['copy'] ?? 'Social click activity'))) ?: 'Social click activity',
@@ -8624,13 +7685,11 @@ discoverSelectedIds: [],
                         ->take(30)
                         ->values();
                 }
-
                 // v126: Highest social-click totals always rank first, regardless of source.
                 $coachEngagementRows = $coachEngagementRows
                     ->sortByDesc(fn ($row) => (int) ($row['clicks'] ?? $row['count'] ?? 0))
                     ->values();
             @endphp
-
             <div class="rc-stats-drawer-backdrop"
                 data-rc-modal-id="coach-engagement"
                 data-engagement-platform=""
@@ -8663,7 +7722,6 @@ discoverSelectedIds: [],
                                 <p>How coaches are engaging with your social platforms, and who's clicking through.</p>
                             </div>
                         </div>
-
                         <div class="rc-detail-stats-v2">
                             <button type="button" class="rc-detail-stat-v2 is-neutral rc-engagement-filter-card" data-engagement-filter="x" aria-pressed="false" onclick="window.rcFilterCoachEngagement(this, 'x')">
                                 <span><img class="rc-engagement-brand-icon-v124" src="{{ $socialIconUrls['x'] }}" alt="X" referrerpolicy="no-referrer"></span>
@@ -8678,7 +7736,6 @@ discoverSelectedIds: [],
                                 <div><small>YouTube</small><strong>{{ number_format($ytClicks) }}</strong><em>{{ number_format(max(0, $ytClicks)) }} clicks</em></div>
                             </button>
                         </div>
-
                         <section class="rc-detail-table-v2">
                             <header>
                                 <h2 data-engagement-table-title>Who's Clicking</h2>
@@ -8736,24 +7793,20 @@ discoverSelectedIds: [],
                 </aside>
             </div>
         </div>
-
         @if($section === 'emails-sent')
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
                 $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
-
                 $emailSentCount = max((int) ($dashboardMetrics['email_sent_count'] ?? 0), (int) ($dashboardMetrics['emails_sent'] ?? 0), (int) ($dashboardMetrics['personal_emails_sent'] ?? 0) + (int) ($dashboardMetrics['campaigns_sent'] ?? 0));
                 $emailOpenCount = (int) ($dashboardMetrics['email_open_count'] ?? $dashboardMetrics['email_opens'] ?? 0);
                 $emailClickCount = (int) ($dashboardMetrics['email_click_count'] ?? $dashboardMetrics['email_clicks'] ?? 0);
                 $emailProfileLinkCount = (int) ($dashboardMetrics['view_profile_email_link'] ?? 0);
-
                 $emailRows = $dashboardRecentActivity
                     ->filter(fn ($activity) => str_contains(strtolower((string) ($activity['type'] ?? $activity['title'] ?? $activity['copy'] ?? '')), 'email'))
                     ->take(12)
                     ->values()
                     ->map(function ($row, $index) use ($formatActivityTimeLabel) {
                         $time = $row['time'] ?? null;
-
                         return [
                             'rank' => $index + 1,
                             'title' => (string) ($row['title'] ?? 'Email activity'),
@@ -8763,7 +7816,6 @@ discoverSelectedIds: [],
                             'time_label' => $formatActivityTimeLabel($time),
                         ];
                     });
-
                 if ($emailRows->isEmpty()) {
                     $emailRows = collect([
                         ['rank' => 1, 'title' => 'Emails sent', 'copy' => 'Emails sent from the recruiting center', 'type' => 'Sent', 'count' => $emailSentCount, 'time_label' => 'Updated'],
@@ -8776,7 +7828,6 @@ discoverSelectedIds: [],
                     });
                 }
             @endphp
-
             <div class="rc-stats-drawer-backdrop"
                 x-data="{ open: true, close() { this.open = false; setTimeout(() => $wire.set('section', 'dashboard'), 130); } }"
                 x-show="open"
@@ -8811,13 +7862,11 @@ discoverSelectedIds: [],
                         <input type="search" placeholder="Search schools, coaches, conferences..." wire:model.live.debounce.350ms="search">
                     </form>
                 </div>
-
                 <div class="rc-detail-stats-v2">
                     <div class="rc-detail-stat-v2 is-coral"><span>✉</span><div><small>Sent</small><strong>{{ number_format($emailSentCount) }}</strong><em>Sent email count</em></div></div>
                     <div class="rc-detail-stat-v2 is-blue"><span>◉</span><div><small>Opened</small><strong>{{ number_format($emailOpenCount) }}</strong><em>Open count</em></div></div>
                     <div class="rc-detail-stat-v2 is-green"><span>↗</span><div><small>Clicked</small><strong>{{ number_format($emailClickCount) }}</strong><em>Click count</em></div></div>
                 </div>
-
                 <section class="rc-detail-table-v2">
                     <header><h2>Email Tracking</h2><span>● Updated</span></header>
                     <div class="rc-detail-rows-v2">
@@ -8840,8 +7889,6 @@ discoverSelectedIds: [],
                 </aside>
             </div>
         @endif
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="schools" x-show="activeSection === 'schools'" style="{{ ($section === 'schools') ? '' : 'display:none;' }}">
             @php
                 $discoverSchoolCount = (int) ($this->filteredSchoolsCount ?? 0);
@@ -8857,14 +7904,12 @@ discoverSelectedIds: [],
                 ];
                 $discoverShownCount = count($this->filteredSchools ?? []);
             @endphp
-
             <style>
                 .rc-discover-v29 {
                     display: grid;
                     gap: .9rem;
                     color: var(--rc-text);
                 }
-
                 .rc-discover-top-v29 {
                     display: grid;
                     grid-template-columns: minmax(0, 1fr) auto;
@@ -8872,7 +7917,6 @@ discoverSelectedIds: [],
                     align-items: start;
                     margin: -.65rem 0 .45rem;
                 }
-
                 .rc-discover-title-v29 h1 {
                     margin: 0;
                     color: var(--rc-text);
@@ -8881,32 +7925,27 @@ discoverSelectedIds: [],
                     font-weight: 500;
                     letter-spacing: -.035em;
                 }
-
                 .rc-discover-title-v29 p {
                     margin: .45rem 0 0;
                     color: var(--rc-muted);
                     font-size: .82rem;
                 }
-
                 .rc-discover-actions-v29 {
                     display: grid;
                     grid-template-columns: minmax(28rem, 1fr) 3rem 3rem;
                     gap: .6rem;
                     align-items: start;
                 }
-
                 .rc-discover-actions-v29 .rc-home-search-v2 {
                     width: 100%;
                     max-width: none;
                     min-height: 2.65rem;
                     border-radius: .82rem;
                 }
-
                 .rc-discover-actions-v29 .rc-home-search-v2 input {
                     min-height: 2.65rem;
                     font-size: .86rem;
                 }
-
                 .rc-discover-actions-v29 .rc-home-refresh-v2,
                 .rc-discover-actions-v29 .rc-home-dark-toggle-v2 {
                     width: 2.75rem;
@@ -8914,7 +7953,6 @@ discoverSelectedIds: [],
                     min-height: 2.65rem;
                     border-radius: .82rem;
                 }
-
                 .rc-discover-program-search-v27 {
                     position: relative;
                     display: flex;
@@ -8926,7 +7964,6 @@ discoverSelectedIds: [],
                     box-shadow: 0 8px 20px rgba(15,23,42,.045);
                     overflow: visible;
                 }
-
                 .rc-discover-program-search-v27 svg {
                     width: 1.08rem;
                     height: 1.08rem;
@@ -8934,7 +7971,6 @@ discoverSelectedIds: [],
                     margin-left: 1rem;
                     flex: 0 0 auto;
                 }
-
                 .rc-discover-program-search-v27 input {
                     width: 100%;
                     border: 0 !important;
@@ -8946,14 +7982,12 @@ discoverSelectedIds: [],
                     color: var(--rc-text);
                     font-size: .95rem;
                 }
-
                 .rc-discover-filter-v27 {
                     display: grid;
                     grid-template-columns: minmax(0, 34rem) minmax(15rem, 20rem) 1fr;
                     gap: .6rem;
                     align-items: center;
                 }
-
                 .rc-discover-tabs-v27 {
                     display: flex;
                     align-items: center;
@@ -8964,7 +7998,6 @@ discoverSelectedIds: [],
                     min-width: 0;
                     overflow: auto;
                 }
-
                 .rc-discover-tab-v27 {
                     border: 0;
                     min-height: 2.15rem;
@@ -8977,13 +8010,11 @@ discoverSelectedIds: [],
                     white-space: nowrap;
                     transition: background .16s ease, color .16s ease;
                 }
-
                 .rc-discover-tab-v27.is-active {
                     color: #fff;
                     background: var(--rc-accent);
                     box-shadow: 0 10px 22px rgba(255,99,56,.2);
                 }
-
                 .rc-discover-select-v27 {
                     width: 100%;
                     min-height: 2.55rem;
@@ -8996,7 +8027,6 @@ discoverSelectedIds: [],
                     font-weight: 500;
                     box-shadow: 0 8px 20px rgba(15,23,42,.035);
                 }
-
                 .rc-discover-meta-v27 {
                     display: flex;
                     align-items: center;
@@ -9005,7 +8035,6 @@ discoverSelectedIds: [],
                     margin: .15rem 0 -.05rem;
                     flex-wrap: wrap;
                 }
-
                 .rc-discover-count-v27 {
                     display: inline-flex;
                     align-items: center;
@@ -9014,9 +8043,7 @@ discoverSelectedIds: [],
                     font-size: .9rem;
                     font-weight: 600;
                 }
-
                 .rc-discover-count-v27 strong { color: var(--rc-text); }
-
                 .rc-discover-select-all-v27 {
                     display: inline-flex;
                     align-items: center;
@@ -9025,20 +8052,17 @@ discoverSelectedIds: [],
                     font-size: .84rem;
                     font-weight: 650;
                 }
-
                 .rc-discover-select-all-v27 input {
                     width: 1.05rem;
                     height: 1.05rem;
                     border-radius: .35rem;
                     accent-color: var(--rc-accent);
                 }
-
                 .rc-discover-right-v27 {
                     display: inline-flex;
                     align-items: center;
                     gap: .65rem;
                 }
-
                 .rc-discover-toggle-v27 {
                     display: inline-flex;
                     align-items: center;
@@ -9049,7 +8073,6 @@ discoverSelectedIds: [],
                     background: var(--rc-surface);
                     box-shadow: 0 10px 24px rgba(15,23,42,.06);
                 }
-
                 .rc-discover-toggle-v27 button {
                     width: 2.35rem;
                     height: 2.35rem;
@@ -9060,17 +8083,14 @@ discoverSelectedIds: [],
                     color: var(--rc-muted);
                     background: transparent;
                 }
-
                 .rc-discover-toggle-v27 button.is-active {
                     color: var(--rc-accent);
                     background: var(--rc-accent-soft);
                 }
-
                 .rc-discover-loading-v27 {
                     position: relative;
                     min-height: 12rem;
                 }
-
                 .rc-discover-loading-overlay-v27 {
                     position: absolute;
                     inset: 0;
@@ -9082,15 +8102,12 @@ discoverSelectedIds: [],
                     background: color-mix(in srgb, var(--rc-surface) 75%, transparent);
                     backdrop-filter: blur(3px);
                 }
-
                 .rc-discover-loading-v27.is-loading .rc-discover-loading-overlay-v27 { display: flex; }
-
                 .rc-discover-v29 .rc-school-grid.rc-discover-school-grid {
                     display: grid;
                     grid-template-columns: repeat(4, minmax(0, 1fr));
                     gap: 1rem;
                 }
-
                 .rc-discover-v29 .rc-school-card.rc-discover-school-card {
                     min-height: 8.25rem;
                     border: 1px solid var(--rc-border);
@@ -9100,20 +8117,17 @@ discoverSelectedIds: [],
                     box-shadow: 0 8px 20px rgba(15,23,42,.045);
                     transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
                 }
-
                 .rc-discover-v29 .rc-school-card.rc-discover-school-card:hover {
                     transform: translateY(-1px);
                     border-color: rgba(255,99,56,.3);
                     box-shadow: 0 16px 34px rgba(15,23,42,.08);
                 }
-
                 .rc-discover-v29 .rc-discover-card-main {
                     display: grid;
                     grid-template-columns: minmax(0, 1fr) 1.7rem;
                     gap: .6rem;
                     align-items: start;
                 }
-
                 .rc-discover-v29 .rc-discover-card-title {
                     display: grid;
                     grid-template-columns: 3.15rem minmax(0, 1fr);
@@ -9127,7 +8141,6 @@ discoverSelectedIds: [],
                     cursor: pointer;
                     min-width: 0;
                 }
-
                 .rc-discover-v29 .rc-school-card-logo-box,
                 .rc-discover-v29 .rc-school-list-logo-box {
                     display: inline-flex;
@@ -9138,26 +8151,22 @@ discoverSelectedIds: [],
                     position: relative;
                     flex: 0 0 auto;
                 }
-
                 .dark .rc-discover-v29 .rc-school-card-logo-box,
                 .dark .rc-discover-v29 .rc-school-list-logo-box {
                     background: rgba(148,163,184,.12);
                 }
-
                 .rc-discover-v29 .rc-school-card-logo-box {
                     width: 2.7rem;
                     height: 2.7rem;
                     border-radius: .78rem;
                     padding: .4rem;
                 }
-
                 .rc-discover-v29 .rc-school-list-logo-box {
                     width: 2.15rem;
                     height: 2.15rem;
                     border-radius: .55rem;
                     padding: .25rem;
                 }
-
                 .rc-discover-v29 .rc-school-card-logo,
                 .rc-discover-v29 .rc-school-list-logo {
                     width: auto;
@@ -9167,7 +8176,6 @@ discoverSelectedIds: [],
                     object-fit: contain;
                     display: block;
                 }
-
                 .rc-discover-v29 .rc-logo-fallback-text {
                     position: absolute;
                     inset: 0;
@@ -9179,21 +8187,17 @@ discoverSelectedIds: [],
                     font-weight: 500;
                     background: #f3f4f6;
                 }
-
                 .dark .rc-discover-v29 .rc-logo-fallback-text {
                     color: #e5e7eb;
                     background: rgba(148,163,184,.12);
                 }
-
                 .rc-discover-v29 .is-missing-logo .rc-logo-fallback-text { display: flex; }
                 .rc-discover-v29 .is-missing-logo img { display: none; }
-
                 .rc-discover-v29 .rc-discover-card-copy {
                     min-width: 0;
                     display: grid;
                     gap: .18rem;
                 }
-
                 .rc-discover-v29 .rc-discover-card-copy strong {
                     color: var(--rc-text);
                     font-size: .98rem;
@@ -9204,7 +8208,6 @@ discoverSelectedIds: [],
                     text-overflow: ellipsis;
                     white-space: nowrap;
                 }
-
                 .rc-discover-v29 .rc-discover-card-copy small {
                     color: var(--rc-muted);
                     font-size: .8rem;
@@ -9214,7 +8217,6 @@ discoverSelectedIds: [],
                     -webkit-box-orient: vertical;
                     overflow: hidden;
                 }
-
                 .rc-discover-v29 .rc-discover-card-check,
                 .rc-discover-v29 .rc-discover-row-check {
                     display: inline-flex;
@@ -9230,21 +8232,18 @@ discoverSelectedIds: [],
                     font-weight: 500;
                     box-shadow: 0 1px 3px rgba(15,23,42,.04);
                 }
-
                 .rc-discover-v29 .rc-discover-card-rule {
                     height: 1px;
                     background: var(--rc-border);
                     margin: .92rem 0 .82rem;
                     opacity: .75;
                 }
-
                 .rc-discover-v29 .rc-discover-card-footer {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
                     gap: .6rem;
                 }
-
                 .rc-discover-v29 .rc-discover-division-pill {
                     display: inline-flex;
                     align-items: center;
@@ -9257,13 +8256,11 @@ discoverSelectedIds: [],
                     font-weight: 650;
                     white-space: nowrap;
                 }
-
                 .rc-discover-v29 .rc-discover-coach-count {
                     color: var(--rc-muted);
                     font-size: .82rem;
                     white-space: nowrap;
                 }
-
                 .rc-discover-v29 .rc-school-list-table.rc-discover-school-list {
                     display: grid;
                     gap: 0;
@@ -9273,7 +8270,6 @@ discoverSelectedIds: [],
                     overflow: hidden;
                     box-shadow: 0 10px 26px rgba(15,23,42,.05);
                 }
-
                 .rc-discover-v29 .rc-discover-school-list-head,
                 .rc-discover-v29 .rc-discover-school-list-row {
                     display: grid;
@@ -9281,7 +8277,6 @@ discoverSelectedIds: [],
                     gap: 1rem;
                     align-items: center;
                 }
-
                 .rc-discover-v29 .rc-discover-school-list-head {
                     padding: .88rem 1.2rem;
                     background: var(--rc-soft);
@@ -9291,16 +8286,13 @@ discoverSelectedIds: [],
                     text-transform: uppercase;
                     letter-spacing: .06em;
                 }
-
                 .rc-discover-v29 .rc-discover-school-list-row {
                     border-top: 1px solid var(--rc-border);
                     padding: .86rem 1.2rem;
                     background: transparent;
                     box-shadow: none;
                 }
-
                 .rc-discover-v29 .rc-discover-school-list-row:hover { background: var(--rc-soft); }
-
                 .rc-discover-v29 .rc-discover-school-list-school {
                     display: grid;
                     grid-template-columns: 2.15rem minmax(0, 1fr);
@@ -9314,7 +8306,6 @@ discoverSelectedIds: [],
                     font-weight: 650;
                     cursor: pointer;
                 }
-
                 .rc-discover-v29 .rc-discover-school-list-name-copy,
                 .rc-discover-v29 .rc-discover-list-coach,
                 .rc-discover-v29 .rc-discover-list-muted,
@@ -9324,20 +8315,15 @@ discoverSelectedIds: [],
                     text-overflow: ellipsis;
                     white-space: nowrap;
                 }
-
                 .rc-discover-v29 .rc-discover-list-coach { color: var(--rc-text); font-weight: 650; font-size: .82rem; }
                 .rc-discover-v29 .rc-discover-list-muted { color: var(--rc-muted); font-size: .82rem; }
                 .rc-discover-v29 .rc-discover-list-email a { color: #3b82f6; text-decoration: none; font-size: .82rem; }
                 .rc-discover-v29 .rc-discover-list-division { color: var(--rc-accent); font-size: .76rem; font-weight: 650; }
                 .rc-discover-v29 .rc-head-coach-chip { display:inline-flex; margin-left:.28rem; border-radius:.35rem; padding:.12rem .28rem; background:rgba(255,99,56,.13); color:var(--rc-accent); font-size:.62rem; font-weight:950; vertical-align:middle; }
-
                 @media (max-width: 1320px) {
                     .rc-discover-v29 .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
                     .rc-discover-filter-v27 { grid-template-columns: minmax(0, 1fr) minmax(16rem, 21rem); }
                 }
-
-
-
                 .rc-discover-bulk-v36 {
                     display:flex;
                     align-items:center;
@@ -9352,12 +8338,10 @@ discoverSelectedIds: [],
                     color:#fff;
                     box-shadow:0 14px 32px rgba(15,23,42,.13);
                 }
-
                 .dark .rc-discover-bulk-v36 {
                     background:#111217;
                     box-shadow:0 14px 32px rgba(0,0,0,.28);
                 }
-
                 .rc-discover-bulk-left-v36,
                 .rc-discover-bulk-actions-v36 {
                     display:flex;
@@ -9365,13 +8349,11 @@ discoverSelectedIds: [],
                     gap:.7rem;
                     min-width:0;
                 }
-
                 .rc-discover-bulk-count-v36 {
                     font-size:.86rem;
                     font-weight:700;
                     white-space:nowrap;
                 }
-
                 .rc-discover-bulk-email-v36,
                 .rc-discover-bulk-list-v36 > button {
                     display:inline-flex;
@@ -9388,29 +8370,24 @@ discoverSelectedIds: [],
                     cursor:pointer;
                     transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
                 }
-
                 .rc-discover-bulk-email-v36 {
                     background:#ff6338;
                     color:#fff;
                     box-shadow:0 10px 24px rgba(255,99,56,.22);
                 }
-
                 .rc-discover-bulk-list-v36 {
                     position:relative;
                     display:inline-flex;
                 }
-
                 .rc-discover-bulk-list-v36 > button {
                     background:#fff;
                     color:#273044;
                     box-shadow:0 8px 18px rgba(0,0,0,.12);
                 }
-
                 .rc-discover-bulk-email-v36:hover,
                 .rc-discover-bulk-list-v36 > button:hover {
                     transform:translateY(-1px);
                 }
-
                 .rc-discover-bulk-clear-v36 {
                     border:0;
                     background:transparent;
@@ -9421,12 +8398,10 @@ discoverSelectedIds: [],
                     padding:.4rem .2rem;
                     opacity:.92;
                 }
-
                 .rc-discover-bulk-clear-v36:hover {
                     opacity:1;
                     text-decoration:underline;
                 }
-
                 .rc-discover-bulk-menu-v36 {
                     position:absolute;
                     z-index:80;
@@ -9442,13 +8417,11 @@ discoverSelectedIds: [],
                     color:#111827;
                     box-shadow:0 20px 45px rgba(15,23,42,.18);
                 }
-
                 .dark .rc-discover-bulk-menu-v36 {
                     border-color:rgba(63,63,70,.95);
                     background:#18181b;
                     color:#f4f4f5;
                 }
-
                 .rc-discover-bulk-option-v36 {
                     width:100%;
                     border:0;
@@ -9465,17 +8438,14 @@ discoverSelectedIds: [],
                     font-weight:650;
                     cursor:pointer;
                 }
-
                 .rc-discover-bulk-option-v36:hover {
                     background:rgba(255,99,56,.1);
                     color:#ff6338;
                 }
-
                 .rc-discover-school-card.is-selected {
                     border-color:#ff6338 !important;
                     box-shadow:0 12px 30px rgba(255,99,56,.12), 0 1px 2px rgba(15,23,42,.05) !important;
                 }
-
                 .rc-discover-card-check.is-selected,
                 .rc-discover-row-check.is-selected {
                     background:#ff6338 !important;
@@ -9483,7 +8453,6 @@ discoverSelectedIds: [],
                     color:#fff !important;
                     box-shadow:0 8px 18px rgba(255,99,56,.18);
                 }
-
                 @media (max-width: 1100px) {
                     .rc-discover-top-v29 { grid-template-columns: 1fr; }
                     .rc-discover-actions-v29 { justify-self: stretch; grid-template-columns: minmax(0, 1fr) 3rem 3rem; }
@@ -9493,13 +8462,11 @@ discoverSelectedIds: [],
                     .rc-discover-v29 .rc-discover-school-list-row { grid-template-columns: 1fr auto; gap: .5rem; }
                     .rc-discover-v29 .rc-discover-school-list-row > :nth-child(n+2):nth-child(-n+5) { display: none; }
                 }
-
                 @media (max-width: 640px) {
                     .rc-discover-v29 .rc-school-grid.rc-discover-school-grid { grid-template-columns: 1fr; }
                     .rc-discover-actions-v29 { grid-template-columns: 1fr 3rem 3rem; }
                     .rc-discover-title-v29 h1 { font-size: 1.75rem; }
                 }
-            
                 .rc-discover-top-v29 {
                     display: grid !important;
                     grid-template-columns: minmax(0, 1fr) minmax(34rem, 45rem) !important;
@@ -9507,19 +8474,16 @@ discoverSelectedIds: [],
                     align-items: start !important;
                     margin: -.7rem 0 .55rem !important;
                 }
-
                 .rc-discover-title-v29 h1 {
                     white-space: nowrap;
                     font-weight: 760 !important;
                     font-size: clamp(1.6rem, 2.05vw, 2.05rem) !important;
                     line-height: 1.05 !important;
                 }
-
                 .rc-discover-title-v29 p {
                     font-size: .88rem !important;
                     margin-top: .38rem !important;
                 }
-
                 .rc-discover-actions-v29 {
                     justify-self: end !important;
                     width: 100% !important;
@@ -9531,20 +8495,17 @@ discoverSelectedIds: [],
                     align-items: center !important;
                     gap: .65rem !important;
                 }
-
                 .rc-discover-actions-v29 .rc-home-search-v2,
                 .rc-discover-program-search-v27 {
                     min-height: 2.62rem !important;
                     border-radius: .8rem !important;
                 }
-
                 .rc-discover-actions-v29 .rc-home-search-v2 input,
                 .rc-discover-program-search-v27 input {
                     min-height: 2.62rem !important;
                     font-size: .86rem !important;
                     font-weight: 400 !important;
                 }
-
                 .rc-discover-actions-v29 .rc-home-refresh-v2,
                 .rc-discover-actions-v29 .rc-home-dark-toggle-v2 {
                     width: 2.75rem !important;
@@ -9555,36 +8516,29 @@ discoverSelectedIds: [],
                     max-height: 2.75rem !important;
                     border-radius: .8rem !important;
                 }
-
                 .rc-discover-tabs-v27 {
                     min-height: 2.55rem !important;
                     padding: .2rem !important;
                     border-radius: .78rem !important;
                 }
-
                 .rc-discover-tab-v27 {
                     min-height: 2.14rem !important;
                     border-radius: .62rem !important;
                     font-size: .8rem !important;
                     font-weight: 600 !important;
                 }
-
                 .rc-discover-select-v27 {
                     min-height: 2.55rem !important;
                     border-radius: .78rem !important;
                     font-size: .86rem !important;
                     font-weight: 500 !important;
                 }
-
                 .rc-discover-count-v27,
                 .rc-discover-select-all-v27,
                 .rc-discover-card-copy strong,
                 .rc-discover-list-coach {
                     font-weight: 600 !important;
                 }
-
-
-
                 .rc-discover-bulk-v36 {
                     display:flex;
                     align-items:center;
@@ -9599,12 +8553,10 @@ discoverSelectedIds: [],
                     color:#fff;
                     box-shadow:0 14px 32px rgba(15,23,42,.13);
                 }
-
                 .dark .rc-discover-bulk-v36 {
                     background:#111217;
                     box-shadow:0 14px 32px rgba(0,0,0,.28);
                 }
-
                 .rc-discover-bulk-left-v36,
                 .rc-discover-bulk-actions-v36 {
                     display:flex;
@@ -9612,13 +8564,11 @@ discoverSelectedIds: [],
                     gap:.7rem;
                     min-width:0;
                 }
-
                 .rc-discover-bulk-count-v36 {
                     font-size:.86rem;
                     font-weight:700;
                     white-space:nowrap;
                 }
-
                 .rc-discover-bulk-email-v36,
                 .rc-discover-bulk-list-v36 > button {
                     display:inline-flex;
@@ -9635,29 +8585,24 @@ discoverSelectedIds: [],
                     cursor:pointer;
                     transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
                 }
-
                 .rc-discover-bulk-email-v36 {
                     background:#ff6338;
                     color:#fff;
                     box-shadow:0 10px 24px rgba(255,99,56,.22);
                 }
-
                 .rc-discover-bulk-list-v36 {
                     position:relative;
                     display:inline-flex;
                 }
-
                 .rc-discover-bulk-list-v36 > button {
                     background:#fff;
                     color:#273044;
                     box-shadow:0 8px 18px rgba(0,0,0,.12);
                 }
-
                 .rc-discover-bulk-email-v36:hover,
                 .rc-discover-bulk-list-v36 > button:hover {
                     transform:translateY(-1px);
                 }
-
                 .rc-discover-bulk-clear-v36 {
                     border:0;
                     background:transparent;
@@ -9668,12 +8613,10 @@ discoverSelectedIds: [],
                     padding:.4rem .2rem;
                     opacity:.92;
                 }
-
                 .rc-discover-bulk-clear-v36:hover {
                     opacity:1;
                     text-decoration:underline;
                 }
-
                 .rc-discover-bulk-menu-v36 {
                     position:absolute;
                     z-index:80;
@@ -9689,13 +8632,11 @@ discoverSelectedIds: [],
                     color:#111827;
                     box-shadow:0 20px 45px rgba(15,23,42,.18);
                 }
-
                 .dark .rc-discover-bulk-menu-v36 {
                     border-color:rgba(63,63,70,.95);
                     background:#18181b;
                     color:#f4f4f5;
                 }
-
                 .rc-discover-bulk-option-v36 {
                     width:100%;
                     border:0;
@@ -9712,17 +8653,14 @@ discoverSelectedIds: [],
                     font-weight:650;
                     cursor:pointer;
                 }
-
                 .rc-discover-bulk-option-v36:hover {
                     background:rgba(255,99,56,.1);
                     color:#ff6338;
                 }
-
                 .rc-discover-school-card.is-selected {
                     border-color:#ff6338 !important;
                     box-shadow:0 12px 30px rgba(255,99,56,.12), 0 1px 2px rgba(15,23,42,.05) !important;
                 }
-
                 .rc-discover-card-check.is-selected,
                 .rc-discover-row-check.is-selected {
                     background:#ff6338 !important;
@@ -9730,13 +8668,11 @@ discoverSelectedIds: [],
                     color:#fff !important;
                     box-shadow:0 8px 18px rgba(255,99,56,.18);
                 }
-
                 @media (max-width: 1100px) {
                     .rc-discover-top-v29 { grid-template-columns: 1fr !important; }
                     .rc-discover-actions-v29 { max-width:none !important; grid-template-columns:minmax(0,1fr) 2.75rem 2.75rem !important; }
                     .rc-discover-title-v29 h1 { white-space: normal; }
                 }
-
                 /* v73: Discover Schools uses its own program search. Hide the shared
                    header search here so two inputs never mirror the same Livewire state. */
                 .rc-discover-v29 .rc-home-header-v2 .rc-home-search-v2 {
@@ -9780,7 +8716,6 @@ discoverSelectedIds: [],
                     }
                 }
 </style>
-
             <div class="rc-discover-v29"
                  x-on:click.capture="const b = $event.target.closest('button'); if (b && !b.disabled) { b.classList.add('rc-click-feedback-v73'); setTimeout(() => b.classList.remove('rc-click-feedback-v73'), 240); }">
                 @include('filament.partials.coach-database-header', [
@@ -9788,19 +8723,16 @@ discoverSelectedIds: [],
                     'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
                     'showNewEmail' => false,
                 ])
-
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
                     <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." x-model="discoverSearch" x-on:input.debounce.40ms="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })" autocomplete="off" />
                 </div>
-
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
                         @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
                             <button type="button" class="rc-discover-tab-v27" x-bind:class="discoverDivision === @js($divisionValue) ? 'is-active' : ''" x-on:click="discoverDivision = (discoverDivision === @js($divisionValue) ? '' : @js($divisionValue)); discoverConference=''; $dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })">{{ $divisionLabel }}</button>
                         @endforeach
                     </div>
-
                     <select class="rc-discover-select-v27" x-model="discoverConference" x-on:change="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })" aria-label="Conference filter">
                         <option value="" x-text="`All Conferences (${Number(discoverAvailableConferences.length || 0).toLocaleString()})`"></option>
                         <template x-for="conferenceOption in discoverAvailableConferences" :key="`discover-conf-${conferenceOption}`">
@@ -9808,13 +8740,11 @@ discoverSelectedIds: [],
                         </template>
                     </select>
                 </div>
-
                 <div class="rc-discover-meta-v27">
                     <div class="rc-discover-count-v27">
                         <span><strong x-text="Number(discoverClientCount || {{ (int) $discoverSchoolCount }}).toLocaleString()"></strong> schools</span>
                         <button type="button" class="rc-discover-select-all-v27 rc-discover-select-all-button-v36" x-on:click="$dispatch('rc-discover-toggle-visible')"><input type="checkbox" x-bind:checked="discoverSelectedIds.length > 0 && discoverSelectedIds.length >= discoverClientShown" readonly tabindex="-1"><span>Select All (<span x-text="Number(discoverClientShown || 0).toLocaleString()"></span>)</span></button>
                     </div>
-
                     <div class="rc-discover-right-v27">
                         <div class="rc-discover-toggle-v27" aria-label="School view">
                             <button type="button" x-bind:class="discoverViewMode === 'grid' ? 'is-active' : ''" x-on:click="discoverViewMode='grid'; $dispatch('rc-discover-view',{mode:'grid'})" aria-label="Grid view"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
@@ -9822,7 +8752,6 @@ discoverSelectedIds: [],
                         </div>
                     </div>
                 </div>
-
                 <div class="rc-discover-bulk-v36" x-cloak x-show="discoverSelectedIds.length > 0" x-transition.opacity wire:key="discover-bulk-selection-bar">
                         <div class="rc-discover-bulk-left-v36">
                             <span class="rc-discover-bulk-count-v36"><span x-text="Number(discoverSelectedIds.length).toLocaleString()"></span> selected</span>
@@ -9845,7 +8774,6 @@ discoverSelectedIds: [],
                                         </button>
                                     </template>
                                     <div class="rc-school-list-empty" x-show="discoverLists.length === 0">No lists yet.</div>
-
                                     <div class="rc-list-quick-create-v112">
                                         <div class="rc-list-quick-create-title-v112">Create new list</div>
                                         <div class="rc-list-quick-create-row-v112">
@@ -9861,9 +8789,7 @@ discoverSelectedIds: [],
                         </div>
                         <button type="button" class="rc-discover-bulk-clear-v36" x-on:click="discoverSelectedIds=[]; window.dispatchEvent(new CustomEvent('rc-discover-clear-selection'))">Clear</button>
                 </div>
-
                 <div class="rc-discover-bulk-notice-v112" x-cloak x-show="discoverBulkNotice" x-transition.opacity x-text="discoverBulkNotice"></div>
-
                 {{-- v103: Discover is local DB-backed. Never blur/block the entire grid for local filters or selection. --}}
                 <div class="rc-discover-loading-v27">
                     @include('filament.partials.coach-database-school-grid', ['schools' => $this->discoverClientSchools, 'viewMode' => 'grid', 'selectedSchoolIds' => $selectedSchoolIds])
@@ -9873,10 +8799,6 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="favorites" x-show="activeSection === 'favorites'" style="{{ ($section === 'favorites') ? '' : 'display:none;' }}">
             <style>
                 .rc-favorites-v37 { display:grid; gap:1.05rem; margin-top:1.15rem; }
@@ -9928,7 +8850,6 @@ discoverSelectedIds: [],
                 @media (max-width: 900px) { .rc-favorites-head-v37 { align-items:flex-start; flex-direction:column; } .rc-favorites-grid-v37 { grid-template-columns:repeat(2,minmax(0,1fr)); } .rc-fav-list-row-v40 { grid-template-columns:minmax(0,1fr) auto; } .rc-fav-list-count-v40 { display:none; } }
                 @media (max-width: 640px) { .rc-favorites-grid-v37 { grid-template-columns:1fr; } }
             </style>
-
             @php
                 $favoriteSchoolRows = collect($this->favoriteSchools ?? [])->filter(fn ($school) => is_array($school))->values();
                 $favoriteInitialsFor = function (string $name): string {
@@ -9953,13 +8874,11 @@ discoverSelectedIds: [],
                     return '';
                 };
             @endphp
-
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
                 'showNewEmail' => false,
             ])
-
             <div class="rc-favorites-v37">
                 <div class="rc-favorites-head-v37">
                     <div class="rc-favorites-title-v37">
@@ -9981,11 +8900,9 @@ discoverSelectedIds: [],
                         </a>
                     </div>
                 </div>
-
                 @if($isSyncingTags)
                     <div class="rc-favorites-loading-v37"><span class="rc-spinner-mini"></span> Syncing saved and favorite tags…</div>
                 @endif
-
                 @if($favoriteSchoolRows->isEmpty())
                     <div class="rc-favorites-empty-v37">No favorite schools yet. Star a school from Discover Schools to keep it here.</div>
                 @elseif($schoolViewMode === 'list')
@@ -10066,9 +8983,6 @@ discoverSelectedIds: [],
                 @endif
             </div>
         </section>
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="lists" x-show="activeSection === 'lists'" style="{{ ($section === 'lists') ? '' : 'display:none;' }}">
             <style>
                 .rc-my-lists-v115{display:grid;gap:1.15rem}
@@ -10124,13 +9038,11 @@ discoverSelectedIds: [],
                 .dark .rc-list-fade-v115{background:linear-gradient(to bottom,rgba(31,31,35,0),var(--rc-surface) 86%)}
                 @media(max-width:780px){.rc-my-lists-head-v115{align-items:flex-start;flex-direction:column}.rc-new-list-btn-v115{width:100%}.rc-list-card-head-v115{align-items:flex-start}.rc-list-rename-v115 input{min-width:11rem}.rc-list-delete-confirm-v115{align-items:flex-start;flex-direction:column}.rc-list-card-actions-v115{align-self:flex-start}}
             </style>
-
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
                 'showNewEmail' => false,
             ])
-
             @php
                 $listRows = collect($lists ?? [])->filter(fn ($list) => is_array($list))->values();
                 $listColorPalette = ['#ff6338', '#3b82f6', '#22c55e', '#f59e0b', '#7c5cff'];
@@ -10165,7 +9077,6 @@ discoverSelectedIds: [],
                     ];
                 })->filter(fn(array $school): bool => $school['id'] !== '')->values()->all();
             @endphp
-
             <div class="rc-my-lists-v115">
                 <div class="rc-my-lists-head-v115">
                     <div class="rc-my-lists-title-v115">
@@ -10177,7 +9088,6 @@ discoverSelectedIds: [],
                         New List
                     </button>
                 </div>
-
                 @if($showNewListComposer)
                     <div class="rc-new-list-panel-v115">
                         <input class="rc-input" placeholder="List name" wire:model.defer="newListName" wire:keydown.enter="createCustomList" autofocus>
@@ -10190,7 +9100,6 @@ discoverSelectedIds: [],
                         <button class="rc-btn" type="button" wire:click="$set('showNewListComposer', false)">Cancel</button>
                     </div>
                 @endif
-
                 <div class="rc-list-stack-v115">
                     @forelse($listRows as $listIndex => $list)
                         @php
@@ -10250,7 +9159,6 @@ discoverSelectedIds: [],
                                     </button>
                                 </div>
                             </div>
-
                             <div class="rc-list-tools-v115" x-cloak x-show="addOpen" x-transition.opacity>
                                 <div class="rc-list-search-v115">
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -10266,7 +9174,6 @@ discoverSelectedIds: [],
                                     </div>
                                 </div>
                             </div>
-
                             <div class="rc-list-delete-confirm-v115" x-cloak x-show="confirmDelete" x-transition.opacity>
                                 <span>Delete “<span x-text="label"></span>” and remove all of its school memberships?</span>
                                 <div class="rc-list-delete-actions-v115">
@@ -10274,7 +9181,6 @@ discoverSelectedIds: [],
                                     <button type="button" class="rc-list-delete-btn-v115" x-on:click="deleteList()" x-bind:disabled="deleting"><span x-text="deleting?'Deleting…':'Delete'"></span></button>
                                 </div>
                             </div>
-
                             <div class="rc-list-chip-stage-v115">
                                 <div class="rc-list-chip-wrap-v115" x-bind:class="needsCollapse&&!expanded?'is-collapsed':''">
                                     <template x-for="school in items" :key="`list-${key}-${school.id}`">
@@ -10290,8 +9196,6 @@ discoverSelectedIds: [],
                                 </div>
                                 <div class="rc-list-fade-v115" x-cloak x-show="needsCollapse&&!expanded"></div>
                             </div>
-
-
                             <div class="rc-list-inline-error-v115" x-cloak x-show="error" x-text="error"></div>
                         </article>
                     @empty
@@ -10300,10 +9204,6 @@ discoverSelectedIds: [],
                 </div>
             </div>
         </section>
-
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="coaches" x-show="activeSection === 'coaches'" style="{{ ($section === 'coaches') ? '' : 'display:none;' }}">
             <div class="rc-card rc-toolbar is-flat"><input class="rc-input" placeholder="Search coaches" wire:model.live.debounce.400ms="coachSearch" /></div>
             <div class="rc-card">
@@ -10315,30 +9215,22 @@ discoverSelectedIds: [],
                 @if($this->canLoadMoreCoaches)<div style="margin-top:1rem"><button class="rc-btn" wire:click="loadMoreCoaches">Load more</button></div>@endif
             </div>
         </section>
-
-
         {{-- v118: Inbox restored from the supplied latest reference implementation. --}}
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="conversations" x-show="activeSection === 'conversations'" style="{{ ($section === 'conversations') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
                 'showNewEmail' => false,
             ])
-
-
-
             <style id="rc-inbox-immediate-loader-v1038">
                 /* v10.113.5: disable the full-panel Inbox loading overlay. The overlay made
                    the entire Recruiting Center feel frozen while slow inbox calls were running. */
                 html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::before,
                 html[data-rc-inbox-loading] .rc-inbox-mid-loading-host-v82::after { display:none!important; content:none!important; }
             </style>
-
             <style>
                 .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
                 .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#facc15!important;background:rgba(250,204,21,.16)!important;border-color:rgba(250,204,21,.34)!important}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-inbox-star-spinner-v114{width:.9rem!important;height:.9rem!important;border-width:2px!important}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
-
                 .rc-inbox-shell-v56,
                 .rc-inbox-list-v56,
                 .rc-message-stream-v56 {
@@ -10364,19 +9256,15 @@ discoverSelectedIds: [],
                     overflow-wrap: anywhere;
                     word-break: break-word;
                 }
-
                 .rc-inbox-history-trimmed{margin:.3rem 0 .7rem;padding:.5rem .7rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-soft);color:var(--rc-muted);font-size:.72rem;text-align:center;}
                 .rc-message-stream-v56{padding:0 .9rem .9rem !important;}
                 .rc-inbox-load-older-top{position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:center;height:2.65rem;margin:0 -.9rem .9rem;padding:0;background:var(--rc-surface);border-bottom:1px solid var(--rc-border);}
                 .rc-inbox-load-older-top .rc-inbox-open-composer-v56{background:var(--rc-surface);}
-
                 @media (max-width:1320px){.rc-inbox-shell-v56{grid-template-columns:18.5rem minmax(0,1fr)}.rc-inbox-right-v56{display:none}}
                 @media (max-width:900px){.rc-inbox-shell-v56{grid-template-columns:1fr;height:auto;max-height:none}.rc-message-stream-v56{height:auto;max-height:38rem}}
             </style>
-
             {{-- v10.113.5: no Inbox background poll. Inbox should never keep the full
                  Recruiting Center in a recurring loading/morph cycle. --}}
-
             @php
                 $inboxConversations = collect($this->filteredConversations ?? [])->values();
                 $filteredConversationTotal = (int) ($this->filteredConversationTotal ?? $inboxConversations->count());
@@ -10392,7 +9280,6 @@ discoverSelectedIds: [],
                 $selectedConversation = $selectedConversationId ? $allConversationRows->firstWhere('id', $selectedConversationId) : null;
                 $selectedContactId = (string) ($selectedConversation['contact_id'] ?? $selectedConversation['contactId'] ?? '');
                 $selectedEmail = strtolower(trim((string) ($selectedConversation['email'] ?? $selectedConversation['contact_email'] ?? '')));
-
                 // v10.113: conversation rows are already enriched in one batched local query.
                 // Reuse that data here instead of calling allCoaches()/allSchools() during
                 // every Inbox Livewire morph.
@@ -10413,18 +9300,15 @@ discoverSelectedIds: [],
                         'division' => $selectedConversation['division'] ?? '',
                     ];
                 }
-
                 $selectedName = (string) ($selectedConversation['contact_name'] ?? $selectedConversation['name'] ?? data_get($selectedCoach, 'name') ?? 'Coach');
                 $selectedSchool = (string) ($selectedConversation['school'] ?? $selectedConversation['company_name'] ?? data_get($selectedCoach, 'school') ?? data_get($selectedCoach, 'company_name') ?? 'School');
                 $selectedTitle = (string) (data_get($selectedCoach, 'title') ?? $selectedConversation['title'] ?? 'Coach');
                 $selectedInitials = strtoupper(collect(explode(' ', trim($selectedName)))->filter()->map(fn($part) => substr((string) $part, 0, 1))->take(2)->implode('') ?: 'C');
                 $selectedSchoolLogo = trim((string) (data_get($selectedCoach, 'school_logo_url') ?? data_get($selectedCoach, 'business_logo_url') ?? data_get($selectedCoach, 'logo_url') ?? $selectedConversation['school_logo_url'] ?? $selectedConversation['logo_url'] ?? ''));
                 $selectedStarred = (bool) ($selectedConversation['starred'] ?? $selectedConversation['is_starred'] ?? false);
-
                 $selectedInboxSchool = $this->resolveInboxSchoolForConversation(
                     is_array($selectedConversation) ? $selectedConversation : null
                 );
-
                 if (! is_array($selectedInboxSchool) || empty($selectedInboxSchool)) {
                     $selectedInboxSchool = [
                         'id' => '',
@@ -10438,7 +9322,6 @@ discoverSelectedIds: [],
                         'list_keys' => [],
                     ];
                 }
-
                 $selectedInboxSchoolId = trim((string) ($selectedInboxSchool['id'] ?? $selectedInboxSchool['school_id'] ?? ''));
                 $selectedInboxFavorite = (bool) ($selectedInboxSchool['is_favorite'] ?? false);
                 $selectedInboxListKeys = collect($selectedInboxSchool['list_keys'] ?? $selectedInboxSchool['lists'] ?? [])
@@ -10456,7 +9339,6 @@ discoverSelectedIds: [],
                     })
                     ->values()
                     ->all();
-
                 $threadMessages = is_array($messages ?? null) ? $messages : [];
                 $filterStatus = 'all';
                 $threadInitials = function (string $name): string {
@@ -10499,11 +9381,9 @@ discoverSelectedIds: [],
                 };
                 $prepareInboxEmailDocument = function ($body): string {
                     $raw = trim((string) $body);
-
                     if ($raw === '') {
                         return '<!doctype html><html><body style="margin:0;font:14px Arial,sans-serif;color:#64748b">No message body.</body></html>';
                     }
-
                     $decoded = $raw;
                     for ($i = 0; $i < 3; $i++) {
                         $next = html_entity_decode($decoded, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -10512,17 +9392,14 @@ discoverSelectedIds: [],
                         }
                         $decoded = $next;
                     }
-
                     $hasDocumentHtml = (bool) preg_match('/<!doctype\s+html|<html\b|<head\b|<body\b/i', $decoded);
                     $hasHtml = (bool) preg_match('/<\s*(table|tbody|tr|td|p|div|br|a|img|ul|ol|li|span|strong|em|h[1-6])\b/i', $decoded);
-
                     if (! $hasHtml) {
                         return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
                             . '<body style="margin:0;padding:0;font:14px/1.6 Arial,sans-serif;color:#111827;white-space:pre-wrap;overflow-wrap:anywhere">'
                             . e($decoded)
                             . '</body></html>';
                     }
-
                     // GHL's email detail endpoint returns the complete compiled email
                     // document in emailMessage.body. Keep its head, style blocks,
                     // media queries, tables, buttons, images, and signatures intact.
@@ -10531,7 +9408,6 @@ discoverSelectedIds: [],
                     $clean = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $clean) ?? $clean;
                     $clean = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean) ?? $clean;
                     $clean = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $clean) ?? $clean;
-
                     $responsiveEmailCss = <<<'CSS'
 <style id="rc-inbox-email-fit-v62">
     html, body {
@@ -10590,25 +9466,20 @@ discoverSelectedIds: [],
     }
 </style>
 CSS;
-
                     if ($hasDocumentHtml) {
                         if (preg_match('/<\/head\s*>/i', $clean)) {
                             return preg_replace('/<\/head\s*>/i', $responsiveEmailCss . '</head>', $clean, 1) ?? $clean;
                         }
-
                         if (preg_match('/<body\b/i', $clean)) {
                             return preg_replace('/<body\b/i', '<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">' . $responsiveEmailCss . '</head><body', $clean, 1) ?? $clean;
                         }
-
                         return $responsiveEmailCss . $clean;
                     }
-
                     return '<!doctype html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
                         . $responsiveEmailCss
                         . '</head><body style="margin:0;padding:0">' . $clean . '</body></html>';
                 };
             @endphp
-
             <style>
                 .rc-msg-bubble-email-v61 {
                     display:block;
@@ -10701,7 +9572,6 @@ CSS;
                     font-size:.78rem;
                     font-weight:750;
                 }
-
                 html[data-rc-thread-autoloading] [data-rc-inbox-message-stream] {
                     position:relative;
                     min-height:16rem;
@@ -10740,7 +9610,6 @@ CSS;
                 .rc-thread-loading-copy-v11312 strong{display:block;font-size:.9rem;color:var(--rc-text);margin-bottom:.35rem;}
                 .rc-thread-loading-copy-v11312 span{display:block;color:var(--rc-muted);line-height:1.45;}
                 .rc-thread-loading-copy-v11312 small{display:inline-flex;align-items:center;gap:.38rem;margin-top:.68rem;color:var(--rc-muted);font-size:.74rem;}
-
                 /* v10.113.27: use real DOM loaders instead of pseudo-elements so the
                    thread-switch animation paints immediately before Livewire starts. */
                 html[data-rc-thread-autoloading] [data-rc-inbox-message-stream]::before,
@@ -10799,9 +9668,6 @@ CSS;
                 }
             </style>
             {{-- v10.113.20: direct Inbox email rendering; no custom element/shadow DOM. --}}
-
-
-
             <style id="rc-inbox-unread-status-v73">
                 .rc-thread-unread-dot-v56{width:.62rem!important;height:.62rem!important;border-radius:999px!important;background:#ff6338!important;box-shadow:0 0 0 3px rgba(255,99,56,.14)!important;}
                 .rc-thread-status-v56.is-incoming{color:#ff6338!important;background:rgba(255,99,56,.11)!important;}
@@ -10813,7 +9679,6 @@ CSS;
                 /* v10.113.30: keep browser-only filters working even though card CSS uses display:grid!important. */
                 .rc-inbox-list-v56 .rc-thread-card-v56[style*="display: none"]{display:none!important;}
                 .rc-inbox-list-v56 .rc-thread-card-v56.is-filter-hidden{display:none!important;}
-
                 /* v10.113.30: starred inbox rows use a plain small yellow star pinned to the bottom-right. */
                 .rc-thread-card-v56{position:relative!important;padding-right:2.2rem!important;}
                 .rc-thread-card-side-v56{align-self:stretch!important;display:flex!important;flex-direction:column!important;align-items:flex-end!important;justify-content:flex-start!important;gap:.35rem!important;min-width:2.2rem!important;position:relative!important;padding-bottom:1.15rem!important;}
@@ -10836,14 +9701,12 @@ CSS;
                                 </button>
                             </div>
                         </div>
-
                         <div class="rc-inbox-search-v56">
                             <label>
                                 <svg viewBox="0 0 24 24" fill="none"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                                 <input type="search" placeholder="Search conversations..." wire:model.live.debounce.450ms="conversationSearch">
                             </label>
                         </div>
-
                         <div class="rc-inbox-quick-filters-v56" role="group" aria-label="Conversation filters">
                             <button type="button" x-bind:class="{ 'is-active': conversationStatusFilter === 'all' }" x-on:click.prevent="conversationStatusFilter = 'all'">All</button>
                             <button type="button" x-bind:class="{ 'is-active': conversationStatusFilter === 'unread' }" x-on:click.prevent="conversationStatusFilter = 'unread'">
@@ -10859,10 +9722,8 @@ CSS;
                                 <span>{{ $starredConversationCount }}</span>
                             </button>
                         </div>
-
                         {{-- Conversations open cache-first. A lightweight Inbox timer then refreshes
                              the newest summaries and the currently open thread without a page reload. --}}
-
                         <div
                             class="rc-inbox-list-v56"
                             x-data="{
@@ -10876,9 +9737,7 @@ CSS;
                                         && serverConversationId === window.__rcInboxPendingConversationId) {
                                         window.__rcInboxPendingConversationId = null;
                                     }
-
                                     this.selectedConversationId = window.__rcInboxPendingConversationId || serverConversationId;
-
                                     // v10.113.14: this Alpine island can be recreated by a Livewire morph.
                                     // Autoload once per selected thread per page URL only, otherwise an empty
                                     // or failed thread can keep re-triggering and make the whole RC feel frozen.
@@ -10889,7 +9748,6 @@ CSS;
                                         window.__rcInboxBootAutoloadedFor = bootKey;
                                         this.loadConversation(this.selectedConversationId, false, true);
                                     }
-
                                     // v10.114: keep Inbox live without a page reload. The timer only runs
                                     // while this panel is actually visible and pauses during user interaction.
                                     this.startRealtimePolling();
@@ -10931,7 +9789,6 @@ CSS;
                                     const stream = document.querySelector('[data-rc-inbox-message-stream]');
                                     let anchorId = '';
                                     let anchorOffset = 0;
-
                                     if (list) {
                                         const listRect = list.getBoundingClientRect();
                                         const cards = Array.from(list.querySelectorAll('[data-rc-inbox-conversation-trigger][data-rc-conversation-id]'));
@@ -10941,11 +9798,9 @@ CSS;
                                             anchorOffset = anchor.getBoundingClientRect().top - listRect.top;
                                         }
                                     }
-
                                     const threadTop = stream ? stream.scrollTop : 0;
                                     const threadHeight = stream ? stream.scrollHeight : 0;
                                     const threadNearBottom = !!stream && (stream.scrollHeight - stream.scrollTop - stream.clientHeight) < 120;
-
                                     return {
                                         listTop: list ? list.scrollTop : 0,
                                         anchorId,
@@ -10960,7 +9815,6 @@ CSS;
                                     const restore = () => {
                                         const list = document.querySelector('[data-rc-client-section=conversations] .rc-inbox-list-v56');
                                         const stream = document.querySelector('[data-rc-inbox-message-stream]');
-
                                         if (list) {
                                             let restoredByAnchor = false;
                                             if (state.anchorId) {
@@ -10975,7 +9829,6 @@ CSS;
                                             }
                                             if (!restoredByAnchor) list.scrollTop = Number(state.listTop || 0);
                                         }
-
                                         if (stream) {
                                             if (state.threadNearBottom) {
                                                 stream.scrollTop = stream.scrollHeight;
@@ -10984,7 +9837,6 @@ CSS;
                                             }
                                         }
                                     };
-
                                     window.requestAnimationFrame(() => {
                                         window.requestAnimationFrame(() => {
                                             restore();
@@ -11007,16 +9859,13 @@ CSS;
                                         || this.selectedLoadingId
                                         || window.__rcInboxMessageLoader?.busy
                                         || document.documentElement.hasAttribute('data-rc-thread-autoloading');
-
                                     if (shouldDefer) {
                                         this.startRealtimePolling();
                                         return;
                                     }
-
                                     this.realtimePollBusy = true;
                                     window.__rcInboxRealtimeLastPollAt = Date.now();
                                     const scrollState = this.captureRealtimeScrollState();
-
                                     try {
                                         await this.$wire.pollConversationUpdates();
                                     } catch (error) {
@@ -11025,7 +9874,6 @@ CSS;
                                     } finally {
                                         this.realtimePollBusy = false;
                                         this.restoreRealtimeScrollState(scrollState);
-
                                         // Livewire may preserve this Alpine island in-place. If so, schedule
                                         // the next pass here. If it rebuilt the island, init() already did it.
                                         if (this.$el && this.$el.isConnected) {
@@ -11037,7 +9885,6 @@ CSS;
                                     if (window.__rcInboxRealtimeTimer) {
                                         window.clearTimeout(window.__rcInboxRealtimeTimer);
                                     }
-
                                     window.__rcInboxRealtimeOwner = this;
                                     const lastPollAt = Number(window.__rcInboxRealtimeLastPollAt || 0);
                                     const elapsed = lastPollAt > 0 ? Date.now() - lastPollAt : Number.MAX_SAFE_INTEGER;
@@ -11047,7 +9894,6 @@ CSS;
                                     const delay = lastPollAt > 0
                                         ? Math.max(3000, 20000 - elapsed)
                                         : 5000;
-
                                     window.__rcInboxRealtimeTimer = window.setTimeout(() => {
                                         const owner = window.__rcInboxRealtimeOwner;
                                         if (owner && typeof owner.pollRealtimeInbox === 'function') {
@@ -11071,24 +9917,19 @@ CSS;
                                 loadConversation(conversationId, force = false, boot = false) {
                                     const id = String(conversationId || '');
                                     if (! id) return;
-
                                     this.selectedConversationId = id;
                                     this.setThreadLoading(id);
-
                                     window.__rcInboxMessageLoader = window.__rcInboxMessageLoader || { busy: false, queued: '', promise: null, lastId: '', lastAt: 0 };
                                     const loader = window.__rcInboxMessageLoader;
                                     const now = Date.now();
-
                                     if (!force && loader.busy) {
                                         loader.queued = id;
                                         return loader.promise;
                                     }
-
                                     if (!force && loader.lastId === id && (now - Number(loader.lastAt || 0)) < 1250) {
                                         window.requestAnimationFrame(() => this.clearThreadLoading(id, 0));
                                         return Promise.resolve();
                                     }
-
                                     const token = ++this.requestToken;
                                     loader.busy = true;
                                     loader.queued = '';
@@ -11105,19 +9946,16 @@ CSS;
                                             loader.busy = false;
                                             loader.lastId = id;
                                             loader.lastAt = Date.now();
-
                                             window.requestAnimationFrame(() => {
                                                 this.clearThreadLoading(id, token);
                                                 this.scrollToNewestMessage();
                                             });
-
                                             const queued = String(loader.queued || '');
                                             loader.queued = '';
                                             if (queued && queued !== id) {
                                                 window.setTimeout(() => this.loadConversation(queued, false, false), 0);
                                             }
                                         });
-
                                     return loader.promise;
                                 },
                                 selectConversation(conversationId) {
@@ -11183,7 +10021,6 @@ CSS;
                                     </div>
                                 </div>
                             @endforelse
-
                             <div class="rc-inbox-empty-v56" x-cloak x-show="conversationStatusFilter === 'unread' && {{ (int) $unreadConversationCount }} === 0">
                                 <div><strong>No unread conversations.</strong><br><span>Unread emails also count as Incoming.</span></div>
                             </div>
@@ -11193,7 +10030,6 @@ CSS;
                             <div class="rc-inbox-empty-v56" x-cloak x-show="conversationStatusFilter === 'starred' && {{ (int) $starredConversationCount }} === 0">
                                 <div><strong>No starred conversations.</strong><br><span>Star a coach conversation to keep it here.</span></div>
                             </div>
-
                             @if($canLoadMoreInboxConversations)
                                 <div style="padding:.75rem .95rem">
                                     <button type="button" class="rc-btn" style="width:100%" wire:click="loadMoreInboxConversations" wire:loading.attr="disabled" wire:target="loadMoreInboxConversations">
@@ -11204,7 +10040,6 @@ CSS;
                             @endif
                         </div>
                     </aside>
-
                     <main class="rc-inbox-mid-v56 rc-inbox-mid-loading-host-v82" data-rc-selected-thread>
                         @if($selectedConversation)
                             <div class="rc-inbox-mid-head-v56">
@@ -11230,7 +10065,6 @@ CSS;
                                     <button type="button" class="rc-inbox-icon-btn-v56 {{ $selectedUnread ? 'is-unread' : '' }}" wire:click="toggleSelectedConversationUnread" title="{{ $selectedUnread ? 'Mark as read' : 'Mark as unread' }}" aria-pressed="{{ $selectedUnread ? 'true' : 'false' }}"><svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M3.5 6.5h17v12h-17v-12Z" stroke="currentColor" stroke-width="1.7"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></button>
                                 </div>
                             </div>
-
                             <div class="rc-message-stream-v56" data-rc-inbox-message-stream>
                                 <div class="rc-inbox-switch-loader-v11327" aria-live="polite" aria-hidden="true">
                                     <div class="rc-inbox-switch-loader-card-v11327">
@@ -11261,12 +10095,10 @@ CSS;
                                                     ?? $message['updated_at']
                                                     ?? $message['updatedAt']
                                                     ?? 0;
-
                                                 if (is_numeric($value)) {
                                                     $number = (float) $value;
                                                     return $number > 9999999999 ? $number / 1000 : $number;
                                                 }
-
                                                 try {
                                                     return \Illuminate\Support\Carbon::parse($value)->getTimestamp();
                                                 } catch (\Throwable $exception) {
@@ -11274,7 +10106,6 @@ CSS;
                                                 }
                                             })
                                             ->values();
-
                                         // The Livewire method is responsible for loading the initial latest
                                         // batch and prepending older batches. Render every message currently
                                         // present instead of trimming back to ten after each request.
@@ -11460,9 +10291,7 @@ CSS;
                                         </article>
                                     @endforeach
                                 @endif
-
                             </div>
-
                             <form
                                 class="rc-inbox-quick-reply-v92"
                                 wire:submit.prevent="sendQuickReply"
@@ -11472,28 +10301,23 @@ CSS;
                                     lastAppliedServerBody: '',
                                     init() {
                                         window.__rcInboxReplyDrafts = window.__rcInboxReplyDrafts || {};
-
                                         this.$nextTick(() => {
                                             if (!this.$refs.replyEditor) return;
-
                                             // Server/template content wins only when it is explicitly present.
                                             // Otherwise preserve the current browser draft for this conversation.
                                             const serverBody = String(this.initialBody || '');
                                             const localBody = String(window.__rcInboxReplyDrafts[this.conversationKey] || '');
                                             const body = serverBody !== '' ? serverBody : localBody;
-
                                             if (body !== '') {
                                                 this.$refs.replyEditor.innerHTML = body;
                                                 this.lastAppliedServerBody = serverBody;
                                             }
-
                                             this.sync(false);
                                         });
                                     },
                                     applyServerBody(value) {
                                         const html = String(value || '');
                                         if (!this.$refs.replyEditor || html === '' || html === this.lastAppliedServerBody) return;
-
                                         // A template/body change from Livewire should populate the editor once.
                                         // Never re-apply the same server value over a user's subsequent edits.
                                         this.lastAppliedServerBody = html;
@@ -11531,11 +10355,9 @@ CSS;
                                     },
                                     finishUpload() {
     this.uploadProgress = 100;
-
     this.$nextTick(() => {
         this.uploadActive = false;
         this.uploadFileName = '';
-
         if (this.$refs.quickReplyFileInput) {
             this.$refs.quickReplyFileInput.value = '';
         }
@@ -11566,7 +10388,6 @@ CSS;
                                         <button type="button" title="Bulleted list" x-on:click="command('insertUnorderedList')">•</button>
                                         <button type="button" title="Numbered list" x-on:click="command('insertOrderedList')">1.</button>
                                     </div>
-
                                     <div wire:ignore>
                                         <div
                                             x-ref="replyEditor"
@@ -11587,7 +10408,6 @@ CSS;
                                         tabindex="-1"
                                         aria-hidden="true"
                                     ></textarea>
-
                                     <div
     class="rc-inbox-quick-reply-uploading-v96"
     x-show="uploadActive"
@@ -11599,12 +10419,10 @@ CSS;
         class="rc-inbox-quick-reply-upload-spinner-v96"
         aria-hidden="true"
     ></span>
-
     <span
         class="rc-inbox-quick-reply-upload-name-v96"
         x-text="uploadFileName || 'Uploading file'"
     ></span>
-
     <span
         class="rc-inbox-quick-reply-upload-percent-v96"
         x-text="uploadProgress >= 100
@@ -11614,7 +10432,6 @@ CSS;
                 : 'Uploading…')"
     ></span>
 </div>
-
 @if(! empty($quickReplyAttachments))
     <div
         class="rc-inbox-quick-reply-attachments-v94"
@@ -11629,29 +10446,24 @@ CSS;
                         ?? ''
                     )
                 );
-
                 $attachmentName = trim(
                     (string) ($attachment['name'] ?? 'Attachment')
                 ) ?: 'Attachment';
-
                 $attachmentMime = strtolower(
                     (string) ($attachment['mime_type'] ?? '')
                 );
-
                 $isImageAttachment =
                     str_starts_with($attachmentMime, 'image/')
                     || preg_match(
                         '/\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i',
                         $attachmentName
                     );
-
                 $attachmentKey = sha1(
                     $attachmentUrl !== ''
                         ? $attachmentUrl
                         : $attachmentName . ':' . $attachmentIndex
                 );
             @endphp
-
             <span
                 class="rc-inbox-quick-reply-attachment-chip-v96"
                 wire:key="quick-reply-attachment-{{ $attachmentKey }}"
@@ -11712,14 +10524,12 @@ CSS;
                         </svg>
                     @endif
                 </span>
-
                 <span
                     class="rc-inbox-quick-reply-attachment-name-v96"
                     title="{{ $attachmentName }}"
                 >
                     {{ $attachmentName }}
                 </span>
-
                 <button
                     type="button"
                     wire:click="removeQuickReplyAttachmentByUrl(@js($attachmentUrl))"
@@ -11734,7 +10544,6 @@ CSS;
                     >
                         ×
                     </span>
-
                     <span
                         wire:loading
                         wire:target="removeQuickReplyAttachmentByUrl"
@@ -11746,7 +10555,6 @@ CSS;
         @endforeach
     </div>
 @endif
-
                                     <div class="rc-inbox-quick-reply-footer-v92">
                                         <div class="rc-inbox-quick-reply-tools-v92" aria-label="Reply attachment">
                                             <label
@@ -11772,7 +10580,6 @@ CSS;
                                                 <span wire:loading wire:target="quickReplyAttachmentUploads,addQuickReplyAttachments" class="rc-inbox-quick-reply-tool-spinner-v95" aria-hidden="true"></span>
                                             </label>
                                         </div>
-
                                         <div class="rc-inbox-quick-reply-actions-v92">
                                             <button
                                                 type="submit"
@@ -11794,7 +10601,6 @@ CSS;
                             <div class="rc-inbox-empty-v56"><div><strong>Select a conversation.</strong><br><span>Email messages will appear here.</span></div></div>
                         @endif
                     </main>
-
                     <aside class="rc-inbox-right-v56">
                         <div class="rc-coach-profile-v56">
                             <div class="rc-coach-cover-v56">
@@ -11806,13 +10612,11 @@ CSS;
                                 <div class="rc-profile-avatar-v56">{{ $selectedInitials }}</div>
                                 <div class="rc-profile-name-v56"><h3>{{ $selectedName }}</h3><span class="rc-verified-v56">✓</span></div>
                                 <div class="rc-profile-sub-v56">{{ $selectedTitle }}<br>{{ $selectedSchool }}</div>
-
                                 <div class="rc-contact-lines-v56">
                                     <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4V6Zm0 0 8 7 8-7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg><span>{{ data_get($selectedCoach, 'email') ?? $selectedConversation['email'] ?? 'Email unavailable' }}</span></div>
                                     <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M6 2h12v20H6V2Zm5 17h2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg><span>{{ data_get($selectedCoach, 'phone') ?? $selectedConversation['phone'] ?? 'Phone unavailable' }}</span></div> -->
                                     <!-- <div class="rc-contact-line-v56"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.3" stroke="currentColor" stroke-width="1.7"/></svg><span>{{ data_get($selectedCoach, 'city') ?: data_get($selectedCoach, 'state') ?: 'Location unavailable' }}</span></div> -->
                                 </div>
-
                                 <div
                                     class="rc-profile-actions-v56"
                                     x-data="{
@@ -11906,7 +10710,6 @@ CSS;
                                         <span class="rc-action-spinner-v81" x-cloak x-show="openingSchool"></span>
                                         <span>View School</span>
                                     </button>
-
                                     <div class="rc-profile-action-wrap-v57 rc-school-list-dropdown-v72" x-on:click.outside="listsOpen=false">
                                         <button
                                             type="button"
@@ -11920,7 +10723,6 @@ CSS;
                                             <svg viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
                                             <span x-text="listKeys.length ? 'In Lists' : 'Add to List'"></span>
                                         </button>
-
                                         <div class="rc-school-list-menu-v72 rc-profile-list-menu-v57" x-cloak x-show="listsOpen" x-transition.opacity.scale.origin.top.left x-on:click.stop role="menu">
                                             <h4>Add to a list</h4>
                                             {{-- v10.75: render Inbox lists on the server. The list collection is already
@@ -11967,7 +10769,6 @@ CSS;
                                             @endforelse
                                         </div>
                                     </div>
-
                                     <button
                                         type="button"
                                         class="rc-profile-action-v56"
@@ -11982,7 +10783,6 @@ CSS;
                                         <span x-text="favorite ? 'Favorited' : 'Favorite'"></span>
                                     </button>
                                 </div>
-
                                 <div class="rc-section-title" style="margin:1rem 0 .75rem">About School</div>
                                 <div class="rc-about-grid-v56">
                                     <div class="rc-about-item-v56"><span><svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 21V9l8-5 8 5v12M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg></span><span><strong>{{ $selectedSchool }}</strong>School</span></div>
@@ -11995,9 +10795,6 @@ CSS;
                 </div>
             </div>
         </section>
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="photos" x-show="activeSection === 'photos'" style="{{ ($section === 'photos') ? '' : 'display:none;' }}">
             @php
                 $mediaGallery = $this->mediaGallery;
@@ -12005,7 +10802,6 @@ CSS;
                 $plyrcardGallery = collect($mediaGallery['plyrcard'] ?? [])->values();
                 $canManagePlyrcardGallery = (bool) ($mediaGallery['can_manage_plyrcard'] ?? false);
             @endphp
-
             <style id="rc-my-photos-v102">
                 .rc-photos-v102{display:grid;gap:1rem;color:var(--rc-text)}
                 .rc-photos-head-v102{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;padding:.2rem 0 .35rem;border-bottom:1px solid var(--rc-border)}
@@ -12030,13 +10826,11 @@ CSS;
                 @media(max-width:520px){.rc-photos-grid-v102{gap:.5rem}.rc-photos-head-v102{align-items:flex-start}.rc-photos-head-v102 h1{font-size:1.3rem}.rc-photo-action-v102{width:2rem;height:2rem}}
                 @media(hover:none){.rc-photo-card-v102 .rc-photo-overlay-v102{opacity:1;pointer-events:auto;background:linear-gradient(to top,rgba(8,15,28,.48),rgba(8,15,28,0) 48%)}}
             </style>
-
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences, divisions, lists...',
                 'showNewEmail' => false,
             ])
-
             <div class="rc-photos-v102" x-data="{tab:'player'}">
                 <div class="rc-photos-head-v102">
                     <div>
@@ -12045,12 +10839,10 @@ CSS;
                     </div>
                     <span class="rc-photos-mark-v102" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11Z" stroke="currentColor" stroke-width="1.7"/><path d="m6.5 16 3.2-3.5 2.6 2.5 2.3-2.6L18 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="8.5" r="1.4" fill="currentColor"/></svg></span>
                 </div>
-
                 <div class="rc-photos-tabs-v102" role="tablist" aria-label="Photo categories">
                     <button type="button" class="rc-photos-tab-v102" :class="tab==='player' && 'is-active'" x-on:click="tab='player'">Player Photos <span class="rc-photos-count-v102">{{ $playerGallery->count() }}</span></button>
                     <button type="button" class="rc-photos-tab-v102" :class="tab==='plyrcard' && 'is-active'" x-on:click="tab='plyrcard'">PLYRCARD Photos <span class="rc-photos-count-v102">{{ $plyrcardGallery->count() }}</span></button>
                 </div>
-
                 <div x-show="tab==='player'" style="display:grid;gap:1rem">
                     <div class="rc-photos-upload-v102">
                         <div class="rc-photos-upload-copy-v102"><strong>Add Player Photos</strong><span>Upload images you want available in your player gallery.</span></div>
@@ -12076,7 +10868,6 @@ CSS;
                         @endforelse
                     </div>
                 </div>
-
                 <div x-show="tab==='plyrcard'" x-cloak style="display:grid;gap:1rem">
                     @if($canManagePlyrcardGallery)
                         <div class="rc-photos-upload-v102">
@@ -12112,29 +10903,21 @@ CSS;
                 </div>
             </div>
         </section>
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
             {{-- v10.87: The Support page is intentionally self-contained. --}}
             <div class="rc-support-page-v1 rc-support-page-clean-v87">
                 @include('filament.partials.support-ticket-form')
             </div>
         </section>
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'placeholder' => 'Search schools, coaches, conferences...',
                 'showNewEmail' => false,
             ])
-
             @php
                 $scheduleEvents = collect($this->myScheduleEvents ?? [])->values();
             @endphp
-
             <div class="rc-schedule-page-v72">
                 <div class="rc-schedule-titlebar-v72">
                     <div>
@@ -12143,7 +10926,6 @@ CSS;
                     </div>
                     <button type="button" class="rc-btn rc-btn-primary" wire:click="startAddScheduleEvent" wire:loading.attr="disabled" wire:target="startAddScheduleEvent">+ Add Event</button>
                 </div>
-
                 @if($showScheduleForm)
                     <form class="rc-schedule-form-v72" wire:submit.prevent="saveScheduleEvent">
                         <h2 style="margin:0;font-size:1rem;">{{ $editingScheduleId ? 'Edit Event' : 'Add Event' }}</h2>
@@ -12158,7 +10940,6 @@ CSS;
                         <div style="display:flex;justify-content:flex-end;gap:.65rem;"><button class="rc-btn" type="button" wire:click="cancelScheduleEvent">Cancel</button><button class="rc-btn rc-btn-primary" type="submit" wire:loading.attr="disabled" wire:target="saveScheduleEvent">{{ $editingScheduleId ? 'Save Changes' : 'Add Event' }}</button></div>
                     </form>
                 @endif
-
                 <div class="rc-schedule-list-title-v72">Upcoming ({{ $scheduleEvents->count() }})</div>
                 <div class="rc-schedule-list-v72">
                     @forelse($scheduleEvents as $event)
@@ -12176,9 +10957,6 @@ CSS;
                 </div>
             </div>
         </section>
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
@@ -12187,7 +10965,6 @@ CSS;
             ])
             <div class="rc-settings-page-v72">
                 <div class="rc-schedule-titlebar-v72"><div><h1>Settings</h1><p class="rc-schedule-sub-v72">Control your recruiting notifications and account shortcuts.</p></div></div>
-
                 <div class="rc-settings-card-v72">
                     <div class="rc-settings-head-v72">
                         <div class="rc-settings-icon-v72">🔔</div>
@@ -12214,7 +10991,6 @@ CSS;
                         </div>
                     @endforeach
                 </div>
-
                 <div class="rc-settings-card-v72">
                     <div class="rc-settings-head-v72">
                         <div class="rc-settings-icon-v72">⚙️</div>
@@ -12241,7 +11017,6 @@ CSS;
                         </div>
                     @endforeach
                 </div>
-
                 <div class="rc-settings-card-v72" id="account-security">
                     <div class="rc-settings-head-v72">
                         <div class="rc-settings-icon-v72">🔒</div>
@@ -12276,104 +11051,15 @@ CSS;
                         </div>
                     </form>
                 </div>
-
-                @php
-                    $settingsBillingService = app(\App\Services\BillingProfileService::class);
-                    // Force an authoritative subscription/payment refresh when Billing & Payments is opened.
-                    $settingsBilling = $settingsBillingService->refreshPaymentIdentity(auth()->user());
-                    $settingsPaymentUpdateUrl = $settingsBillingService->paymentMethodUpdateUrl(auth()->user(), $settingsBilling);
-                    $settingsBillingConnected = filled($settingsBilling->ghl_contact_id);
-                    $settingsCancellationRequested = (bool) data_get($settingsBilling->registration_meta ?? [], 'cancellation_requested_at');
-                    $settingsBrand = strtoupper((string) ($settingsBilling->payment_brand ?: 'CARD'));
-                @endphp
-
-                <div class="rc-settings-card-v72" id="billing-payments">
-                    <div class="rc-settings-head-v72">
-                        <div class="rc-settings-icon-v72">💳</div>
-                        <div>
-                            <h2 style="margin:0;">Billing &amp; Payments</h2>
-                            <p style="margin:.2rem 0 0;color:var(--rc-muted);">Manage the billing contact, address, subscription, and saved payment method used for your PLYRCARD account.</p>
-                        </div>
-                    </div>
-
-                    @if(session('success'))
-                        <div style="margin:0 0 1rem;padding:.7rem .8rem;border:1px solid rgba(16,185,129,.3);border-radius:.7rem;background:rgba(16,185,129,.08);color:#047857;font-size:.82rem;font-weight:650;">{{ session('success') }}</div>
-                    @endif
-                    @if($errors->has('locker_room'))
-                        <div style="margin:0 0 1rem;padding:.7rem .8rem;border:1px solid rgba(239,68,68,.3);border-radius:.7rem;background:rgba(239,68,68,.08);color:#b91c1c;font-size:.82rem;font-weight:650;">{{ $errors->first('locker_room') }}</div>
-                    @endif
-
-                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem;margin-bottom:1rem;">
-                        <div class="rc-card is-flat"><div class="rc-subtle">Billing account</div><strong>{{ $settingsBillingConnected ? 'Connected' : 'Not connected yet' }}</strong></div>
-                        <div class="rc-card is-flat"><div class="rc-subtle">Plan</div><strong>{{ str($settingsBilling->plan_key ?: 'free')->replace('-', ' ')->title() }}</strong></div>
-                        <div class="rc-card is-flat"><div class="rc-subtle">Subscription</div><strong>{{ $settingsCancellationRequested ? 'Cancellation Requested' : str($settingsBilling->subscription_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
-                        <div class="rc-card is-flat"><div class="rc-subtle">Payment</div><strong>{{ str($settingsBilling->payment_status ?: 'not available')->replace('_', ' ')->title() }}</strong></div>
-                    </div>
-
-                    @php
-                        $settingsIsAmplify = auth()->user()?->getRoleNames()?->contains(fn ($role) => strcasecmp(trim((string) $role), 'Amplify') === 0) ?? false;
-                    @endphp
-
-                    @if(!$settingsIsAmplify)
-                        <div class="rc-row" style="align-items:center;margin-bottom:.8rem;border:1px solid rgba(255,99,56,.22);background:rgba(255,99,56,.055);border-radius:.85rem;padding:.85rem 1rem;">
-                            <div><div class="rc-row-title">Amplify</div><p class="rc-subtle" style="margin:.2rem 0 0;">Upgrade without leaving Settings. Payment confirmation updates your account automatically.</p></div>
-                            <button class="rc-btn rc-btn-primary" type="button" data-plyrcard-amplify-open>Upgrade to Amplify</button>
-                        </div>
-                    @endif
-
-                    <div class="rc-row" style="align-items:flex-start;">
-                        <div>
-                            <div class="rc-row-title">Payment Method</div>
-                            @if($settingsBilling->card_last_four)
-                                <p class="rc-subtle" style="margin:.25rem 0 0;">{{ $settingsBrand }} ending in {{ $settingsBilling->card_last_four }}{{ $settingsBilling->card_expiration ? ' · Expires '.$settingsBilling->card_expiration : '' }}</p>
-                            @else
-                                <p class="rc-subtle" style="margin:.25rem 0 0;">No saved payment method is available yet.</p>
-                            @endif
-                        </div>
-                        @if($settingsPaymentUpdateUrl)
-                            <a class="rc-btn rc-btn-primary" href="{{ $settingsPaymentUpdateUrl }}">{{ $settingsBilling->card_last_four ? 'Update Card' : 'Add Payment Method' }}</a>
-                        @endif
-                    </div>
-
-                    <form method="POST" action="{{ route('locker-room.billing.update') }}" style="margin-top:1rem;">
-                        @csrf
-                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;">
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Name<input class="rc-input" style="width:100%;" name="billing_name" placeholder="Parent or cardholder name" value="{{ old('billing_name', $settingsBilling->billing_name) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Billing Email<input class="rc-input" style="width:100%;" type="email" name="billing_email" placeholder="billing@example.com" value="{{ old('billing_email', $settingsBilling->billing_email) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Phone<input class="rc-input" style="width:100%;" name="billing_phone" placeholder="(555) 123-4567" value="{{ old('billing_phone', $settingsBilling->billing_phone) }}"></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Company / Organization<input class="rc-input" style="width:100%;" name="billing_company" placeholder="Optional organization" value="{{ old('billing_company', $settingsBilling->billing_company) }}"></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 1<input class="rc-input" style="width:100%;" name="billing_address_1" placeholder="123 Main Street" value="{{ old('billing_address_1', $settingsBilling->billing_address_1) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;grid-column:1/-1;">Address Line 2<input class="rc-input" style="width:100%;" name="billing_address_2" placeholder="Apt, suite, unit (optional)" value="{{ old('billing_address_2', $settingsBilling->billing_address_2) }}"></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">City<input class="rc-input" style="width:100%;" name="billing_city" placeholder="City" value="{{ old('billing_city', $settingsBilling->billing_city) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">State / Province<input class="rc-input" style="width:100%;" name="billing_state" placeholder="State / Province" value="{{ old('billing_state', $settingsBilling->billing_state) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Postal Code<input class="rc-input" style="width:100%;" name="billing_postal_code" placeholder="Postal code" value="{{ old('billing_postal_code', $settingsBilling->billing_postal_code) }}" required></label>
-                            <label style="display:grid;gap:.32rem;font-size:.76rem;font-weight:700;">Country<input class="rc-input" style="width:100%;" name="billing_country" placeholder="US" value="{{ old('billing_country', $settingsBilling->billing_country ?: 'US') }}" required></label>
-                        </div>
-                        <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;margin-top:1rem;">
-                            <button class="rc-btn rc-btn-primary" type="submit" data-rc-billing-save>Save Billing Information</button>
-                            @if(!$settingsCancellationRequested && in_array(strtolower((string) $settingsBilling->subscription_status), ['active','trialing','trial','past_due'], true))
-                                <button class="rc-btn" style="border-color:#fecaca;color:#b42318;background:#fff7f7;" type="button" data-rc-cancel-plan>Cancel Plan</button>
-                            @elseif($settingsCancellationRequested)
-                                <span class="rc-subtle" style="color:#b54708;font-weight:750;">Cancellation requested</span>
-                            @endif
-                            @if(!$settingsBillingConnected)
-                                <span class="rc-subtle">Saving will automatically connect this billing profile to your PLYRCARD billing account.</span>
-                            @endif
-                        </div>
-                    </form>
-                </div>
+                @include('filament.partials.stripe-billing-settings')
             </div>
         </section>
-
-
         {{-- v118: Compose school/coach selection is browser-local; the send API is touched only when sending. --}}
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="compose" x-show="activeSection === 'compose'" style="{{ ($section === 'compose') ? '' : 'display:none;' }}">
             <script>
                 (() => {
                     if (window.__rcComposeLegacyOpenerGuardV82) return;
                     window.__rcComposeLegacyOpenerGuardV82 = true;
-
                     const hideLegacyComposeOpeners = (root = document) => {
                         root.querySelectorAll?.('[data-rc-opening-overlay], .rc-open-loading-overlay, .rc-compose-opening-overlay, .rc-compose-loading-backdrop').forEach((node) => {
                             const text = String(node.textContent || '').toLowerCase();
@@ -12385,7 +11071,6 @@ CSS;
                             }
                         });
                     };
-
                     hideLegacyComposeOpeners();
                     // v10.113.22: no whole-document MutationObserver here. Compose is
                     // mounted even while Inbox is open, so the old observer scanned the
@@ -12396,14 +11081,11 @@ CSS;
                     document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(hideLegacyComposeOpeners));
                 })();
             </script>
-
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
                 'showNewEmail' => false,
             ])
-
             {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
-
             <style>
                 .rc-compose-page-v45 { display:grid; gap:1rem; }
                 .rc-compose-titlebar-v45 { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; }
@@ -12477,7 +11159,6 @@ CSS;
                 .rc-compose-modal-v45 { position:fixed; inset:0; z-index:90; display:grid; place-items:center; padding:1rem; background:rgba(2,6,23,.62); backdrop-filter:blur(5px); }
                 @media (max-width: 1100px) { .rc-compose-titlebar-v45 { align-items:flex-start; flex-direction:column; } .rc-attachment-grid-v45 { grid-template-columns:1fr; } .rc-compose-field-row-v45 { grid-template-columns:1fr; } .rc-compose-coach-grid-v45 { grid-template-columns:1fr; } }
             </style>
-
             <div class="rc-compose-page-v45"
                 x-data="{
                     dataset: @js($this->composeClientDataset),
@@ -12493,7 +11174,6 @@ CSS;
                     init() {
                         const cached = window.__rcComposeRecipientStateV101;
                         const currentPath = String(window.location?.pathname || '');
-
                         // v101: the browser-side Compose recipient state is authoritative
                         // across Livewire morphs on this same page. The server-rendered
                         // campaignSchoolId may still be empty/older because school/coach
@@ -12501,7 +11181,6 @@ CSS;
                         if (cached && String(cached.path || '') === currentPath) {
                             const cachedSchoolId = String(cached.schoolId || '');
                             const schoolExists = cachedSchoolId === '' || this.schools.some(row => String(row.id || '') === cachedSchoolId);
-
                             if (schoolExists) {
                                 this.selectedSchoolId = cachedSchoolId;
                                 this.selectedCoachIds = Array.isArray(cached.selectedCoachIds) ? [...cached.selectedCoachIds].map(String) : [];
@@ -12510,7 +11189,6 @@ CSS;
                                 this.chooserOpen = Boolean(cached.chooserOpen);
                             }
                         }
-
                         try {
                             const requestedSchoolId = String(new URLSearchParams(window.location.search || '').get('school') || '').trim();
                             if (requestedSchoolId && this.schools.some(row => String(row.id || '') === requestedSchoolId)) {
@@ -12521,7 +11199,6 @@ CSS;
                                 this.chooserOpen = false;
                             }
                         } catch (_) {}
-
                         this.rememberRecipientState();
                     },
                     rememberRecipientState() {
@@ -12579,7 +11256,6 @@ CSS;
                             const escaped = String(token).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                             output = output.replace(new RegExp('\\{\\{\\s*' + escaped + '\\s*\\}\\}', 'gi'), String(replacement ?? ''));
                         });
-
                         // Preview should look like the actual email, not the editor.
                         // Merge/custom values are highlighted inside the contenteditable
                         // with rc-merge-token-v48, so unwrap those editor-only spans after
@@ -12592,7 +11268,6 @@ CSS;
                             });
                             output = template.innerHTML;
                         }
-
                         return output;
                     },
                     openPreview() {
@@ -12815,7 +11490,6 @@ CSS;
                                     if (!this.name) this.name = subject;
                                     this.error = '';
                                     this.open = !this.open;
-                                    
                                 },
                                 async saveTemplate() {
                                     if (this.saving) return;
@@ -12824,7 +11498,6 @@ CSS;
                                         this.error = 'Enter a template name.';
                                         return;
                                     }
-
                                     const composePage = document.querySelector('.rc-compose-page-v45') || document;
                                     const subject = String(composePage.querySelector('[data-rc-compose-subject]')?.value || '').trim();
                                     const nativeEditor = window.__plyrNativeEditors?.campaignBody;
@@ -12834,10 +11507,8 @@ CSS;
                                         || editorElement?.innerHTML
                                         || ''
                                     ).trim();
-
                                     if (!subject) { this.error = 'Add a subject before saving this template.'; return; }
                                     if (!body || !String(editorElement?.innerText || '').trim()) { this.error = 'Write the email content before saving this template.'; return; }
-
                                     this.saving = true;
                                     this.error = '';
                                     try {
@@ -12847,12 +11518,10 @@ CSS;
                                             subject: subject,
                                             body: body,
                                         });
-
                                         if (!result?.ok) {
                                             this.error = String(result?.message || 'Unable to save the template.');
                                             return;
                                         }
-
                                         this.open = false;
                                         this.name = '';
                                         window.dispatchEvent(new CustomEvent('rc-compose-template-created', { detail: { template: result.template || null } }));
@@ -12911,7 +11580,6 @@ CSS;
                         </button>
                     </div>
                 </div>
-
                 <div class="rc-compose-layout-v45">
                     <div class="rc-compose-card-v45">
                         <div class="rc-compose-inner-v45">
@@ -12925,13 +11593,11 @@ CSS;
                                         </span>
                                     </template>
                                     <template x-if="!selectedSchool"><em class="rc-subtle">No school selected — search to add one below</em></template>
-
                                     <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && headCoachOnly}" x-on:click="chooseHeadCoach()">Head Coach Only</button>
                                     <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='school' && !headCoachOnly}" x-on:click="chooseAllCoaches()">All Coaches</button>
                                     <button type="button" class="rc-compose-tab-v45" x-bind:class="{'is-active':selectedSchool && targetMode==='coaches'}" x-on:click="chooseSpecificCoaches()">Choose Coaches</button>
                                     <button type="button" class="rc-compose-tab-v45 {{ $composeShowCcBcc ? 'is-active' : '' }}" wire:click="$toggle('composeShowCcBcc')">CC / BCC</button>
                                 </div>
-
                                 <div class="rc-compose-school-search-v45" style="margin-top:.65rem;position:relative;max-width:34rem">
                                     <div class="rc-global-search-shell" style="width:100%;height:2.85rem;box-shadow:none">
                                         <svg class="rc-global-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z" /></svg>
@@ -12952,14 +11618,12 @@ CSS;
                                         <div x-show="schoolResults.length===0" class="rc-empty-state" style="padding:.8rem">No schools found.</div>
                                     </div>
                                 </div>
-
                                 @if($composeShowCcBcc)
                                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-top:.65rem;max-width:42rem">
                                         <input class="rc-input" placeholder="CC emails, comma separated" wire:model.blur="campaignCc" />
                                         <input class="rc-input" placeholder="BCC emails, comma separated" wire:model.blur="campaignBcc" />
                                     </div>
                                 @endif
-
                                 <div x-cloak x-show="selectedSchool && chooserOpen" style="margin-top:.65rem">
                                     <input class="rc-input" style="width:100%;max-width:28rem" placeholder="Filter coaches..." x-model="coachQuery" />
                                     <div class="rc-compose-coach-grid-v45">
@@ -12979,10 +11643,8 @@ CSS;
                                         <button type="button" class="rc-btn" x-on:click="clearCoaches()">Clear coaches</button>
                                     </div>
                                 </div>
-
                                 <div class="rc-compose-send-line-v45" style="margin-top:.7rem" x-text="sendingDescription"></div>
                             </div>
-
                             <div>
                                 <div class="rc-compose-label-v45">Subject Line</div>
                                 <div class="rc-compose-field-row-v45">
@@ -13107,7 +11769,6 @@ CSS;
                                     </div>
                                 </div>
                             </div>
-
                             <div>
                                 <div class="rc-compose-label-v45">Insert Variable</div>
                                 <div class="rc-compose-vars-v45">
@@ -13120,14 +11781,12 @@ CSS;
                                     <button class="rc-compose-var-v45" type="button" x-on:mousedown.prevent="window.rcPreparePlyrNativeEditor && window.rcPreparePlyrNativeEditor('campaignBody')" x-on:click.prevent.stop="window.rcInsertPlyrNativeMergeToken && window.rcInsertPlyrNativeMergeToken('campaignBody','HighlightLink')">@{{HighlightLink}}</button>
                                 </div>
                             </div>
-
                             <div
                                 x-data="plyrNativeEditorBase('campaignBody')"
                                 x-init="
                                     const serverTemplateId = @js((string) ($campaignTemplateId ?? ''));
                                     const serverBodyBase64 = @js(base64_encode((string) ($campaignBody ?? '')));
                                     const serverBodyKey = 'server-' + @js(sha1((string) ($campaignTemplateId ?? '') . '|' . (string) ($campaignBody ?? '')));
-
                                     // A Compose route with ?template=... is rendered after Laravel has
                                     // already loaded that local template. Seed the editor directly from
                                     // that canonical server body and never restore an older localStorage copy.
@@ -13137,7 +11796,6 @@ CSS;
                                         window.__plyrComposeEditorFullBodyBase64 = serverBodyBase64;
                                         window.__plyrComposeEditorFullBodyKey = serverBodyKey;
                                     }
-
                                     mount();
                                 "
                                 x-on:plyr-editor-insert-token.window="insertMerge($event.detail.token)"
@@ -13189,7 +11847,6 @@ CSS;
                                         </div>
                                     </div>
                                 </div>
-
                                 <div
                                     x-cloak
                                     x-show="activePanel"
@@ -13214,7 +11871,6 @@ CSS;
                             </div>
                         </div>
                     </div>
-
                     <div class="rc-attachments-v45">
                         <div style="font-weight:700">Attachments ({{ count($composeAttachments) }})</div>
                         <div class="rc-attachment-grid-v45">
@@ -13242,7 +11898,6 @@ CSS;
                     </div>
                 </div>
             </div>
-
             @teleport('body')
             <div
                 x-data="{ open: false, subject: '', body: '' }"
@@ -13267,14 +11922,9 @@ CSS;
             </div>
             @endteleport
         </section>
-
-
-        
 <section class="rc-client-panel-v1033" data-rc-client-section="campaigns" data-rc-server-hydrated="{{ ($section === 'campaigns') ? '1' : '0' }}" x-show="activeSection === 'campaigns'" style="{{ ($section === 'campaigns') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header')
-
             {{-- v10.113.5: template loading banners removed; template access is local/cache-first. --}}
-
             @php
                 $templateQuery = strtolower(trim((string) ($templateSearch ?? '')));
                 $templateRows = collect($templates ?? [])
@@ -13283,7 +11933,6 @@ CSS;
                         if ($templateQuery === '') {
                             return true;
                         }
-
                         return str_contains(strtolower((string) ($template['name'] ?? '')), $templateQuery)
                             || str_contains(strtolower((string) ($template['subjectLine'] ?? $template['subject'] ?? '')), $templateQuery)
                             || str_contains(strtolower((string) ($template['previewText'] ?? $template['description'] ?? '')), $templateQuery);
@@ -13291,7 +11940,6 @@ CSS;
                     ->values();
                 $templateCount = $templateRows->count();
             @endphp
-
             <style>
                 .rc-templates-page-v50{display:grid;gap:1.1rem;margin-top:1.1rem}
                 .rc-templates-head-v50{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}
@@ -13331,7 +11979,6 @@ CSS;
                 .rc-template-editor-v50 .rc-merge-token-v48{display:inline-block!important;background:rgba(255,99,56,.16)!important;color:#ff4f2f!important;border:1px solid rgba(255,99,56,.18)!important;border-radius:.4rem!important;padding:.04rem .28rem!important;margin:0 .05rem!important;font-family:ui-monospace,SFMono-Regular,Menlo,monospace!important;font-size:.92em!important;font-weight:760!important;white-space:nowrap!important;line-height:1.45!important;user-select:text!important;}
                 .dark .rc-template-editor-v50 .rc-merge-token-v48{background:rgba(255,99,56,.20)!important;color:#ff9b84!important;border-color:rgba(255,99,56,.24)!important;}
                 .rc-template-attachments-v50{border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 16px 38px rgba(15,23,42,.06);padding:1rem;margin-top:1rem}.rc-template-drop-v50{border:1px dashed rgba(148,163,184,.42);border-radius:.95rem;min-height:4.6rem;display:grid;place-items:center;text-align:center;color:var(--rc-muted);font-size:.82rem;background:rgba(148,163,184,.035);cursor:pointer}
-
                 /* v10.113.31: friendlier new-template builder */
                 .rc-template-builder-v11331{display:grid;gap:1rem}
                 .rc-template-builder-intro-v11331{display:flex;align-items:center;justify-content:space-between;gap:1rem;border:1px solid rgba(255,99,56,.16);border-radius:1.05rem;background:linear-gradient(135deg,rgba(255,99,56,.085),rgba(248,250,252,.92));padding:1rem 1.05rem;box-shadow:0 14px 34px rgba(15,23,42,.055)}
@@ -13362,7 +12009,6 @@ CSS;
                 .rc-template-editor-footer-v11331{padding:.5rem .68rem!important}
                 .rc-template-bottom-bar-v11331{padding:0!important;margin-top:-.2rem!important}
                 @media(max-width:900px){.rc-template-builder-intro-v11331,.rc-template-builder-card-head-v11331{align-items:flex-start;flex-direction:column}.rc-template-builder-steps-v11331{justify-content:flex-start}.rc-template-details-grid-v11331{grid-template-columns:1fr}.rc-template-editor-v50{min-height:18rem!important}}
-                
                 /* Compact templates cards */
                 .rc-template-grid-v50{gap:.78rem!important;margin-top:.85rem!important}
                 .rc-template-card-v50{border-radius:.9rem!important;padding:.78rem!important;gap:.62rem!important;min-height:12.4rem!important;box-shadow:0 10px 26px rgba(15,23,42,.055)!important}
@@ -13379,7 +12025,6 @@ CSS;
 @media(max-width:1180px){.rc-template-grid-v50{grid-template-columns:repeat(2,minmax(0,1fr))}.rc-template-editor-layout-v50{grid-template-columns:1fr}}
                 @media(max-width:720px){.rc-template-grid-v50{grid-template-columns:1fr}.rc-templates-head-v50,.rc-template-list-top-v50{align-items:stretch;flex-direction:column}.rc-template-search-v50{min-width:0}}
             </style>
-
             <div class="rc-templates-page-v50"
                  x-data="{
                     templateEditorOpenClient: @js((bool) ($templateEditorOpen ?? false)),
@@ -13421,7 +12066,6 @@ CSS;
                             <button class="rc-btn rc-btn-primary" type="button" data-rc-local-action x-on:click.prevent="openNewTemplateClient()">+ New Template</button>
                         </div>
                     </div>
-
                     <div class="rc-template-grid-v50" wire:loading.class="opacity-60" wire:target="loadTemplates,selectTemplate,duplicateTemplate,deleteTemplate,deleteTemplateById,useTemplateForCompose">
                         @forelse($templateRows as $template)
                             @php
@@ -13495,7 +12139,6 @@ CSS;
                             <button class="rc-btn rc-btn-primary" type="button" x-on:click.prevent="window.rcSaveCoachDatabaseTemplate && window.rcSaveCoachDatabaseTemplate($wire)" wire:loading.attr="disabled" wire:target="saveTemplateFromClient,saveTemplateFromClientPayload,templateAttachmentUploads,addTemplateAttachments,uploadTemplateEditorImage"><span wire:loading.remove wire:target="saveTemplateFromClient,saveTemplateFromClientPayload">✓ Save Template</span><span wire:loading.flex wire:target="saveTemplateFromClient,saveTemplateFromClientPayload" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Saving</span></button>
                         </div>
                     </div>
-
                     <div class="rc-template-editor-layout-v50" wire:key="template-editor-{{ $templateEditorRefreshKey }}" x-data="plyrTemplateEditor()" x-init="mount()" x-on:keydown.escape.window="showPreview = false">
                         <section class="rc-template-editor-card-v50 rc-template-builder-v11331">
                             <div class="rc-template-builder-intro-v11331">
@@ -13509,7 +12152,6 @@ CSS;
                                     <span class="rc-template-step-pill-v11331">3 Attachments</span>
                                 </div>
                             </div>
-
                             <div class="rc-template-builder-card-v11331">
                                 <div class="rc-template-builder-card-head-v11331">
                                     <div class="rc-template-builder-title-v11331">
@@ -13538,7 +12180,6 @@ CSS;
                                     <div class="rc-template-help-card-v11331">Tip: use merge variables so every email feels personal without rewriting it for each coach.</div>
                                 </div>
                             </div>
-
                             <div class="rc-template-builder-card-v11331">
                                 <div class="rc-template-builder-card-head-v11331">
                                     <div class="rc-template-builder-title-v11331">
@@ -13579,7 +12220,6 @@ CSS;
                                             </select>
                                         </div>
                                     </div>
-
                                     <div class="rc-template-editor-shell-v11331">
                                         <div class="rc-template-editor-toolbar-v11331" role="toolbar" aria-label="Template editor toolbar">
                                             <select class="rc-select" style="width:auto" x-on:change="block($event.target.value); $event.target.value='p'"><option value="p">Paragraph</option><option value="h2">Heading</option><option value="blockquote">Quote</option></select>
@@ -13617,7 +12257,6 @@ CSS;
                                     </div>
                                 </div>
                             </div>
-
                             <div class="rc-template-attachments-friendly-v11331">
                                 <div class="rc-template-builder-card-head-v11331">
                                     <div class="rc-template-builder-title-v11331">
@@ -13653,14 +12292,12 @@ CSS;
                                     <div wire:loading.flex wire:target="templateAttachmentUploads,addTemplateAttachments" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading files</div>
                                 </div>
                             </div>
-
                             <div class="rc-template-bottom-bar-v11331">
                                 <div class="rc-template-bottom-status-v11331">Words: {{ str_word_count(strip_tags($templateBody ?? '')) }} <b>Looks good</b></div>
                                 @if($selectedTemplateId && ! $templateIsNew)
                                     <button class="rc-btn" type="button" wire:click="deleteTemplate" wire:confirm="Delete this template?">Delete Template</button>
                                 @endif
                             </div>
-
                             <div class="rc-preview-modal-backdrop" x-cloak x-show="showPreview" x-transition.opacity>
                                 <div class="rc-preview-modal" x-on:click.outside="showPreview = false">
                                     <div class="rc-preview-modal-head"><div><div style="font-size:.78rem;color:#64748b;margin-bottom:.25rem">Template preview</div><h3 style="margin:0;font-size:1.2rem;line-height:1.35;font-weight:800" x-text="previewSubject()"></h3></div><button type="button" class="rc-btn" x-on:click="showPreview = false">Close</button></div>
@@ -13668,14 +12305,10 @@ CSS;
                                 </div>
                             </div>
                         </section>
-
                     </div>
                 </div>
             </div>
         </section>
-
-
-
         @if($selectedCoachId && $section !== 'conversations')
             <div class="rc-card">
                 <?php $composerCoach = $this->selectedCoach; ?>
@@ -13688,12 +12321,10 @@ CSS;
                                     </div>
                                     <button class="rc-btn" type="button" wire:click="closeComposer">Close</button>
                                 </div>
-
                                 <label style="display:grid;gap:.35rem">
                                     <span class="rc-section-title" style="margin:0">Subject</span>
                                     <input class="rc-input" style="width:100%" type="text" wire:model.live.debounce.500ms="emailSubject" placeholder="Subject">
                                 </label>
-
                                 <div class="rc-rich-editor-shell rc-native-editor-shell">
                                     <div class="rc-rich-editor-toolbar" role="toolbar" aria-label="Email message toolbar">
                                         <button class="rc-rich-tool" type="button" x-on:click="command('undo')">↶</button>
@@ -13729,7 +12360,6 @@ CSS;
                                                                                                                         <button class="rc-token-chip" type="button" x-on:click="insertMerge('YoutubeLink')">YouTube</button>
                                     </div>
                                     <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
-                                    
                                     <div
                                         x-cloak
                                         x-show="activePanel"
@@ -13772,7 +12402,6 @@ CSS;
                                         @blur="syncNow()"
                                     ></div>
                                 </div>
-
                                 <div class="rc-toolbar" style="justify-content:flex-end">
                                     <button class="rc-btn" type="button" wire:click="closeComposer">Cancel</button>
                                     <button class="rc-btn rc-btn-primary" type="button" wire:click="sendEmail" wire:loading.attr="disabled" wire:target="sendEmail">
@@ -13784,9 +12413,7 @@ CSS;
                         </div>
             </div>
         @endif
-
         </div>
-
         {{-- v108: persistent instant client-side school drawer shell. The selected school is mirrored
             to window.__plyrSchoolDrawerOptimistic so a Livewire morph cannot reset the open drawer
             between the optimistic click state and the final local roster response. --}}
@@ -13805,9 +12432,8 @@ CSS;
              x-bind:style="isValidOpenSchool() ? 'display:flex !important;z-index:9999' : 'display:none !important;z-index:9999'"
              x-effect="if (schoolDrawerOpen && !isValidOpenSchool()) { closeDiscoverSchool(); }"
              x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()">
-                <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop> 
+                <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop>
                     <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
-
                 <div class="rc-school-modal-hero-v72">
                     <div class="rc-school-logo-large-v72">
                         <img x-show="optimisticSchool?.logo_url" x-bind:src="optimisticSchool?.logo_url || ''" x-bind:alt="`${optimisticSchool?.name || 'School'} logo`" referrerpolicy="no-referrer" onerror="this.style.display='none'">
@@ -13826,18 +12452,15 @@ CSS;
                         <div class="rc-school-score-label" x-text="Number(optimisticSchool?.engagement_score || 0) >= 70 ? 'HOT' : (Number(optimisticSchool?.engagement_score || 0) >= 35 ? 'WARM' : 'NEW')"></div>
                     </div>
                 </div>
-
                 <div class="rc-school-modal-actions-v72">
                     <button class="rc-school-action rc-school-action-primary" type="button" x-on:click.stop.prevent="openComposeForSchool(optimisticSchool?.id || optimisticSchool?.school_id || optimisticSchool?.business_id)">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6.5h16v11H4v-11Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m4.5 7 7.5 6 7.5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                         <span>Email Coaches</span>
                     </button>
-
                     <button class="rc-school-action" type="button" x-on:click="favoriteDiscoverSchool()" x-bind:class="optimisticSchool?.is_favorite ? 'is-favorited' : ''">
                         <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3.8 2.48 5.03 5.55.8-4.02 3.91.95 5.53L12 16.46l-4.96 2.61.95-5.53-4.02-3.91 5.55-.8L12 3.8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
                         <span x-text="optimisticSchool?.is_favorite ? 'Favorited' : 'Favorite'"></span>
                     </button>
-
                     <div class="rc-school-list-dropdown-v72" x-on:click.outside="discoverListsOpen=false">
                         <button class="rc-school-action" type="button" x-on:click="discoverListsOpen=!discoverListsOpen" x-bind:class="(optimisticSchool?.list_keys || []).filter(k => String(k).toLowerCase() !== '__favorite__').length ? 'is-in-list' : ''">
                             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
@@ -13854,7 +12477,6 @@ CSS;
                                 </button>
                             </template>
                             <div class="rc-school-list-empty" x-show="discoverLists.length === 0">No lists yet.</div>
-
                             <div class="rc-list-quick-create-v112">
                                 <div class="rc-list-quick-create-title-v112">Create new list</div>
                                 <div class="rc-list-quick-create-row-v112">
@@ -13868,13 +12490,11 @@ CSS;
                         </div>
                     </div>
                 </div>
-
                 <div class="rc-school-tabbar-v72 rc-discover-tabbar-v111" role="tablist" aria-label="School detail tabs">
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'coaches' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='coaches'">Coaching Staff</button>
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'roster' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='roster'">Roster &amp; Stats</button>
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications(true)">Communications</button>
                 </div>
-
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
                     <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
                         <div style="display:grid;gap:.7rem" x-show="(optimisticSchool?.coaches?.length ?? 0) > 0">
@@ -13909,7 +12529,6 @@ CSS;
                         </div>
                     </div>
                 </section>
-
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'roster'" x-cloak>
                     <div style="min-height:18rem;display:flex;align-items:center;justify-content:center;padding:2rem;text-align:center;">
                         <div style="max-width:24rem;">
@@ -13919,13 +12538,11 @@ CSS;
                         </div>
                     </div>
                 </section>
-
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'comms'" x-cloak>
                     <div class="rc-school-comms-history-v123">
                         <div class="rc-school-comms-loading-v123" x-show="discoverSchoolCommsLoading">
                             <span class="rc-spinner-mini"></span><span>Loading conversation history…</span>
                         </div>
-
                         {{-- Keep the list mounted instead of nesting x-for inside x-if. The
                              existing Communications data/fetching logic stays unchanged. --}}
                         <div class="rc-school-comms-list-v123" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length > 0" x-cloak>
@@ -13944,7 +12561,6 @@ CSS;
                                 </div>
                             </template>
                         </div>
-
                         <div class="rc-empty" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length === 0">
                             <strong>No conversation history yet.</strong>
                             <span>Emails and replies with coaches from this school will appear here.</span>
@@ -13953,12 +12569,10 @@ CSS;
                 </section>
             </div>
         </div>
-
         {{-- v113: legacy section-specific server drawer removed. The Discover drawer above
              is the single global drawer for Dashboard, Discover, Favorites, and My Lists. --}}
     </div>
     </div>
-
     <style>
         /* v100: keep logo fallback initials from ever becoming a full-page overlay.
            This is intentionally non-invasive: it does not touch data loading, school loading,
@@ -13975,7 +12589,6 @@ CSS;
             box-sizing: border-box !important;
             z-index: 0 !important;
         }
-
         .rc-wrap .rc-school-card-logo-box,
         .rc-wrap .rc-school-list-logo-box,
         .rc-wrap .rc-radar-logo-v2,
@@ -13991,15 +12604,12 @@ CSS;
             overflow: hidden !important;
         }
     </style>
-
     <style id="rc-school-drawer-stability-v112">
         .rc-school-coaches-error-v112{display:grid;justify-items:start;gap:.45rem;text-align:left}.rc-school-coaches-error-v112 span{font-size:.78rem;line-height:1.45;color:var(--rc-muted)}.rc-school-coaches-retry-v112{display:inline-flex;align-items:center;justify-content:center;min-height:2rem;padding:.42rem .75rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);font-size:.75rem;font-weight:800;cursor:pointer}.rc-school-coaches-retry-v112:hover{border-color:rgba(255,99,56,.45);color:var(--rc-accent)}
     </style>
-
     <style id="rc-school-comms-v123">
         .rc-school-comms-history-v123{min-height:14rem;padding:.15rem 0}.rc-school-comms-loading-v123{min-height:10rem;display:flex;align-items:center;justify-content:center;gap:.55rem;color:var(--rc-muted);font-size:.84rem}.rc-school-comms-list-v123{display:grid;gap:.65rem}.rc-school-comms-row-v123{display:grid;grid-template-columns:2.15rem minmax(0,1fr);gap:.7rem;align-items:start;padding:.8rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface)}.rc-school-comms-direction-v123{width:2.15rem;height:2.15rem;display:grid;place-items:center;border-radius:.65rem;background:#fff1ed;color:#ff6338;font-weight:900}.rc-school-comms-direction-v123.is-inbound{background:#ecfdf5;color:#16a34a}.rc-school-comms-copy-v123{min-width:0;display:grid;gap:.18rem}.rc-school-comms-copy-v123 strong{font-size:.82rem;color:var(--rc-text)}.rc-school-comms-copy-v123 span{font-size:.75rem;color:var(--rc-muted);line-height:1.42}.rc-school-comms-copy-v123 small{font-size:.68rem;color:#9aa3b2}
     </style>
-
     <style>
         /* v111: Discover drawer owns the interaction plane. The backdrop catches clicks and
            the panel opts into pointer events explicitly so nothing can click through to cards. */
@@ -14068,7 +12678,6 @@ CSS;
         .rc-wrap .rc-discover-tab-panel-v111 {
             padding-top: 1rem !important;
         }
-
         /* v112: Discover bulk/list menus share the polished drawer menu language and
            include inline list creation without a page rerender. */
         .rc-wrap .rc-discover-list-menu-v112 {
@@ -14173,19 +12782,15 @@ CSS;
             background: rgba(34, 197, 94, .12) !important;
         }
     </style>
-
     <script>
-
         window.plyrRepairBrokenEditorLinkFragments = function (html) {
             let source = String(html || '');
             if (!source) return '';
-
             const buttonStyle = 'display:block;width:100%;box-sizing:border-box;text-align:center;text-decoration:none;font-weight:800;border-radius:10px;padding:12px 16px;margin:0 0 10px;';
             const repairs = [
                 { token: 'ProfileLink', label: 'View PLYRCard Profile', style: buttonStyle + 'background:#ff5b32;color:#ffffff;', className: 'rc-email-button' },
                 { token: 'HighlightLink', label: 'Watch Highlights', style: buttonStyle + 'background:#111827;color:#ffffff;', className: 'rc-email-button' },
             ];
-
             const escReg = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             repairs.forEach((item) => {
                 const tokenPattern = '\\{\\{\\s*' + escReg(item.token) + '\\s*\\}\\}';
@@ -14199,23 +12804,19 @@ CSS;
                     source = source.replace(new RegExp(tokenPattern + '\\s*' + attrQuote + '\\s*data-plyrcard-link\\s*=\\s*' + attrQuote + '[^"\\\' >]+' + attrQuote + '\\s*[^>\\n\\r]*>\\s*', 'gi'), replacement + ' ');
                 }
             });
-
             source = source.replace(/<span\b[^>]*style="[^"]*(?:background\s*:\s*#?000|background-color\s*:\s*#?000)[^"]*"[^>]*>\s*(?:<\/span>|&nbsp;)?/gi, '');
             source = source.replace(/<span\b[^>]*class="[^"]*social[^"]*"[^>]*>\s*<\/span>/gi, '');
             source = source.replace(/<\/a>\s*(?=<a\b)/gi, '');
             return source;
         };
-
         window.rcComposeTemplateStorageKey = function (templateId) {
             return 'plyrcard-compose-template-body:' + String(templateId || '').trim();
         };
-
         window.rcRememberComposeTemplateBody = function (templateId, bodyBase64, bodyKey) {
             templateId = String(templateId || '').trim();
             bodyBase64 = String(bodyBase64 || '');
             bodyKey = String(bodyKey || ('compose-' + Date.now()));
             if (!templateId || !bodyBase64) return false;
-
             // Keep this as an in-memory instant-paint helper only. Persistent
             // localStorage was able to outlive template edits and overwrite the
             // body that Laravel had just loaded from the database.
@@ -14226,20 +12827,17 @@ CSS;
             window.__plyrComposeEditorFullBodyKey = finalKey;
             return true;
         };
-
         window.rcSeedComposeTemplateFromStorage = function () {
             // Legacy compatibility shim. Compose templates now come from the
             // canonical Laravel/local-template row, not persistent browser cache.
             return false;
         };
-
         window.rcDecodeEditorBodyBase64 = function (encoded) {
             encoded = String(encoded || '');
             if (!encoded) return '';
             try { return decodeURIComponent(escape(window.atob(encoded))); }
             catch (error) { try { return window.atob(encoded); } catch (_) { return ''; } }
         };
-
         window.rcEditorBodyScore = function (html) {
             html = String(html || '');
             if (!html.trim()) return 0;
@@ -14259,39 +12857,31 @@ CSS;
             const blocks = (html.match(/<\s*(p|div|li|h[1-6]|blockquote|tr|br)\b/gi) || []).length;
             return text.length + (tokens * 120) + (images * 100) + (links * 30) + (blocks * 18) + Math.min(html.length, 1200) / 20;
         };
-
         window.rcChooseComposeEditorBodyBase64 = function (incomingEncoded, incomingKey = '') {
             incomingEncoded = String(incomingEncoded || '');
             incomingKey = String(incomingKey || '');
             const fullEncoded = String(window.__plyrComposeEditorFullBodyBase64 || '');
             const fullKey = String(window.__plyrComposeEditorFullBodyKey || incomingKey || 'compose-full');
-
             if (!fullEncoded) {
                 return { body: incomingEncoded, key: incomingKey };
             }
-
             if (!incomingEncoded || incomingEncoded === fullEncoded) {
                 return { body: fullEncoded, key: fullKey };
             }
-
             const incomingHtml = window.rcDecodeEditorBodyBase64(incomingEncoded);
             const fullHtml = window.rcDecodeEditorBodyBase64(fullEncoded);
             const incomingScore = window.rcEditorBodyScore(incomingHtml);
             const fullScore = window.rcEditorBodyScore(fullHtml);
             const incomingTokens = (incomingHtml.match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
             const fullTokens = (fullHtml.match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
-
             if (fullTokens > incomingTokens || fullScore > incomingScore + 25 || fullHtml.length > incomingHtml.length + 30) {
                 return { body: fullEncoded, key: fullKey };
             }
-
             return { body: incomingEncoded, key: incomingKey };
         };
-
         window.rcOpenComposeTemplateFromCard = function (element, fallbackUrl) {
             const id = String(element?.dataset?.rcTemplateId || '').trim();
             if (!id) return;
-
             // Only carry the template id. The Compose route loads subject + full
             // body from the same local database row, so there is no stale browser
             // body to disagree with it.
@@ -14299,7 +12889,6 @@ CSS;
             const separator = baseUrl.includes('?') ? '&' : '?';
             window.location.href = baseUrl + separator + 'template=' + encodeURIComponent(id);
         };
-
         window.plyrNativeEditorBase = function (modelName, initialBody = '') {
             return {
                 syncTimer: null,
@@ -14337,25 +12926,21 @@ CSS;
                         if (window.__plyrComposeEditorRefreshHandler) {
                             window.removeEventListener('rc-compose-editor-refresh', window.__plyrComposeEditorRefreshHandler);
                         }
-
                         this.composeRefreshHandler = (event) => {
                             const editor = this.$refs.editor;
                             if (!editor || !editor.isConnected) return;
-
                             // This event is emitted after the requested local template was
                             // loaded by Livewire. It is authoritative even when it is shorter
                             // than the previously selected template.
                             const encoded = String(event.detail?.body || '');
                             const key = String(event.detail?.key || ('livewire-' + encoded.length));
                             if (!encoded) return;
-
                             window.__plyrComposeEditorPendingBodyBase64 = encoded;
                             window.__plyrComposeEditorPendingBodyKey = key;
                             window.__plyrComposeEditorFullBodyBase64 = encoded;
                             window.__plyrComposeEditorFullBodyKey = key;
                             this.applyEncodedBody(encoded, key, true);
                         };
-
                         window.__plyrComposeEditorRefreshHandler = this.composeRefreshHandler;
                         window.addEventListener('rc-compose-editor-refresh', this.composeRefreshHandler);
                     }
@@ -14378,17 +12963,14 @@ CSS;
                     const pendingKey = modelName === 'campaignBody' ? String(window.__plyrComposeEditorPendingBodyKey || '') : '';
                     const serverBody = String(initialBody || this.$refs.editor.dataset.initialBody || '');
                     const serverKey = String(this.$refs.editor.dataset.refreshKey || 'initial-' + String(serverBody || '').length);
-
                     // Server-rendered campaignBody is the saved template. Pending browser
                     // state is used only when the server genuinely has no body.
                     let encoded = serverBody || pendingBody;
                     let key = serverBody ? serverKey : pendingKey;
-
                     if (encoded) {
                         const applied = this.applyEncodedBody(encoded, key, force || this.$refs.editor.innerHTML.trim() === '');
                         if (applied) return;
                     }
-
                     if (this.$refs.editor.innerHTML.trim() !== '') {
                         const highlighted = this.highlightMergeTokens(this.$refs.editor.innerHTML || '');
                         if (highlighted !== this.$refs.editor.innerHTML) {
@@ -14402,19 +12984,15 @@ CSS;
                     encoded = String(encoded || '');
                     key = String(key || '');
                     if (!editor || !encoded) return false;
-
                     const html = this.decodeInitialBody(encoded);
                     if (!html) return false;
-
                     const currentText = String(editor.textContent || '').replace(/\s+/g, ' ').trim();
                     const incomingText = String(html || '').replace(/<br\s*\/?\s*>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
                     const shouldApply = force
                         || this.lastAppliedBodyBase64 !== encoded
                         || (incomingText.length > currentText.length + 8)
                         || editor.innerHTML.trim() === '';
-
                     if (!shouldApply) return false;
-
                     editor.dataset.initialBody = encoded;
                     editor.dataset.refreshKey = key;
                     editor.innerHTML = this.highlightMergeTokens(html || '');
@@ -14649,7 +13227,6 @@ CSS;
                 uploadInlineImages(event) {
                     const files = Array.from(event.target.files || []);
                     if (!files.length) return;
-
                     this.uploadingImages = true;
                     const uploadNext = (index = 0) => {
                         if (index >= files.length) {
@@ -14658,7 +13235,6 @@ CSS;
                             this.syncNow();
                             return;
                         }
-
                         const file = files[index];
                         this.$wire.upload('templateInlineImageUpload', file, () => {
                             this.$wire.call('uploadTemplateEditorImage').then((result) => {
@@ -14678,7 +13254,6 @@ CSS;
                             uploadNext(index + 1);
                         });
                     };
-
                     uploadNext();
                 },
                 insertImage(url) {
@@ -14694,12 +13269,10 @@ CSS;
                 }
             };
         };
-
         window.rcPreparePlyrNativeEditor = function (modelName) {
             const editor = window.__plyrNativeEditors?.[modelName];
             if (editor && typeof editor.captureSelection === 'function') editor.captureSelection();
         };
-
         window.rcInsertPlyrNativeMergeToken = function (modelName, token) {
             const editor = window.__plyrNativeEditors?.[modelName];
             if (editor && typeof editor.insertMerge === 'function') {
@@ -14708,30 +13281,24 @@ CSS;
             }
             window.dispatchEvent(new CustomEvent('plyr-editor-insert-token', { detail: { token } }));
         };
-
         window.rcApplyComposeTemplateBodyBase64 = function (encoded, key = '', force = true) {
             encoded = String(encoded || '');
             key = String(key || 'compose-local-' + Date.now());
             if (!encoded) return false;
-
             window.__plyrComposeEditorPendingBodyBase64 = encoded;
             window.__plyrComposeEditorPendingBodyKey = key;
             window.__plyrComposeEditorFullBodyBase64 = encoded;
             window.__plyrComposeEditorFullBodyKey = key;
-
             const editor = window.__plyrNativeEditors?.campaignBody;
             if (editor && typeof editor.applyEncodedBody === 'function') {
                 return editor.applyEncodedBody(encoded, key, force);
             }
-
             window.dispatchEvent(new CustomEvent('rc-compose-editor-refresh', { detail: { body: encoded, key } }));
             return true;
         };
-
         window.plyrCampaignBodyEditor = function () {
             return window.plyrNativeEditorBase('campaignBody');
         };
-
         window.plyrTemplateEditor = function () {
             return {
                 showPreview: false,
@@ -14752,20 +13319,16 @@ CSS;
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
-
                     this.selectionHandler = () => this.captureSelection();
                     document.addEventListener('selectionchange', this.selectionHandler);
-
                     this.$nextTick(() => {
                         this.bootEditor(true);
                         setTimeout(() => this.bootEditor(false), 80);
                         setTimeout(() => this.bootEditor(false), 260);
                     });
-
                     document.addEventListener('rc-open-template-preview', () => {
                         this.openPreview();
                     });
-
                     window.addEventListener('rc-template-editor-refresh', (event) => {
                         const encoded = event.detail?.body || '';
                         const key = String(event.detail?.key || '');
@@ -14781,12 +13344,10 @@ CSS;
                 },
                 bootEditor(force = false) {
                     if (!this.$refs.editor) return;
-
                     const source = this.templateHydrationSource();
                     const encoded = source.body || '';
                     const key = source.key || '';
                     const html = this.decodeBodyValue(encoded);
-
                     if (html && this.shouldHydrateTemplateEditor(html, String(this.$refs.editor.innerHTML || ''), force, key, encoded)) {
                         this.applyTemplateBodyHtml(html, encoded, key);
                     } else if (String(this.$refs.editor.innerHTML || '').trim() && !String(this.$refs.editor.innerHTML || '').includes('rc-merge-token-v48')) {
@@ -14806,11 +13367,9 @@ CSS;
                     const fullBody = String(window.__plyrTemplateEditorFullBodyBase64 || '').trim();
                     const fullKey = String(window.__plyrTemplateEditorFullBodyKey || '').trim();
                     const mode = String(window.__rcTemplateClientMode || '').trim();
-
                     if (mode === 'new') {
                         return { body: domBody || attrBody, key: domKey };
                     }
-
                     return {
                         body: cardBody || fullBody || String(pending.body || '').trim() || domBody || attrBody,
                         key: cardKey || fullKey || String(pending.key || '').trim() || domKey,
@@ -14832,11 +13391,9 @@ CSS;
                     if (force) return true;
                     if (encoded && encoded !== this.lastHydratedTemplateBody && key && key !== this.lastHydratedTemplateKey) return true;
                     if (current === '' || current === '<br>' || current.includes('Write your reusable email template...')) return true;
-
                     const nextTokens = this.templateEditorTokenCount(next);
                     const currentTokens = this.templateEditorTokenCount(current);
                     if (nextTokens > currentTokens) return true;
-
                     const nextText = this.templateEditorVisibleText(next);
                     const currentText = this.templateEditorVisibleText(current);
                     return nextText.length > currentText.length + 8;
@@ -14879,7 +13436,6 @@ CSS;
                 },
                 syncNow() {
                     if (!this.$refs.hidden || !this.$refs.editor) return;
-
                     const html = this.serializeEditorHtml();
                     this.$refs.hidden.value = html;
                     this.$refs.editor.dataset.plyrLastSerializedHtml = html;
@@ -15011,37 +13567,29 @@ CSS;
                             return activeRange.cloneRange();
                         }
                     }
-
                     if (this.savedSelectionRange && this.rangeBelongsToEditor(this.savedSelectionRange)) {
                         return this.savedSelectionRange.cloneRange();
                     }
-
                     return null;
                 },
                 insertHtml(html) {
                     const editor = this.$refs.editor;
                     const selection = window.getSelection?.();
                     if (!editor || !selection) return;
-
                     let range = this.currentEditorRange();
                     this.focusEditor();
-
                     if (!range || !this.rangeBelongsToEditor(range)) {
                         range = this.placeCaretAtEnd();
                     }
-
                     if (!range) return;
-
                     const template = document.createElement('template');
                     template.innerHTML = String(html || '');
                     const fragment = template.content.cloneNode(true);
                     const lastNode = fragment.lastChild;
-
                     selection.removeAllRanges();
                     selection.addRange(range);
                     range.deleteContents();
                     range.insertNode(fragment);
-
                     const nextRange = document.createRange();
                     if (lastNode && lastNode.parentNode) {
                         nextRange.setStartAfter(lastNode);
@@ -15174,7 +13722,6 @@ CSS;
                 uploadInlineImages(event) {
                     const files = Array.from(event.target.files || []);
                     if (!files.length) return;
-
                     this.uploadingImages = true;
                     const uploadNext = (index = 0) => {
                         if (index >= files.length) {
@@ -15183,7 +13730,6 @@ CSS;
                             this.syncNow();
                             return;
                         }
-
                         const file = files[index];
                         this.$wire.upload('templateInlineImageUpload', file, () => {
                             this.$wire.call('uploadTemplateEditorImage').then((result) => {
@@ -15203,7 +13749,6 @@ CSS;
                             uploadNext(index + 1);
                         });
                     };
-
                     uploadNext();
                 },
                 insertImage(url) {
@@ -15229,7 +13774,6 @@ CSS;
                     const instagramLink = String(current.InstagramLink || current.instagramLink || '#instagram');
                     const youtubeLink = String(current.YouTubeLink || current.YoutubeLink || current.youtubeLink || '#youtube');
                     const xLink = String(current.XLink || current.xLink || '#x');
-
                     return {
                         ...current,
                         CoachName: 'Jordan Taylor',
@@ -15255,18 +13799,15 @@ CSS;
                         ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(value || ''))
                         : String(value || '');
                     const values = this.templatePreviewValues();
-
                     output = output.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, (_match, rawToken) => {
                         const token = String(rawToken || '').trim();
                         const exact = Object.prototype.hasOwnProperty.call(values, token) ? values[token] : undefined;
                         if (exact !== undefined && exact !== null && String(exact) !== '') return String(exact);
-
                         const foundKey = Object.keys(values).find((key) => key.toLowerCase() === token.toLowerCase());
                         if (foundKey) return String(values[foundKey] ?? '');
                         if (token.toLowerCase().startsWith('custom_values.')) return 'Custom value';
                         return (_match || '');
                     });
-
                     return output;
                 },
                 openPreview() {
@@ -15286,16 +13827,12 @@ CSS;
             };
         };
     </script>
-
-
-
 {{-- v118: restored latest Inbox interaction helpers + instant Compose support. --}}
 <style id="rc-inbox-inline-conversation-loader-v82">
     .rc-inbox-mid-loading-host-v82 {
         position: relative !important;
         isolation: isolate;
     }
-
     .rc-inbox-inline-conversation-loader-v82 {
         position: absolute;
         inset: 0;
@@ -15310,7 +13847,6 @@ CSS;
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
-
     .rc-inbox-inline-loader-head-v82 {
         display: grid;
         grid-template-columns: 2.8rem minmax(0, 1fr);
@@ -15319,7 +13855,6 @@ CSS;
         padding-bottom: .85rem;
         border-bottom: 1px solid var(--rc-border, #e5e7eb);
     }
-
     .rc-inbox-inline-loader-avatar-v82,
     .rc-inbox-inline-loader-copy-v82 span,
     .rc-inbox-inline-loader-message-v82 {
@@ -15328,60 +13863,50 @@ CSS;
         background-size: 220% 100%;
         animation: rcInboxInlineLoadingV82 1.05s ease-in-out infinite;
     }
-
     .rc-inbox-inline-loader-avatar-v82 {
         width: 2.8rem;
         height: 2.8rem;
         border-radius: .8rem;
     }
-
     .rc-inbox-inline-loader-copy-v82 {
         display: grid;
         gap: .45rem;
     }
-
     .rc-inbox-inline-loader-copy-v82 span {
         width: min(24rem, 72%);
         height: .72rem;
         border-radius: 999px;
     }
-
     .rc-inbox-inline-loader-copy-v82 span:last-child {
         width: min(15rem, 48%);
         height: .58rem;
     }
-
     .rc-inbox-inline-loader-message-v82 {
         width: 82%;
         min-height: 6.5rem;
         border: 1px solid var(--rc-border, #e5e7eb);
         border-radius: .9rem;
     }
-
     .rc-inbox-inline-loader-message-v82.is-short {
         width: 58%;
         min-height: 4.75rem;
         margin-left: auto;
     }
-
     .rc-inbox-inline-loader-message-v82.is-medium {
         width: 70%;
         min-height: 5.5rem;
         margin-left: auto;
     }
-
     @keyframes rcInboxInlineLoadingV82 {
         from { background-position: 120% 0; }
         to { background-position: -120% 0; }
     }
-
     @media (prefers-reduced-motion: reduce) {
         .rc-inbox-inline-loader-avatar-v82,
         .rc-inbox-inline-loader-copy-v82 span,
         .rc-inbox-inline-loader-message-v82 { animation: none; }
     }
 </style>
-
 <style id="rc-compose-overlay-fixes-v82">
     /* Template selection inside Compose must update in-place, never show the legacy page-wide opening skeleton. */
     [data-rc-opening-overlay="compose"],
@@ -15397,7 +13922,6 @@ CSS;
         backdrop-filter:none !important;
         -webkit-backdrop-filter:none !important;
     }
-
     .rc-compose-preview-backdrop-v82 {
         z-index:2147483200 !important;
         background:rgba(2,6,23,.62) !important;
@@ -15405,7 +13929,6 @@ CSS;
         -webkit-backdrop-filter:blur(5px) !important;
     }
 </style>
-
 <style id="rc-inbox-quick-reply-v92">
     .rc-inbox-mid-v56 {
         display:flex !important;
@@ -15594,7 +14117,6 @@ CSS;
         .rc-inbox-quick-reply-editor-v92 { padding-inline:.55rem; }
         .rc-inbox-quick-reply-tools-v92 button:nth-child(n+4) { display:none; }
     }
-
     .rc-inbox-quick-reply-tools-v92 label {
         width:1.75rem;height:1.75rem;display:inline-flex;align-items:center;justify-content:center;
         border:0;border-radius:.4rem;color:#64748b;cursor:pointer;font-size:.9rem;
@@ -15679,7 +14201,6 @@ CSS;
     }
     .rc-inbox-quick-reply-attachments-v94 button:hover { background:rgba(239,68,68,.1);color:#dc2626; }
     .rc-inbox-quick-reply-attachments-v94 button:disabled { opacity:.45;cursor:not-allowed; }
-
     .rc-inbox-quick-reply-contenteditable-v93 ul,
     .rc-inbox-quick-reply-contenteditable-v93 ol {
         display:block;
@@ -15699,7 +14220,6 @@ CSS;
         background:var(--rc-border);
         margin:0 .15rem;
     }
-
         .rc-inbox-quick-reply-uploading-v96,
         .rc-inbox-quick-reply-attachment-chip-v96 {
             display:inline-flex;
@@ -15747,20 +14267,17 @@ CSS;
             flex:0 0 auto;
         }
         @keyframes rcQuickReplySpinV96 { to { transform:rotate(360deg); } }
-
     .rc-account-readiness-shell {
     position: relative;
     min-height: calc(100vh - 8rem);
     isolation: isolate;
 }
-
 .rc-account-readiness-content {
     transition:
         filter 0.4s ease,
         opacity 0.4s ease,
         transform 0.4s ease;
 }
-
 .rc-account-readiness-shell.is-preparing
 .rc-account-readiness-content {
     filter: blur(7px);
@@ -15769,12 +14286,10 @@ CSS;
     pointer-events: none;
     user-select: none;
 }
-
 html.rc-account-preparing,
 body.rc-account-preparing {
     overflow: hidden !important;
 }
-
 body.rc-account-preparing .fi-sidebar,
 body.rc-account-preparing .fi-topbar,
 body.rc-account-preparing .fi-main-ctn,
@@ -15782,19 +14297,16 @@ body.rc-account-preparing [data-rc-navigation] {
     pointer-events: none !important;
     user-select: none !important;
 }
-
 /* Keep the admin impersonation banner and Leave control usable. */
 body.rc-account-preparing .rc-account-impersonation-bar,
 body.rc-account-preparing .rc-account-impersonation-bar * {
     pointer-events: auto !important;
     user-select: auto !important;
 }
-
 body.rc-account-preparing .rc-account-impersonation-bar {
     position: relative;
     z-index: 2147483647 !important;
 }
-
 .rc-account-preparation-overlay {
     position: fixed;
     inset: var(--rc-account-overlay-top, 0px) 0 0;
@@ -15815,7 +14327,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         rgba(3, 7, 18, 0.68);
     backdrop-filter: blur(5px);
 }
-
 .rc-account-preparation-glow {
     position: absolute;
     width: 24rem;
@@ -15826,20 +14337,17 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     opacity: 0.24;
     animation: rcAccountPreparationFloat 7s ease-in-out infinite;
 }
-
 .rc-account-preparation-glow-one {
     top: 5%;
     left: 12%;
     background: #ff6338;
 }
-
 .rc-account-preparation-glow-two {
     right: 9%;
     bottom: 3%;
     background: #3b82f6;
     animation-delay: -3.5s;
 }
-
 .rc-account-preparation-card {
     position: relative;
     width: min(34rem, 100%);
@@ -15858,7 +14366,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     padding: 1.45rem;
     color: #f8fafc;
 }
-
 .rc-account-preparation-card::before {
     content: "";
     position: absolute;
@@ -15876,7 +14383,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     background-size: 220% 100%;
     animation: rcAccountPreparationShimmer 2.1s linear infinite;
 }
-
 .rc-account-preparation-brand {
     display: flex;
     align-items: center;
@@ -15887,7 +14393,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
-
 .rc-account-preparation-orbit {
     position: relative;
     width: 2.55rem;
@@ -15898,12 +14403,10 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     background: rgba(255, 99, 56, 0.11);
     color: #ff6338;
 }
-
 .rc-account-preparation-orbit > svg {
     width: 1.35rem;
     height: 1.35rem;
 }
-
 .rc-account-preparation-orbit-ring {
     position: absolute;
     inset: -0.3rem;
@@ -15911,7 +14414,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     border-radius: 999px;
     animation: rcAccountPreparationRotate 3.8s linear infinite;
 }
-
 .rc-account-preparation-orbit-dot {
     position: absolute;
     top: -0.36rem;
@@ -15923,11 +14425,9 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     box-shadow: 0 0 14px rgba(255, 99, 56, 0.85);
     transform: translateX(-50%);
 }
-
 .rc-account-preparation-copy {
     margin-top: 1.3rem;
 }
-
 .rc-account-preparation-kicker {
     display: inline-flex;
     align-items: center;
@@ -15940,7 +14440,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     font-size: 0.68rem;
     font-weight: 800;
 }
-
 .rc-account-preparation-copy h2 {
     margin: 0.8rem 0 0;
     color: #ffffff;
@@ -15949,7 +14448,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     letter-spacing: -0.035em;
     line-height: 1.08;
 }
-
 .rc-account-preparation-copy p {
     margin: 0.7rem 0 0;
     max-width: 29rem;
@@ -15957,7 +14455,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     font-size: 0.86rem;
     line-height: 1.6;
 }
-
 .rc-account-preparation-progress {
     height: 0.43rem;
     margin-top: 1.25rem;
@@ -15965,7 +14462,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     border-radius: 999px;
     background: rgba(148, 163, 184, 0.13);
 }
-
 .rc-account-preparation-progress span {
     display: block;
     width: 42%;
@@ -15981,13 +14477,11 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     box-shadow: 0 0 18px rgba(255, 99, 56, 0.35);
     animation: rcAccountPreparationProgress 1.8s ease-in-out infinite;
 }
-
 .rc-account-preparation-statuses {
     display: grid;
     gap: 0.58rem;
     margin-top: 1.1rem;
 }
-
 .rc-account-preparation-status {
     display: grid;
     grid-template-columns: 2.15rem minmax(0, 1fr);
@@ -16000,18 +14494,15 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     background: rgba(255, 255, 255, 0.025);
     color: #64748b;
 }
-
 .rc-account-preparation-status.is-complete {
     color: #10b981;
 }
-
 .rc-account-preparation-status.is-active {
     border-color: rgba(255, 99, 56, 0.22);
     background: rgba(255, 99, 56, 0.07);
     color: #ff6338;
     animation: rcAccountPreparationActive 1.8s ease-in-out infinite;
 }
-
 .rc-account-preparation-status-icon {
     width: 2rem;
     height: 2rem;
@@ -16020,19 +14511,16 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     border-radius: 0.62rem;
     background: rgba(148, 163, 184, 0.09);
 }
-
 .rc-account-preparation-status-icon svg {
     width: 1.05rem;
     height: 1.05rem;
 }
-
 .rc-account-preparation-status strong {
     display: block;
     color: #e2e8f0;
     font-size: 0.76rem;
     line-height: 1.25;
 }
-
 .rc-account-preparation-status small {
     display: block;
     margin-top: 0.18rem;
@@ -16040,11 +14528,9 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     font-size: 0.67rem;
     line-height: 1.35;
 }
-
 .rc-account-preparation-status.is-active small {
     color: #94a3b8;
 }
-
 .rc-account-preparation-mini-spinner {
     width: 0.88rem;
     height: 0.88rem;
@@ -16054,7 +14540,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     border-radius: 999px;
     animation: rcAccountPreparationRotate 0.7s linear infinite;
 }
-
 .rc-account-preparation-note {
     display: flex;
     align-items: center;
@@ -16066,7 +14551,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     font-size: 0.7rem;
     font-weight: 650;
 }
-
 .rc-account-preparation-pulse {
     width: 0.46rem;
     height: 0.46rem;
@@ -16076,81 +14560,66 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.42);
     animation: rcAccountPreparationPulse 1.7s ease-out infinite;
 }
-
 @keyframes rcAccountPreparationRotate {
     to {
         transform: rotate(360deg);
     }
 }
-
 @keyframes rcAccountPreparationProgress {
     0% {
         transform: translateX(-115%);
     }
-
     55% {
         transform: translateX(125%);
     }
-
     100% {
         transform: translateX(285%);
     }
 }
-
 @keyframes rcAccountPreparationShimmer {
     from {
         background-position: 130% 0;
     }
-
     to {
         background-position: -130% 0;
     }
 }
-
 @keyframes rcAccountPreparationFloat {
     0%,
     100% {
         transform: translate3d(0, 0, 0) scale(1);
     }
-
     50% {
         transform: translate3d(0, -1rem, 0) scale(1.08);
     }
 }
-
 @keyframes rcAccountPreparationActive {
     0%,
     100% {
         box-shadow: 0 0 0 rgba(255, 99, 56, 0);
     }
-
     50% {
         box-shadow: 0 0 24px rgba(255, 99, 56, 0.08);
     }
 }
-
 @keyframes rcAccountPreparationPulse {
     0% {
         box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.38);
     }
-
     70%,
     100% {
         box-shadow: 0 0 0 0.6rem rgba(16, 185, 129, 0);
     }
 }
-
 @media (max-width: 640px) {
     .rc-account-preparation-card {
         padding: 1.05rem;
         border-radius: 1.05rem;
     }
-
     .rc-account-preparation-overlay {
         padding: 0.75rem;
     }
 }
-
 @media (prefers-reduced-motion: reduce) {
     .rc-account-preparation-glow,
     .rc-account-preparation-progress span,
@@ -16162,17 +14631,14 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     }
 }
 </style>
-
 <script id="rc-inbox-editor-link-guard-v91">
     (() => {
         if (window.__rcInboxEditorLinkGuardV91) return;
         window.__rcInboxEditorLinkGuardV91 = true;
-
         document.addEventListener('click', (event) => {
             const anchor = event.target.closest?.('[contenteditable="true"] a[href]');
             if (!anchor) return;
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
             // In an editor, a normal click selects/edits the link instead of leaving
             // the page. Ctrl/Cmd-click is still available when the user wants to open it.
             event.preventDefault();
@@ -16180,7 +14646,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         }, true);
     })();
     </script>
-
 {{-- v90: Inbox viewport-height layout. Keep quick reply/send visible on short screens. --}}
 <style id="rc-inbox-viewport-fit-v90">
     .rc-inbox-page-v56 {
@@ -16188,14 +14653,12 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         max-height: none !important;
         overflow: hidden !important;
     }
-
     .rc-inbox-shell-v56 {
         height: var(--rc-inbox-fit-height, calc(100dvh - 10rem)) !important;
         min-height: 0 !important;
         max-height: none !important;
         overflow: hidden !important;
     }
-
     .rc-inbox-shell-v56 > *,
     .rc-inbox-left-v56,
     .rc-inbox-mid-v56,
@@ -16203,13 +14666,11 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         min-height: 0 !important;
         max-height: 100% !important;
     }
-
     .rc-inbox-left-v56 {
         display: flex !important;
         flex-direction: column !important;
         overflow: hidden !important;
     }
-
     .rc-inbox-left-v56 > .rc-inbox-list-v56,
     .rc-inbox-list-v56 {
         flex: 1 1 auto !important;
@@ -16218,18 +14679,15 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         overflow-y: auto !important;
         overscroll-behavior: contain;
     }
-
     .rc-inbox-mid-v56 {
         display: flex !important;
         flex-direction: column !important;
         min-height: 0 !important;
         overflow: hidden !important;
     }
-
     .rc-inbox-mid-head-v56 {
         flex: 0 0 auto !important;
     }
-
     .rc-inbox-mid-v56 > .rc-message-stream-v56,
     .rc-message-stream-v56 {
         flex: 1 1 0 !important;
@@ -16239,7 +14697,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         overflow-y: auto !important;
         overscroll-behavior: contain;
     }
-
     .rc-inbox-quick-reply-v92 {
         position: relative !important;
         inset: auto !important;
@@ -16252,12 +14709,10 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         border-top: 1px solid var(--rc-border) !important;
         box-shadow: 0 -8px 22px rgba(15,23,42,.045) !important;
     }
-
     .rc-inbox-quick-reply-contenteditable-v93 {
         min-height: 2.75rem !important;
         max-height: min(7rem, 18vh) !important;
     }
-
     .rc-inbox-quick-reply-footer-v92 {
         position: sticky;
         bottom: 0;
@@ -16265,14 +14720,12 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         background: var(--rc-surface);
         padding-bottom: .05rem;
     }
-
     .rc-inbox-right-v56,
     .rc-coach-profile-v56 {
         height: 100% !important;
         min-height: 0 !important;
         overflow-y: auto !important;
     }
-
     @media (max-height: 760px) and (min-width: 901px) {
         .rc-inbox-panel-head-v56 { padding-top: .55rem !important; padding-bottom: .4rem !important; }
         .rc-inbox-search-v56 { padding-bottom: .4rem !important; }
@@ -16282,7 +14735,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         .rc-inbox-quick-reply-editor-v92 { padding-top: .32rem !important; padding-bottom: .4rem !important; }
         .rc-inbox-quick-reply-contenteditable-v93 { min-height: 2.35rem !important; max-height: 4.5rem !important; }
     }
-
     @media (max-width: 900px) {
         .rc-inbox-page-v56,
         .rc-inbox-shell-v56 {
@@ -16295,43 +14747,35 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         .rc-inbox-quick-reply-v92 { max-height: none !important; overflow: visible !important; }
     }
 </style>
-
 <script id="rc-inbox-viewport-fit-script-v90">
 (() => {
     if (window.__rcInboxViewportFitV90) {
         window.__rcInboxViewportFitV90();
         return;
     }
-
     let frame = null;
-
     const fit = () => {
         if (frame) cancelAnimationFrame(frame);
         frame = requestAnimationFrame(() => {
             const shell = document.querySelector('.rc-inbox-shell-v56');
             if (!shell) return;
-
             if (window.innerWidth <= 900) {
                 shell.style.removeProperty('--rc-inbox-fit-height');
                 return;
             }
-
             const top = Math.max(0, shell.getBoundingClientRect().top);
             const bottomGap = 14;
             const available = Math.max(320, Math.floor(window.innerHeight - top - bottomGap));
             shell.style.setProperty('--rc-inbox-fit-height', `${available}px`);
         });
     };
-
     window.__rcInboxViewportFitV90 = fit;
     window.addEventListener('resize', fit, { passive: true });
     window.addEventListener('orientationchange', fit, { passive: true });
     document.addEventListener('livewire:navigated', fit);
-
     // v10.113.23: do not fit on every Livewire morph. Conversation switches can
     // morph message HTML several times; repeated getBoundingClientRect calls here
     // are visible as intermittent UI stalls. Resize/navigation is enough.
-
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', fit, { once: true });
     } else {
@@ -16339,12 +14783,9 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     }
 })();
 </script>
-
-
 {{-- v119 Inbox visual alignment: reference-style compact three-column inbox. --}}
 <style id="rc-inbox-reference-v119">
     .rc-section-async-banner { display:none !important; }
-
     .rc-inbox-page-v56 {
         width:100%;
         min-width:0;
@@ -16354,7 +14795,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         overflow:visible !important;
         margin-top:.8rem;
     }
-
     .rc-inbox-shell-v56 {
         --rc-inbox-fit-height: calc(100dvh - 9.75rem);
         width:100%;
@@ -16369,12 +14809,10 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         background:#fff !important;
         box-shadow:0 12px 30px rgba(15,23,42,.045) !important;
     }
-
     .dark .rc-inbox-shell-v56 {
         border-color:var(--rc-border) !important;
         background:var(--rc-surface) !important;
     }
-
     .rc-inbox-left-v56 {
         display:flex !important;
         flex-direction:column !important;
@@ -16385,7 +14823,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         border-right:1px solid #e7e9ee !important;
         background:#fff !important;
     }
-
     .rc-inbox-panel-head-v56 {
         min-height:3.1rem !important;
         padding:.78rem 1rem .55rem !important;
@@ -16411,7 +14848,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         color:#667085 !important;
     }
     .rc-inbox-icon-btn-v56:hover { background:#f2f4f7 !important; color:#111827 !important; }
-
     .rc-inbox-search-v56 { padding:0 .9rem .55rem !important; }
     .rc-inbox-search-v56 label { display:block !important; position:relative !important; }
     .rc-inbox-search-v56 input {
@@ -16426,7 +14862,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         box-shadow:none !important;
     }
     .rc-inbox-search-v56 svg { left:.62rem !important; width:.95rem !important; height:.95rem !important; color:#98a2b3 !important; }
-
     .rc-inbox-quick-filters-v56 {
         padding:0 .9rem .62rem !important;
         gap:.38rem !important;
@@ -16455,7 +14890,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         color:#fff !important;
         font-size:.61rem !important;
     }
-
     .rc-inbox-list-v56 {
         flex:1 1 auto !important;
         min-height:0 !important;
@@ -16518,7 +14952,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         font-size:.62rem !important;
         font-weight:800 !important;
     }
-
     .rc-inbox-mid-v56 {
         position:relative !important;
         min-width:0 !important;
@@ -16540,14 +14973,12 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     .rc-inbox-school-logo-v56 { width:2.15rem !important; height:2.15rem !important; border-radius:999px !important; }
     .rc-inbox-coach-title-v56 h3 { font-size:.88rem !important; font-weight:800 !important; color:#111827 !important; }
     .rc-inbox-coach-title-v56 p { margin-top:.08rem !important; font-size:.68rem !important; color:#667085 !important; }
-
     .rc-inbox-inline-conversation-loader-v82 {
         inset:3.95rem 0 0 !important;
         z-index:20 !important;
         padding:1rem !important;
         background:#fff !important;
     }
-
     .rc-message-stream-v56 {
         flex:1 1 0 !important;
         min-height:0 !important;
@@ -16573,7 +15004,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         color:#344054 !important;
         font-size:.68rem !important;
     }
-
     .rc-inbox-message-v56 {
         width:100% !important;
         display:grid !important;
@@ -16617,7 +15047,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         background:#f2f5f9 !important;
     }
     .rc-message-status-v56 { margin:.38rem 0 0 2.75rem !important; font-size:.66rem !important; color:#16a34a !important; }
-
     .rc-inbox-quick-reply-v92 {
         position:relative !important;
         inset:auto !important;
@@ -16678,7 +15107,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         color:#fff !important;
         box-shadow:0 6px 16px rgba(255,99,56,.18) !important;
     }
-
     .rc-inbox-right-v56 {
         min-width:0 !important;
         min-height:0 !important;
@@ -16727,7 +15155,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     .rc-about-grid-v56 { margin-top:.55rem !important; display:grid !important; gap:.68rem !important; grid-template-columns:1fr !important; }
     .rc-about-item-v56 { font-size:.68rem !important; color:#667085 !important; }
     .rc-about-item-v56 strong { display:block !important; margin-bottom:.08rem !important; color:#101828 !important; font-size:.78rem !important; font-weight:800 !important; }
-
     .dark .rc-inbox-left-v56,
     .dark .rc-inbox-mid-v56,
     .dark .rc-inbox-right-v56,
@@ -16748,7 +15175,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     .dark .rc-about-item-v56 strong { color:var(--rc-text) !important; }
     .dark .rc-msg-bubble-v56,
     .dark .rc-msg-bubble-email-v61 { background:var(--rc-soft) !important; color:var(--rc-text) !important; }
-
     @media (max-width:1320px) {
         .rc-inbox-shell-v56 { grid-template-columns:19.5rem minmax(0,1fr) !important; }
         .rc-inbox-right-v56 { display:none !important; }
@@ -16762,9 +15188,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         .rc-message-stream-v56 { max-height:42rem !important; }
     }
 </style>
-
-
-
 <style id="rc-plan-access-v129">
 .rc-plyrcard-preparing-banner-v129 {
     display:grid;
@@ -16792,7 +15215,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     font-size:.74rem;font-weight:800;text-decoration:none!important;white-space:nowrap;
 }
 @keyframes rcPrepareSpinV129 { to { transform:rotate(360deg); } }
-
 .rc-free-plan-gate-v129 {
     position:fixed;inset:0;z-index:2147483000;display:flex;justify-content:flex-end;
     background:rgba(2,6,23,.72);backdrop-filter:blur(9px);padding:1rem;
@@ -16825,7 +15247,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
 }
 @media(prefers-reduced-motion:reduce){.rc-plyrcard-preparing-icon-v129 svg{animation:none}}
 </style>
-
 @if($isFreePlanAccount ?? false)
     {{-- v10.30: This gate is deliberately client-only. It is always present for a
          Free account and Alpine only toggles visibility. Do not use wire:click or
@@ -16875,7 +15296,6 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         </section>
     </div>
 @endif
-
 <script data-navigate-once>
 window.rcTemplateUnicodeBase64 = function (value) {
     const source = String(value || '');
@@ -16885,7 +15305,6 @@ window.rcTemplateUnicodeBase64 = function (value) {
         return btoa(source);
     }
 };
-
 window.rcVisibleCoachDatabaseTemplateEditor = function () {
     const editors = Array.from(document.querySelectorAll('[data-plyr-template-editor]'));
     return editors.find((editor) => {
@@ -16893,7 +15312,6 @@ window.rcVisibleCoachDatabaseTemplateEditor = function () {
         return rect && rect.width > 0 && rect.height > 0 && editor.offsetParent !== null;
     }) || editors[editors.length - 1] || null;
 };
-
 window.rcEscapeTemplateHtmlText = function (value) {
     return String(value || '')
         .replace(/&/g, '&amp;')
@@ -16902,13 +15320,11 @@ window.rcEscapeTemplateHtmlText = function (value) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 };
-
 window.rcDecodeTemplateEntities = function (value) {
     const textarea = document.createElement('textarea');
     textarea.innerHTML = String(value || '');
     return textarea.value;
 };
-
 window.rcNormalizeCoachDatabaseMergeTokens = function (value) {
     let source = window.rcDecodeTemplateEntities ? window.rcDecodeTemplateEntities(value) : String(value || '');
     source = source.replace(/\u200B|\u200C|\u200D|\uFEFF/g, '');
@@ -16916,7 +15332,6 @@ window.rcNormalizeCoachDatabaseMergeTokens = function (value) {
     source = source.replace(/\{\s*\{\s*([A-Za-z][A-Za-z0-9_. ]{0,90})\s*\}\s*\}/g, (_match, token) => ('{' + '{') + String(token || '').trim() + ('}' + '}'));
     return source;
 };
-
 window.rcNormalizeCoachDatabaseMergeTokensInHtml = function (html) {
     const template = document.createElement('template');
     template.innerHTML = String(html || '');
@@ -16927,11 +15342,9 @@ window.rcNormalizeCoachDatabaseMergeTokensInHtml = function (html) {
     output = output.replace(/<span\b[^>]*class=(?:"[^"]*rc-merge-token-v48[^"]*"|'[^']*rc-merge-token-v48[^']*')[^>]*>(.*?)<\/span>/gis, (_match, inner) => window.rcNormalizeCoachDatabaseMergeTokens(String(inner || '').replace(/<[^>]*>/g, '')));
     return window.rcNormalizeCoachDatabaseMergeTokens(output);
 };
-
 window.rcTextToTemplateParagraphHtml = function (value) {
     const text = String(value || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
     if (!text) return '';
-
     return text
         .split(/\n{2,}/)
         .map((paragraph) => paragraph.trim())
@@ -16939,16 +15352,13 @@ window.rcTextToTemplateParagraphHtml = function (value) {
         .map((paragraph) => '<p>' + window.rcEscapeTemplateHtmlText(paragraph).replace(/\n/g, '<br>') + '</p>')
         .join('\n');
 };
-
 window.rcCollectCoachDatabaseTemplatePlainText = function (editor) {
     if (!editor) return '';
-
     const pieces = [];
     const append = (value) => {
         const text = String(value || '').replace(/\u00a0/g, ' ');
         if (text !== '') pieces.push(text);
     };
-
     const walk = (node) => {
         if (!node) return;
         if (node.nodeType === Node.TEXT_NODE) {
@@ -16956,7 +15366,6 @@ window.rcCollectCoachDatabaseTemplatePlainText = function (editor) {
             return;
         }
         if (node.nodeType !== Node.ELEMENT_NODE) return;
-
         const tag = String(node.tagName || '').toLowerCase();
         if (tag === 'br') {
             pieces.push('\n');
@@ -16974,66 +15383,49 @@ window.rcCollectCoachDatabaseTemplatePlainText = function (editor) {
             pieces.push('\n');
         }
     };
-
     Array.from(editor.childNodes || []).forEach(walk);
-
     const walked = pieces.join('').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
     const browser = String(editor.innerText || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
-
     return browser.length > walked.length ? browser : walked;
 };
-
 window.rcCollectCoachDatabaseTemplateLosslessHtml = function (editor) {
     if (!editor) return '';
-
     const escapeText = window.rcEscapeTemplateHtmlText || ((value) => String(value || '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;'));
-
     const normalizeToken = window.rcNormalizeCoachDatabaseMergeTokens || ((value) => String(value || ''));
     const allowedTags = new Set(['p','div','br','strong','b','em','i','u','ul','ol','li','blockquote','h1','h2','h3','h4','a','img','table','thead','tbody','tr','td','th','span']);
     const allowedAttrs = new Set(['href','src','alt','title','target','rel','style','class','colspan','rowspan']);
-
     const safeAttrValue = (value) => String(value || '')
         .replace(/&/g, '&amp;')
         .replace(/"/g, '&quot;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-
     const serialize = (node) => {
         if (!node) return '';
-
         if (node.nodeType === Node.TEXT_NODE) {
             return escapeText(String(node.nodeValue || '').replace(/\u00a0/g, ' '));
         }
-
         if (node.nodeType !== Node.ELEMENT_NODE) {
             return '';
         }
-
         const tag = String(node.tagName || '').toLowerCase();
-
         if (node.classList && node.classList.contains('rc-merge-token-v48')) {
             return escapeText(normalizeToken(node.textContent || ''));
         }
-
         if (tag === 'br') {
             return '<br>';
         }
-
         if (['script','style','textarea','input','select','option','button','form','iframe','object','embed'].includes(tag)) {
             return '';
         }
-
         const children = Array.from(node.childNodes || []).map(serialize).join('');
-
         if (!allowedTags.has(tag) || tag === 'span') {
             return children;
         }
-
         let attrs = '';
         Array.from(node.attributes || []).forEach((attr) => {
             const name = String(attr.name || '').toLowerCase();
@@ -17043,37 +15435,28 @@ window.rcCollectCoachDatabaseTemplateLosslessHtml = function (editor) {
             if (name === 'class' && !/rc-email-button/.test(value)) return;
             attrs += ' ' + name + '="' + safeAttrValue(value) + '"';
         });
-
         if (tag === 'img') {
             return '<img' + attrs + '>';
         }
-
         return '<' + tag + attrs + '>' + children + '</' + tag + '>';
     };
-
     let html = Array.from(editor.childNodes || []).map(serialize).join('').trim();
     html = window.rcNormalizeCoachDatabaseMergeTokensInHtml
         ? window.rcNormalizeCoachDatabaseMergeTokensInHtml(html)
         : html;
-
     if (!/<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|br)\b/i.test(html)) {
         const plain = (window.rcCollectCoachDatabaseTemplatePlainText ? window.rcCollectCoachDatabaseTemplatePlainText(editor) : '').trim();
         if (plain && plain.length > String(html || '').replace(/<[^>]*>/g, '').length) {
             html = window.rcTextToTemplateParagraphHtml ? window.rcTextToTemplateParagraphHtml(plain) : escapeText(plain);
         }
     }
-
     return html || '<p><br></p>';
 };
-
-
 window.rcCollectCoachDatabaseTemplateAst = function (editor) {
     if (!editor) return '';
-
     const normalizeToken = window.rcNormalizeCoachDatabaseMergeTokens || ((value) => String(value || ''));
     const allowedTags = new Set(['p','div','br','strong','b','em','i','u','ul','ol','li','blockquote','h1','h2','h3','h4','a','img','table','thead','tbody','tr','td','th','span']);
     const allowedAttrs = new Set(['href','src','alt','title','target','rel','style','class','colspan','rowspan']);
-
     const cleanAttr = (name, value) => {
         name = String(name || '').toLowerCase();
         value = String(value || '');
@@ -17082,59 +15465,47 @@ window.rcCollectCoachDatabaseTemplateAst = function (editor) {
         if (name === 'class' && !/rc-email-button/i.test(value)) return null;
         return value;
     };
-
     const walk = (node) => {
         if (!node) return null;
         if (node.nodeType === Node.TEXT_NODE) {
             return { type: 'text', value: String(node.nodeValue || '').replace(/\u00a0/g, ' ') };
         }
         if (node.nodeType !== Node.ELEMENT_NODE) return null;
-
         const tag = String(node.tagName || '').toLowerCase();
-
         if (node.classList && node.classList.contains('rc-merge-token-v48')) {
             return { type: 'token', value: normalizeToken(node.textContent || '') };
         }
-
         if (tag === 'br') return { type: 'br' };
         if (['script','style','textarea','input','select','option','button','form','iframe','object','embed'].includes(tag)) return null;
-
         const children = Array.from(node.childNodes || []).map(walk).filter(Boolean);
         if (!allowedTags.has(tag) || tag === 'span') {
             return children.length ? { type: 'fragment', children } : null;
         }
-
         const attrs = {};
         Array.from(node.attributes || []).forEach((attr) => {
             const clean = cleanAttr(attr.name, attr.value);
             if (clean !== null && clean !== '') attrs[String(attr.name || '').toLowerCase()] = clean;
         });
-
         return { type: 'element', tag, attrs, children };
     };
-
     try {
         return JSON.stringify({ version: 1, nodes: Array.from(editor.childNodes || []).map(walk).filter(Boolean) });
     } catch (_) {
         return '';
     }
 };
-
 window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     if (!editor) return '';
-
     const clone = editor.cloneNode(true);
     clone.querySelectorAll('.rc-merge-token-v48').forEach((node) => {
         node.replaceWith(document.createTextNode(window.rcNormalizeCoachDatabaseMergeTokens(node.textContent || '')));
     });
     clone.querySelectorAll('[contenteditable]').forEach((node) => node.removeAttribute('contenteditable'));
     clone.querySelectorAll('[data-placeholder]').forEach((node) => node.removeAttribute('data-placeholder'));
-
     let html = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(clone.innerHTML || '').trim());
     const losslessHtml = window.rcCollectCoachDatabaseTemplateLosslessHtml ? window.rcCollectCoachDatabaseTemplateLosslessHtml(editor) : '';
     const plain = window.rcCollectCoachDatabaseTemplatePlainText(editor);
     const plainHtml = window.rcTextToTemplateParagraphHtml(plain);
-
     const htmlText = String(clone.textContent || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
     const losslessText = String(losslessHtml || '').replace(/<br\s*\/?\s*>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
     const htmlLines = htmlText.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
@@ -17142,7 +15513,6 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     const htmlTokens = (String(html || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
     const losslessTokens = (String(losslessHtml || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
     const hasRealHtml = /<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i.test(html);
-
     if (losslessHtml && (
         losslessTokens > htmlTokens
         || losslessText.length > htmlText.length + 8
@@ -17150,7 +15520,6 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     )) {
         html = losslessHtml;
     }
-
     if (plainHtml && (
         !hasRealHtml
         || plainLines > htmlLines
@@ -17158,10 +15527,8 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     )) {
         html = plainHtml;
     }
-
     return html || '<p><br></p>';
 };
-
 window.rcResetCoachDatabaseTemplateEditor = function () {
     window.__rcTemplateClientMode = 'new';
     const name = document.querySelector('[data-plyr-template-name]');
@@ -17170,7 +15537,6 @@ window.rcResetCoachDatabaseTemplateEditor = function () {
     const editor = document.querySelector('[data-plyr-template-editor]');
     const hidden = document.querySelector('[data-plyr-native-editor-hidden="template-body"]');
     const blankHtml = '<p><br></p>';
-
     if (name) {
         name.value = 'New Recruiting Email';
     }
@@ -17189,7 +15555,6 @@ window.rcResetCoachDatabaseTemplateEditor = function () {
         hidden.value = blankHtml;
     }
 };
-
 window.rcFindCoachDatabaseLivewireComponent = function (startNode) {
     let node = startNode && startNode.nodeType === 1 ? startNode : startNode?.parentElement;
     while (node) {
@@ -17198,25 +15563,21 @@ window.rcFindCoachDatabaseLivewireComponent = function (startNode) {
     }
     return Array.from(document.querySelectorAll('*')).find((el) => el.hasAttribute && el.hasAttribute('wire:id')) || null;
 };
-
 window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const editor = window.rcVisibleCoachDatabaseTemplateEditor ? window.rcVisibleCoachDatabaseTemplateEditor() : document.querySelector('[data-plyr-template-editor]');
     const name = document.querySelector('[data-plyr-template-name]');
     const subject = document.querySelector('[data-plyr-template-subject]');
     const preview = document.querySelector('[data-plyr-template-preview]');
     if (!editor) return;
-
     const root = window.rcFindCoachDatabaseLivewireComponent ? window.rcFindCoachDatabaseLivewireComponent(editor) : null;
     const wireId = root?.getAttribute?.('wire:id');
     const livewire = ($wire && typeof $wire.call === 'function')
         ? $wire
         : (wireId && window.Livewire?.find ? window.Livewire.find(wireId) : null);
-
     if (!livewire || typeof livewire.call !== 'function') {
         console.error('Template save failed: Livewire component was not found.');
         return;
     }
-
     // Force one final capture from the live contenteditable before the Livewire call.
     editor.dispatchEvent(new Event('input', { bubbles: true }));
     const bodyHtml = window.rcCollectCoachDatabaseTemplateHtml
@@ -17236,13 +15597,9 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     const hiddenBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(hidden?.value || ''));
     const activeBodyHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(window.__plyrTemplateEditorActiveBodyHtml || ''));
     const lastSerializedHtml = window.rcNormalizeCoachDatabaseMergeTokensInHtml(String(editor.__plyrLastSerializedHtml || editor.dataset.plyrLastSerializedHtml || ''));
-
     window.__plyrTemplateEditorActiveBodyHtml = bodyHtml;
-
     if (hidden) hidden.value = bodyHtml;
-
     const encode = (value) => window.rcTemplateUnicodeBase64 ? window.rcTemplateUnicodeBase64(value) : btoa(unescape(encodeURIComponent(String(value || ''))));
-
     await livewire.call('saveTemplateFromClientPayload', {
         name: String(name?.value || ''),
         subject: String(subject?.value || ''),
@@ -17259,12 +15616,10 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     });
 };
 </script>
-
 <script data-navigate-once>
 (() => {
     if (window.__plyrRcPersistentNavInstalled) return;
     window.__plyrRcPersistentNavInstalled = true;
-
     const pathToSection = (pathname) => {
         const path = String(pathname || '').replace(/\/+$/, '') || '/';
         if (!path.startsWith('/admin/coach-database')) return null;
@@ -17282,7 +15637,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         if (/\/(support)$/.test(path)) return 'support';
         return null;
     };
-
     const sectionFromAnchor = (anchor) => {
         try {
             const url = new URL(anchor.href, window.location.href);
@@ -17292,30 +15646,25 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             return null;
         }
     };
-
     const currentRoot = () => document.querySelector('.rc-livewire-root');
     const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule']);
     const isFreePlan = () => currentRoot()?.dataset?.rcFreePlan === '1';
     let pendingSection = null;
     let pendingTimer = null;
-
     const openFreePlanGate = (section) => {
         if (!isFreePlan() || !freePlanLockedSections.has(section)) return false;
         window.dispatchEvent(new CustomEvent('rc-free-plan-gate', { detail: { section } }));
         return true;
     };
-
     const renderedSectionPanel = (section) => {
         const safe = String(section || '').replace(/[^a-z0-9_-]/gi, '');
         return !!safe && !!document.querySelector(`[data-rc-client-section="${safe}"]`);
     };
-
     const sectionNeedsServerHydration = (section) => {
         if (section !== 'campaigns') return false;
         const panel = document.querySelector('[data-rc-client-section="campaigns"]');
         return !!panel && panel.dataset.rcServerHydrated !== '1';
     };
-
     const sectionLabels = {
         dashboard: 'Dashboard',
         schools: 'Discover Schools',
@@ -17330,30 +15679,25 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         settings: 'Settings',
         support: 'Support',
     };
-
     const setPageChrome = (section) => {
         const label = sectionLabels[section] || 'Dashboard';
         document.body.classList.add('rc-recruiting-center-page');
         if (document.title) document.title = `${label} - PlyrCard`;
     };
-
     const setSidebarActive = (section) => {
         document.querySelectorAll('.fi-sidebar a[href]').forEach((anchor) => {
             const candidate = sectionFromAnchor(anchor);
             if (!candidate) return;
-
             const active = candidate === section;
             const item = anchor.closest('.fi-sidebar-item');
             const button = anchor.classList.contains('fi-sidebar-item-button')
                 ? anchor
                 : (item?.querySelector('.fi-sidebar-item-button') || anchor);
-
             // Remove both Filament's route-derived state and our previous optimistic state.
             // Otherwise the route that originally mounted the page remains highlighted.
             if (item) item.dataset.rcSection = candidate;
             button.dataset.rcSection = candidate;
             anchor.dataset.rcSection = candidate;
-
             item?.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active');
             item?.removeAttribute('data-rc-active');
             button.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active', 'rc-fast-active');
@@ -17364,7 +15708,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             anchor.removeAttribute('data-plyr-active');
             anchor.removeAttribute('data-rc-active');
             anchor.removeAttribute('aria-current');
-
             if (active) {
                 item?.classList.add('plyr-sidebar-item-active');
                 item?.setAttribute('data-rc-active', 'true');
@@ -17378,22 +15721,18 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
                 anchor.setAttribute('aria-current', 'page');
             }
         });
-
         setPageChrome(section);
     };
-
     // v10.113: share the synchronous browser half of Recruiting Center navigation
     // with contextual actions such as Discover School -> Email Coaches. Those actions
     // already have their own Livewire method and must not trigger a second section-sync call.
     const activateSectionClientOnly = (section, href = null, replace = false) => {
         const root = currentRoot();
         if (!root || !section) return false;
-
         // v10.113.16: this page may render only the active section to keep Inbox fast.
         // Never switch the browser to a section that is not actually mounted, because
         // Alpine would hide the current panel and leave the content area blank.
         if (!renderedSectionPanel(section)) return false;
-
         root.dataset.rcCurrentSection = section;
         if (section !== 'conversations') {
             document.documentElement.removeAttribute('data-rc-inbox-loading');
@@ -17406,22 +15745,17 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             if ((currentRoot()?.dataset?.rcCurrentSection || '') === section) setSidebarActive(section);
         }, 120);
         window.dispatchEvent(new CustomEvent('rc-client-section', { detail: { section } }));
-
         if (href) {
             const target = new URL(href, window.location.href);
             const historyFn = replace ? 'replaceState' : 'pushState';
             window.history[historyFn]({ ...(window.history.state || {}), rcSection: section }, '', target.pathname + target.search + target.hash);
         }
-
         return true;
     };
-
     window.__plyrRcActivateSectionClientOnly = activateSectionClientOnly;
-
     const switchSection = (section, href = null, replace = false) => {
         const root = currentRoot();
         if (!root || !section) return false;
-
         if (!renderedSectionPanel(section) || sectionNeedsServerHydration(section)) {
             if (href) {
                 const target = new URL(href, window.location.href);
@@ -17430,12 +15764,9 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             }
             return false;
         }
-
         const alreadyActive = root.dataset.rcCurrentSection === section;
         if (!activateSectionClientOnly(section, href, replace)) return false;
-
         if (alreadyActive || pendingSection === section) return true;
-
         // v10.113.20: keep sidebar navigation purely client-side. The old
         // renderless section-sync call still made Livewire morph the whole 16k-line
         // page after quick tab switches, causing the freeze/unfreeze behavior.
@@ -17448,39 +15779,30 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         }
         return true;
     };
-
     // v10.103.8: move the Recruiting Center highlight on pointer-down, not after
     // Livewire, history, or even the browser click event. This is purely visual feedback;
     // the click handler below still owns the actual section switch and access checks.
     document.addEventListener('pointerdown', (event) => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
         const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
         if (!anchor || !currentRoot()) return;
-
         const section = sectionFromAnchor(anchor);
         if (!section) return;
         if (isFreePlan() && freePlanLockedSections.has(section)) return;
         if (!renderedSectionPanel(section)) return;
-
         setSidebarActive(section);
     }, true);
-
     document.addEventListener('click', (event) => {
         if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
         const anchor = event.target?.closest?.('.fi-sidebar a[href], a[data-rc-fast-nav][href]');
         if (!anchor) return;
-
         const section = sectionFromAnchor(anchor);
         if (!section || !currentRoot()) return;
-
         if (openFreePlanGate(section)) {
             event.preventDefault();
             event.stopPropagation();
             return;
         }
-
         // Settings contains server-rendered billing/payment state and normal POST
         // forms. Leaving it through the client-only section switch can leave the
         // persistent shell stuck on Settings in some Filament/Livewire navigation
@@ -17496,7 +15818,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             window.location.assign(anchor.href);
             return;
         }
-
         // Templates are intentionally loaded server-side. When the persistent shell
         // was mounted from Dashboard/Inbox/etc., the visible Templates panel exists
         // but its template list is not hydrated yet. Force one real navigation so
@@ -17507,16 +15828,13 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             window.location.assign(anchor.href);
             return;
         }
-
         // If the destination panel is not mounted, allow the real Filament/browser
         // navigation to proceed so the server renders that section instead of blanking.
         if (!renderedSectionPanel(section)) return;
-
         event.preventDefault();
         event.stopPropagation();
         switchSection(section, anchor.href, false);
     }, true);
-
     window.addEventListener('popstate', () => {
         const section = pathToSection(window.location.pathname);
         if (!section || !currentRoot()) return;
@@ -17527,7 +15845,6 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         }
         switchSection(section, null, true);
     });
-
     const syncCurrentChrome = () => {
         const root = currentRoot();
         if (!root) {
@@ -17535,47 +15852,37 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             document.documentElement.removeAttribute('data-rc-inbox-loading');
             return;
         }
-
         const section = root.dataset.rcCurrentSection || pathToSection(window.location.pathname) || 'dashboard';
         setSidebarActive(section);
     };
-
     const bindPersistentLivewireHooks = () => {
         if (!window.Livewire || window.__plyrRcPersistentNavLivewireHooksBound) return;
         window.__plyrRcPersistentNavLivewireHooksBound = true;
-
         Livewire.on('rc-section-switched', ({ section } = {}) => {
             if (!section) return;
-
             // Ignore a late acknowledgement from a previously clicked section.
             // The browser's current section is authoritative for navigation chrome.
             const current = currentRoot()?.dataset?.rcCurrentSection || '';
             if (current !== section) return;
-
             pendingSection = null;
             clearTimeout(pendingTimer);
             pendingTimer = null;
             setSidebarActive(section);
         });
-
         Livewire.on('rc-fast-section-ready', ({ section } = {}) => {
             if (section === 'conversations') {
                 window.dispatchEvent(new CustomEvent('rc-fast-inbox-refresh', { detail: { section } }));
             }
         });
-
         // v10.113.23: sidebar chrome is controlled by pointer/click/popstate and
         // livewire:navigated. Do not re-query every Recruiting Center sidebar item
         // after each Livewire morph; Inbox message renders make that too expensive.
     };
-
     if (window.Livewire) bindPersistentLivewireHooks();
     else document.addEventListener('livewire:init', bindPersistentLivewireHooks, { once: true });
-
     document.addEventListener('livewire:navigated', () => {
         window.requestAnimationFrame(syncCurrentChrome);
     });
-
     const initial = pathToSection(window.location.pathname);
     if (initial) {
         const root = currentRoot();
@@ -17584,10 +15891,8 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
     }
 })();
 </script>
-
 <style data-navigate-once>
 .rc-client-panel-v1033{min-width:0;}
-
 /* Recruiting Center owns its visible section title; suppress Filament's route title only here. */
 body.rc-recruiting-center-page .fi-page > .fi-header,
 body.rc-recruiting-center-page .fi-main > .fi-header,
@@ -17598,7 +15903,6 @@ body:has(.rc-livewire-root) .fi-main > .fi-header,
 body:has(.rc-livewire-root) .fi-main .fi-header:has(.fi-header-heading) {
     display:none !important;
 }
-
 /* Neutralize Filament's original route highlight for every Recruiting Center item.
    The route class may remain on the page that originally mounted the persistent shell,
    so the browser-owned data-rc-active flag is the only visual source of truth. */
@@ -17620,7 +15924,6 @@ body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not
 html.dark body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-section]:not([data-rc-active="true"]) .fi-sidebar-item-label {
     color:#e5e7eb !important;
 }
-
 /* Exactly one browser-selected Recruiting Center item gets the full active treatment. */
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] > .fi-sidebar-item-button,
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] .fi-sidebar-item-button,
@@ -17640,7 +15943,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     color:#ff6338 !important;
 }
 </style>
-
         <div class="rc-cancel-plan-modal-v59" data-rc-cancel-modal hidden>
             <div class="rc-cancel-plan-card-v59" role="dialog" aria-modal="true" aria-labelledby="rc-cancel-title">
                 <h3 id="rc-cancel-title">Cancel your plan?</h3>
@@ -17669,7 +15971,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
             document.addEventListener('submit', e=>{const form=e.target;if(!form.matches('#billing-payments form'))return;const btn=e.submitter;if(btn){btn.classList.add('is-api-busy');btn.disabled=true;}});
         })();
         </script>
-
     @include('partials.amplify-upgrade-modal')
 <style id="rc-inbox-list-dropdown-v1075">
     /* v10.75: instant server-rendered Inbox list menu; preserves v10.74 sizing. It stays anchored directly under
@@ -17678,7 +15979,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         position: relative !important;
         overflow: visible !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 {
         position: absolute !important;
         top: calc(100% + .42rem) !important;
@@ -17701,7 +16001,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         box-sizing: border-box !important;
         z-index: 180 !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 h4 {
         margin: .08rem .36rem .34rem !important;
         padding: 0 !important;
@@ -17711,7 +16010,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         letter-spacing: .055em !important;
         color: var(--rc-muted) !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 > template + button,
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 button[role="menuitemcheckbox"] {
         width: 100% !important;
@@ -17729,18 +16027,15 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         text-align: left !important;
         transform: none !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 button[role="menuitemcheckbox"]:hover {
         transform: none !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-list-check-v81 {
         width: .95rem !important;
         height: .95rem !important;
         min-width: .95rem !important;
         border-radius: .3rem !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-label-v87 {
         display: flex !important;
         align-items: center !important;
@@ -17752,20 +16047,17 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         line-height: 1.15 !important;
         white-space: nowrap !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-dot-v72 {
         width: .52rem !important;
         height: .52rem !important;
         min-width: .52rem !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-label-v87 span:last-child {
         min-width: 0 !important;
         overflow: hidden !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-list-count-v81 {
         min-width: 1.35rem !important;
         height: 1.35rem !important;
@@ -17779,7 +16071,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         font-size: .58rem !important;
         line-height: 1 !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-empty {
         width: 100% !important;
         min-width: 0 !important;
@@ -17787,7 +16078,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         padding: .72rem .55rem !important;
         box-sizing: border-box !important;
     }
-
     .rc-profile-action-wrap-v57.rc-school-list-dropdown-v72 > .rc-profile-list-menu-v57.rc-school-list-menu-v72 .rc-school-list-empty button {
         display: flex !important;
         width: 100% !important;
@@ -17798,8 +16088,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         font-size: .64rem !important;
     }
 </style>
-
-
 <style id="rc-remove-global-refresh-v101138">
     /* v10.113.8: keep the global header quiet. The removed refresh dropdown used
        refreshStatsOnly / refreshCoachDatabase / refreshData / startBackgroundLoad / loadNextBatch
@@ -17808,22 +16096,18 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     .rc-global-search-bar .rc-home-refresh-v2 {
         display: none !important;
     }
-
     .rc-global-search-bar {
         grid-template-columns: minmax(0, 1fr) auto !important;
         grid-template-areas: "search dark" !important;
     }
-
     .rc-home-actions-v2 {
         grid-template-columns: minmax(28rem, 1fr) 3rem !important;
         grid-template-areas:
             "search dark"
             ". email" !important;
     }
-
     .rc-home-search-v2 { grid-area: search !important; }
     .rc-home-dark-toggle-v2 { grid-area: dark !important; }
-
     @media (max-width: 760px) {
         .rc-home-actions-v2 {
             grid-template-columns: minmax(0, 1fr) 3rem !important;
@@ -17833,7 +16117,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         }
     }
 </style>
-
 <style id="rc-disable-all-global-reload-v1011310">
     /* v10.113.10: remove every global Coach Database reload control, including
        section-level orphan refresh buttons that can appear under the header. Manual,
@@ -17855,18 +16138,15 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         visibility: hidden !important;
         pointer-events: none !important;
     }
-
     .rc-home-actions-v2,
     .rc-global-search-bar,
     .rc-discover-actions-v29 {
         grid-template-columns: minmax(0, 1fr) auto !important;
         grid-template-areas: "search dark" !important;
     }
-
     .rc-home-search-v2 { grid-area: search !important; }
     .rc-home-dark-toggle-v2 { grid-area: dark !important; }
 </style>
-
 <script id="rc-disable-all-global-reload-script-v1011322">
     (() => {
         const selectors = [
@@ -17883,7 +16163,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
             'button[wire\:click="startBackgroundLoad"]',
             'button[wire\:click="loadNextBatch"]'
         ];
-
         const removeGlobalReloadControls = () => {
             // v10.113.22: run only on page/navigation lifecycle events. The previous
             // whole-document MutationObserver queried the full DOM after every small
@@ -17897,7 +16176,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
                 });
             } catch (_) {}
         };
-
         window.__plyrRemoveRecruitingGlobalReloadControls = removeGlobalReloadControls;
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', removeGlobalReloadControls, { once: true });
@@ -17909,6 +16187,5 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(removeGlobalReloadControls));
     })();
 </script>
-
 </x-filament-panels::page>
 </div>

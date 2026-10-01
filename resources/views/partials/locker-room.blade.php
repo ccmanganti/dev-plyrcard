@@ -4,7 +4,6 @@
     $lrInitialData = $lrLoggedIn && $lrUser
         ? app(\App\Services\LockerRoomDataService::class)->snapshot($lrUser)
         : null;
-
     $lrDataUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.data')
         ? route('locker-room.data')
         : null;
@@ -92,7 +91,6 @@
     $lrSupportPhone = '+15718880852';
     $lrFacebookUrl = 'https://www.facebook.com/plyrcard';
     $lrMainShareUrl = rtrim((string) config('app.url', url('/')), '/');
-
     // v10.107: desktop Locker Room navigation always points back to the main
     // PLYRCARD Recruiting Center, even when the Locker Room is opened on a
     // player's custom domain. Keep the CTA itself limited to the main app host.
@@ -106,7 +104,6 @@
     $lrAppHost = strtolower((string) parse_url($lrAppBaseUrl, PHP_URL_HOST));
     $lrAppHost = preg_replace('/^www\./', '', $lrAppHost) ?: $lrAppHost;
     $lrOnMainPlyrcardHost = $lrCurrentHost !== '' && $lrCurrentHost === $lrAppHost;
-
     // v10.38: authenticated Locker Room is public-player-site only. The navigation
     // partial resolves ownership and passes $plyrShouldRenderPullup. Never allow a
     // direct include to make Locker Room appear inside Filament/Admin.
@@ -115,12 +112,10 @@
     $lrRenderAllowed = isset($plyrShouldRenderPullup)
         ? (bool) $plyrShouldRenderPullup
         : (! $lrLoggedIn && ! $lrOnAdmin && ! $lrOnRegistration);
-
     if ($lrOnAdmin || $lrOnRegistration) {
         $lrRenderAllowed = false;
     }
 @endphp
-
 @if($lrRenderAllowed)
 <style>
     .lr-drawer, .lr-drawer * { box-sizing: border-box; }
@@ -367,10 +362,8 @@
         .lr-stat-grid { grid-template-columns:1fr 1fr; }
         .lr-plan { display:none; }
     }
-
     /* v10.38: Get Started uses the same right-side 50% / full-height shell as Locker Room.
        The default .lr-panel geometry above now applies to both authenticated and guest states. */
-
     /* v10.37 Get Started launcher: restore the original 8-action structure. */
     .lr-guest-shell { display: grid; gap: 20px; width: 100%; }
     .lr-guest-group { display: grid; gap: 9px; }
@@ -387,7 +380,6 @@
     .lr-login-remember input { accent-color: #ff5c35; }
         @media (max-width: 900px) { .lr-guest-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; } .lr-guest-card { min-height: 84px; } }
     @media (max-width: 350px) { .lr-guest-grid { grid-template-columns: 1fr; } }
-
     /* v10.35 conditional visibility + native Locker Room form controls. */
     #plyrcard-action-drawer.lr-drawer [hidden] { display: none !important; }
     .lr-select-wrap { position: relative; }
@@ -431,7 +423,6 @@
     .lr-billing-meta > div { border-radius: 11px; background: #f8fafc; padding: 10px; }
     .lr-billing-meta small { display: block; color: #98a2b3; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .045em; }
     .lr-billing-meta strong { display: block; margin-top: 4px; color: #344054; font-size: 11px; }
-
     /* Restore the original Locker Room pull-up tab style. */
     .lr-drawer-tab {
         position: fixed !important;
@@ -462,7 +453,6 @@
     @media (min-width: 901px) {
         .lr-drawer.is-open + .lr-drawer-tab { right: 50vw !important; }
     }
-
     @media (max-width: 900px) {
         .lr-drawer-tab { width: 190px !important; min-width: 190px !important; height: 56px !important; padding-left: 42px !important; font-size: 19px !important; }
         .lr-media-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
@@ -476,7 +466,6 @@
         .lr-payment-card > .lr-chip { grid-column: 2; justify-self: start; }
         .lr-billing-meta { grid-template-columns: 1fr; }
     }
-
     /* v10.34 Locker Room visual stabilization.
        Keep every drawer child scoped and stretched so host-page CSS cannot
        collapse the application into a narrow centered column. */
@@ -619,7 +608,6 @@
     #plyrcard-action-drawer.lr-drawer .lr-menu-copy { min-width:0; }
     #plyrcard-action-drawer.lr-drawer .lr-menu-copy strong { font-size:14px !important; }
     #plyrcard-action-drawer.lr-drawer .lr-menu-copy small { font-size:11px !important; line-height:1.35 !important; }
-
     @media (min-width: 901px) {
         #plyrcard-action-drawer.lr-drawer .lr-desktop-recruiting-link { display:inline-flex; }
     }
@@ -654,7 +642,6 @@
         #plyrcard-action-drawer.lr-drawer .lr-detail-kpi em { font-size:8px !important; }
         #plyrcard-action-drawer.lr-drawer .lr-home-section-head span { display:none; }
     }
-
     /* v10.59: Admin-stat visual parity, adapted to the compact Locker Room drawer. */
     .lr-dashboard-detail-body{background:#f7f8fa}.lr-detail-kpi,.lr-engagement-filter{min-height:92px;border:1px solid #e4e7ec!important;border-radius:15px!important;background:#fff!important;padding:12px!important;box-shadow:0 4px 16px rgba(15,23,42,.025)}
     .lr-detail-kpi small,.lr-engagement-filter span{font-size:9px!important;text-transform:none!important;letter-spacing:0!important;color:#667085!important;font-weight:750!important}.lr-detail-kpi strong,.lr-engagement-filter strong{font-size:22px!important;color:#101828!important}.lr-detail-kpi em{font-style:normal;font-size:9px;color:#98a2b3;line-height:1.25}.lr-engagement-filter.is-active{border-color:#ff6338!important;box-shadow:0 0 0 2px rgba(255,99,56,.10)!important}
@@ -662,12 +649,10 @@
     .lr-inline-success-v59{display:flex;gap:10px;align-items:flex-start;margin-top:12px;padding:12px;border:1px solid #a7f3d0;border-radius:12px;background:#ecfdf5;color:#065f46;font-size:11px;line-height:1.5}.lr-inline-success-v59[hidden]{display:none!important}.lr-inline-success-v59 i{margin-top:2px}
     .lr-btn.is-busy{pointer-events:none;opacity:.72}.lr-btn.is-busy:before{content:'';width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:lr-v59-spin .7s linear infinite}@keyframes lr-v59-spin{to{transform:rotate(360deg)}}
     @media(max-width:520px){.lr-dashboard-detail-body{padding:11px 10px 20px}.lr-detail-kpis,.lr-engagement-filters{gap:6px!important}.lr-detail-kpi{min-height:82px;padding:10px!important}.lr-detail-kpi strong{font-size:21px!important}.lr-detail-kpi em{display:none}.lr-engagement-filter{min-height:82px!important;padding:9px!important;grid-template-columns:32px minmax(0,1fr)!important;gap:7px!important}.lr-platform-filter-icon{width:32px!important;height:32px!important}.lr-engagement-filter strong{font-size:19px!important}.lr-activity-row{grid-template-columns:42px minmax(0,1fr) 60px;padding:9px;gap:8px}.lr-activity-school-logo{width:42px;height:42px;border-radius:11px}.lr-activity-count{min-width:56px;min-height:52px}.lr-activity-count strong{font-size:20px}.lr-activity-copy strong{white-space:normal;line-height:1.25}}
-
     /* v10.61: Locker Room school drawer mirrors the Admin school slider while staying compact. */
     .lr-school-adminlike-hero{display:grid;grid-template-columns:62px minmax(0,1fr) auto;gap:14px;align-items:start;padding:4px 0 16px}.lr-school-adminlike-logo{width:62px;height:62px;border:1px solid #e5e7eb;border-radius:16px;background:#f8fafc;display:grid;place-items:center;overflow:hidden;font-weight:850}.lr-school-adminlike-logo img{width:100%;height:100%;object-fit:contain}.lr-school-adminlike-main{min-width:0}.lr-school-adminlike-main .lr-school-division{display:inline-flex;padding:4px 8px;border-radius:8px;background:#fff0eb;color:#ff5c35;font-size:10px;font-weight:850}.lr-school-adminlike-main h3{margin:7px 0 3px;font-size:22px;line-height:1.06;color:#111827}.lr-school-adminlike-main p{margin:0;color:#7c8798;font-size:12px}.lr-school-scorebox{display:grid;justify-items:center;gap:3px}.lr-school-score-ring{width:54px;height:54px;border:5px solid #ff5c35;border-radius:999px;display:grid;place-items:center;font-weight:900;font-size:14px}.lr-school-scorebox small{color:#ff5c35;font-size:9px;font-weight:900}.lr-school-actions{display:grid;grid-template-columns:1.2fr 1fr 1.15fr;gap:8px;margin-bottom:14px}.lr-school-action{min-height:42px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;color:#111827;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px}.lr-school-action.is-primary{background:#ff5c35;border-color:#ff5c35;color:#fff}.lr-school-action.is-active{border-color:#ffb7a2;background:#fff3ee;color:#f05b34}.lr-school-list-wrap{position:relative}.lr-school-list-menu{position:absolute;z-index:20;top:calc(100% + 6px);right:0;width:min(240px,72vw);max-height:260px;overflow:auto;padding:8px;border:1px solid #e5e7eb;border-radius:13px;background:#fff;box-shadow:0 18px 40px rgba(15,23,42,.15)}.lr-school-list-menu[hidden]{display:none}.lr-school-list-menu h5{margin:2px 5px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#98a2b3}.lr-school-list-option{width:100%;border:0;background:transparent;border-radius:9px;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;font-size:12px;font-weight:750;cursor:pointer}.lr-school-list-option:hover{background:#f8fafc}.lr-school-list-option.is-active{background:#fff3ee;color:#f05b34}.lr-school-tabs{grid-template-columns:repeat(3,minmax(0,1fr));background:#f7f8fa;padding:4px;border:1px solid #e5e7eb;border-radius:14px}.lr-school-tab{min-height:44px;border-radius:10px}.lr-school-tab.is-active{background:#fff;box-shadow:0 5px 14px rgba(15,23,42,.06)}.lr-school-coach{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:13px;background:#fff}.lr-school-coach-avatar{width:42px;height:42px;border-radius:12px;background:#f2f4f7;display:grid;place-items:center;font-size:11px;font-weight:850}.lr-school-coach-copy{min-width:0}.lr-school-coach-copy strong{display:block}.lr-school-coach-copy span,.lr-school-coach-copy a{display:block;margin-top:2px;color:#667085;font-size:11px;text-decoration:none;overflow:hidden;text-overflow:ellipsis}.lr-school-mailbtn{width:34px;height:34px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;display:grid;place-items:center;color:#ff5c35;text-decoration:none}.lr-school-comms{display:grid;gap:8px}.lr-school-comm{background:#fff}.lr-school-backlabel{font-size:11px;color:#667085;margin-bottom:10px}.lr-school-busy{opacity:.6;pointer-events:none}.lr-school-list-wrap>.lr-school-action{width:100%;padding-inline:10px;white-space:nowrap}.lr-school-list-wrap>.lr-school-action i:last-child{font-size:9px;margin-left:1px}
     @media(max-width:620px){.lr-school-adminlike-hero{grid-template-columns:52px minmax(0,1fr) auto;gap:10px}.lr-school-adminlike-logo{width:52px;height:52px;border-radius:13px}.lr-school-adminlike-main h3{font-size:18px}.lr-school-score-ring{width:46px;height:46px;border-width:4px}.lr-school-actions{grid-template-columns:1.2fr .9fr 1.05fr;gap:6px}.lr-school-action{font-size:10px;padding:0 6px}.lr-school-tab{font-size:10px}}
 </style>
-
 <style id="lr-photos-v102">
     .lr-photo-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:2px 0 11px;border-bottom:1px solid #e5e7eb}.lr-photo-hero h3{margin:4px 0 4px;font:700 30px/1 Antonio,Inter,sans-serif;letter-spacing:-.035em;color:#101828}.lr-photo-hero p{margin:0;color:#667085;font-size:11px;line-height:1.5;max-width:480px}.lr-photo-hero-icon{width:42px;height:42px;border-radius:12px;background:#fff0eb;color:#ff5c35;display:grid;place-items:center;font-size:17px;flex:0 0 auto}
     .lr-photo-tabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:4px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}.lr-photo-tab{min-height:42px;border:0;border-radius:9px;background:transparent;color:#667085;cursor:pointer;font-size:10px;font-weight:850;display:flex;align-items:center;justify-content:center;gap:6px}.lr-photo-tab.is-active{background:#f5f6f8;color:#101828;box-shadow:inset 0 0 0 1px #e5e7eb}.lr-photo-tab em{font-style:normal;background:#eef1f5;color:#475467;padding:2px 6px;border-radius:999px;font-size:8px}
@@ -677,7 +662,6 @@
     @media(max-width:520px){.lr-photo-gallery{grid-template-columns:1fr 1fr;gap:7px}.lr-photo-upload{align-items:flex-start;flex-direction:column}.lr-photo-upload .lr-btn{width:100%}.lr-photo-hero h3{font-size:27px}.lr-photo-hero-icon{display:none}}
     @media(hover:none){.lr-photo-card .lr-photo-actions{opacity:1;pointer-events:auto;background:linear-gradient(to top,rgba(8,15,28,.46),rgba(8,15,28,0) 48%)}}
 </style>
-
 <style id="lr-analytics-v103">
     /* v10.103 analytics polish: these rules intentionally come after the legacy parity block. */
     #plyrcard-action-drawer .lr-detail-kpi{position:relative!important;overflow:hidden!important;border-radius:16px!important;padding:15px!important;box-shadow:0 7px 22px rgba(15,23,42,.035)!important}
@@ -708,7 +692,7 @@
     #plyrcard-action-drawer .lr-platform-pill.is-x .lr-platform-mark{background:#0b0b0b}
     @media(max-width:520px){#plyrcard-action-drawer .lr-engagement-filter{min-height:82px!important;padding:9px!important;grid-template-columns:32px minmax(0,1fr)!important;gap:7px!important}#plyrcard-action-drawer .lr-engagement-filter .lr-platform-filter-icon{width:32px!important;height:32px!important}#plyrcard-action-drawer .lr-activity-row{grid-template-columns:42px minmax(0,1fr) 60px!important;padding:9px!important;gap:8px!important}#plyrcard-action-drawer .lr-activity-school-logo{width:42px;height:42px;border-radius:11px}#plyrcard-action-drawer .lr-activity-count{min-width:56px;min-height:52px}#plyrcard-action-drawer .lr-activity-count strong{font-size:20px!important}}
 </style>
-
+<script src="https://js.stripe.com/v3/"></script>
 <script type="application/json" id="plyrcard-locker-room-initial">@json($lrInitialData)</script>
 <div id="plyrcard-action-drawer" class="lr-drawer" data-state="closed"
      data-url="{{ $lrDataUrl }}"
@@ -723,7 +707,7 @@
      data-schedule-url="{{ $lrScheduleStoreUrl }}"
      data-schedule-base-url="{{ $lrScheduleBaseUrl }}"
      data-settings-url="{{ $lrSettingsUrl }}"
-     data-billing-url="{{ $lrBillingUrl }}" data-cancel-billing-url="{{ route('billing.cancel-request') }}"
+     data-billing-url="{{ $lrBillingUrl }}" data-cancel-billing-url="{{ route('billing.cancel-request') }}" data-billing-summary-url="{{ route('billing.stripe.summary') }}" data-payment-method-setup-url="{{ route('billing.stripe.payment-method.setup') }}" data-billing-resume-url="{{ route('billing.stripe.resume') }}"
      data-referral-url="{{ $lrReferralUrl }}"
      data-additional-service-url="{{ $lrAdditionalServiceUrl }}"
      data-support-tickets-url="{{ $lrSupportTicketsUrl }}"
@@ -757,7 +741,6 @@
                 <button type="button" class="lr-close" data-lr-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
             </div>
         </header>
-
         <div class="lr-body">
             @auth
                 <section class="lr-view is-active" data-lr-view="home">
@@ -803,7 +786,6 @@
                         </div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="dashboard">
                     <div class="lr-section">
                         <div class="lr-preparing" data-lr-preparing hidden><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>We are preparing your PLYRCARD.</strong><span>Complete your profile while our team gets your public PLYRCARD and recruiting workspace ready.</span></div></div>
@@ -817,7 +799,6 @@
                         <div class="lr-card" data-lr-next-schedule><h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div></div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="profile">
                     <form class="lr-form" data-lr-profile-form enctype="multipart/form-data">
                         <div class="lr-tabs" data-lr-profile-tabs>
@@ -828,7 +809,6 @@
                             <button type="button" class="lr-tab" data-pane="people">People</button>
                             <button type="button" class="lr-tab" data-pane="media">Media</button>
                         </div>
-
                         <div class="lr-profile-pane is-active" data-lr-profile-pane="basic">
                             <div class="lr-form-section"><h4>Personal Information</h4><div class="lr-form-grid">
                                 <div class="lr-field"><label>First Name</label><input class="lr-input" name="first_name" required></div>
@@ -843,7 +823,6 @@
                                 <div class="lr-field"><label>Country</label><input class="lr-input" name="country"></div>
                             </div></div></div>
                         </div>
-
                         <div class="lr-profile-pane" data-lr-profile-pane="athlete">
                             <div class="lr-form-section"><h4>Sport Details</h4><div class="lr-form-grid">
                                 <div class="lr-field"><label>Sport</label><div class="lr-select-wrap"><select class="lr-select" name="sport" required data-lr-sport></select><i class="fa-solid fa-chevron-down"></i></div></div>
@@ -871,7 +850,6 @@
                                 <div class="lr-field"><label>Pro Club Logo</label><input class="lr-input" type="file" name="pro_club_logo" accept="image/*"></div>
                             </div><div data-lr-pro-club-preview style="margin-top:10px;"></div></div></div>
                         </div>
-
                         <div class="lr-profile-pane" data-lr-profile-pane="bio">
                             <div class="lr-form-section"><h4>Bio & Accolades</h4><div class="lr-form-grid">
                                 <div class="lr-field is-full"><label>Player Bio</label><textarea class="lr-textarea" name="player_bio"></textarea></div>
@@ -879,7 +857,6 @@
                                 <div class="lr-field is-full"><label>Sports Accolades</label><textarea class="lr-textarea" name="sports_accolades" placeholder="One accolade per line"></textarea></div>
                             </div></div>
                         </div>
-
                         <div class="lr-profile-pane" data-lr-profile-pane="social">
                             <div class="lr-form-section"><h4>Social & Highlights</h4><div data-lr-social-lock class="lr-preparing" hidden><i class="fa-solid fa-lock"></i><div><strong>Unlock Social & Video Links</strong><span>Upgrade to My Journey to add social links and video highlights to your PLYRCARD.</span></div></div><div class="lr-form-grid" data-lr-social-fields>
                                 <div class="lr-field"><label>Instagram Handle</label><input class="lr-input" name="ig_handle" placeholder="yourhandle"></div>
@@ -889,7 +866,6 @@
                                 <div class="lr-field is-full"><label>Featured Video URLs</label><textarea class="lr-textarea" name="featured_video_urls" placeholder="One URL per line"></textarea></div>
                             </div></div>
                         </div>
-
                         <div class="lr-profile-pane" data-lr-profile-pane="people">
                             <div class="lr-form-section"><h4>Parents / Guardians</h4><div class="lr-form-grid">
                                 <div class="lr-field"><label>Primary Parent</label><input class="lr-input" name="parent"></div><div class="lr-field"><label>Primary Parent Email</label><input class="lr-input" type="email" name="parent_email"></div><div class="lr-field"><label>Primary Parent Phone</label><input class="lr-input" name="parent_phone"></div>
@@ -904,16 +880,13 @@
                                 <div class="lr-field"><label>Strength & Conditioning Trainer</label><input class="lr-input" name="snc_trainer"></div><div class="lr-field"><label>Trainer Email</label><input class="lr-input" type="email" name="snc_trainer_email"></div><div class="lr-field"><label>Trainer Phone</label><input class="lr-input" name="snc_trainer_phone"></div>
                             </div></div>
                         </div>
-
                         <div class="lr-profile-pane" data-lr-profile-pane="media">
                             <div class="lr-form-section"><h4>PLYRCARD Photos</h4><div class="lr-media-featured" data-lr-profile-image-preview></div><p class="lr-card-copy" style="margin-top:10px;">Photos prepared for your PLYRCARD appear here. Add your own player photos below anytime.</p></div>
                             <div class="lr-form-section"><h4>Player Photos</h4><p class="lr-card-copy">Upload up to 20 player photos. New selections appear here before you save them.</p><div class="lr-media-grid" data-lr-raw-images></div><div data-lr-raw-existing-hidden></div><input type="file" name="raw_player_images_new[]" accept="image/*" multiple data-lr-raw-file-input hidden><div class="lr-upload-status" data-lr-raw-status>No images selected.</div></div>
                         </div>
-
                         <button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Quick Profile</button>
                     </form>
                 </section>
-
                 <section class="lr-view" data-lr-view="photos">
                     <div class="lr-section" data-lr-photos-root>
                         <div class="lr-photo-hero">
@@ -934,7 +907,6 @@
                         <div class="lr-muted" data-lr-photo-status aria-live="polite"></div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="schedule">
                     <div class="lr-section">
                         <div class="lr-preparing" data-lr-preparing hidden><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>We are preparing your PLYRCARD.</strong><span>You can still manage your schedule while we finish preparing the rest of your recruiting workspace.</span></div></div>
@@ -955,7 +927,6 @@
                         <div class="lr-schedule-list" data-lr-schedule-list></div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="settings">
                     <form class="lr-form" data-lr-settings-form>
                         <div class="lr-form-section"><h4>Notifications</h4><div data-lr-notifications></div></div>
@@ -964,9 +935,7 @@
                         <button class="lr-btn lr-btn-primary" type="submit">Save Settings</button>
                     </form>
                 </section>
-
                 <section class="lr-view" data-lr-view="upgrade"><div class="lr-section"><div class="lr-hero"><span class="lr-eyebrow">Plans</span><h3>Build Your Recruiting Reach</h3><p class="lr-muted">Choose the level of support that fits where you are right now.</p></div><div class="lr-plan-grid" data-lr-plans></div></div></section>
-
                 <section class="lr-view" data-lr-view="checkout">
                     <div class="lr-checkout-shell">
                         <div class="lr-checkout-card">
@@ -992,14 +961,12 @@
                             <div class="lr-checkout-state is-error" data-lr-checkout-error hidden>
                                 <div class="lr-checkout-state-inner"><strong>Checkout could not be prepared</strong><span data-lr-checkout-error-copy>Please try again.</span><div class="lr-actions" style="justify-content:center;margin-top:16px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-checkout-retry>Try Again</button></div></div>
                             </div>
-                            <iframe class="lr-checkout-frame" data-lr-checkout-frame src="about:blank" scrolling="no" title="Secure checkout" data-cookie-consent="true" data-cookie-consent-provider="auto" hidden></iframe>
+                            <div class="lr-checkout-frame" data-lr-checkout-frame hidden><div id="lr-stripe-payment-element" style="padding:18px;"></div><div class="lr-actions" style="padding:0 18px 18px;justify-content:flex-end;"><button class="lr-btn lr-btn-primary" type="button" data-lr-stripe-confirm>Pay securely</button></div></div>
                             <div class="lr-checkout-foot"><span data-lr-checkout-status>Payment confirmation is checked automatically.</span><strong>Secure checkout</strong></div>
                         </div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="share"><div class="lr-section"><div class="lr-card" data-lr-share-card></div></div></section>
-
                 <section class="lr-view" data-lr-view="services">
                     <div class="lr-section">
                         <div class="lr-hero"><span class="lr-eyebrow">À La Carte</span><h3>Additional Services</h3><p class="lr-muted">Add individual recruiting support whenever you need it. Ordering is coming soon.</p></div>
@@ -1019,11 +986,8 @@
                         </div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="show"><div class="lr-section"><div class="lr-hero"><span class="lr-eyebrow">PLYRCARD Show</span><h3>Stories, Recruiting & The Game</h3><p class="lr-muted">Explore PLYRCARD conversations and athlete stories. Opening the show is an intentional external action, not Locker Room navigation.</p><div class="lr-actions"><a class="lr-btn lr-btn-primary" href="/podcast">Open PLYRCARD Show</a></div></div></div></section>
-
                 <section class="lr-view" data-lr-view="refer"><form class="lr-form" data-lr-referral-form><div class="lr-form-section"><h4>Refer a Friend</h4><p class="lr-card-copy">Invite another athlete to PLYRCARD. We only need their name and email.</p><div class="lr-form-grid" style="margin-top:12px;"><div class="lr-field"><label>Friend's Name</label><input class="lr-input" name="friend_name" placeholder="Friend's full name" required></div><div class="lr-field"><label>Friend's Email</label><input class="lr-input" type="email" name="friend_email" placeholder="friend@example.com" required></div><div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="message" placeholder="Optional message"></textarea></div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Invitation Email</button><div class="lr-upload-status" data-lr-referral-status>The invitation will be emailed directly to your friend.</div></form></section>
-
                 <section class="lr-view" data-lr-view="support">
                     <div class="lr-section">
                         <div class="lr-hero"><span class="lr-eyebrow">Support</span><h3>How can we help?</h3><p class="lr-muted">Send a request, track its status, and follow up without leaving Locker Room.</p></div>
@@ -1033,19 +997,16 @@
                         <div class="lr-card"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><div><h3 class="lr-card-title">Your Requests</h3><p class="lr-card-copy">Track status and add follow-ups to existing tickets.</p></div><span class="lr-chip" data-lr-support-count>0 tickets</span></div><div class="lr-support-history" data-lr-support-history><div class="lr-detail-empty" style="margin-top:12px">Loading your support tickets…</div></div></div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book a Call</h3><p class="lr-card-copy">Choose a time that works for you. Booking stays inside Locker Room.</p></div><div data-lr-book-embed></div></div></section>
-
                 <section class="lr-view" data-lr-view="billing">
                     <form class="lr-form" data-lr-billing-form>
-                        <div class="lr-card" data-lr-billing-summary></div>
+                        <div class="lr-card" data-lr-billing-summary></div><div class="lr-card" style="margin-top:12px;" data-lr-credit-summary></div>
                         <div class="lr-form-section"><h4>Payment Method</h4><div data-lr-payment-method></div></div>
                         <div class="lr-form-section"><h4>Billing Contact</h4><div class="lr-form-grid"><div class="lr-field"><label>Full Name</label><input class="lr-input" name="billing_name" placeholder="Parent or cardholder name" required></div><div class="lr-field"><label>Email</label><input class="lr-input" type="email" name="billing_email" placeholder="billing@example.com" required></div><div class="lr-field"><label>Phone</label><input class="lr-input" name="billing_phone" placeholder="(555) 123-4567"></div><div class="lr-field"><label>Company / Organization</label><input class="lr-input" name="billing_company" placeholder="Optional organization"></div></div></div>
                         <div class="lr-form-section"><h4>Billing Address</h4><div class="lr-form-grid"><div class="lr-field is-full"><label>Address Line 1</label><input class="lr-input" name="billing_address_1" placeholder="123 Main Street" required></div><div class="lr-field is-full"><label>Address Line 2</label><input class="lr-input" name="billing_address_2" placeholder="Apt, suite, unit (optional)"></div><div class="lr-field"><label>City</label><input class="lr-input" name="billing_city" placeholder="City" required></div><div class="lr-field"><label>State / Province</label><input class="lr-input" name="billing_state" placeholder="State / Province" required></div><div class="lr-field"><label>Postal Code</label><input class="lr-input" name="billing_postal_code" placeholder="Postal code" required></div><div class="lr-field"><label>Country</label><input class="lr-input" name="billing_country" placeholder="US" required></div></div></div>
                         <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit">Save Billing Information</button><button class="lr-btn lr-btn-danger" type="button" data-lr-cancel-plan hidden>Cancel Plan</button></div>
                     </form>
                 </section>
-
                 <section class="lr-view" data-lr-view="password">
                     <form class="lr-form" data-lr-password-form>
                         <div class="lr-form-section">
@@ -1059,7 +1020,6 @@
                         <button class="lr-btn lr-btn-primary" type="submit">Save Password</button>
                     </form>
                 </section>
-
                 <section class="lr-view" data-lr-view="gate"><div class="lr-card lr-gate"><div class="lr-gate-icon"><i class="fa-solid fa-lock"></i></div><h3 class="lr-card-title" data-lr-gate-title>Available with My Journey</h3><p class="lr-card-copy">Your Free plan keeps Profile and Settings available. Upgrade to unlock recruiting stats, Schedule, and the full recruiting workspace.</p><div class="lr-actions" style="justify-content:center;"><button class="lr-btn" type="button" data-lr-back>Not now</button><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="upgrade">See Plans</button></div></div></section>
             @else
                 <section class="lr-view is-active" data-lr-view="guest-home">
@@ -1073,7 +1033,6 @@
                                 <a class="lr-guest-card" href="{{ $lrFacebookUrl }}" target="_blank" rel="noopener"><span class="lr-guest-icon"><i class="fa-brands fa-facebook-messenger"></i></span><strong>Chat Us</strong></a>
                             </div>
                         </div>
-
                         <div class="lr-guest-group">
                             <div class="lr-guest-group-title">Start</div>
                             <div class="lr-guest-grid">
@@ -1085,7 +1044,6 @@
                         </div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="share-site">
                     <div class="lr-form-section">
                         <h4>Share PLYRCARD</h4>
@@ -1094,7 +1052,6 @@
                         <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-guest-share>Share</button><button class="lr-btn" type="button" data-lr-guest-copy>Copy Link</button></div>
                     </div>
                 </section>
-
                 <section class="lr-view" data-lr-view="login">
                     <form class="lr-form" data-lr-login-form>
                         <div class="lr-form-section">
@@ -1113,7 +1070,6 @@
                 <section class="lr-view" data-lr-view="book-call"><div class="lr-card" style="padding:0;overflow:hidden;"><div style="padding:14px 15px;border-bottom:1px solid #e5e7eb;"><h3 class="lr-card-title">Book Demo</h3><p class="lr-card-copy">Choose a time to see how PLYRCARD works.</p></div><div data-lr-book-embed></div></div></section>
             @endauth
         </div>
-
         <aside class="lr-dashboard-detail" data-lr-dashboard-activity-panel aria-label="Dashboard activity detail">
             <div class="lr-dashboard-detail-head">
                 <div class="lr-dashboard-detail-head-main">
@@ -1122,7 +1078,6 @@
             </div>
             <div class="lr-dashboard-detail-body" data-lr-dashboard-detail-body><div class="lr-detail-empty">Choose a dashboard stat to view its activity.</div></div>
         </aside>
-
         <aside class="lr-dashboard-detail" data-lr-dashboard-school-panel aria-label="School detail">
             <div class="lr-dashboard-detail-head">
                 <div class="lr-dashboard-detail-head-main">
@@ -1131,12 +1086,10 @@
             </div>
             <div class="lr-dashboard-detail-body" data-lr-dashboard-school-body><div class="lr-detail-empty">Select a school from a coach activity row.</div></div>
         </aside>
-
         <div class="lr-toast" data-lr-toast></div>
     </section>
 </div>
 <button type="button" class="lr-drawer-tab" data-plyrcard-toggle-drawer aria-expanded="false"><i class="fa-solid fa-chevron-up" aria-hidden="true"></i><span>{{ $lrLoggedIn ? 'Locker Room' : 'Get Started' }}</span></button>
-
 @once
 <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
 @endonce
@@ -1145,7 +1098,6 @@
     const drawer = document.getElementById('plyrcard-action-drawer');
     if (!drawer || drawer.dataset.lrReady === '1') return;
     drawer.dataset.lrReady = '1';
-
     const authenticated = drawer.dataset.authenticated === '1';
     let forcePassword = authenticated && drawer.dataset.forcePassword === '1';
     let state = {};
@@ -1173,6 +1125,9 @@
     let lockerCheckoutTimer = null;
     let lockerCheckoutStartedAt = 0;
     let lockerCheckoutStarting = false;
+    let lockerStripe = null;
+    let lockerStripeElements = null;
+    let lockerStripeMode = 'payment';
     const dashboardMetricCache = new Map();
     const dashboardMetricPromises = new Map();
     const profileOptionCache = new Map();
@@ -1183,10 +1138,8 @@
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
     const isDesktopLockerRoom = () => window.matchMedia ? window.matchMedia('(min-width: 901px)').matches : window.innerWidth > 900;
-
     const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
     const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
-
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
         el.textContent = message || (error ? 'Something went wrong.' : 'Saved.');
@@ -1194,7 +1147,6 @@
         el.classList.add('is-showing');
         clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('is-showing'), 3200);
     }
-
     function setFormBusy(form, busy, label = 'Working…') {
         if (!form) return;
         const button = form.querySelector('button[type="submit"]');
@@ -1211,7 +1163,6 @@
             if (button.dataset.lrOriginalLabel) { button.innerHTML = button.dataset.lrOriginalLabel; delete button.dataset.lrOriginalLabel; }
         }
     }
-
     function openDrawer() {
         drawer.classList.add('is-open'); drawer.dataset.state = 'open'; document.documentElement.classList.add('lr-open');
         document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','true'));
@@ -1224,7 +1175,6 @@
         dashboardSchoolState = null;
         dashboardSchoolLoading = false;
     }
-
     function closeDashboardActivity() {
         closeDashboardSchool();
         const panel = q('[data-lr-dashboard-activity-panel]');
@@ -1232,9 +1182,7 @@
         dashboardActivityState = null;
         dashboardActivityLoading = false;
     }
-
     function closeDrawer() { stopLockerCheckoutPolling(); closeDashboardActivity(); drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
-
     function isFree() { return state?.plan?.is_free === true; }
     function requiresPremium(view) { return ['dashboard','schedule'].includes(view); }
     function setView(view, push = true) {
@@ -1257,7 +1205,6 @@
         render();
     }
     function goBack() { if (currentView === 'checkout') stopLockerCheckoutPolling(); const target = history.pop() || (authenticated ? 'home' : 'guest-home'); setView(target, false); }
-
     async function request(url, options = {}) {
         const headers = Object.assign({'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrf()}, options.headers || {});
         if (options.body && !(options.body instanceof FormData) && typeof options.body !== 'string') { headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(options.body); }
@@ -1272,12 +1219,10 @@
         }
         return json;
     }
-
     function lrInitials(name) {
         const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
         return (parts.slice(0, 2).map(part => part.charAt(0).toUpperCase()).join('') || 'PC');
     }
-
     function metricRowSubtitle(row) {
         const bits = [];
         if (row.coach_title) bits.push(row.coach_title);
@@ -1286,14 +1231,12 @@
         if (row.last_at_label) bits.push(row.last_at_label);
         return bits.join(' · ');
     }
-
     function renderDashboardActivityDetail() {
         const panel = q('[data-lr-dashboard-activity-panel]');
         const body = q('[data-lr-dashboard-detail-body]');
         const title = q('[data-lr-dashboard-detail-title]');
         const subtitle = q('[data-lr-dashboard-detail-subtitle]');
         if (!panel || !body) return;
-
         panel.classList.add('is-open');
         if (dashboardActivityLoading && !dashboardActivityState) {
             if (title) title.textContent = 'Recruiting Activity';
@@ -1301,7 +1244,6 @@
             body.innerHTML = `<div class="lr-detail-kpis"><div class="lr-detail-kpi lr-skeleton">.</div><div class="lr-detail-kpi lr-skeleton">.</div><div class="lr-detail-kpi lr-skeleton">.</div></div><div class="lr-activity-list"><div class="lr-activity-row lr-skeleton" style="height:66px">.</div><div class="lr-activity-row lr-skeleton" style="height:66px">.</div><div class="lr-activity-row lr-skeleton" style="height:66px">.</div></div>`;
             return;
         }
-
         const data = dashboardActivityState || {};
         let rows = Array.isArray(data.rows) ? data.rows : [];
         const metric = data.metric || '';
@@ -1311,9 +1253,7 @@
             : metric === 'social_clicks'
                 ? 'How coaches are engaging with your social platforms.'
                 : 'Identified coaches connected to this activity.';
-
         const note = data.note ? `<div class="lr-preparing" style="margin-bottom:11px;border-color:#e5e7eb;background:#fff;"><i class="fa-solid fa-circle-info" style="color:#667085"></i><div><span style="margin-top:0;color:#667085;">${esc(data.note)}</span></div></div>` : '';
-
         let summary = '';
         if (metric === 'profile_views') {
             summary = `<div class="lr-detail-kpis">
@@ -1335,7 +1275,6 @@
         } else {
             summary = `<div class="lr-activity-summary"><div><span>Total activity</span><strong>${Number(data.total || 0).toLocaleString()}</strong></div><div style="text-align:right"><span>Identified coaches</span><strong>${Number(data.identified_count || rows.length || 0).toLocaleString()}</strong></div></div>`;
         }
-
         const rowCountForSort = row => metric === 'social_clicks' && dashboardEngagementFilter
             ? Number((row.platform_counts || {})[dashboardEngagementFilter] || 0)
             : Number(row.count || row.views || row.clicks || 0);
@@ -1351,12 +1290,10 @@
             return rowCountForSort(b) - rowCountForSort(a);
         });
         const sortControl = `<div class="lr-sort-row"><label>Sort</label><select class="lr-sort-select" data-lr-dashboard-sort><option value="count_desc" ${dashboardActivitySort === 'count_desc' ? 'selected' : ''}>${metric === 'social_clicks' ? 'Clicks' : 'Views'}: High to Low</option><option value="count_asc" ${dashboardActivitySort === 'count_asc' ? 'selected' : ''}>${metric === 'social_clicks' ? 'Clicks' : 'Views'}: Low to High</option><option value="date_desc" ${dashboardActivitySort === 'date_desc' ? 'selected' : ''}>Date: Newest First</option><option value="date_asc" ${dashboardActivitySort === 'date_asc' ? 'selected' : ''}>Date: Oldest First</option></select></div>`;
-
         if (!rows.length) {
             body.innerHTML = summary + note + sortControl + '<div class="lr-detail-empty">No identified coach rows are available for this view yet.</div>';
             return;
         }
-
         const sectionHeading = metric === 'profile_views' ? "Who's Viewing You" : (metric === 'social_clicks' ? "Who's Clicking" : 'Activity');
         const html = rows.map(row => {
             const school = row.school || {};
@@ -1390,7 +1327,6 @@
         }).join('');
         body.innerHTML = summary + note + sortControl + `<div style="font-size:12px;font-weight:850;color:#101828;margin:13px 2px 8px;">${esc(sectionHeading)}</div><div class="lr-activity-list">${html}</div>`;
     }
-
     async function fetchDashboardMetric(metric) {
         if (dashboardMetricCache.has(metric)) return dashboardMetricCache.get(metric);
         if (dashboardMetricPromises.has(metric)) return dashboardMetricPromises.get(metric);
@@ -1405,14 +1341,12 @@
         dashboardMetricPromises.set(metric, promise);
         return promise;
     }
-
     function prefetchDashboardMetrics() {
         if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
         const run = () => ['profile_views','social_clicks'].forEach(metric => fetchDashboardMetric(metric).catch(() => {}));
         if ('requestIdleCallback' in window) window.requestIdleCallback(run, {timeout:900});
         else setTimeout(run, 180);
     }
-
     async function openDashboardMetric(metric) {
         if (!authenticated || isFree() || !drawer.dataset.dashboardActivityUrl) return;
         closeDashboardSchool();
@@ -1430,7 +1364,6 @@
             renderDashboardActivityDetail();
         }
     }
-
     function renderDashboardSchoolDetail() {
         const panel = q('[data-lr-dashboard-school-panel]');
         const body = q('[data-lr-dashboard-school-body]');
@@ -1488,7 +1421,6 @@
             <div class="lr-school-tab-panel" data-lr-school-tab-panel="roster" hidden><div class="lr-school-coming"><div><i class="fa-solid fa-arrow-trend-up"></i><strong>Roster &amp; Stats Coming Soon</strong><span>${esc(data.roster?.message || 'Team roster and school performance insights will be available here soon.')}</span></div></div></div>
             <div class="lr-school-tab-panel" data-lr-school-tab-panel="comms" hidden><div class="lr-school-comms">${comms}</div></div>`;
     }
-
     async function toggleDashboardSchoolFavorite(button) {
         if (!button || !drawer.dataset.dashboardSchoolFavoriteUrl || !dashboardSchoolState?.school?.id) return;
         const next = button.dataset.favorite !== '1';
@@ -1500,7 +1432,6 @@
             renderDashboardSchoolDetail();
         } catch (error) { showAlert(error.message || 'Unable to update favorite.', 'error'); }
     }
-
     async function toggleDashboardSchoolList(button) {
         if (!button || !drawer.dataset.dashboardSchoolListUrl || !dashboardSchoolState?.school?.id) return;
         const key = String(button.dataset.lrSchoolListKey || '').trim();
@@ -1517,7 +1448,6 @@
             const menu = q('[data-lr-school-list-menu]'); if (menu) menu.hidden = false;
         } catch (error) { showAlert(error.message || 'Unable to update list.', 'error'); }
     }
-
     async function openDashboardSchool(reference) {
         reference = String(reference || '').trim();
         if (!reference || !authenticated || isFree() || !drawer.dataset.dashboardSchoolUrl) return;
@@ -1536,7 +1466,6 @@
             renderDashboardSchoolDetail();
         }
     }
-
     async function refreshData() {
         if (!authenticated || !drawer.dataset.url) return;
         try {
@@ -1544,7 +1473,6 @@
             if (json.data) { state = json.data; render(); }
         } catch (_) { /* Keep the server-rendered snapshot; no disruptive loader. */ }
     }
-
     function fillForm(form, data) {
         if (!form || !data) return;
         Array.from(form.elements).forEach(el => {
@@ -1557,7 +1485,6 @@
             else el.value = value ?? '';
         });
     }
-
     function photoGalleryData(category = photoGalleryCategory) {
         const photos = state?.photos || {};
         const key = category === 'plyrcard' ? 'plyrcard' : 'player';
@@ -1568,26 +1495,22 @@
             max: Number(key === 'player' ? (photos.player_max || 20) : (photos.plyrcard_max || 30)),
         };
     }
-
     function setPhotoStatus(message = '', isError = false) {
         const el = q('[data-lr-photo-status]');
         if (!el) return;
         el.textContent = message || '';
         el.style.color = isError ? '#b42318' : '#667085';
     }
-
     function renderPhotos() {
         const root = q('[data-lr-photos-root]');
         const gallery = q('[data-lr-photo-gallery]');
         if (!root || !gallery || !authenticated) return;
-
         const data = photoGalleryData();
         qa('[data-lr-photo-tab]').forEach(tab => tab.classList.toggle('is-active', tab.dataset.lrPhotoTab === data.key));
         qa('[data-lr-photo-count]').forEach(el => {
             const rows = Array.isArray(state?.photos?.[el.dataset.lrPhotoCount]) ? state.photos[el.dataset.lrPhotoCount] : [];
             el.textContent = String(rows.length);
         });
-
         const uploadPanel = q('[data-lr-photo-upload-panel]');
         const uploadTitle = q('[data-lr-photo-upload-title]');
         const uploadCopy = q('[data-lr-photo-upload-copy]');
@@ -1601,12 +1524,10 @@
             pick.hidden = !data.canManage;
             pick.innerHTML = '<i class="fa-solid fa-plus"></i> Add Photos';
         }
-
         if (!data.rows.length) {
             gallery.innerHTML = `<div class="lr-photo-empty"><div><i class="fa-regular fa-images"></i><strong>${data.key === 'player' ? 'No player photos yet' : 'No PLYRCARD photos yet'}</strong><span>${data.canManage ? 'Use Add Photos to start this gallery.' : 'Photos prepared for your PLYRCARD will appear here.'}</span></div></div>`;
             return;
         }
-
         gallery.innerHTML = data.rows.map((photo, position) => {
             const url = photo?.url || '';
             const source = photo?.source || (data.key === 'plyrcard' ? 'additional' : 'player');
@@ -1618,7 +1539,6 @@
             return `<article class="lr-photo-card"><img src="${esc(url)}" alt="${data.key === 'player' ? 'Player photo' : 'PLYRCARD photo'}" loading="lazy"><div class="lr-photo-actions"><a class="lr-photo-action" href="${esc(url)}" target="_blank" rel="noopener" download title="Download" aria-label="Download photo"><i class="fa-solid fa-download"></i></a>${remove}</div></article>`;
         }).join('');
     }
-
     async function uploadLockerPhotos(files) {
         const data = photoGalleryData();
         if (!data.canManage || !files?.length || !drawer.dataset.photosUploadUrl) return;
@@ -1640,8 +1560,6 @@
             const input = q('[data-lr-photo-files]'); if (input) input.value = '';
         }
     }
-
-
     function photoDeleteUrl(category, index, source = '', field = '') {
         const base = String(drawer.dataset.photosDeleteUrl || '')
             .replace('__CATEGORY__', encodeURIComponent(category))
@@ -1651,7 +1569,6 @@
         if (field) url.searchParams.set('field', field);
         return url.toString();
     }
-
     async function deleteLockerPhoto(index, source = '', field = '') {
         const data = photoGalleryData();
         if (!data.canManage || !drawer.dataset.photosDeleteUrl) return;
@@ -1670,10 +1587,6 @@
             root?.classList.remove('lr-photo-busy');
         }
     }
-
-
-
-
     function render() {
         if (!authenticated || !state?.user) return;
         q('[data-lr-plan]') && (q('[data-lr-plan]').textContent = state.plan?.label || 'Free');
@@ -1682,17 +1595,14 @@
         q('[data-lr-completion]') && (q('[data-lr-completion]').textContent = `${completion}%`);
         q('[data-lr-progress]') && (q('[data-lr-progress]').style.width = `${Math.max(0,Math.min(100,completion))}%`);
         qa('[data-lr-stat]').forEach(el => el.textContent = new Intl.NumberFormat().format(Number(state.dashboard?.stats?.[el.dataset.lrStat] || 0)));
-
         const next = state.dashboard?.next_schedule;
         const nextBox = q('[data-lr-next-schedule]');
         if (nextBox) nextBox.innerHTML = next
             ? `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy"><strong>${esc(next.opponent || next.title || 'Game')}</strong><br>${esc(next.date_label || '')}${next.time_label ? ` · ${esc(next.time_label)}` : ''}${next.venue || next.location ? `<br>${esc(next.venue || next.location)}` : ''}</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`
             : `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`;
-
         renderProfile(); renderPhotos(); renderSchedule(); renderSettings(); renderPlans(); renderBilling(); renderShare();
         prefetchDashboardMetrics();
     }
-
     async function fetchProfileOptions(type, params = {}) {
         if (!drawer.dataset.profileOptionsUrl) return [];
         const query = new URLSearchParams({type, ...Object.fromEntries(Object.entries(params).filter(([,v]) => v !== null && v !== undefined && String(v) !== ''))});
@@ -1707,7 +1617,6 @@
             return [];
         }
     }
-
     function populateSelect(select, rows, placeholder, value = '') {
         if (!select) return;
         const current = value === null || value === undefined ? '' : String(value);
@@ -1719,7 +1628,6 @@
             select.value = current;
         }
     }
-
     async function loadClubOptions() {
         const user = state.user || {};
         const club = q('[data-lr-club]');
@@ -1743,7 +1651,6 @@
         populateSelect(age, ageRows, 'Select age group', user.team_name || '');
         age.disabled = !club.value;
     }
-
     async function loadProfileAssociationOptions() {
         const version = ++profileOptionsLoadVersion;
         const user = state.user || {};
@@ -1753,7 +1660,6 @@
         const age = q('[data-lr-age-group]');
         const national = q('[data-lr-national-team]');
         if (!school || !league || !club || !age || !national) return;
-
         const sport = q('[data-lr-sport]')?.value || user.sport || '';
         const gender = q('[data-lr-gender]')?.value || user.gender || '';
         const [schools, nationalTeams] = await Promise.all([
@@ -1763,7 +1669,6 @@
         if (version !== profileOptionsLoadVersion) return;
         populateSelect(school, schools, 'Select school', user.school_id || '');
         populateSelect(national, nationalTeams, 'Select national team', user.national_team_id || '');
-
         league.disabled = !(sport && gender);
         if (!(sport && gender)) {
             populateSelect(league, [], 'Select sport and sex first', '');
@@ -1773,7 +1678,6 @@
             age.disabled = true;
             return;
         }
-
         league.innerHTML = '<option value="">Loading leagues...</option>';
         const leagues = await fetchProfileOptions('league', {sport, gender});
         if (version !== profileOptionsLoadVersion) return;
@@ -1781,7 +1685,6 @@
         league.disabled = false;
         await loadClubOptions();
     }
-
     function updatePositionUi() {
         const user = state.user || {};
         const sport = q('[data-lr-sport]')?.value || user.sport || '';
@@ -1795,18 +1698,15 @@
         const labels = Array.from(profilePositionSelection).map(value => user.position_options?.[sport]?.[value] || value);
         trigger.textContent = labels.length ? labels.join(', ') : 'Select position';
     }
-
     function renderPositions(reset = true) {
         const user = state.user || {};
         if (reset) profilePositionSelection = new Set(Array.isArray(user.position) ? user.position : []);
         updatePositionUi();
     }
-
     function clearPendingRawPreviewUrls() {
         pendingRawPreviewUrls.forEach(url => { try { URL.revokeObjectURL(url); } catch (_) {} });
         pendingRawPreviewUrls = [];
     }
-
     function updateRawUploadStatus(existingCount = 0) {
         const status = q('[data-lr-raw-status]');
         if (!status) return;
@@ -1828,7 +1728,6 @@
             status.textContent = 'No images uploaded yet. Select Add More to choose player photos.';
         }
     }
-
     function renderMedia() {
         const user = state.user || {};
         const featured = q('[data-lr-profile-image-preview]');
@@ -1843,12 +1742,10 @@
             featured.style.display = 'block';
             featured.innerHTML = prepared.length ? `<div class="lr-media-grid" style="margin-top:0;">${prepared.map(([label,url]) => `<div><div class="lr-media-thumb"><img src="${esc(url)}" alt="${esc(label)} image"></div><div class="lr-card-copy" style="margin-top:5px;text-align:center;">${esc(label)}</div></div>`).join('')}</div><div style="margin-top:10px;"><span class="lr-chip">Managed by PLYRCARD team</span></div>` : `<div class="lr-card-copy">Processed PLYRCARD images have not been added yet.</div><div style="margin-top:10px;"><span class="lr-chip">Managed by PLYRCARD team</span></div>`;
         }
-
         const raws = Array.isArray(user.raw_player_images) ? user.raw_player_images : [];
         const grid = q('[data-lr-raw-images]');
         const hidden = q('[data-lr-raw-existing-hidden]');
         clearPendingRawPreviewUrls();
-
         const savedTiles = raws.map((item,index) => `<div class="lr-media-thumb"><img src="${esc(item.url)}" alt="Uploaded raw player image"><button class="lr-media-remove" type="button" data-lr-remove-raw="${index}" aria-label="Remove uploaded image"><i class="fa-solid fa-xmark"></i></button></div>`);
         const pendingTiles = pendingRawFiles.map((file,index) => {
             const url = URL.createObjectURL(file);
@@ -1860,11 +1757,9 @@
         if (grid) grid.innerHTML = [...savedTiles, ...pendingTiles, addTile].filter(Boolean).join('');
         if (hidden) hidden.innerHTML = raws.map(item => `<input type="hidden" name="raw_player_images_existing[]" value="${esc(item.path)}">`).join('');
         updateRawUploadStatus(raws.length);
-
         const pro = q('[data-lr-pro-club-preview]');
         if (pro) pro.innerHTML = user.pro_club_logo_url ? `<div class="lr-chip"><i class="fa-solid fa-image"></i>&nbsp; Current pro club logo saved</div>` : '';
     }
-
     function renderProfile() {
         const user = state.user || {};
         const sport = q('[data-lr-sport]');
@@ -1883,7 +1778,6 @@
         if (socialLock) socialLock.hidden = !locked;
         if (socialFields) socialFields.style.display = locked ? 'none' : 'grid';
     }
-
     function renderSchedule() {
         const rows = state.schedule?.items || [];
         q('[data-lr-schedule-count]') && (q('[data-lr-schedule-count]').textContent = rows.length);
@@ -1895,7 +1789,6 @@
             return `<article class="lr-schedule-item"><div class="lr-datebox"><strong>${esc(day)}</strong><span>${esc(mon)}</span></div><div><h4>${esc(item.opponent || item.title || 'Schedule')}</h4><div class="lr-schedule-meta">${esc(item.status || 'upcoming')} ${item.time_label ? `· ${esc(item.time_label)}` : ''}<br>${esc(item.venue || item.location || 'Location TBD')}${item.score ? `<br>Score: ${esc(item.score)}` : ''}</div></div><div class="lr-schedule-tools">${item.can_edit ? `<button class="lr-icon-btn" type="button" data-lr-edit-schedule="${item.id}" title="Edit"><i class="fa-solid fa-pen"></i></button><button class="lr-icon-btn" type="button" data-lr-delete-schedule="${item.id}" title="Delete"><i class="fa-solid fa-trash"></i></button>` : '<span class="lr-chip">Team</span>'}</div></article>`;
         }).join('');
     }
-
     function renderSettings() {
         const box = q('[data-lr-notifications]'); if (!box) return;
         const settings = state.settings?.notifications || {};
@@ -1907,12 +1800,10 @@
         q('[data-lr-article-value]').value = article;
         qa('[data-lr-article]').forEach(btn => btn.classList.toggle('is-active', btn.dataset.lrArticle === article));
     }
-
     function stopLockerCheckoutPolling() {
         if (lockerCheckoutTimer) clearTimeout(lockerCheckoutTimer);
         lockerCheckoutTimer = null;
     }
-
     function showLockerCheckoutPart(part) {
         const loading = q('[data-lr-checkout-loading]');
         const success = q('[data-lr-checkout-success]');
@@ -1921,7 +1812,6 @@
         const frame = q('[data-lr-checkout-frame]');
         [loading, success, error, billing, frame].forEach(el => { if (el) el.hidden = el !== part; });
     }
-
     function lockerCheckoutUrls(type) {
         if (type === 'amplify') {
             return {start: drawer.dataset.amplifyStartUrl || '', status: drawer.dataset.amplifyStatusUrl || ''};
@@ -1931,7 +1821,6 @@
         }
         return {start: drawer.dataset.myJourneyStartUrl || '', status: drawer.dataset.myJourneyStatusUrl || ''};
     }
-
     function configureLockerCheckout(type) {
         const isAmplify = type === 'amplify';
         const isJumpstart = type === 'jumpstart';
@@ -1940,18 +1829,17 @@
         q('[data-lr-checkout-eyebrow]').textContent = isAmplify ? 'Amplify' : (isJumpstart ? 'Jumpstart' : 'My Journey');
         q('[data-lr-checkout-heading]').textContent = isAmplify ? 'Upgrade to Amplify' : (isJumpstart ? 'Get Jumpstart' : 'Upgrade to My Journey');
         q('[data-lr-checkout-copy]').textContent = isAmplify
-            ? `Complete the ${plan.due_today || plan.price || ''} checkout below. Your Amplify entitlement will update automatically after payment is confirmed.`
+            ? `Complete the ${plan.due_today || plan.price || ''} Stripe checkout below. Amplify adds 600 pooled credits that do not expire.`
             : (isJumpstart
-                ? `Complete the ${plan.due_today || plan.price || '$149'} checkout below. Jumpstart is a one-time service extension of My Journey.`
+                ? `Complete the ${plan.due_today || plan.price || '$149'} Stripe checkout below. Jumpstart adds 100 pooled credits that do not expire.`
                 : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`);
-        q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify is active' : (isJumpstart ? 'Jumpstart is active' : 'My Journey is active');
+        q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify credits added' : (isJumpstart ? 'Jumpstart credits added' : 'My Journey is active');
         q('[data-lr-checkout-success-copy]').textContent = isAmplify
-            ? 'Your Amplify service was confirmed. My Journey remains the subscription layer on your PLYRCARD account.'
+            ? 'Payment confirmed. 600 pooled PLYRCARD credits were added to your account and do not expire.'
             : (isJumpstart
-                ? 'Your Jumpstart service was confirmed. My Journey remains the subscription layer on your PLYRCARD account.'
+                ? 'Payment confirmed. 100 pooled PLYRCARD credits were added to your account and do not expire.'
                 : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.');
     }
-
     async function pollLockerCheckout() {
         if (currentView !== 'checkout' || !lockerCheckoutType) return;
         if (Date.now() - lockerCheckoutStartedAt > 12 * 60 * 1000) {
@@ -1976,7 +1864,6 @@
         }
         lockerCheckoutTimer = setTimeout(pollLockerCheckout, 2500);
     }
-
     function showLockerCheckoutBilling(payload = {}) {
         const form = q('[data-lr-checkout-billing-form]');
         if (!form) return;
@@ -1985,7 +1872,6 @@
         showLockerCheckoutPart(q('[data-lr-checkout-billing]'));
         q('[data-lr-checkout-status]').textContent = 'Save the billing profile to continue checkout.';
     }
-
     async function saveLockerCheckoutBilling(form) {
         if (!drawer.dataset.billingUrl) throw new Error('Billing update is unavailable right now.');
         setFormBusy(form, true, 'Saving…');
@@ -2000,7 +1886,6 @@
             setFormBusy(form, false);
         }
     }
-
     async function openLockerCheckout(type, retryAfterBilling = false) {
         if (lockerCheckoutStarting) return;
         lockerCheckoutType = ['amplify', 'jumpstart'].includes(type) ? type : 'my-journey';
@@ -2021,22 +1906,19 @@
                 q('[data-lr-checkout-status]').textContent = data.message || 'Your upgrade is already active.';
                 return;
             }
-            if (!data.checkout_url) throw new Error(data.message || 'Secure checkout is unavailable.');
+            if (!data.client_secret || !data.publishable_key) throw new Error(data.message || 'Stripe checkout is unavailable.');
             const frame = q('[data-lr-checkout-frame]');
-            try {
-                const checkoutUrl = new URL(data.checkout_url, window.location.origin);
-                const pathParts = checkoutUrl.pathname.split('/').filter(Boolean);
-                const surveyId = pathParts[pathParts.length - 1] || '';
-                if (surveyId) frame.id = surveyId;
-            } catch (_) {}
-            frame.src = data.checkout_url;
+            const mount = q('#lr-stripe-payment-element');
+            if (mount) mount.innerHTML = '';
+            lockerStripe = window.Stripe(data.publishable_key);
+            lockerStripeElements = lockerStripe.elements({clientSecret:data.client_secret});
+            lockerStripeElements.create('payment').mount('#lr-stripe-payment-element');
+            lockerStripeMode = 'payment';
             showLockerCheckoutPart(frame);
             lockerCheckoutStartedAt = Date.now();
-            q('[data-lr-checkout-status]').textContent = data.message || 'Complete checkout below to continue.';
-            lockerCheckoutTimer = setTimeout(pollLockerCheckout, 1800);
+            q('[data-lr-checkout-status]').textContent = data.message || 'Enter your payment details and confirm below.';
         } catch (error) {
-            // Upgrade purchases always belong in the hosted HighLevel survey.
-            // Never switch the Upgrade screen to the native billing-profile form.
+            // Native Stripe checkout failed to initialize; keep the user in the checkout view with a useful error.
             showLockerCheckoutPart(q('[data-lr-checkout-error]'));
             q('[data-lr-checkout-error-copy]').textContent = error?.message || 'Please try again.';
             q('[data-lr-checkout-status]').textContent = 'Secure checkout was not started.';
@@ -2044,7 +1926,6 @@
             lockerCheckoutStarting = false;
         }
     }
-
     function renderPlans() {
         const box = q('[data-lr-plans]'); if (!box) return;
         const amplifyActive = state?.plan?.amplify_active === true;
@@ -2055,9 +1936,8 @@
             const isAddonActive = (isAmplify && (plan.active_addon === true || amplifyActive))
                 || (isJumpstart && (plan.active_addon === true || jumpstartActive));
             let action = '';
-
             if (isAddonActive) {
-                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary lr-btn-amplify-active" type="button" disabled aria-disabled="true">${esc(plan.action_label || (isJumpstart ? 'Jumpstart Purchased' : 'Amplify My Recruiting'))}</button></div>`;
+                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="${isJumpstart ? 'jumpstart' : 'amplify'}">${esc(plan.action_label || (isJumpstart ? 'Buy 100 More Credits' : 'Buy 600 More Credits'))}</button></div>`;
             } else if (!plan.current) {
                 if (plan.action_kind === 'my_journey_checkout' || plan.key === 'my-journey') {
                     action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="my-journey">${esc(plan.action_label || 'Get My Journey')}</button></div>`;
@@ -2069,15 +1949,12 @@
                     action = `<div class="lr-actions"><a class="lr-btn lr-btn-primary" href="${esc(plan.action_url)}">${esc(plan.action_label || 'Choose Plan')}</a></div>`;
                 }
             }
-
             const statusPill = isAddonActive
                 ? '<span class="lr-active-pill"><i class="fa-solid fa-check"></i> Active</span>'
                 : (plan.current ? '<span class="lr-chip">Current Plan</span>' : '');
-
             return `<article class="lr-plan-card ${plan.current?'is-current':''} ${isAddonActive?'is-amplify-active':''}"><div style="display:flex;justify-content:space-between;gap:10px;align-items:start;"><div><div class="lr-plan-name">${esc(plan.name)}</div><div class="lr-plan-price">${esc(plan.price)} <small>${esc(plan.suffix || '')}</small></div>${plan.due_today ? `<div class="lr-chip" style="margin-top:7px;">${esc(plan.due_today)}</div>` : ''}</div>${statusPill}</div><p class="lr-card-copy">${esc(plan.description)}</p><ul class="lr-plan-list">${(plan.features||[]).map(f=>`<li>${esc(f)}</li>`).join('')}</ul>${action}</article>`;
         }).join('');
     }
-
     function renderBilling() {
         const billing = state.billing || {}, form = q('[data-lr-billing-form]');
         fillForm(form,billing);
@@ -2086,32 +1963,52 @@
         const statusLabel = value => value ? String(value).replace(/_/g,' ').replace(/\b\w/g, ch => ch.toUpperCase()) : 'Not available';
         const paidAt = billing.last_transaction_paid_at ? new Date(billing.last_transaction_paid_at) : null;
         const paidAtLabel = paidAt && !Number.isNaN(paidAt.getTime()) ? paidAt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : null;
-
         if (summary) {
             summary.innerHTML = `<h3 class="lr-card-title">${esc(state.plan?.label || 'Free')} Plan</h3><div class="lr-billing-meta"><div><small>Payment Status</small><strong>${esc(statusLabel(billing.payment_status))}</strong></div><div><small>Subscription</small><strong>${esc(billing.cancellation_requested ? 'Cancellation Requested' : statusLabel(billing.subscription_status))}</strong></div><div><small>Recurring</small><strong>${billing.recurring_amount_cents ? `${money(billing.recurring_amount_cents)}/mo` : '—'}</strong></div>${billing.setup_fee_cents ? `<div><small>Setup Fee</small><strong>${money(billing.setup_fee_cents)}</strong></div>` : ''}${billing.amount_paid_cents ? `<div><small>Total Recorded</small><strong>${money(billing.amount_paid_cents)}</strong></div>` : ''}${billing.amount_refunded_cents ? `<div><small>Refunded</small><strong>${money(billing.amount_refunded_cents)}</strong></div>` : ''}</div>`;
         }
-
         const cancelButton = q('[data-lr-cancel-plan]');
         if (cancelButton) {
             const sub = String(billing.subscription_status || '').toLowerCase();
-            cancelButton.hidden = !!billing.cancellation_requested || !['active','trialing','trial','past_due'].includes(sub);
+            cancelButton.hidden = !['active','trialing','trial','past_due'].includes(sub);
+            cancelButton.dataset.lrBillingAction = billing.cancellation_requested ? 'resume' : 'cancel';
+            cancelButton.textContent = billing.cancellation_requested ? 'Keep My Journey' : 'Cancel at Period End';
         }
-
         if (method) {
             const brand = billing.payment_brand ? String(billing.payment_brand).toUpperCase() : 'CARD';
             if (billing.card_last_four) {
                 const detailBits = [];
                 if (billing.card_expiration) detailBits.push(`Expires ${esc(billing.card_expiration)}`);
                 if (billing.cardholder_name) detailBits.push(esc(billing.cardholder_name));
-                const changeButton = billing.payment_method_update_url ? `<div class="lr-actions" style="margin-top:10px;"><a class="lr-btn lr-btn-primary" href="${esc(billing.payment_method_update_url)}">Change Payment Method</a><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>` : `<div class="lr-actions" style="margin-top:10px;"><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
+                const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Change Payment Method</button><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
                 method.innerHTML = `<div class="lr-payment-card"><div class="lr-payment-icon"><i class="fa-solid fa-credit-card"></i></div><div class="lr-payment-main"><strong>${esc(brand)} ending in ${esc(billing.card_last_four)}</strong><span>${detailBits.join(' · ') || 'Secure payment method on file'}</span></div></div>${changeButton}<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${billing.last_transaction_amount_cents ? money(billing.last_transaction_amount_cents) : (billing.amount_paid_cents ? money(billing.amount_paid_cents) : '—')}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div><p class="lr-card-copy" style="margin-top:10px;">For security, PLYRCARD only shows limited card metadata. Full card numbers and security codes are never displayed or stored here.</p>`;
             } else {
-                const changeButton = billing.payment_method_update_url ? `<div class="lr-actions" style="margin-top:10px;"><a class="lr-btn lr-btn-primary" href="${esc(billing.payment_method_update_url)}">Add / Change Payment Method</a><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>` : `<div class="lr-actions" style="margin-top:10px;"><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
+                const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Add / Change Payment Method</button><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
                 method.innerHTML = `<div class="lr-preparing" style="border-color:#e5e7eb;background:#f8fafc;"><i class="fa-solid fa-shield-halved" style="color:#667085;"></i><div><strong>No saved payment method is available yet.</strong><span>Use the secure payment-method flow to add or replace the card used for future billing.</span></div></div>${changeButton}${billing.last_transaction_amount_cents ? `<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${money(billing.last_transaction_amount_cents)}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div>` : ''}`;
             }
         }
+        const creditBox = q('[data-lr-credit-summary]');
+        if (creditBox) {
+            const credits = Number(state?.credits?.available ?? billing.points_available ?? 0);
+            const history = Array.isArray(billing.history) ? billing.history : [];
+            creditBox.innerHTML = `<h3 class="lr-card-title">Credits & Billing History</h3><p class="lr-card-copy"><strong>${credits.toLocaleString()} credits available</strong> · Purchased credits do not expire.</p>${history.length ? `<div style="margin-top:12px;display:grid;gap:8px;">${history.slice(0,8).map(row=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #eef2f6;"><div><strong style="font-size:12px;">${esc(row.source_name||'Stripe payment')}</strong><div style="font-size:10px;color:#98a2b3;">${row.paid_at ? new Date(row.paid_at).toLocaleDateString() : ''} · ${esc(statusLabel(row.status))}</div></div><strong style="font-size:12px;">${money(row.amount_cents||0)}</strong></div>`).join('')}</div>` : '<p class="lr-card-copy" style="margin-top:10px;">No Stripe billing history yet.</p>'}`;
+        }
     }
-
+    async function openLockerCardUpdate() {
+        if (!drawer.dataset.paymentMethodSetupUrl) throw new Error('Payment method update is unavailable.');
+        lockerCheckoutType = null;
+        stopLockerCheckoutPolling();
+        setView('checkout', true);
+        q('[data-lr-checkout-eyebrow]').textContent = 'Billing';
+        q('[data-lr-checkout-heading]').textContent = 'Update payment method';
+        q('[data-lr-checkout-copy]').textContent = 'Your card details are handled securely by Stripe and are never stored by PLYRCARD.';
+        showLockerCheckoutPart(q('[data-lr-checkout-loading]'));
+        const data = await request(drawer.dataset.paymentMethodSetupUrl,{method:'POST',body:{}});
+        if (!data.client_secret || !data.publishable_key) throw new Error(data.message||'Unable to prepare card update.');
+        const mount=q('#lr-stripe-payment-element'); if(mount) mount.innerHTML='';
+        lockerStripe=window.Stripe(data.publishable_key); lockerStripeElements=lockerStripe.elements({clientSecret:data.client_secret}); lockerStripeElements.create('payment').mount('#lr-stripe-payment-element'); lockerStripeMode='setup';
+        const btn=q('[data-lr-stripe-confirm]'); if(btn) btn.textContent='Save card';
+        showLockerCheckoutPart(q('[data-lr-checkout-frame]')); q('[data-lr-checkout-status]').textContent='Enter the card you want to use for future My Journey billing.';
+    }
     function renderShare() {
         const box=q('[data-lr-share-card]'); if(!box) return;
         const url=state.website?.url || '';
@@ -2119,7 +2016,6 @@
         const status=state.website?.is_published ? 'Your PLYRCARD is published and ready to share.' : 'Your link is reserved. Visitors will see the preparation screen until your PLYRCARD is published.';
         box.innerHTML=`<h3 class="lr-card-title">Your PLYRCARD Link</h3><p class="lr-card-copy">${esc(status)}</p><div class="lr-field" style="margin-top:12px;"><input class="lr-input" value="${esc(url)}" readonly data-lr-share-input></div><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-copy-link>Copy Link</button><button class="lr-btn" type="button" data-lr-native-share>Share</button></div>`;
     }
-
     function supportStatusClass(status) {
         status=String(status||'').toLowerCase();
         if (['resolved','closed'].includes(status)) return 'is-resolved';
@@ -2127,12 +2023,10 @@
         if (status==='waiting_on_user') return 'is-waiting';
         return '';
     }
-
     function supportDate(value) {
         const date=new Date(value||'');
         return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
     }
-
     function renderSupportTickets() {
         const select=q('[data-lr-support-category]');
         if(select){
@@ -2151,7 +2045,6 @@
             return `<article class="lr-support-ticket" data-lr-support-ticket="${esc(ticket.id)}"><button type="button" class="lr-support-ticket-summary" data-lr-support-ticket-toggle><div><strong>${esc(ticket.category_label||ticket.category||'Support Ticket')}</strong><small>${esc(ticket.ticket_number||'')} · Updated ${esc(supportDate(ticket.updated_at))}</small><span class="lr-support-status ${supportStatusClass(ticket.status)}">${esc(ticket.status_label||ticket.status||'Open')}</span></div><i class="fa-solid fa-chevron-down"></i></button><div class="lr-support-ticket-body" data-lr-support-ticket-body hidden>${messages||'<div class="lr-detail-empty">No messages yet.</div>'}<div class="lr-support-followup"><textarea class="lr-textarea" rows="3" data-lr-support-followup-message placeholder="Add more details or ask for an update…"></textarea><div class="lr-actions"><button type="button" class="lr-btn lr-btn-primary" data-lr-support-followup data-ticket-id="${esc(ticket.id)}"><i class="fa-regular fa-paper-plane"></i> Send Follow-up</button></div></div></div></article>`;
         }).join('');
     }
-
     async function ensureSupportTickets(force=false) {
         if(!authenticated || !drawer.dataset.supportTicketsUrl)return;
         if(supportTicketsLoaded && !force){ renderSupportTickets(); return; }
@@ -2161,7 +2054,6 @@
             supportTicketsLoaded=true; renderSupportTickets();
         }catch(err){ const holder=q('[data-lr-support-history]'); if(holder)holder.innerHTML=`<div class="lr-detail-empty">${esc(err.message||'Unable to load support tickets.')}</div>`; }
     }
-
     async function submitLockerSupportTicket(form) {
         setFormBusy(form,true,'Submitting…');
         try{
@@ -2170,7 +2062,6 @@
             supportTicketState.tickets=json.tickets||supportTicketState.tickets; supportTicketsLoaded=true; form.reset(); renderSupportTickets(); showToast(json.message||'Support ticket submitted.');
         }catch(err){showToast(err.message,true)}finally{setFormBusy(form,false)}
     }
-
     async function followUpLockerSupportTicket(button) {
         const card=button.closest('[data-lr-support-ticket]'), textarea=card?.querySelector('[data-lr-support-followup-message]');
         const message=String(textarea?.value||'').trim(); if(!message)return showToast('Enter a follow-up message.',true);
@@ -2180,14 +2071,12 @@
             const json=await request(url,{method:'POST',body:{message}}); supportTicketState.tickets=json.tickets||supportTicketState.tickets; supportTicketsLoaded=true; renderSupportTickets(); showToast(json.message||'Follow-up added.');
         }catch(err){showToast(err.message,true)}finally{button.disabled=false;button.classList.remove('is-busy')}
     }
-
     function ensureBookEmbed() {
         const holder = q('[data-lr-book-embed]'); if (!holder || holder.dataset.loaded === '1') return; holder.dataset.loaded='1';
         const url = state.integrations?.book_call_url || 'https://systems.plyrcard.com/widget/booking/SvuQy1svAyETQ5Q9px9l';
         // No allow-top-navigation: confirmation/redirect remains inside the Locker Room instead of taking over the parent page.
         holder.innerHTML = `<iframe class="lr-embed" src="${esc(url)}" sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals" title="Book a PLYRCARD Call"></iframe>`;
     }
-
     document.addEventListener('click', event => {
         const open = event.target.closest('[data-plyrcard-open-drawer],[data-plyrcard-toggle-drawer]'); if (open) { event.preventDefault(); if (open.matches('[data-plyrcard-toggle-drawer]') && drawer.classList.contains('is-open')) closeDrawer(); else openDrawer(); return; }
         if (event.target.closest('[data-lr-close]')) { event.preventDefault(); closeDrawer(); return; }
@@ -2250,23 +2139,19 @@
         const edit = event.target.closest('[data-lr-edit-schedule]'); if (edit) { const item=(state.schedule?.items||[]).find(x=>String(x.id)===String(edit.dataset.lrEditSchedule)); if(!item)return; const form=q('[data-lr-schedule-form]'); fillForm(form,item); form.querySelector('[name="schedule_id"]').value=item.id; form.querySelector('[name="is_home"]').value=item.is_home?'1':'0'; q('[data-lr-schedule-form-title]').textContent='Edit Schedule'; form.hidden=false; form.scrollIntoView({behavior:'auto',block:'start'}); return; }
         const del = event.target.closest('[data-lr-delete-schedule]'); if (del) { if(!confirm('Remove this schedule item?')) return; request(`${drawer.dataset.scheduleBaseUrl}/${del.dataset.lrDeleteSchedule}`,{method:'DELETE'}).then(json=>{if(json.data)state=json.data; render(); showToast('Schedule removed.');}).catch(err=>showToast(err.message,true)); return; }
     }, true);
-
     document.addEventListener('change', event => {
         const upload = event.target.closest('[data-lr-photo-files]');
         if (upload && drawer.contains(upload)) { uploadLockerPhotos(upload.files); return; }
         const sort = event.target.closest('[data-lr-dashboard-sort]');
         if (sort && drawer.contains(sort)) { dashboardActivitySort = sort.value || 'count_desc'; renderDashboardActivityDetail(); return; }
     }, true);
-
     // Fill sensible placeholders for Locker Room fields that do not define one explicitly.
     const placeholderMap = {first_name:'First name',last_name:'Last name',personal_email:'you@example.com',email:'you@example.com',phone:'(555) 123-4567',street:'123 Main Street',city:'City',state:'State / Province',country:'US',gpa:'3.8',jersey_number:'10',player_bio:'Tell coaches who you are as a player…',parent:'Parent or guardian name',parent_email:'parent@example.com',parent_phone:'(555) 123-4567',club_coach:'Coach name',club_coach_email:'coach@example.com',club_coach_phone:'(555) 123-4567',friend_name:"Friend's full name",friend_email:'friend@example.com',billing_name:'Parent or cardholder name',billing_email:'billing@example.com',billing_phone:'(555) 123-4567',billing_company:'Optional organization',billing_address_1:'123 Main Street',billing_address_2:'Apt, suite, unit (optional)',billing_city:'City',billing_state:'State / Province',billing_postal_code:'Postal code',billing_country:'US',opponent:'Opponent or event',location:'City or location',venue:'Venue name',result:'W / L / Draw',score:'e.g. 3-1',notes:'Optional notes'};
     qa('input:not([placeholder]), textarea:not([placeholder])').forEach(el => { const key=String(el.name||'').replace(/\[.*?\]/g,''); if(placeholderMap[key]) el.placeholder=placeholderMap[key]; });
-
     q('[data-lr-sport]')?.addEventListener('change', () => { state.user.sport=q('[data-lr-sport]').value; state.user.position=[]; state.user.league_id=null; state.user.club_id=null; state.user.team_name=null; profilePositionSelection.clear(); renderPositions(false); profileOptionCache.clear(); loadProfileAssociationOptions(); });
     q('[data-lr-gender]')?.addEventListener('change', () => { state.user.gender=q('[data-lr-gender]').value; state.user.league_id=null; state.user.club_id=null; state.user.team_name=null; profileOptionCache.clear(); loadProfileAssociationOptions(); });
     q('[data-lr-league]')?.addEventListener('change', () => { state.user.league_id=q('[data-lr-league]').value || null; state.user.club_id=null; state.user.team_name=null; loadClubOptions(); });
     q('[data-lr-club]')?.addEventListener('change', () => { state.user.club_id=q('[data-lr-club]').value || null; state.user.team_name=null; const age=q('[data-lr-age-group]'); if(age){ age.disabled=!state.user.club_id; if(!state.user.club_id) age.value=''; } });
-
     q('[data-lr-raw-file-input]')?.addEventListener('change', event => {
         const input = event.currentTarget;
         const existingCount = Array.isArray(state.user?.raw_player_images) ? state.user.raw_player_images.length : 0;
@@ -2280,7 +2165,6 @@
         rawUploadStatusTone = accepted.length < selected.length ? 'ready' : '';
         renderMedia();
     });
-
     q('[data-lr-profile-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget;
         if (!profilePositionSelection.size) { showToast('Choose at least one position.', true); return; }
@@ -2324,11 +2208,11 @@
     });
     q('[data-lr-cancel-plan]')?.addEventListener('click', async event => {
         const button=event.currentTarget;
-        if (!confirm('Cancel your current PLYRCARD plan? Your access remains active until cancellation is confirmed.')) return;
+        const resume=button.dataset.lrBillingAction==='resume';
+        if (!resume && !confirm('Cancel My Journey at the end of the current billing period? Your purchased credits will not expire.')) return;
         button.disabled=true; button.classList.add('is-busy');
-        try { const json=await request(drawer.dataset.cancelBillingUrl || drawer.dataset.lrCancelBillingUrl || '/billing/cancel-request',{method:'POST',body:{}}); if(json.data) state=json.data; await refreshData(); render(); showToast(json.message || 'Cancellation requested.'); } catch(err){ showToast(err.message,true); } finally { button.disabled=false; button.classList.remove('is-busy'); }
+        try { const url=resume ? drawer.dataset.billingResumeUrl : (drawer.dataset.cancelBillingUrl || '/billing/cancel-request'); const json=await request(url,{method:'POST',body:{}}); await refreshData(); render(); showToast(json.message || (resume ? 'Subscription resumed.' : 'Cancellation scheduled.')); } catch(err){ showToast(err.message,true); } finally { button.disabled=false; button.classList.remove('is-busy'); }
     });
-
     q('[data-lr-password-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget;
         try {
@@ -2336,27 +2220,22 @@
             form.reset(); forcePassword=false; drawer.dataset.forcePassword='0'; history=[]; setView('home',false); showToast('Password updated.');
         } catch(err){ showToast(err.message,true); }
     });
-
     document.addEventListener('click', event => { const picker=q('[data-lr-position-picker]'); const menu=q('[data-lr-position-menu]'); if(picker && menu && !picker.contains(event.target)) menu.hidden=true; });
-
     document.addEventListener('keydown', event => {
         if (event.key !== 'Escape' || !drawer.classList.contains('is-open')) return;
         if (q('[data-lr-dashboard-school-panel]')?.classList.contains('is-open')) { closeDashboardSchool(); return; }
         if (q('[data-lr-dashboard-activity-panel]')?.classList.contains('is-open')) { closeDashboardActivity(); return; }
         closeDrawer();
     });
-
     // Keep the existing public mobile navigation functional without any page-loader animation.
     const menuButton=document.getElementById('menu-btn'), mobileNav=document.getElementById('mobile-nav');
     if(menuButton && mobileNav && menuButton.dataset.lrBound!=='1') { menuButton.dataset.lrBound='1'; menuButton.addEventListener('click',()=>{const open=mobileNav.classList.toggle('open');menuButton.setAttribute('aria-expanded',open?'true':'false');}); }
     const header=document.getElementById('site-header'); if(header && header.dataset.lrScrollBound!=='1'){header.dataset.lrScrollBound='1'; const onScroll=()=>header.classList.toggle('scrolled',window.scrollY>14); onScroll(); window.addEventListener('scroll',onScroll,{passive:true});}
-
     q('[data-lr-checkout-billing-form]')?.addEventListener('submit', async event => {
         event.preventDefault();
         try { await saveLockerCheckoutBilling(event.currentTarget); }
         catch (err) { showToast(err.message || 'Unable to save billing information.', true); }
     });
-
     document.addEventListener('click', event => {
         if (event.target.closest('[data-lr-checkout-billing-cancel]')) { stopLockerCheckoutPolling(); setView('upgrade', false); return; }
         const checkoutButton = event.target.closest('[data-lr-plan-checkout]');
@@ -2365,10 +2244,11 @@
             openLockerCheckout(checkoutButton.dataset.lrPlanCheckout);
             return;
         }
-        if (event.target.closest('[data-lr-checkout-retry]')) { openLockerCheckout(lockerCheckoutType || 'my-journey'); return; }
+        if (event.target.closest('[data-lr-checkout-retry]')) { if(lockerCheckoutType) openLockerCheckout(lockerCheckoutType); else openLockerCardUpdate().catch(err=>showToast(err.message,true)); return; }
+        if (event.target.closest('[data-lr-card-update]')) { event.preventDefault(); openLockerCardUpdate().catch(err=>showToast(err.message,true)); return; }
+        if (event.target.closest('[data-lr-stripe-confirm]')) { event.preventDefault(); (async()=>{ const btn=q('[data-lr-stripe-confirm]'); if(!lockerStripe||!lockerStripeElements)return; btn.disabled=true; const old=btn.textContent; btn.textContent=lockerStripeMode==='setup'?'Saving…':'Processing…'; try { const result=lockerStripeMode==='setup' ? await lockerStripe.confirmSetup({elements:lockerStripeElements,redirect:'if_required'}) : await lockerStripe.confirmPayment({elements:lockerStripeElements,redirect:'if_required'}); if(result.error) throw result.error; q('[data-lr-checkout-status]').textContent=lockerStripeMode==='setup'?'Card saved. Refreshing billing…':'Payment submitted. Confirming…'; if(lockerStripeMode==='setup'){ await new Promise(r=>setTimeout(r,900)); await refreshData(); render(); setView('billing',false); showToast('Payment method updated.'); } else { lockerCheckoutStartedAt=Date.now(); pollLockerCheckout(); } } catch(err){ q('[data-lr-checkout-status]').textContent=err.message||'Stripe could not complete this request.'; } finally { btn.disabled=false; btn.textContent=old; } })(); return; }
         if (event.target.closest('[data-lr-checkout-done]')) { stopLockerCheckoutPolling(); setView('upgrade', false); return; }
     });
-
     window.addEventListener('plyrcard:my-journey-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('My Journey is active.'); });
     window.addEventListener('plyrcard:jumpstart-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('Jumpstart is active.'); });
     window.addEventListener('plyrcard:amplify-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('Amplify is active.'); });
@@ -2377,5 +2257,4 @@
 })();
 </script>
 @endif
-
 <script src="https://systems.plyrcard.com/js/form_embed.js" defer></script>

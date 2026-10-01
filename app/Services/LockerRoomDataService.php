@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Services;
-
 use App\Models\BillingInformation;
 use App\Models\PaymentTransaction;
 use App\Models\Schedule;
@@ -14,49 +12,31 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
-
 class LockerRoomDataService
 {
     public function __construct(
-        protected BillingAccountService $billingAccount,
+        protected StripeBillingService $stripeBilling,
     ) {
     }
-
     public function snapshot(User $user): array
     {
         $user->loadMissing(['roles', 'school', 'club', 'league', 'nationalTeam']);
-
         $billing = BillingInformation::query()
             ->where('user_id', $user->id)
             ->latest('updated_at')
             ->first();
-
-        if (filled($user->ghl_subscriber_contact_id)) {
-            $billing ??= BillingInformation::query()->firstOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'billing_name' => trim((string) ($user->first_name . ' ' . $user->last_name)),
-                    'billing_email' => $user->email,
-                    'billing_phone' => $user->phone,
-                    'billing_address_1' => $user->street,
-                    'billing_city' => $user->city,
-                    'billing_state' => $user->state,
-                    'billing_country' => $user->country ?: 'US',
-                    'currency' => 'USD',
-                    'ghl_location_id' => config('ghl.location_id'),
-                ],
-            );
-
-            $this->billingAccount->syncSubscriberAccount($user, $billing);
-            $billing->refresh();
+        if ($billing && (filled($billing->stripe_customer_id) || filled($billing->stripe_subscription_id))) {
+            try {
+                $billing = $this->stripeBilling->refreshBilling($user);
+            } catch (\Throwable) {
+                $billing->refresh();
+            }
         }
-
         $website = Website::query()
             ->where('user_id', $user->id)
             ->where('is_active', true)
             ->latest('updated_at')
             ->first();
-
         $latestPaymentTransaction = null;
         try {
             if (class_exists(PaymentTransaction::class)) {
@@ -71,12 +51,10 @@ class LockerRoomDataService
             // Keep Locker Room usable when the optional payment ledger is not available yet.
             $latestPaymentTransaction = null;
         }
-
         $planKey = $this->planKey($user, $billing);
         $isFree = $planKey === 'free';
         $isPremium = $planKey === 'my-journey';
         $workspaceReady = $this->workspaceReady($user);
-
         return [
             'user' => $this->profilePayload($user, $isPremium),
             'plan' => [
@@ -94,6 +72,11 @@ class LockerRoomDataService
             'schedule' => $this->schedulePayload($user),
             'settings' => $this->settingsPayload($user, $website, $isPremium),
             'billing' => $this->billingPayload($billing, $user, $latestPaymentTransaction),
+            'credits' => [
+                'available' => (int) ($user->points_available ?? 0),
+                'history' => class_exists(\App\Models\CreditPointTransaction::class) ? app(CreditPointService::class)->recent($user, 12) : [],
+                'catalog' => (array) config('plyrcard-points.catalog', []),
+            ],
             'website' => $this->websitePayload($website),
             'plans' => $this->plans($planKey, $user),
             'integrations' => [
@@ -102,7 +85,6 @@ class LockerRoomDataService
             ],
         ];
     }
-
     protected function planKey(User $user, ?BillingInformation $billing): string
     {
         // PLYRCARD roles are authoritative for product access/current tier.
@@ -112,11 +94,9 @@ class LockerRoomDataService
         if ($this->hasRole($user, 'My Journey')) {
             return 'my-journey';
         }
-
         if ($this->hasRole($user, 'Free')) {
             return 'free';
         }
-
         // Compatibility fallback for legacy users that do not yet have a tier role.
         $billingPlan = strtolower(trim((string) ($billing?->plan_key ?? '')));
         if ($billingPlan === 'amplify') {
@@ -125,10 +105,8 @@ class LockerRoomDataService
         if (in_array($billingPlan, ['my-journey', 'my_journey'], true)) {
             return 'my-journey';
         }
-
         return 'free';
     }
-
     protected function hasRole(User $user, string $role): bool
     {
         try {
@@ -137,33 +115,26 @@ class LockerRoomDataService
             }
         } catch (\Throwable) {
         }
-
         return $user->getRoleNames()
             ->contains(fn ($name): bool => strcasecmp(trim((string) $name), $role) === 0);
     }
-
     protected function workspaceReady(User $user): bool
     {
         $values = [
             method_exists($user, 'getRawOriginal') ? $user->getRawOriginal('ghl_api_key') : $user->ghl_api_key,
             method_exists($user, 'getRawOriginal') ? $user->getRawOriginal('ghl_location_id') : $user->ghl_location_id,
         ];
-
         $missing = ['', 'null', 'none', 'pending', 'not set', 'n/a'];
-
         foreach ($values as $value) {
             if (in_array(strtolower(trim((string) $value)), $missing, true)) {
                 return false;
             }
         }
-
         return true;
     }
-
     protected function profilePayload(User $user, bool $isPremium): array
     {
         $positions = is_array($user->position) ? array_values($user->position) : array_values(array_filter([(string) $user->position]));
-
         return [
             'id' => $user->id,
             'first_name' => $user->first_name,
@@ -260,7 +231,6 @@ class LockerRoomDataService
             ]))->values()->mapWithKeys(fn ($label) => [(string) $label => (string) $label])->all(),
         ];
     }
-
     protected function photosPayload(User $user): array
     {
         $player = collect(is_array($user->raw_player_images ?? null) ? $user->raw_player_images : [])
@@ -274,12 +244,10 @@ class LockerRoomDataService
                 'url' => $this->storageUrl($path),
                 'name' => 'Player photo',
             ])->all();
-
         $websiteFields = [
             'plyrcard_image', 'player_image', 'action_image',
             'national_team_image', 'mobile_hero_image', 'youtube_thumbnail',
         ];
-
         $plyrcard = collect($websiteFields)
             ->map(function (string $field) use ($user): ?array {
                 $path = trim((string) ($user->{$field} ?? ''));
@@ -308,7 +276,6 @@ class LockerRoomDataService
                     ])
             )
             ->unique('url')->values()->all();
-
         $canManagePlyrcard = false;
         try {
             $canManagePlyrcard = method_exists($user, 'isSuperadminOrImpersonating')
@@ -317,7 +284,6 @@ class LockerRoomDataService
         } catch (\Throwable) {
             $canManagePlyrcard = false;
         }
-
         return [
             'player' => $player,
             'plyrcard' => $plyrcard,
@@ -327,18 +293,15 @@ class LockerRoomDataService
             'plyrcard_max' => 30,
         ];
     }
-
     protected function dashboardPayload(User $user): array
     {
         $tracking = [];
         $remoteStats = [];
-
         try {
             $tracking = app(LocalRecruitingTrackingService::class)->dashboardStats($user);
         } catch (\Throwable) {
             $tracking = [];
         }
-
         // Match the Admin Dashboard source layering: local tracking is authoritative,
         // while cached dashboard sync values may contribute metrics that are not stored
         // as local redirect/open events (for example coach replies).
@@ -350,9 +313,7 @@ class LockerRoomDataService
         } catch (\Throwable) {
             $remoteStats = [];
         }
-
         $number = static fn (...$values): int => max(array_map(static fn ($value): int => is_numeric($value) ? (int) $value : 0, $values));
-
         $profileViews = $number(
             $tracking['profile_views'] ?? 0,
             $tracking['view_profile_total'] ?? 0,
@@ -360,7 +321,6 @@ class LockerRoomDataService
             $remoteStats['profile_views'] ?? 0,
             $remoteStats['view_profile_total'] ?? 0
         );
-
         $emailsSent = $number(
             $tracking['emails_sent'] ?? 0,
             $tracking['email_sent_count'] ?? 0,
@@ -370,7 +330,6 @@ class LockerRoomDataService
             (int) ($remoteStats['personal_emails_sent'] ?? 0) + (int) ($remoteStats['campaigns_sent'] ?? 0),
             $user->total_emails_sent ?? 0
         );
-
         // v10.51: use the exact same source-of-truth rule as Coach Database.
         // When LocalRecruitingTrackingService has attributed engagement rows, those
         // rows are authoritative for BOTH the dashboard card and its drill-down.
@@ -382,7 +341,6 @@ class LockerRoomDataService
         $youtubeClicks = (int) ($engagement['platform_counts']['youtube'] ?? 0);
         $xClicks = (int) ($engagement['platform_counts']['x'] ?? 0);
         $socialClicks = (int) ($engagement['total'] ?? ($instagramClicks + $youtubeClicks + $xClicks));
-
         // v10.103: mirror the Admin Dashboard's exact profile-row source. When
         // attributed LocalRecruitingTrackingService rows exist, their coach/school
         // identities are authoritative for the unique-contact and school counts.
@@ -396,7 +354,6 @@ class LockerRoomDataService
         $profileRows = collect(is_array($profileRows) ? $profileRows : [])
             ->filter(fn ($row): bool => is_array($row))
             ->values();
-
         $profileUniqueContacts = $profileRows->isNotEmpty()
             ? $profileRows->pluck('coach_id')->filter()->unique()->count()
             : $number(
@@ -421,7 +378,6 @@ class LockerRoomDataService
                 $remoteStats['schools_with_profile_views'] ?? 0,
                 $remoteStats['schools_with_clicks'] ?? 0
             );
-
         // Match the Coach Database dashboard's Favorites card.
         // This is a local PLYRCARD relationship, so no external request is needed.
         try {
@@ -429,7 +385,6 @@ class LockerRoomDataService
         } catch (\Throwable) {
             $favorites = 0;
         }
-
         $schoolsEngaged = $number(
             $tracking['schools_with_clicks'] ?? 0,
             $tracking['schools_with_profile_views'] ?? 0,
@@ -437,7 +392,6 @@ class LockerRoomDataService
             $remoteStats['schools_with_clicks'] ?? 0,
             $remoteStats['schools_with_profile_views'] ?? 0
         );
-
         $upcoming = Schedule::query()
             ->where(function ($query) use ($user): void {
                 $query->where('created_by_user_id', $user->id)
@@ -448,7 +402,6 @@ class LockerRoomDataService
             ->orderBy('game_date')
             ->orderBy('game_time')
             ->first();
-
         return [
             'profile_completion' => $this->profileCompletion($user),
             'stats' => [
@@ -482,7 +435,6 @@ class LockerRoomDataService
             'next_schedule' => $upcoming ? $this->scheduleRow($upcoming, $user) : null,
         ];
     }
-
     /**
      * v10.103: Build Locker Room Profile Views directly from the same
      * LocalRecruitingTrackingService::profileViewRows() collection used by Admin.
@@ -491,17 +443,14 @@ class LockerRoomDataService
     protected function localProfileViewSnapshot(User $user): array
     {
         $rawRows = [];
-
         try {
             $rawRows = app(LocalRecruitingTrackingService::class)->profileViewRows($user);
         } catch (\Throwable) {
             $rawRows = [];
         }
-
         $rows = collect(is_array($rawRows) ? $rawRows : [])
             ->filter(fn ($row): bool => is_array($row))
             ->values();
-
         if ($rows->isEmpty()) {
             return [
                 'rows' => [],
@@ -511,7 +460,6 @@ class LockerRoomDataService
                 'authoritative_rows' => false,
             ];
         }
-
         $schoolCache = [];
         $formatted = $rows->map(function (array $row) use (&$schoolCache): array {
             $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
@@ -521,14 +469,12 @@ class LockerRoomDataService
             $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? ''));
             $cacheKey = strtolower($schoolRef !== '' ? $schoolRef : ('school:' . $schoolName));
             $school = null;
-
             if ($cacheKey !== '' && array_key_exists($cacheKey, $schoolCache)) {
                 $school = $schoolCache[$cacheKey];
             } elseif ($schoolRef !== '' || $schoolName !== '') {
                 $school = $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName);
                 if ($cacheKey !== '') $schoolCache[$cacheKey] = $school;
             }
-
             if (! $school && $contactId !== '') {
                 $coachKey = 'coach:' . $contactId;
                 if (array_key_exists($coachKey, $schoolCache)) {
@@ -547,7 +493,6 @@ class LockerRoomDataService
                     $schoolCache[$coachKey] = $school;
                 }
             }
-
             $schoolPayload = $school ? $this->schoolPayload($school) : [
                 'id' => null,
                 'reference' => $schoolRef !== '' ? $schoolRef : ($schoolName !== '' ? 'school:' . $schoolName : null),
@@ -558,10 +503,8 @@ class LockerRoomDataService
                 'city' => null,
                 'state' => null,
             ];
-
             $views = max(1, (int) ($row['views'] ?? $row['count'] ?? 1));
             $time = $row['time'] ?? $row['last_at'] ?? $row['occurred_at'] ?? $row['created_at'] ?? null;
-
             return [
                 'identity_key' => $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $coachName . '|' . $coachEmail),
                 'contact_id' => $contactId ?: null,
@@ -578,7 +521,6 @@ class LockerRoomDataService
                 'last_subject' => null,
             ];
         })->sortByDesc(fn (array $row): int => (int) ($row['count'] ?? 0))->take(100)->values();
-
         return [
             'rows' => $formatted->all(),
             'identified_count' => $rows->pluck('coach_id')->filter()->unique()->count(),
@@ -589,7 +531,6 @@ class LockerRoomDataService
             'authoritative_rows' => true,
         ];
     }
-
     /**
      * Return Coach Engagement using the exact LocalRecruitingTrackingService rows
      * used by Coach Database. This mirrors InteractsWithCoachDatabase:
@@ -601,24 +542,20 @@ class LockerRoomDataService
     protected function localCoachEngagementSnapshot(User $user, array $dashboardStats = []): array
     {
         $rawRows = [];
-
         try {
             $rawRows = app(LocalRecruitingTrackingService::class)->coachEngagementRows($user);
         } catch (\Throwable) {
             $rawRows = [];
         }
-
         $rows = collect(is_array($rawRows) ? $rawRows : [])
             ->filter(fn ($row): bool => is_array($row))
             ->values();
-
         if ($rows->isNotEmpty()) {
             $platformCounts = [
                 'instagram' => $this->dashboardSocialClickTotal($rows, 'instagram'),
                 'youtube' => $this->dashboardSocialClickTotal($rows, 'youtube'),
                 'x' => $this->dashboardSocialClickTotal($rows, 'x'),
             ];
-
             return [
                 'total' => array_sum($platformCounts),
                 'platform_counts' => $platformCounts,
@@ -630,7 +567,6 @@ class LockerRoomDataService
                 'authoritative_rows' => true,
             ];
         }
-
         // Same fallback concept as Coach Database when no local rows exist. Keep it
         // local-only here; remote snapshot counters are deliberately not maxed in.
         $instagram = max(
@@ -647,7 +583,6 @@ class LockerRoomDataService
             (int) ($dashboardStats['x_clicks'] ?? 0),
             (int) ($dashboardStats['twitter_clicks'] ?? 0),
         );
-
         return [
             'total' => $instagram + $youtube + $x,
             'platform_counts' => ['instagram' => $instagram, 'youtube' => $youtube, 'x' => $x],
@@ -657,7 +592,6 @@ class LockerRoomDataService
             'authoritative_rows' => false,
         ];
     }
-
     protected function normalizeDashboardSocialPlatform(mixed $platform = null, array $row = []): string
     {
         $raw = strtolower(trim((string) $platform));
@@ -679,7 +613,6 @@ class LockerRoomDataService
                 $row['last_clicked_url'] ?? null,
             ]
         )))));
-
         return match (true) {
             str_contains($haystack, 'instagram'),
             preg_match('/(^|[^a-z0-9])ig([^a-z0-9]|$)/', $haystack) === 1 => 'instagram',
@@ -692,7 +625,6 @@ class LockerRoomDataService
             default => $raw === 'twitter' ? 'x' : $raw,
         };
     }
-
     protected function dashboardTrackingRowClickCount(array $row): int
     {
         foreach (['clicks', 'click_count', 'clicks_count', 'total', 'count', 'events_count', 'value'] as $key) {
@@ -700,14 +632,11 @@ class LockerRoomDataService
                 return max(0, (int) $row[$key]);
             }
         }
-
         return 1;
     }
-
     protected function dashboardSocialClickTotal(\Illuminate\Support\Collection $rows, string $platform): int
     {
         $platform = $platform === 'twitter' ? 'x' : strtolower(trim($platform));
-
         return $rows
             ->filter(fn ($row): bool => is_array($row))
             ->filter(function (array $row) use ($platform): bool {
@@ -718,7 +647,6 @@ class LockerRoomDataService
             })
             ->sum(fn (array $row): int => $this->dashboardTrackingRowClickCount($row));
     }
-
     protected function formatCoachEngagementRows(\Illuminate\Support\Collection $rows): array
     {
         return $rows
@@ -727,11 +655,9 @@ class LockerRoomDataService
                     $row['platform_key'] ?? $row['platform'] ?? $row['rc_platform'] ?? $row['utm_content'] ?? null,
                     $row,
                 );
-
                 if (! in_array($platform, ['instagram', 'youtube', 'x'], true)) {
                     return null;
                 }
-
                 $clicks = $this->dashboardTrackingRowClickCount($row);
                 $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
                 $coachName = trim((string) ($row['coach_name'] ?? $row['name'] ?? $row['title'] ?? 'Known coach contact')) ?: 'Known coach contact';
@@ -740,7 +666,6 @@ class LockerRoomDataService
                 $school = ($schoolRef !== '' || $schoolName !== '')
                     ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
                     : null;
-
                 // Use the same coach -> school resolution used by Profile Views.
                 // Coach Engagement events often contain only the coach identity,
                 // so resolve the canonical local school before the row is rendered.
@@ -753,11 +678,9 @@ class LockerRoomDataService
                 if ($school && $schoolName === '') {
                     $schoolName = trim((string) $school->name);
                 }
-
                 $identity = $contactId !== ''
                     ? 'coach:' . $contactId
                     : 'viewer:' . strtolower($schoolRef . '|' . $coachName . '|' . ($row['coach_email'] ?? $row['email'] ?? ''));
-
                 return [
                     'identity_key' => $identity,
                     'contact_id' => $contactId ?: null,
@@ -816,7 +739,6 @@ class LockerRoomDataService
             ->values()
             ->all();
     }
-
     /**
      * Locker Room dashboard drill-down using the same local tracking source that
      * powers the Admin Dashboard. Only coach-attributed rows are returned in the
@@ -834,14 +756,11 @@ class LockerRoomDataService
             'coach_replies' => ['label' => 'Coach Replies', 'icon' => 'reply'],
             'schools_engaged' => ['label' => 'Schools Engaged', 'icon' => 'school'],
         ];
-
         if (! isset($definitions[$metric])) {
             return ['metric' => $metric, 'label' => 'Recruiting Activity', 'total' => 0, 'identified_count' => 0, 'rows' => []];
         }
-
         $dashboard = $this->dashboardPayload($user);
         $total = (int) data_get($dashboard, 'stats.' . $metric, 0);
-
         if ($metric === 'coach_replies') {
             $rows = $this->cachedReplyActivityRows($user);
             return [
@@ -854,7 +773,6 @@ class LockerRoomDataService
                 'note' => $total > count($rows) ? 'Some reply activity is available only as an aggregate count.' : null,
             ];
         }
-
         if ($metric === 'profile_views') {
             // v10.103: canonical local rows win, exactly as they do in the Admin
             // Profile Views drawer. This fixes stale cached per-coach counts in Locker Room.
@@ -871,7 +789,6 @@ class LockerRoomDataService
                     'note' => 'Direct or anonymous visits are included in the total but are not shown as identified coaches.',
                 ];
             }
-
             $cachedRows = $this->cachedProfileViewRows($user);
             if ($cachedRows !== []) {
                 return [
@@ -886,7 +803,6 @@ class LockerRoomDataService
                 ];
             }
         }
-
         if ($metric === 'social_clicks') {
             $tracking = [];
             try {
@@ -894,7 +810,6 @@ class LockerRoomDataService
             } catch (\Throwable) {
                 $tracking = [];
             }
-
             $engagement = $this->localCoachEngagementSnapshot($user, $tracking);
             if (! empty($engagement['rows']) || (bool) ($engagement['authoritative_rows'] ?? false)) {
                 return [
@@ -909,7 +824,6 @@ class LockerRoomDataService
                 ];
             }
         }
-
         if (! Schema::hasTable('coach_database_tracking_events')) {
             return [
                 'metric' => $metric,
@@ -920,10 +834,8 @@ class LockerRoomDataService
                 'rows' => [],
             ];
         }
-
         $query = DB::table('coach_database_tracking_events')
             ->where('athlete_user_id', $user->getKey());
-
         if ($metric === 'profile_views') {
             $query->where('event_type', 'profile_view');
         } elseif ($metric === 'email_clicks') {
@@ -949,7 +861,6 @@ class LockerRoomDataService
                     });
             })->whereNotNull('school_business_id')->where('school_business_id', '<>', '');
         }
-
         $events = $query
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')
@@ -957,13 +868,11 @@ class LockerRoomDataService
             ->get()
             ->map(fn ($row): array => (array) $row)
             ->values();
-
         if ($metric === 'schools_engaged') {
             $rows = $this->groupSchoolActivityRows($events->all());
         } else {
             $rows = $this->groupCoachActivityRows($events->all(), $metric);
         }
-
         return [
             'metric' => $metric,
             'label' => $definitions[$metric]['label'],
@@ -986,16 +895,13 @@ class LockerRoomDataService
                 : null,
         ];
     }
-
     public function dashboardSchool(User $user, string $reference): array
     {
         $reference = trim(urldecode($reference));
         if ($reference === '') {
             return ['school' => null, 'coaches' => [], 'lists' => []];
         }
-
         $school = $this->resolveSchool($reference);
-
         // Analytics rows are coach-first. If a historical tracking row does not
         // carry a canonical school id/business id, resolve the coach back to its
         // local Coach Database school so clicking the coach remains equivalent to
@@ -1003,11 +909,9 @@ class LockerRoomDataService
         if (! $school && (str_starts_with($reference, 'coach:') || str_starts_with($reference, 'coach-email:'))) {
             $school = $this->resolveSchoolFromCoachReference($reference);
         }
-
         if (! $school) {
             return ['school' => null, 'coaches' => [], 'lists' => []];
         }
-
         // Use the same local Recruiting Center row builder as the Admin school drawer.
         // This keeps favorite/list state, canonical local school identity, logo/meta,
         // and local coaching staff aligned between Admin and Locker Room.
@@ -1027,14 +931,12 @@ class LockerRoomDataService
             $schoolRow = null;
             $lists = [];
         }
-
         // The canonical local service is gender-scoped. If it successfully resolved
         // the request but returned no school, this school has no coaches for the
         // logged-in athlete's gender and must not open in Locker Room.
         if ($genderScopedSchoolLookupCompleted && ! is_array($schoolRow)) {
             return ['school' => null, 'coaches' => [], 'lists' => $lists];
         }
-
         $coaches = collect(is_array($schoolRow) ? ($schoolRow['coaches'] ?? []) : [])
             ->filter(fn ($row): bool => is_array($row))
             ->map(function (array $row): array {
@@ -1048,13 +950,11 @@ class LockerRoomDataService
                     'gender' => $row['gender'] ?? null,
                 ];
             })->values()->all();
-
         if ($coaches === [] && Schema::hasTable('coaches')) {
             $gender = \App\Models\Coach::normalizeGender($user->gender ?? null);
             if (! $gender || ! Schema::hasColumn('coaches', 'gender')) {
                 return ['school' => null, 'coaches' => [], 'lists' => $lists];
             }
-
             $query = DB::table('coaches')
                 ->where('school_id', $school->getKey())
                 ->where('gender', $gender);
@@ -1072,11 +972,9 @@ class LockerRoomDataService
                 ];
             })->sortBy(fn (array $row): string => strtolower((string) $row['name']))->values()->all();
         }
-
         if ($coaches === []) {
             return ['school' => null, 'coaches' => [], 'lists' => $lists];
         }
-
         $payload = is_array($schoolRow) ? $schoolRow : $this->schoolPayload($school);
         $payload['id'] = (string) ($payload['id'] ?? $school->getKey());
         $payload['school_id'] = (string) ($payload['school_id'] ?? $school->getKey());
@@ -1088,7 +986,6 @@ class LockerRoomDataService
         $payload['state'] = $payload['state'] ?? $school->state ?? null;
         $payload['coaches'] = $coaches;
         $payload['engagement_score'] = app(CoachDatabaseService::class)->schoolEngagementScoreForUser($user, $payload);
-
         return [
             'school' => $payload,
             'coaches' => $coaches,
@@ -1100,14 +997,12 @@ class LockerRoomDataService
             'communications' => $this->dashboardSchoolCommunications($user, $school, $coaches),
         ];
     }
-
     protected function dashboardSchoolCommunications(User $user, School $school, array $coaches): array
     {
         $schoolId = (string) $school->getKey();
         $schoolName = trim((string) $school->name);
         $businessId = trim((string) ($school->ghl_business_id ?? ''));
         $cacheKey = 'locker-room:school-comms:' . $user->getKey() . ':' . md5($schoolId . '|' . $businessId . '|' . strtolower($schoolName));
-
         return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($user, $schoolId, $schoolName, $businessId, $coaches): array {
             try {
                 $coachIds = collect($coaches)
@@ -1118,31 +1013,25 @@ class LockerRoomDataService
                     ])
                     ->map(fn ($value): string => strtolower(trim((string) $value)))
                     ->filter()->unique()->values();
-
                 $coachEmails = collect($coaches)
                     ->map(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? ''))))
                     ->filter()->unique()->values();
-
                 $coachNames = collect($coaches)
                     ->map(fn (array $coach): string => strtolower(trim((string) ($coach['name'] ?? ''))))
                     ->filter()->unique()->values();
-
                 $schoolIds = collect([$schoolId, $businessId])
                     ->map(fn ($value): string => strtolower(trim((string) $value)))
                     ->filter()->unique()->values();
                 $schoolNameKey = strtolower($schoolName);
-
                 $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
                     'limit' => 200,
                     'status' => 'all',
                     'search' => '',
                     'fetch_all' => true,
                 ]);
-
                 if (! ($result['success'] ?? false)) {
                     return [];
                 }
-
                 $matched = collect((array) ($result['conversations'] ?? []))
                     ->filter(fn ($row): bool => is_array($row))
                     ->filter(function (array $conversation) use ($coachIds, $coachEmails, $coachNames, $schoolIds, $schoolNameKey): bool {
@@ -1152,7 +1041,6 @@ class LockerRoomDataService
                             $conversation['coach_id'] ?? null,
                             $conversation['coach_contact_id'] ?? null,
                         ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique();
-
                         $conversationSchoolIds = collect([
                             $conversation['school_id'] ?? null,
                             $conversation['school_business_id'] ?? null,
@@ -1160,11 +1048,9 @@ class LockerRoomDataService
                             $conversation['company_id'] ?? null,
                             $conversation['ghl_business_id'] ?? null,
                         ])->map(fn ($value): string => strtolower(trim((string) $value)))->filter()->unique();
-
                         $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
                         $name = strtolower(trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? '')));
                         $conversationSchool = strtolower(trim((string) ($conversation['school'] ?? $conversation['school_name'] ?? $conversation['company_name'] ?? $conversation['company'] ?? '')));
-
                         return ($conversationContactIds->isNotEmpty() && $coachIds->intersect($conversationContactIds)->isNotEmpty())
                             || ($email !== '' && $coachEmails->contains($email))
                             || ($conversationSchoolIds->isNotEmpty() && $schoolIds->intersect($conversationSchoolIds)->isNotEmpty())
@@ -1173,29 +1059,24 @@ class LockerRoomDataService
                     })
                     ->take(30)
                     ->values();
-
                 $rows = [];
                 foreach ($matched as $conversation) {
                     $conversationId = trim((string) ($conversation['id'] ?? ''));
                     if ($conversationId === '') {
                         continue;
                     }
-
                     $messages = app(GoHighLevelService::class)->getConversationMessagesForUser($user, $conversationId, null, 20);
                     $messageRows = collect(($messages['success'] ?? false) ? ($messages['messages'] ?? []) : [])
                         ->filter(fn ($row): bool => is_array($row))
                         ->values();
-
                     if ($messageRows->isEmpty()) {
                         $rows[] = $this->dashboardSchoolCommunicationRow($conversation, $conversation);
                         continue;
                     }
-
                     foreach ($messageRows as $message) {
                         $rows[] = $this->dashboardSchoolCommunicationRow($message, $conversation);
                     }
                 }
-
                 return collect($rows)
                     ->filter(fn (array $row): bool => trim((string) ($row['preview'] ?? '')) !== '')
                     ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
@@ -1210,7 +1091,6 @@ class LockerRoomDataService
             }
         });
     }
-
     protected function dashboardSchoolCommunicationRow(array $message, array $conversation = []): array
     {
         $directionRaw = strtolower(trim((string) ($message['direction'] ?? $message['messageDirection'] ?? $conversation['direction'] ?? '')));
@@ -1221,7 +1101,6 @@ class LockerRoomDataService
         $time = $message['dateAdded'] ?? $message['createdAt'] ?? $message['created_at'] ?? $conversation['last_message_at'] ?? $conversation['updated_at'] ?? $conversation['created_at'] ?? null;
         $carbon = null;
         try { if ($time) $carbon = Carbon::parse($time); } catch (\Throwable) { $carbon = null; }
-
         return [
             'id' => (string) ($message['id'] ?? $message['_id'] ?? $conversation['id'] ?? md5($coachName . '|' . $preview . '|' . (string) $time)),
             'direction' => $direction,
@@ -1233,17 +1112,14 @@ class LockerRoomDataService
             '_timestamp' => $carbon ? $carbon->getTimestamp() : 0,
         ];
     }
-
     public function hasPremiumLockerRoomAccess(User $user): bool
     {
         $billing = BillingInformation::query()
             ->where('user_id', $user->id)
             ->latest('updated_at')
             ->first();
-
         return $this->planKey($user, $billing) === 'my-journey';
     }
-
     protected function groupCoachActivityRows(array $events, string $metric): array
     {
         $contactIds = collect($events)
@@ -1251,7 +1127,6 @@ class LockerRoomDataService
             ->filter()
             ->unique()
             ->values();
-
         $coaches = collect();
         if ($contactIds->isNotEmpty() && Schema::hasTable('coaches') && Schema::hasColumn('coaches', 'ghl_contact_id')) {
             $coachQuery = DB::table('coaches')->whereIn('ghl_contact_id', $contactIds->all());
@@ -1261,15 +1136,12 @@ class LockerRoomDataService
             $coaches = $coachQuery->get()->map(fn ($row): array => (array) $row)
                 ->keyBy(fn (array $row): string => trim((string) ($row['ghl_contact_id'] ?? '')));
         }
-
         $grouped = [];
-
         foreach ($events as $event) {
             $contactId = trim((string) ($event['coach_contact_id'] ?? ''));
             if ($contactId === '') {
                 continue;
             }
-
             $metadata = $this->trackingMetadata($event['metadata'] ?? null);
             $coach = $coaches->get($contactId, []);
             $name = trim((string) ($coach['display_name'] ?? ''))
@@ -1280,7 +1152,6 @@ class LockerRoomDataService
             $title = trim((string) ($coach['title'] ?? $metadata['coach_title'] ?? ''));
             $schoolReference = trim((string) ($event['school_business_id'] ?? ''));
             $schoolName = trim((string) ($metadata['school_name'] ?? $metadata['school'] ?? $metadata['business_name'] ?? ''));
-
             $school = null;
             $coachSchoolId = $coach['school_id'] ?? null;
             if ($coachSchoolId) {
@@ -1289,7 +1160,6 @@ class LockerRoomDataService
             if (! $school && ($schoolReference !== '' || $schoolName !== '')) {
                 $school = $this->resolveSchool($schoolReference !== '' ? $schoolReference : 'school:' . $schoolName);
             }
-
             $schoolPayload = $school ? $this->schoolPayload($school) : [
                 'id' => null,
                 'reference' => $schoolReference !== '' ? $schoolReference : ($schoolName !== '' ? 'school:' . $schoolName : null),
@@ -1300,7 +1170,6 @@ class LockerRoomDataService
                 'city' => $coach['city'] ?? null,
                 'state' => $coach['state'] ?? null,
             ];
-
             $key = strtolower($contactId);
             if (! isset($grouped[$key])) {
                 $grouped[$key] = [
@@ -1324,25 +1193,21 @@ class LockerRoomDataService
                     'last_subject' => trim((string) ($metadata['email_subject'] ?? $metadata['subject'] ?? '')) ?: null,
                 ];
             }
-
             $grouped[$key]['count']++;
             $platform = strtolower(trim((string) ($event['platform'] ?? '')));
             if (array_key_exists($platform, $grouped[$key]['platform_counts'])) {
                 $grouped[$key]['platform_counts'][$platform]++;
             }
         }
-
         return collect($grouped)
             ->sortByDesc(fn (array $row): int => (int) ($row['count'] ?? 0))
             ->values()
             ->take(100)
             ->all();
     }
-
     protected function groupSchoolActivityRows(array $events): array
     {
         $rows = [];
-
         foreach ($events as $event) {
             $metadata = $this->trackingMetadata($event['metadata'] ?? null);
             $reference = trim((string) ($event['school_business_id'] ?? ''));
@@ -1350,7 +1215,6 @@ class LockerRoomDataService
             if ($reference === '' && $name === '') {
                 continue;
             }
-
             $school = $this->resolveSchool($reference !== '' ? $reference : 'school:' . $name);
             $payload = $school ? $this->schoolPayload($school) : [
                 'id' => null,
@@ -1362,12 +1226,10 @@ class LockerRoomDataService
                 'city' => null,
                 'state' => null,
             ];
-
             $key = strtolower((string) ($payload['reference'] ?? $payload['id'] ?? $payload['name'] ?? ''));
             if ($key === '') {
                 continue;
             }
-
             if (! isset($rows[$key])) {
                 $rows[$key] = [
                     'school' => $payload,
@@ -1377,14 +1239,12 @@ class LockerRoomDataService
                     'last_at_label' => $this->activityTimeLabel($event['occurred_at'] ?? $event['created_at'] ?? null),
                 ];
             }
-
             $rows[$key]['count']++;
             $contactId = trim((string) ($event['coach_contact_id'] ?? ''));
             if ($contactId !== '') {
                 $rows[$key]['coach_contacts'][$contactId] = true;
             }
         }
-
         return collect($rows)
             ->map(function (array $row): array {
                 $row['coach_count'] = count($row['coach_contacts'] ?? []);
@@ -1396,11 +1256,9 @@ class LockerRoomDataService
             ->take(100)
             ->all();
     }
-
     protected function cachedProfileViewRows(User $user): array
     {
         $rows = Cache::get($this->dashboardActivityHistoryCacheKey($user), []);
-
         return collect(is_array($rows) ? $rows : [])
             ->filter(fn ($row): bool => is_array($row))
             ->filter(function (array $row): bool {
@@ -1418,14 +1276,12 @@ class LockerRoomDataService
                 if (preg_match('/(\d[\d,]*)\s+tracked\s+profile\s+views?/i', $copy, $matches)) {
                     $views = max($views, (int) str_replace(',', '', $matches[1]));
                 }
-
                 $schoolRef = trim((string) ($row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? ''));
                 $schoolName = trim((string) ($row['school'] ?? $row['school_name'] ?? ''));
                 $school = ($schoolRef !== '' || $schoolName !== '')
                     ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
                     : null;
                 $contactId = trim((string) ($row['coach_id'] ?? $row['coach_contact_id'] ?? $row['contact_id'] ?? ''));
-
                 return [
                     'identity_key' => $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $title),
                     'contact_id' => $contactId ?: null,
@@ -1466,11 +1322,9 @@ class LockerRoomDataService
             ->values()
             ->all();
     }
-
     protected function cachedCoachEngagementRows(User $user): array
     {
         $rows = Cache::get($this->dashboardActivityHistoryCacheKey($user), []);
-
         $normalizePlatform = static function (array $row): string {
             $raw = strtolower(trim((string) (
                 $row['platform_icon_key']
@@ -1480,7 +1334,6 @@ class LockerRoomDataService
                 ?? $row['title']
                 ?? ''
             )));
-
             return match (true) {
                 str_contains($raw, 'instagram'), $raw === 'ig' => 'instagram',
                 str_contains($raw, 'youtube'), str_contains($raw, 'you_tube'), $raw === 'yt' => 'youtube',
@@ -1488,13 +1341,11 @@ class LockerRoomDataService
                 default => '',
             };
         };
-
         return collect(is_array($rows) ? $rows : [])
             ->filter(fn ($row): bool => is_array($row))
             ->map(function (array $row) use ($normalizePlatform): ?array {
                 $platform = $normalizePlatform($row);
                 if ($platform === '') return null;
-
                 $title = trim((string) ($row['coach_name'] ?? $row['title'] ?? 'Tracked coach engagement')) ?: 'Tracked coach engagement';
                 $clicks = max(1, (int) ($row['clicks'] ?? $row['count'] ?? 1));
                 $schoolRef = trim((string) ($row['school_id'] ?? $row['school_business_id'] ?? $row['business_id'] ?? ''));
@@ -1513,7 +1364,6 @@ class LockerRoomDataService
                     $schoolName = trim((string) $school->name);
                 }
                 $identity = $contactId !== '' ? 'coach:' . $contactId : 'viewer:' . strtolower($schoolRef . '|' . $title);
-
                 return [
                     'identity_key' => $identity,
                     'contact_id' => $contactId ?: null,
@@ -1568,11 +1418,9 @@ class LockerRoomDataService
             ->values()
             ->all();
     }
-
     protected function cachedReplyActivityRows(User $user): array
     {
         $rows = Cache::get($this->dashboardActivityHistoryCacheKey($user), []);
-
         return collect(is_array($rows) ? $rows : [])
             ->filter(fn ($row): bool => is_array($row))
             ->filter(function (array $row): bool {
@@ -1589,7 +1437,6 @@ class LockerRoomDataService
                 $school = ($schoolRef !== '' || $schoolName !== '')
                     ? $this->resolveSchool($schoolRef !== '' ? $schoolRef : 'school:' . $schoolName)
                     : null;
-
                 return [
                     'coach_id' => $row['coach_id'] ?? null,
                     'contact_id' => $row['contact_id'] ?? $row['coach_contact_id'] ?? null,
@@ -1617,42 +1464,34 @@ class LockerRoomDataService
             ->values()
             ->all();
     }
-
     protected function dashboardActivitySummaryCacheKey(User $user): string
     {
         return 'coach-database:dashboard-activity:' . $user->id . ':' . md5((string) ($user->ghl_location_id ?? '') . '|' . substr((string) ($user->ghl_api_key ?? ''), -12));
     }
-
     protected function dashboardActivityHistoryCacheKey(User $user): string
     {
         return 'coach-database:dashboard-activity-history:' . $user->id . ':' . md5((string) ($user->ghl_location_id ?? ''));
     }
-
     protected function trackingMetadata($raw): array
     {
         if (is_array($raw)) {
             return $raw;
         }
-
         if (! is_string($raw) || trim($raw) === '') {
             return [];
         }
-
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : [];
     }
-
     protected function resolveSchoolFromCoachReference(string $reference): ?School
     {
         if (! Schema::hasTable('coaches')) {
             return null;
         }
-
         $query = DB::table('coaches');
         if (Schema::hasColumn('coaches', 'deleted_at')) {
             $query->whereNull('deleted_at');
         }
-
         if (str_starts_with($reference, 'coach-email:')) {
             $email = trim(substr($reference, strlen('coach-email:')));
             if ($email === '' || ! Schema::hasColumn('coaches', 'email')) {
@@ -1664,7 +1503,6 @@ class LockerRoomDataService
             if ($contactId === '') {
                 return null;
             }
-
             $query->where(function ($builder) use ($contactId): void {
                 $matched = false;
                 foreach (['ghl_contact_id', 'contact_id', 'id'] as $column) {
@@ -1683,12 +1521,10 @@ class LockerRoomDataService
                 }
             });
         }
-
         $coach = $query->first();
         if (! $coach) {
             return null;
         }
-
         $coach = (array) $coach;
         if (! empty($coach['school_id'])) {
             $school = School::query()->find($coach['school_id']);
@@ -1696,7 +1532,6 @@ class LockerRoomDataService
                 return $school;
             }
         }
-
         foreach (['school_business_id', 'business_id', 'ghl_business_id'] as $column) {
             $value = trim((string) ($coach[$column] ?? ''));
             if ($value !== '') {
@@ -1706,49 +1541,41 @@ class LockerRoomDataService
                 }
             }
         }
-
         $schoolName = trim((string) ($coach['school_name'] ?? $coach['school'] ?? ''));
         return $schoolName !== '' ? $this->resolveSchool('school:' . $schoolName) : null;
     }
-
     protected function resolveSchool(string $reference): ?School
     {
         $reference = trim(urldecode($reference));
         if ($reference === '') {
             return null;
         }
-
         if (str_starts_with($reference, 'school:')) {
             $name = trim(substr($reference, 7));
             return $name !== ''
                 ? School::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->first()
                 : null;
         }
-
         if (ctype_digit($reference)) {
             $school = School::query()->find((int) $reference);
             if ($school) {
                 return $school;
             }
         }
-
         if (Schema::hasColumn('schools', 'ghl_business_id')) {
             $school = School::query()->where('ghl_business_id', $reference)->first();
             if ($school) {
                 return $school;
             }
         }
-
         return School::query()->whereRaw('LOWER(name) = ?', [strtolower($reference)])->first();
     }
-
     protected function schoolPayload(School $school): array
     {
         $logo = $school->logo_url ?? $school->logo ?? null;
         if ($logo && ! Str::startsWith((string) $logo, ['http://', 'https://'])) {
             $logo = $this->storageUrl((string) $logo);
         }
-
         return [
             'id' => $school->getKey(),
             'reference' => filled($school->ghl_business_id ?? null) ? (string) $school->ghl_business_id : (string) $school->getKey(),
@@ -1761,20 +1588,17 @@ class LockerRoomDataService
             'state' => $school->state ?? null,
         ];
     }
-
     protected function activityTimeLabel($value): string
     {
         if (! $value) {
             return 'Recent';
         }
-
         try {
             return Carbon::parse($value)->diffForHumans();
         } catch (\Throwable) {
             return 'Recent';
         }
     }
-
     protected function schedulePayload(User $user): array
     {
         $rows = Schedule::query()
@@ -1789,14 +1613,12 @@ class LockerRoomDataService
             ->map(fn (Schedule $schedule): array => $this->scheduleRow($schedule, $user))
             ->values()
             ->all();
-
         return [
             'items' => $rows,
             'upcoming_count' => collect($rows)->where('status', 'upcoming')->count(),
             'total_count' => count($rows),
         ];
     }
-
     protected function scheduleRow(Schedule $schedule, User $user): array
     {
         $time = null;
@@ -1807,7 +1629,6 @@ class LockerRoomDataService
                 $time = (string) $schedule->game_time;
             }
         }
-
         return [
             'id' => $schedule->id,
             'title' => $schedule->title,
@@ -1826,7 +1647,6 @@ class LockerRoomDataService
             'can_edit' => (int) $schedule->created_by_user_id === (int) $user->id,
         ];
     }
-
     protected function settingsPayload(User $user, ?Website $website, bool $isPremium): array
     {
         $defaults = [
@@ -1839,10 +1659,8 @@ class LockerRoomDataService
             'weekly_digest' => false,
             'product_news' => false,
         ];
-
         $stored = Cache::get('coach-database:notification-settings:' . $user->id, []);
         $notifications = is_array($stored) ? array_merge($defaults, $stored) : $defaults;
-
         return [
             'notifications' => $notifications,
             'website' => [
@@ -1854,7 +1672,6 @@ class LockerRoomDataService
             ],
         ];
     }
-
     protected function billingPayload(?BillingInformation $billing, User $user, ?PaymentTransaction $transaction = null): array
     {
         $brand = $billing?->payment_brand ?: $transaction?->card_brand;
@@ -1864,7 +1681,6 @@ class LockerRoomDataService
         if ($amountPaid <= 0 && $transaction) {
             $amountPaid = (int) ($transaction->amount_cents ?? 0);
         }
-
         return [
             'billing_name' => $billing?->billing_name ?: trim($user->first_name . ' ' . $user->last_name),
             'billing_email' => $billing?->billing_email ?: $user->email,
@@ -1878,7 +1694,8 @@ class LockerRoomDataService
             'billing_country' => $billing?->billing_country ?: $user->country,
             'profile_complete' => $billing ? app(BillingProfileService::class)->isComplete($billing) : false,
             'missing_required_fields' => $billing ? app(BillingProfileService::class)->missingRequiredFields($billing) : app(BillingProfileService::class)->requiredProfileFields(),
-            'subscriber_contact_ready' => filled($user->ghl_subscriber_contact_id) || filled($billing?->ghl_contact_id),
+            'subscriber_contact_ready' => filled($billing?->stripe_customer_id),
+            'stripe_customer_ready' => filled($billing?->stripe_customer_id),
             'plan_key' => $billing?->plan_key,
             'billing_cycle' => $billing?->billing_cycle,
             'currency' => $billing?->currency ?: 'USD',
@@ -1889,8 +1706,9 @@ class LockerRoomDataService
             'amount_refunded_cents' => (int) ($billing?->amount_refunded_cents ?? $transaction?->refunded_amount_cents ?? 0),
             'payment_status' => $billing?->payment_status,
             'subscription_status' => $billing?->subscription_status,
-            'cancellation_requested' => (bool) data_get($billing?->registration_meta ?? [], 'cancellation_requested_at'),
-            'cancellation_requested_at' => data_get($billing?->registration_meta ?? [], 'cancellation_requested_at'),
+            'cancellation_requested' => (bool) (data_get($billing?->registration_meta ?? [], 'stripe.cancel_at_period_end') ?? data_get($billing?->registration_meta ?? [], 'cancellation_requested_at')),
+            'cancellation_requested_at' => data_get($billing?->registration_meta ?? [], 'stripe.cancellation_requested_at') ?? data_get($billing?->registration_meta ?? [], 'cancellation_requested_at'),
+            'current_period_end' => ($ts = data_get($billing?->registration_meta ?? [], 'stripe.current_period_end')) ? date(DATE_ATOM, (int) $ts) : null,
             'cardholder_name' => $billing?->cardholder_name,
             'payment_brand' => $brand,
             'card_last_four' => $lastFour,
@@ -1902,15 +1720,25 @@ class LockerRoomDataService
             'last_transaction_amount_cents' => (int) ($transaction?->amount_cents ?? 0),
             'last_transaction_paid_at' => optional($transaction?->paid_at ?: $transaction?->ghl_created_at)->toIso8601String(),
             'payment_synced_at' => optional($billing?->payment_synced_at ?: $transaction?->synced_at)->toIso8601String(),
-            'payment_method_update_url' => app(BillingProfileService::class)->paymentMethodUpdateUrl($user, $billing),
+            'payment_method_update_url' => null,
+            'payment_method_setup_url' => route('billing.stripe.payment-method.setup'),
+            'billing_summary_url' => route('billing.stripe.summary'),
+            'billing_resume_url' => route('billing.stripe.resume'),
             'admin_billing_url' => url('/admin/billing'),
+            'points_available' => (int) ($user->points_available ?? 0),
+            'history' => Schema::hasTable('payment_transactions') ? PaymentTransaction::query()->where('user_id', $user->id)->where('payment_provider', 'stripe')->latest('paid_at')->latest('id')->limit(20)->get()->map(fn (PaymentTransaction $row) => [
+                'id' => $row->id,
+                'status' => $row->status,
+                'amount_cents' => (int) $row->amount_cents,
+                'currency' => $row->currency ?: 'USD',
+                'source_name' => $row->source_name,
+                'paid_at' => optional($row->paid_at)->toIso8601String(),
+            ])->all() : [],
         ];
     }
-
     protected function websitePayload(?Website $website): array
     {
         $url = null;
-
         if ($website) {
             if (filled($website->domain)) {
                 $domain = preg_replace('#^https?://#i', '', trim((string) $website->domain));
@@ -1919,7 +1747,6 @@ class LockerRoomDataService
                 $url = url('/' . ltrim((string) $website->slug, '/'));
             }
         }
-
         return [
             'exists' => (bool) $website,
             'is_published' => (bool) ($website?->is_published ?? false),
@@ -1928,7 +1755,6 @@ class LockerRoomDataService
             'slug' => $website?->slug,
         ];
     }
-
     protected function plans(string $currentPlan, User $user): array
     {
         $configured = (array) config('plyrcard-registration.plans', []);
@@ -1943,12 +1769,10 @@ class LockerRoomDataService
         $jumpstartActive = $this->hasRole($user, 'Jumpstart');
         $jumpstartCents = (int) data_get($configured, 'jumpstart.setup_fee_cents', 14900);
         $jumpstartDue = $currentPlan === 'my-journey' ? $jumpstartCents : $jumpstartCents + $journeyRecurring;
-
         $money = static function (int $cents): string {
             $amount = $cents / 100;
             return '$' . (floor($amount) === $amount ? number_format($amount, 0) : number_format($amount, 2));
         };
-
         return [
             [
                 'key' => 'free',
@@ -1985,12 +1809,12 @@ class LockerRoomDataService
                 'description' => $currentPlan === 'my-journey'
                     ? 'A one-time recruiting service extension added to your active My Journey membership.'
                     : 'Start My Journey and add the one-time Jumpstart recruiting service in one checkout.',
-                'features' => ['Everything in My Journey', '1 Coach Outreach Campaign', '1 Highlight Edit', '1 Custom Graphic'],
-                'action_label' => $jumpstartActive ? 'Jumpstart Purchased' : 'Get Jumpstart',
+                'features' => ['100 pooled PLYRCARD credits', 'Spend across graphics, reels, outreach, production hours, and supported add-ons', 'Credits do not expire', 'Everything in My Journey'],
+                'action_label' => $jumpstartActive ? 'Buy 100 More Credits' : 'Get Jumpstart',
                 'action_url' => '#',
                 'action_kind' => 'jumpstart_checkout',
                 'active_addon' => $jumpstartActive,
-                'button_disabled' => $jumpstartActive,
+                'button_disabled' => false,
             ],
             [
                 'key' => 'amplify',
@@ -2006,16 +1830,15 @@ class LockerRoomDataService
                 'description' => $currentPlan === 'my-journey'
                     ? 'A one-time done-for-you setup package added to your active My Journey membership.'
                     : 'Start My Journey and add the one-time Amplify done-for-you package in one checkout.',
-                'features' => ['Everything in My Journey', '4 Highlight Reels', '4 Custom Graphics', '4 Managed Coach Outreach sends', '8 Hours of Support', 'Full onboarding'],
-                'action_label' => $currentPlan === 'my-journey' ? 'Amplify My Recruiting' : 'Get Amplify',
+                'features' => ['600 pooled PLYRCARD credits', 'Spend across graphics, reels, outreach, production hours, and supported add-ons', 'Credits do not expire', 'Everything in My Journey', 'Full onboarding'],
+                'action_label' => $amplifyActive ? 'Buy 600 More Credits' : ($currentPlan === 'my-journey' ? 'Buy Amplify Credits' : 'Get Amplify'),
                 'action_url' => '#',
                 'action_kind' => 'amplify_checkout',
                 'active_addon' => $amplifyActive,
-                'button_disabled' => $amplifyActive,
+                'button_disabled' => false,
             ],
         ];
     }
-
     protected function profileCompletion(User $user): int
     {
         // Use the exact same completion calculator as the Coach Database dashboard.
@@ -2029,17 +1852,14 @@ class LockerRoomDataService
                 filled($user->city), filled($user->state), filled($user->country), filled($user->player_image) || filled($user->plyrcard_image),
                 filled($user->league_id), filled($user->club_id), filled($user->team_name),
             ];
-
             return (int) round((collect($checks)->filter()->count() / max(count($checks), 1)) * 100);
         }
     }
-
     protected function dateInputValue($value): ?string
     {
         if (blank($value)) {
             return null;
         }
-
         try {
             return $value instanceof \DateTimeInterface
                 ? Carbon::instance($value)->format('Y-m-d')
@@ -2048,20 +1868,16 @@ class LockerRoomDataService
             return is_scalar($value) ? trim((string) $value) : null;
         }
     }
-
     protected function storageUrl(?string $path): ?string
     {
         if (blank($path)) {
             return null;
         }
-
         if (Str::startsWith($path, ['http://', 'https://'])) {
             return $path;
         }
-
         return Storage::disk('public')->url($path);
     }
-
     protected function sportOptions(): array
     {
         return [
@@ -2071,7 +1887,6 @@ class LockerRoomDataService
             'swimming' => 'Swimming', 'boxing' => 'Boxing', 'martial_arts' => 'Martial Arts',
         ];
     }
-
     protected function positionOptions(): array
     {
         return [
