@@ -16146,6 +16146,89 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     }
     .rc-home-search-v2 { grid-area: search !important; }
     .rc-home-dark-toggle-v2 { grid-area: dark !important; }
+
+    /* PLYRCARD credit balance card. Added inside this existing style block so the
+       Livewire component keeps exactly the same Blade/HTML root structure. */
+    .rc-sidebar-credit-card-v3 {
+        box-sizing: border-box;
+        width: 100%;
+        margin: .55rem 0;
+        padding: .72rem .76rem;
+        border: 1px solid rgba(255, 99, 56, .28);
+        border-radius: .9rem;
+        background: #fff;
+        color: #111827;
+        box-shadow: 0 3px 12px rgba(15, 23, 42, .04);
+    }
+    .rc-sidebar-credit-head-v3 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .5rem;
+        margin-bottom: .62rem;
+    }
+    .rc-sidebar-credit-title-v3 {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        min-width: 0;
+        font-size: .76rem;
+        line-height: 1.2;
+        font-weight: 800;
+        color: #111827;
+    }
+    .rc-sidebar-credit-bolt-v3 {
+        width: 1.65rem;
+        height: 1.65rem;
+        border-radius: .55rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        background: rgba(255, 99, 56, .12);
+        color: #ff6338;
+        font-size: .78rem;
+        font-weight: 900;
+    }
+    .rc-sidebar-credit-action-v3 {
+        border: 0;
+        border-radius: .48rem;
+        background: #ff6338;
+        color: #fff;
+        padding: .34rem .52rem;
+        font-size: .66rem;
+        line-height: 1;
+        font-weight: 800;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .rc-sidebar-credit-action-v3:hover { background: #f0522b; }
+    .rc-sidebar-credit-row-v3 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .65rem;
+        padding: .28rem 0;
+        color: #6b7280;
+        font-size: .72rem;
+        line-height: 1.25;
+    }
+    .rc-sidebar-credit-row-v3 strong {
+        color: #111827;
+        font-size: .74rem;
+        font-weight: 800;
+        text-align: right;
+    }
+    html.dark .rc-sidebar-credit-card-v3,
+    .dark .rc-sidebar-credit-card-v3 {
+        background: rgb(24 24 27);
+        border-color: rgba(255, 99, 56, .34);
+        color: #f4f4f5;
+    }
+    html.dark .rc-sidebar-credit-title-v3,
+    html.dark .rc-sidebar-credit-row-v3 strong,
+    .dark .rc-sidebar-credit-title-v3,
+    .dark .rc-sidebar-credit-row-v3 strong { color: #f4f4f5; }
 </style>
 <script id="rc-disable-all-global-reload-script-v1011322">
     (() => {
@@ -16185,100 +16268,137 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         // v10.113.23: no Livewire morph hook. The controls are removed at page
         // boot/navigation only so Inbox message morphs never trigger a document scan.
         document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(removeGlobalReloadControls));
-    })();
-</script>
 
-<style id="rc-sidebar-credit-balance-v1" data-navigate-once>
-    /* Recruiting Center: show the athlete's current PLYRCARD credit balance
-       inside the existing Filament profile card, directly above Edit Profile. */
-    body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 {
-        display: inline-flex;
-        align-items: center;
-        gap: .28rem;
-        margin: .12rem 0 .05rem;
-        color: #ff6338;
-        font-size: .66rem;
-        font-weight: 800;
-        line-height: 1.2;
-        white-space: nowrap;
-    }
-    body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 svg {
-        width: .72rem;
-        height: .72rem;
-        flex: 0 0 auto;
-        color: currentColor;
-    }
-    .dark body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1,
-    html.dark body.rc-recruiting-center-page .rc-sidebar-credit-balance-v1 {
-        color: #ff7a5c;
-    }
-</style>
-<script id="rc-sidebar-credit-balance-script-v1" data-navigate-once>
-(() => {
-    if (window.__plyrRcSidebarCreditsInstalled) return;
-    window.__plyrRcSidebarCreditsInstalled = true;
+        // Credit balance card: DOM-only enhancement. No new Blade root elements are
+        // emitted, which keeps this Livewire component's original single-root structure.
+        const rcCreditBalance = @json((int) ($rcCatalogUser?->points_available ?? 0));
 
-    const creditBalance = @js((int) ($rcCatalogUser?->points_available ?? 0));
-    const formattedBalance = () => Number(creditBalance || 0).toLocaleString();
+        const rcVisible = (element) => {
+            if (!element) return false;
+            const style = window.getComputedStyle(element);
+            return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+        };
 
-    const findEditProfileElement = (sidebar) => {
-        if (!sidebar) return null;
-        const walker = document.createTreeWalker(sidebar, NodeFilter.SHOW_TEXT);
-        while (walker.nextNode()) {
-            const value = String(walker.currentNode?.nodeValue || '').trim().toLowerCase();
-            if (value === 'edit profile') {
-                return walker.currentNode.parentElement || null;
+        const rcFindExactText = (root, wanted) => {
+            const match = String(wanted || '').trim().toLowerCase();
+            if (!root || !match) return [];
+            const found = [];
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            while (walker.nextNode()) {
+                const node = walker.currentNode;
+                if (String(node.nodeValue || '').trim().toLowerCase() !== match) continue;
+                const element = node.parentElement;
+                if (element && rcVisible(element)) found.push(element);
             }
+            return found;
+        };
+
+        const rcClickable = (element) => element?.closest?.('a,button,[role="button"]') || element;
+
+        const rcDirectChild = (element, parent) => {
+            let current = element;
+            while (current && current.parentElement && current.parentElement !== parent) {
+                current = current.parentElement;
+            }
+            return current && current.parentElement === parent ? current : null;
+        };
+
+        const rcCreditElement = (tag, className, textValue = '') => {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (textValue !== '') element.textContent = textValue;
+            return element;
+        };
+
+        const rcBuildCreditCard = (manageTarget) => {
+            const card = rcCreditElement('div', 'rc-sidebar-credit-card-v3');
+            card.dataset.rcSidebarCreditCard = '1';
+
+            const head = rcCreditElement('div', 'rc-sidebar-credit-head-v3');
+            const title = rcCreditElement('div', 'rc-sidebar-credit-title-v3');
+            const bolt = rcCreditElement('span', 'rc-sidebar-credit-bolt-v3', '⚡');
+            bolt.setAttribute('aria-hidden', 'true');
+            title.appendChild(bolt);
+            title.appendChild(rcCreditElement('span', '', 'Credits'));
+
+            const action = rcCreditElement('button', 'rc-sidebar-credit-action-v3', 'Get More');
+            action.type = 'button';
+            action.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (manageTarget && typeof manageTarget.click === 'function') manageTarget.click();
+            });
+
+            head.appendChild(title);
+            head.appendChild(action);
+            card.appendChild(head);
+
+            const availableRow = rcCreditElement('div', 'rc-sidebar-credit-row-v3');
+            availableRow.appendChild(rcCreditElement('span', '', 'Available'));
+            availableRow.appendChild(rcCreditElement('strong', '', `${Number(rcCreditBalance || 0).toLocaleString()} credits`));
+            card.appendChild(availableRow);
+
+            const expiryRow = rcCreditElement('div', 'rc-sidebar-credit-row-v3');
+            expiryRow.appendChild(rcCreditElement('span', '', 'Expiration'));
+            expiryRow.appendChild(rcCreditElement('strong', '', 'No expiration'));
+            card.appendChild(expiryRow);
+
+            return card;
+        };
+
+        const rcMountCreditCard = () => {
+            const sidebar = document.querySelector('.fi-sidebar');
+            if (!sidebar) return;
+
+            const existing = sidebar.querySelector('[data-rc-sidebar-credit-card="1"]');
+            if (existing) {
+                const rows = existing.querySelectorAll('.rc-sidebar-credit-row-v3 strong');
+                if (rows[0]) rows[0].textContent = `${Number(rcCreditBalance || 0).toLocaleString()} credits`;
+                return;
+            }
+
+            const manageText = rcFindExactText(sidebar, 'Manage Plan')
+                .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
+            if (!manageText) return;
+
+            const editText = rcFindExactText(sidebar, 'Edit Profile')
+                .filter((element) => element.getBoundingClientRect().top < manageText.getBoundingClientRect().top)
+                .sort((a, b) => b.getBoundingClientRect().top - a.getBoundingClientRect().top)[0];
+            if (!editText) return;
+
+            const manageTarget = rcClickable(manageText);
+            const profileTarget = rcClickable(editText);
+            let container = manageTarget?.parentElement || manageText.parentElement;
+            let manageBlock = manageTarget;
+
+            for (let depth = 0; depth < 7 && container; depth++) {
+                const manageChild = rcDirectChild(manageTarget, container);
+                const profileChild = rcDirectChild(profileTarget, container);
+                if (manageChild && profileChild && manageChild !== profileChild) {
+                    manageBlock = manageChild;
+                    break;
+                }
+                container = container.parentElement;
+            }
+
+            const card = rcBuildCreditCard(manageTarget);
+            if (container && manageBlock && manageBlock.parentElement === container) {
+                container.insertBefore(card, manageBlock);
+            } else if (profileTarget?.parentElement) {
+                profileTarget.insertAdjacentElement('afterend', card);
+            }
+        };
+
+        const rcQueueCreditCard = () => window.requestAnimationFrame(rcMountCreditCard);
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', rcQueueCreditCard, { once: true });
+        } else {
+            rcQueueCreditCard();
         }
-        return null;
-    };
-
-    const syncSidebarCredits = () => {
-        const sidebar = document.querySelector('.fi-sidebar');
-        if (!sidebar) return;
-
-        const existing = sidebar.querySelector('[data-rc-sidebar-credits]');
-        if (existing) {
-            const value = existing.querySelector('[data-rc-sidebar-credit-value]');
-            if (value) value.textContent = `${formattedBalance()} Credits`;
-            return;
-        }
-
-        const editProfile = findEditProfileElement(sidebar);
-        if (!editProfile || !editProfile.parentElement) return;
-
-        const credit = document.createElement('div');
-        credit.className = 'rc-sidebar-credit-balance-v1';
-        credit.setAttribute('data-rc-sidebar-credits', '1');
-        credit.setAttribute('title', `${formattedBalance()} PLYRCARD credits available`);
-        credit.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M13.5 2.25 5.25 13.5h5.25l-1.5 8.25L18.75 10.5H13.5l0-8.25Z"></path>
-            </svg>
-            <span data-rc-sidebar-credit-value>${formattedBalance()} Credits</span>
-        `;
-
-        editProfile.parentElement.insertBefore(credit, editProfile);
-    };
-
-    const queueSync = () => window.requestAnimationFrame(syncSidebarCredits);
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', queueSync, { once: true });
-    } else {
-        queueSync();
-    }
-
-    // Filament keeps the sidebar persistent, but navigation can rebuild parts of
-    // its chrome. Re-apply the small credit line only on navigation lifecycle events.
-    document.addEventListener('livewire:navigated', queueSync);
-    window.addEventListener('pageshow', queueSync);
-
-    // One delayed pass covers the initial Filament sidebar hydration without using
-    // a permanent MutationObserver on this already-large Recruiting Center page.
-    window.setTimeout(syncSidebarCredits, 350);
-    window.setTimeout(syncSidebarCredits, 1200);
-})();
+        document.addEventListener('livewire:navigated', rcQueueCreditCard);
+        window.setTimeout(rcMountCreditCard, 350);
+        window.setTimeout(rcMountCreditCard, 1200);
+    })();
 </script>
 </x-filament-panels::page>
 </div>
