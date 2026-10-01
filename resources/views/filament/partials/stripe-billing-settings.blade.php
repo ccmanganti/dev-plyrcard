@@ -22,6 +22,7 @@
 <div class="rc-settings-card-v72" id="billing-payments" data-stripe-billing-settings
      data-summary-url="{{ route('billing.stripe.summary') }}"
      data-card-url="{{ route('billing.stripe.payment-method.setup') }}"
+     data-card-complete-url="{{ route('billing.stripe.payment-method.complete') }}"
      data-cancel-url="{{ route('billing.cancel-request') }}"
      data-resume-url="{{ route('billing.stripe.resume') }}">
     <div class="rc-settings-head-v72">
@@ -103,15 +104,111 @@
     </div>
 </div>
 <script src="https://js.stripe.com/v3/"></script>
-<script>
+<script data-navigate-once>
 (() => {
-    const root=document.querySelector('[data-stripe-billing-settings]'); if(!root||root.dataset.bound==='1')return; root.dataset.bound='1';
-    const csrf=document.querySelector('meta[name="csrf-token"]')?.content||'{{ csrf_token() }}'; let stripe=null,elements=null;
-    const req=async(url,method='POST')=>{const r=await fetch(url,{method,credentials:'same-origin',headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf},body:method==='GET'?undefined:'{}'});const d=await r.json().catch(()=>({}));if(!r.ok||d.success===false)throw new Error(d.message||'Request failed.');return d;};
-    root.querySelector('[data-stripe-card-update]')?.addEventListener('click',async()=>{const panel=root.querySelector('[data-stripe-card-panel]');panel.hidden=false;const status=root.querySelector('[data-stripe-card-status]');status.textContent='Preparing Stripe…';try{const d=await req(root.dataset.cardUrl);stripe=window.Stripe(d.publishable_key);elements=stripe.elements({clientSecret:d.client_secret});document.getElementById('rc-stripe-card-element').innerHTML='';elements.create('payment').mount('#rc-stripe-card-element');status.textContent='';}catch(e){status.textContent=e.message;}});
-    root.querySelector('[data-stripe-card-close]')?.addEventListener('click',()=>{root.querySelector('[data-stripe-card-panel]').hidden=true;});
-    root.querySelector('[data-stripe-card-save]')?.addEventListener('click',async e=>{if(!stripe||!elements)return;const b=e.currentTarget;b.disabled=true;const status=root.querySelector('[data-stripe-card-status]');status.textContent='Saving…';try{const result=await stripe.confirmSetup({elements,redirect:'if_required'});if(result.error)throw result.error;status.textContent='Card saved. Refreshing…';setTimeout(()=>window.location.reload(),900);}catch(err){status.textContent=err.message||'Unable to save card.';}finally{b.disabled=false;}});
-    root.querySelector('[data-stripe-cancel-plan]')?.addEventListener('click',async()=>{if(!confirm('Cancel My Journey at the end of the current billing period? Your purchased credits will not expire.'))return;try{await req(root.dataset.cancelUrl);window.location.reload();}catch(e){alert(e.message);}});
-    root.querySelector('[data-stripe-resume-plan]')?.addEventListener('click',async()=>{try{await req(root.dataset.resumeUrl);window.location.reload();}catch(e){alert(e.message);}});
+    if (window.__plyrStripeBillingSettingsBound) return;
+    window.__plyrStripeBillingSettingsBound = true;
+    let stripe = null, elements = null, activeRoot = null, setupIntentId = null;
+    const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
+    const req = async (url, method='POST', body={}) => {
+        const response = await fetch(url, {
+            method,
+            credentials:'same-origin',
+            headers:{Accept:'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf()},
+            body:method==='GET'?undefined:JSON.stringify(body),
+        });
+        const data = await response.json().catch(()=>({}));
+        if(!response.ok||data.success===false) throw new Error(data.message||'Request failed.');
+        return data;
+    };
+    const rootFor = target => target?.closest?.('[data-stripe-billing-settings]') || document.querySelector('[data-stripe-billing-settings]');
+    const cardStatus = root => root?.querySelector('[data-stripe-card-status]');
+    const closeCardPanel = root => {
+        const panel=root?.querySelector('[data-stripe-card-panel]');
+        if(panel) panel.hidden=true;
+        const mount=root?.querySelector('#rc-stripe-card-element');
+        if(mount) mount.innerHTML='';
+        stripe=null; elements=null; activeRoot=null; setupIntentId=null;
+    };
+    document.addEventListener('click', async event => {
+        const updateButton=event.target.closest('[data-stripe-card-update]');
+        if(updateButton){
+            event.preventDefault();
+            const root=rootFor(updateButton); if(!root)return;
+            const panel=root.querySelector('[data-stripe-card-panel]');
+            const status=cardStatus(root);
+            panel.hidden=false;
+            updateButton.disabled=true;
+            if(status) status.textContent='Preparing secure card update…';
+            try{
+                const data=await req(root.dataset.cardUrl);
+                if(!data.client_secret||!data.publishable_key) throw new Error(data.message||'Unable to prepare card update.');
+                stripe=window.Stripe(data.publishable_key);
+                elements=stripe.elements({clientSecret:data.client_secret});
+                activeRoot=root;
+                setupIntentId=null;
+                const mount=root.querySelector('#rc-stripe-card-element');
+                if(mount) mount.innerHTML='';
+                elements.create('payment').mount(mount);
+                if(status) status.textContent='Enter the card you want to use for future My Journey billing.';
+                panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+            }catch(error){
+                if(status) status.textContent=error.message||'Unable to prepare card update.';
+            }finally{
+                updateButton.disabled=false;
+            }
+            return;
+        }
+        const closeButton=event.target.closest('[data-stripe-card-close]');
+        if(closeButton){
+            event.preventDefault();
+            closeCardPanel(rootFor(closeButton));
+            return;
+        }
+        const saveButton=event.target.closest('[data-stripe-card-save]');
+        if(saveButton){
+            event.preventDefault();
+            const root=rootFor(saveButton);
+            const status=cardStatus(root);
+            if(!root||!stripe||!elements||saveButton.disabled)return;
+            saveButton.disabled=true;
+            const oldLabel=saveButton.textContent;
+            saveButton.textContent='Saving…';
+            try{
+                const result=await stripe.confirmSetup({elements,redirect:'if_required'});
+                if(result.error) throw result.error;
+                setupIntentId=result.setupIntent?.id||null;
+                if(!setupIntentId) throw new Error('Stripe confirmed the card but did not return the SetupIntent ID.');
+                if(status) status.textContent='Card confirmed. Updating your subscription…';
+                await req(root.dataset.cardCompleteUrl,'POST',{setup_intent_id:setupIntentId});
+                if(status) status.textContent='Payment method updated. Refreshing…';
+                saveButton.textContent='Saved';
+                setTimeout(()=>window.location.reload(),450);
+            }catch(error){
+                if(status) status.textContent=error.message||'Unable to save card.';
+                saveButton.disabled=false;
+                saveButton.textContent=oldLabel;
+            }
+            return;
+        }
+        const cancelButton=event.target.closest('[data-stripe-cancel-plan]');
+        if(cancelButton){
+            event.preventDefault();
+            const root=rootFor(cancelButton); if(!root)return;
+            if(!confirm('Cancel My Journey at the end of the current billing period? Your purchased credits will not expire.'))return;
+            cancelButton.disabled=true;
+            try{await req(root.dataset.cancelUrl);window.location.reload();}
+            catch(error){alert(error.message);cancelButton.disabled=false;}
+            return;
+        }
+        const resumeButton=event.target.closest('[data-stripe-resume-plan]');
+        if(resumeButton){
+            event.preventDefault();
+            const root=rootFor(resumeButton); if(!root)return;
+            resumeButton.disabled=true;
+            try{await req(root.dataset.resumeUrl);window.location.reload();}
+            catch(error){alert(error.message);resumeButton.disabled=false;}
+        }
+    });
 })();
 </script>

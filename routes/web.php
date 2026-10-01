@@ -52,6 +52,8 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.stripe.summary');
     Route::post('/billing/stripe/payment-method/setup', [StripeBillingController::class, 'paymentMethodSetup'])
         ->name('billing.stripe.payment-method.setup');
+    Route::post('/billing/stripe/payment-method/complete', [StripeBillingController::class, 'paymentMethodComplete'])
+        ->name('billing.stripe.payment-method.complete');
     Route::post('/billing/stripe/resume', [StripeBillingController::class, 'resume'])
         ->name('billing.stripe.resume');
     Route::get('/support/tickets', [SupportTicketController::class, 'index'])

@@ -25,25 +25,140 @@
     const modal = document.getElementById('plyr-stripe-upgrade-modal');
     if (!modal || modal.dataset.ready === '1') return;
     modal.dataset.ready = '1';
-    let stripe = null, elements = null, activeType = null, statusTimer = null;
+    let stripe = null, elements = null, activeType = null, statusTimer = null, confirming = false;
     const q = s => modal.querySelector(s);
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
     const setStatus = (text, tone='') => { const el=q('[data-stripe-status]'); el.textContent=text||''; el.className='plyr-stripe-status '+tone; };
-    const close = () => { modal.hidden=true; clearTimeout(statusTimer); statusTimer=null; elements=null; stripe=null; activeType=null; q('#plyr-stripe-payment-element').innerHTML=''; };
+    const setConfirmBusy = (busy, label='Pay securely') => {
+        confirming = busy;
+        const btn=q('[data-stripe-confirm]');
+        if (btn) { btn.disabled=busy; btn.textContent=busy ? label : 'Pay securely'; }
+        modal.querySelectorAll('[data-stripe-close]').forEach(el => el.disabled=busy);
+    };
+    const resetPaymentShell = () => {
+        elements=null;
+        const mount=q('#plyr-stripe-payment-element');
+        if (mount) mount.innerHTML='';
+        q('[data-stripe-payment-shell]').hidden=true;
+    };
+    const close = () => {
+        if (confirming) return;
+        modal.hidden=true;
+        clearTimeout(statusTimer);
+        statusTimer=null;
+        resetPaymentShell();
+        stripe=null;
+        activeType=null;
+        setStatus('');
+        setConfirmBusy(false);
+    };
     modal.querySelectorAll('[data-stripe-close]').forEach(el => el.addEventListener('click', close));
-    async function request(url, options={}) { const res=await fetch(url,{credentials:'same-origin',headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf,...(options.headers||{})},...options}); const data=await res.json().catch(()=>({})); if(!res.ok||data.success===false) throw new Error(data.message||'Unable to prepare checkout.'); return data; }
-    async function poll() { if(!activeType) return; try { const data=await request(routes[activeType].status); if(data.completed){ setStatus(data.message||'Payment confirmed.','success'); setTimeout(()=>window.location.reload(),700); return; } } catch(e){} statusTimer=setTimeout(poll,1800); }
+    async function request(url, options={}) {
+        const res=await fetch(url,{credentials:'same-origin',headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-TOKEN':csrf,...(options.headers||{})},...options});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok||data.success===false) throw new Error(data.message||'Unable to prepare checkout.');
+        return data;
+    }
+    async function poll() {
+        if(!activeType) return;
+        try {
+            const data=await request(routes[activeType].status);
+            if(data.completed){
+                clearTimeout(statusTimer);
+                statusTimer=null;
+                setStatus(data.message||'Payment confirmed. Updating your account…','success');
+                setConfirmBusy(true,'Confirmed');
+                setTimeout(()=>window.location.reload(),450);
+                return;
+            }
+            setStatus(data.message||'Payment received. Finishing your account update…','success');
+        } catch(e) {
+            setStatus('Payment was submitted. Still confirming your account…','success');
+        }
+        statusTimer=setTimeout(poll,1200);
+    }
+    async function mountPaymentElement(data) {
+        resetPaymentShell();
+        elements=stripe.elements({clientSecret:data.client_secret,appearance:{theme:document.documentElement.classList.contains('dark')?'night':'stripe'}});
+        elements.create('payment').mount('#plyr-stripe-payment-element');
+        q('[data-stripe-loading]').hidden=true;
+        q('[data-stripe-payment-shell]').hidden=false;
+        setConfirmBusy(false);
+    }
+    async function confirmSavedCard(data) {
+        setConfirmBusy(true,'Confirming saved card…');
+        q('[data-stripe-loading]').hidden=false;
+        q('[data-stripe-payment-shell]').hidden=true;
+        setStatus('Using your saved Stripe payment method…');
+        try {
+            const result=await stripe.confirmCardPayment(data.client_secret);
+            if(result.error) throw result.error;
+            q('[data-stripe-loading]').hidden=true;
+            setStatus('Payment submitted. Confirming your account…','success');
+            poll();
+            return true;
+        } catch(e) {
+            setStatus((e.message||'The saved card could not be used automatically.')+' You can enter another payment method below.','error');
+            await mountPaymentElement(data);
+            return false;
+        }
+    }
     async function open(type) {
-        activeType=type; const route=routes[type]; if(!route)return; modal.hidden=false; q('#plyr-stripe-title').textContent=route.title; q('[data-stripe-loading]').hidden=false; q('[data-stripe-payment-shell]').hidden=true; setStatus(''); q('[data-stripe-summary]').textContent='Preparing '+route.title+' checkout…';
+        if (confirming) return;
+        activeType=type;
+        const route=routes[type];
+        if(!route)return;
+        clearTimeout(statusTimer);
+        statusTimer=null;
+        modal.hidden=false;
+        resetPaymentShell();
+        setConfirmBusy(true,'Preparing…');
+        q('#plyr-stripe-title').textContent=route.title;
+        q('[data-stripe-loading]').hidden=false;
+        setStatus('');
+        q('[data-stripe-summary]').textContent='Preparing '+route.title+' checkout…';
         try {
             const data=await request(route.start,{method:'POST',body:'{}'});
-            if(data.completed){ setStatus(data.message||route.title+' is already active.','success'); setTimeout(()=>window.location.reload(),600); return; }
+            if(data.completed){
+                q('[data-stripe-loading]').hidden=true;
+                setStatus(data.message||route.title+' is active.','success');
+                setConfirmBusy(true,'Confirmed');
+                setTimeout(()=>window.location.reload(),450);
+                return;
+            }
             if(!data.client_secret||!data.publishable_key) throw new Error(data.message||'Stripe did not return a payment session.');
-            stripe=window.Stripe(data.publishable_key); elements=stripe.elements({clientSecret:data.client_secret,appearance:{theme:document.documentElement.classList.contains('dark')?'night':'stripe'}}); const paymentElement=elements.create('payment'); paymentElement.mount('#plyr-stripe-payment-element');
-            q('[data-stripe-summary]').textContent=data.message||'Enter your payment details below.'; q('[data-stripe-loading]').hidden=true; q('[data-stripe-payment-shell]').hidden=false;
-        } catch(e){ q('[data-stripe-loading]').hidden=true; setStatus(e.message||'Checkout could not be prepared.','error'); }
+            stripe=window.Stripe(data.publishable_key);
+            q('[data-stripe-summary]').textContent=data.message||'Confirm your payment below.';
+            if(data.saved_payment_method){
+                await confirmSavedCard(data);
+                return;
+            }
+            await mountPaymentElement(data);
+        } catch(e){
+            q('[data-stripe-loading]').hidden=true;
+            setConfirmBusy(false);
+            setStatus(e.message||'Checkout could not be prepared.','error');
+        }
     }
-    q('[data-stripe-confirm]').addEventListener('click', async () => { if(!stripe||!elements)return; const btn=q('[data-stripe-confirm]'); btn.disabled=true; btn.textContent='Processing…'; setStatus(''); try { const result=await stripe.confirmPayment({elements,redirect:'if_required'}); if(result.error) throw result.error; setStatus('Payment submitted. Confirming your account…','success'); poll(); } catch(e){ setStatus(e.message||'Payment could not be completed.','error'); } finally { btn.disabled=false; btn.textContent='Pay securely'; } });
-    document.addEventListener('click', e => { const a=e.target.closest('[data-plyrcard-my-journey-open],[data-plyrcard-jumpstart-open],[data-plyrcard-amplify-open]'); if(!a)return; e.preventDefault(); open(a.hasAttribute('data-plyrcard-jumpstart-open')?'jumpstart':a.hasAttribute('data-plyrcard-amplify-open')?'amplify':'my-journey'); });
+    q('[data-stripe-confirm]').addEventListener('click', async () => {
+        if(!stripe||!elements||confirming)return;
+        setConfirmBusy(true,'Processing…');
+        setStatus('');
+        try {
+            const result=await stripe.confirmPayment({elements,redirect:'if_required'});
+            if(result.error) throw result.error;
+            setStatus('Payment submitted. Confirming your account…','success');
+            poll();
+        } catch(e){
+            setConfirmBusy(false);
+            setStatus(e.message||'Payment could not be completed.','error');
+        }
+    });
+    document.addEventListener('click', e => {
+        const a=e.target.closest('[data-plyrcard-my-journey-open],[data-plyrcard-jumpstart-open],[data-plyrcard-amplify-open]');
+        if(!a)return;
+        e.preventDefault();
+        open(a.hasAttribute('data-plyrcard-jumpstart-open')?'jumpstart':a.hasAttribute('data-plyrcard-amplify-open')?'amplify':'my-journey');
+    });
 })();
 </script>

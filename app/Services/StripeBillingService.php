@@ -17,6 +17,7 @@ class StripeBillingService
             return $this->checkoutPayload($billing, null, true);
         }
         $customerId = $this->ensureCustomer($user, $billing);
+        $savedPaymentMethodId = $this->resolveSavedPaymentMethodId($billing);
         if (filled($billing->stripe_subscription_id)) {
             try {
                 $existing = $this->retrieveSubscription((string) $billing->stripe_subscription_id);
@@ -29,7 +30,10 @@ class StripeBillingService
                     }
                     $secret = $this->clientSecretFromSubscription($existing);
                     if ($secret) {
-                        return $this->checkoutPayload($billing, $secret, false);
+                        $payload = $this->checkoutPayload($billing, $secret, false);
+                        $payload['saved_payment_method'] = (bool) $savedPaymentMethodId;
+                        $payload['saved_payment_method_id'] = $savedPaymentMethodId;
+                        return $payload;
                     }
                 }
             } catch (\Throwable $exception) {
@@ -83,6 +87,9 @@ class StripeBillingService
                 'latest_invoice.payment_intent',
             ],
         ];
+        if ($savedPaymentMethodId) {
+            $params['default_payment_method'] = $savedPaymentMethodId;
+        }
         if ($setupPriceId) {
             $params['add_invoice_items'] = [[
                 'price' => $setupPriceId,
@@ -128,7 +135,10 @@ class StripeBillingService
         if (! $clientSecret) {
             throw new RuntimeException('Stripe created the subscription but did not return a payment client secret.');
         }
-        return $this->checkoutPayload($billing->fresh(), $clientSecret, false);
+        $payload = $this->checkoutPayload($billing->fresh(), $clientSecret, false);
+        $payload['saved_payment_method'] = (bool) $savedPaymentMethodId;
+        $payload['saved_payment_method_id'] = $savedPaymentMethodId;
+        return $payload;
     }
     public function refreshRegistration(User $user, BillingInformation $billing): array
     {
@@ -199,35 +209,53 @@ class StripeBillingService
             return array_merge($this->billingSummary($user), ['success' => true, 'completed' => true, 'message' => 'My Journey is already active.']);
         }
         $customerId = $this->ensureCustomer($user, $billing);
+        $savedPaymentMethodId = $this->resolveSavedPaymentMethodId($billing);
         $amount = max(1, (int) ($plan['setup_fee_cents'] ?? 0));
         $meta = $this->metadata($user, $billing, $planKey);
         $meta['plyrcard_source'] = 'authenticated_upgrade';
         $meta['plyrcard_charge_type'] = 'one_time_credit_package';
         $attempt = now()->format('YmdHis') . '-' . $user->getKey();
-        $intent = $this->post('/v1/payment_intents', [
+        $intentParams = [
             'amount' => $amount,
             'currency' => strtolower((string) ($billing->currency ?: 'USD')),
             'customer' => $customerId,
             'payment_method_types' => ['card'],
-            'setup_future_usage' => 'off_session',
             'metadata' => $meta,
             'description' => 'PLYRCARD ' . ucfirst($planKey) . ' credit package',
-        ], 'plyrcard-upgrade-' . $planKey . '-' . $attempt);
+        ];
+        if ($savedPaymentMethodId) {
+            $intentParams['payment_method'] = $savedPaymentMethodId;
+            $intentParams['confirm'] = 'true';
+            $intentParams['off_session'] = 'true';
+        } else {
+            $intentParams['setup_future_usage'] = 'off_session';
+        }
+        $intent = $this->post('/v1/payment_intents', $intentParams, 'plyrcard-upgrade-' . $planKey . '-' . $attempt);
         $metaLocal = is_array($billing->registration_meta) ? $billing->registration_meta : [];
         data_set($metaLocal, 'stripe_upgrade.' . $planKey, [
             'payment_intent_id' => $intent['id'] ?? null,
             'started_at' => now()->toIso8601String(),
             'amount_cents' => $amount,
         ]);
+        $intentStatus = (string) ($intent['status'] ?? '');
         $billing->forceFill([
             'payment_provider' => 'stripe',
             'payment_type' => 'card',
-            'payment_status' => 'payment_form_ready',
+            'payment_status' => $intentStatus === 'succeeded' ? 'paid' : 'payment_form_ready',
             'stripe_customer_id' => $customerId,
             'stripe_payment_intent_id' => $intent['id'] ?? $billing->stripe_payment_intent_id,
             'registration_meta' => $metaLocal,
             'stripe_synced_at' => now(),
         ])->save();
+        if ($intentStatus === 'succeeded') {
+            $this->handleOneTimePaymentSucceeded($billing->fresh(), $intent);
+            return array_merge($this->billingSummary($user), [
+                'success' => true,
+                'completed' => true,
+                'used_saved_payment_method' => true,
+                'message' => ucfirst($planKey) . ' was charged to your saved card and the credits were added to your account.',
+            ]);
+        }
         return [
             'success' => true,
             'completed' => false,
@@ -238,26 +266,76 @@ class StripeBillingService
             'amount_due_cents' => $amount,
             'currency' => strtolower((string) ($billing->currency ?: 'USD')),
             'checkout_mode' => $planKey . '_service_only',
-            'message' => 'Complete the one-time ' . ucfirst($planKey) . ' credit purchase below.',
+            'saved_payment_method' => (bool) $savedPaymentMethodId,
+            'saved_payment_method_id' => $savedPaymentMethodId,
+            'requires_action' => $intentStatus === 'requires_action',
+            'message' => $savedPaymentMethodId
+                ? 'Confirm the saved card charge if Stripe asks for additional verification.'
+                : 'Complete the one-time ' . ucfirst($planKey) . ' credit purchase below.',
         ];
     }
     public function upgradeStatus(User $user, string $planKey): array
     {
         $user->refresh()->loadMissing('roles');
         $billing = BillingInformation::query()->where('user_id', $user->getKey())->latest('id')->first();
-        if (in_array($planKey, ['jumpstart', 'amplify'], true) && $billing) {
+        if (! $billing) {
+            return ['success' => true, 'completed' => false, 'message' => 'Waiting for Stripe payment confirmation…'];
+        }
+        if (in_array($planKey, ['jumpstart', 'amplify'], true)) {
             $intentId = (string) data_get($billing->registration_meta ?? [], 'stripe_upgrade.' . $planKey . '.payment_intent_id', '');
             if ($intentId !== '') {
                 try {
                     $intent = $this->get('/v1/payment_intents/' . rawurlencode($intentId));
                     $completed = (string) ($intent['status'] ?? '') === 'succeeded';
-                    if ($completed) $this->handleOneTimePaymentSucceeded($billing, $intent);
+                    if ($completed) {
+                        $this->handleOneTimePaymentSucceeded($billing, $intent);
+                        $user->refresh()->loadMissing('roles');
+                    }
                     return array_merge($this->billingSummary($user), [
                         'success' => true,
                         'completed' => $completed,
                         'message' => $completed ? ucfirst($planKey) . ' credits were added to your account.' : 'Waiting for Stripe payment confirmation…',
                     ]);
-                } catch (\Throwable) {}
+                } catch (\Throwable $exception) {
+                    Log::info('Stripe one-time upgrade status refresh delayed.', [
+                        'user_id' => $user->getKey(),
+                        'plan' => $planKey,
+                        'payment_intent_id' => $intentId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+        }
+        if (filled($billing->stripe_subscription_id)) {
+            try {
+                $subscription = $this->retrieveSubscription((string) $billing->stripe_subscription_id);
+                $sync = $this->syncSubscription($billing, $subscription);
+                $billing->refresh();
+                $user->refresh()->loadMissing('roles');
+                if (($sync['paid'] ?? false) === true) {
+                    $completed = match ($planKey) {
+                        'my-journey' => method_exists($user, 'hasRole') && $user->hasRole('My Journey'),
+                        'jumpstart' => method_exists($user, 'hasRole') && $user->hasRole('Jumpstart'),
+                        'amplify' => method_exists($user, 'hasRole') && $user->hasRole('Amplify'),
+                        default => false,
+                    };
+                    if ($completed) {
+                        return array_merge($this->billingSummary($user), [
+                            'success' => true,
+                            'completed' => true,
+                            'message' => $planKey === 'my-journey'
+                                ? 'My Journey is active.'
+                                : ucfirst($planKey) . ' credits were added to your account.',
+                        ]);
+                    }
+                }
+            } catch (\Throwable $exception) {
+                Log::info('Stripe subscription upgrade status refresh delayed.', [
+                    'user_id' => $user->getKey(),
+                    'plan' => $planKey,
+                    'subscription_id' => $billing->stripe_subscription_id,
+                    'error' => $exception->getMessage(),
+                ]);
             }
         }
         $active = match ($planKey) {
@@ -333,6 +411,30 @@ class StripeBillingService
             'metadata' => $this->metadata($user, $billing, 'payment-method-update'),
         ], 'plyrcard-card-update-' . $billing->getKey() . '-' . now()->format('YmdHis'));
         return ['success'=>true,'client_secret'=>$intent['client_secret'] ?? null,'publishable_key'=>(string) config('services.stripe.key')];
+    }
+    public function completePaymentMethodSetup(User $user, string $setupIntentId): array
+    {
+        $setupIntentId = trim($setupIntentId);
+        if ($setupIntentId === '') {
+            throw new RuntimeException('The Stripe SetupIntent ID is required.');
+        }
+        $billing = BillingInformation::query()->firstOrCreate(['user_id' => $user->getKey()], [
+            'billing_email' => $user->email,
+            'currency' => 'USD',
+        ]);
+        $intent = $this->get('/v1/setup_intents/' . rawurlencode($setupIntentId));
+        $intentCustomerId = $this->idValue($intent['customer'] ?? null);
+        if (filled($billing->stripe_customer_id) && $intentCustomerId !== (string) $billing->stripe_customer_id) {
+            throw new RuntimeException('This payment-method update does not belong to your Stripe customer.');
+        }
+        if ((string) ($intent['status'] ?? '') !== 'succeeded') {
+            throw new RuntimeException('Stripe has not confirmed the new payment method yet.');
+        }
+        $this->handleSetupIntentSucceeded($billing, $intent);
+        return array_merge($this->billingSummary($user), [
+            'success' => true,
+            'message' => 'Your payment method has been updated.',
+        ]);
     }
     public function cancelSubscription(User $user): array
     {
@@ -705,6 +807,46 @@ class StripeBillingService
             ]);
         }
     }
+    protected function resolveSavedPaymentMethodId(BillingInformation $billing): ?string
+    {
+        $paymentMethodId = trim((string) $billing->stripe_payment_method_id);
+        if ($paymentMethodId !== '') {
+            return $paymentMethodId;
+        }
+        if (filled($billing->stripe_subscription_id)) {
+            try {
+                $subscription = $this->retrieveSubscription((string) $billing->stripe_subscription_id);
+                $paymentMethodId = trim((string) $this->idValue($subscription['default_payment_method'] ?? null));
+                if ($paymentMethodId !== '') {
+                    $billing->forceFill(['stripe_payment_method_id' => $paymentMethodId])->save();
+                    return $paymentMethodId;
+                }
+            } catch (\Throwable) {
+            }
+        }
+        if (filled($billing->stripe_customer_id)) {
+            try {
+                $customer = $this->get('/v1/customers/' . rawurlencode((string) $billing->stripe_customer_id), [
+                    'expand' => ['invoice_settings.default_payment_method'],
+                ]);
+                $paymentMethodId = trim((string) $this->idValue(data_get($customer, 'invoice_settings.default_payment_method')));
+                if ($paymentMethodId === '') {
+                    $methods = $this->get('/v1/payment_methods', [
+                        'customer' => (string) $billing->stripe_customer_id,
+                        'type' => 'card',
+                        'limit' => 1,
+                    ]);
+                    $paymentMethodId = trim((string) $this->idValue(data_get($methods, 'data.0')));
+                }
+                if ($paymentMethodId !== '') {
+                    $billing->forceFill(['stripe_payment_method_id' => $paymentMethodId])->save();
+                    return $paymentMethodId;
+                }
+            } catch (\Throwable) {
+            }
+        }
+        return null;
+    }
     protected function ensureCustomer(User $user, BillingInformation $billing): string
     {
         if (filled($billing->stripe_customer_id)) {
@@ -814,8 +956,8 @@ class StripeBillingService
         if (! is_array($invoice)) {
             return null;
         }
-        $secret = data_get($invoice, 'confirmation_secret.client_secret')
-            ?: data_get($invoice, 'payment_intent.client_secret');
+        $secret = data_get($invoice, 'payment_intent.client_secret')
+            ?: data_get($invoice, 'confirmation_secret.client_secret');
         return is_string($secret) && $secret !== '' ? $secret : null;
     }
     protected function paymentIntentId(?array $invoice, ?string $clientSecret = null): ?string
