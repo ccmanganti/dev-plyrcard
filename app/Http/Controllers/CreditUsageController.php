@@ -5,17 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\CreditServiceRequest;
 use App\Models\User;
 use App\Services\CreditPointService;
+use App\Services\SupportAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class CreditUsageController extends Controller
 {
-    public function store(Request $request, CreditPointService $credits): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        CreditPointService $credits,
+        SupportAlertService $alerts,
+    ): RedirectResponse {
         $catalog = $credits->catalog();
 
         $data = $request->validate([
@@ -54,10 +60,8 @@ class CreditUsageController extends Controller
         $batchToken = trim((string) $data['request_token']);
         $notes = trim((string) ($data['notes'] ?? '')) ?: null;
 
-        /** @var array{requests: Collection<int, CreditServiceRequest>, points: int} $result */
+        /** @var array{requests: Collection<int, CreditServiceRequest>, points: int, created_new: bool} $result */
         $result = DB::transaction(function () use ($user, $quotes, $totalPoints, $batchToken, $notes, $credits): array {
-            // A repeated browser submission with the same batch token must never spend
-            // the same credits twice. Every service row gets a deterministic child token.
             $existing = CreditServiceRequest::query()
                 ->where('user_id', $user->getKey())
                 ->where('request_token', 'like', $batchToken . ':%')
@@ -68,6 +72,7 @@ class CreditUsageController extends Controller
                 return [
                     'requests' => $existing,
                     'points' => (int) $existing->sum('points_spent'),
+                    'created_new' => false,
                 ];
             }
 
@@ -102,8 +107,8 @@ class CreditUsageController extends Controller
                     'status' => 'submitted',
                 ]);
 
-                // Credit usage is intentionally final at submission time. There is no
-                // athlete-facing release/refund path. Only an admin adjustment can restore it.
+                // Athlete redemptions are final. No status change, decline, or cancellation
+                // returns credits automatically. Only an explicit admin adjustment can do that.
                 $transaction = $credits->spendForServiceRequest(
                     $lockedUser,
                     $quote['item_key'],
@@ -127,8 +132,34 @@ class CreditUsageController extends Controller
             return [
                 'requests' => $created,
                 'points' => $totalPoints,
+                'created_new' => true,
             ];
         });
+
+        // A mail failure must never reverse a valid credit redemption. Notify admins only
+        // for a newly-created batch so browser retries do not send duplicate alerts.
+        if ($result['created_new']) {
+            try {
+                $alert = $alerts->sendCreditServiceRequestBatch(
+                    $user->fresh() ?? $user,
+                    $result['requests'],
+                    (int) $result['points'],
+                );
+
+                $this->recordAlertResult($result['requests'], $alert);
+            } catch (\Throwable $exception) {
+                Log::warning('PLYRCARD credit request admin notification failed after redemption.', [
+                    'user_id' => $user->getKey(),
+                    'request_ids' => $result['requests']->pluck('id')->all(),
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $this->recordAlertResult($result['requests'], [
+                    'success' => false,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         $count = $result['requests']->count();
 
@@ -140,5 +171,24 @@ class CreditUsageController extends Controller
                 number_format((int) $result['points']),
             ),
         );
+    }
+
+    /** @param Collection<int, CreditServiceRequest> $requests */
+    protected function recordAlertResult(Collection $requests, array $alert): void
+    {
+        if (! Schema::hasColumn('credit_service_requests', 'email_alert_status')) {
+            return;
+        }
+
+        $success = (bool) ($alert['success'] ?? false);
+
+        CreditServiceRequest::query()
+            ->whereKey($requests->pluck('id')->filter()->all())
+            ->update([
+                'email_alert_status' => $success ? 'sent' : 'failed',
+                'email_alerted_at' => $success ? now() : null,
+                'email_alert_error' => $success ? null : ($alert['error'] ?? 'Admin alert email was not accepted by the mail server.'),
+                'updated_at' => now(),
+            ]);
     }
 }
