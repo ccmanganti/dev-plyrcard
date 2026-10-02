@@ -41,10 +41,6 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
             }
         });
 
-        // When the player's own GHL connection becomes complete (or either
-        // credential changes), provision/update the PLYRCARD tracking custom
-        // values in that exact GHL sub-account. A failed remote sync must never
-        // prevent the local user/profile save from succeeding.
         static::saved(function ($user): void {
             $credentialsChanged = $user->wasChanged('ghl_location_id')
                 || $user->wasChanged('ghl_api_key');
@@ -77,6 +73,7 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
     {
         return [
             'email_verified_at' => 'datetime','email_verification_sent_at' => 'datetime','password' => 'hashed','natl_team_exp' => 'boolean','position' => 'array','youtube_cached_videos' => 'array','youtube_cache_refreshed_at' => 'datetime','raw_player_images' => 'array','club_referral_id' => 'integer','utm_club_id' => 'integer','utm_league_id' => 'integer','total_emails_sent' => 'integer','must_change_password' => 'boolean','onboarding_completed_at' => 'datetime',
+            'points_available' => 'integer',
         ];
     }
 
@@ -125,6 +122,8 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
     public function team(): BelongsTo { return $this->belongsTo(Team::class); }
     public function activeWebsite(): HasOne { return $this->hasOne(Website::class)->where('is_active', true); }
     public function billingInformation(): HasOne { return $this->hasOne(BillingInformation::class); }
+    public function creditPointTransactions(): HasMany { return $this->hasMany(CreditPointTransaction::class); }
+    public function creditServiceRequests(): HasMany { return $this->hasMany(CreditServiceRequest::class); }
 
     public function schedules(): BelongsToMany
     {

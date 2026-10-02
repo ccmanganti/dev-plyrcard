@@ -27,6 +27,41 @@
     $globalSchoolDrawerCatalog = $shouldSeedSchoolCatalog
         ? $this->discoverClientSchools
         : [];
+
+    // Credits: keep the cached user balance fast, but read purchase/request history
+    // from the append-only ledger when the supporting tables are available.
+    $rcCreditCatalog = app(\App\Services\CreditPointService::class)->catalog();
+    $rcCreditBalance = (int) ($rcCatalogUser?->points_available ?? 0);
+    $rcRecentCreditPurchaseLabel = 'None yet';
+    $rcSupportCreditRequests = collect();
+
+    if ($rcCatalogUser && \Illuminate\Support\Facades\Schema::hasTable('credit_point_transactions')) {
+        $rcRecentCreditPurchase = \App\Models\CreditPointTransaction::query()
+            ->where('user_id', $rcCatalogUser->getKey())
+            ->where('type', 'grant')
+            ->whereIn('source_type', ['package_purchase', 'top_up_purchase'])
+            ->latest('id')
+            ->first();
+
+        if ($rcRecentCreditPurchase) {
+            $package = trim((string) data_get($rcRecentCreditPurchase->meta ?? [], 'package', ''));
+            $purchaseName = $package !== ''
+                ? str($package)->replace('-', ' ')->title()->toString()
+                : trim((string) ($rcRecentCreditPurchase->reason ?: 'Credit purchase'));
+            $purchaseDate = optional($rcRecentCreditPurchase->created_at)->format('M j');
+            $rcRecentCreditPurchaseLabel = $purchaseName . ($purchaseDate ? ' · ' . $purchaseDate : '');
+        }
+    }
+
+    if ($rcCatalogUser
+        && $rcActiveSectionForSeed === 'support'
+        && \Illuminate\Support\Facades\Schema::hasTable('credit_service_requests')) {
+        $rcSupportCreditRequests = \App\Models\CreditServiceRequest::query()
+            ->where('user_id', $rcCatalogUser->getKey())
+            ->latest('id')
+            ->limit(12)
+            ->get();
+    }
 @endphp
 <div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
@@ -10903,12 +10938,224 @@ CSS;
                 </div>
             </div>
         </section>
+<style>
+    .rc-support-tabs-v4{display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem;padding:.3rem;border:1px solid var(--rc-border);border-radius:.9rem;background:var(--rc-soft)}
+    .rc-support-tab-v4{border:0;background:transparent;color:var(--rc-muted);padding:.62rem .85rem;border-radius:.68rem;font-size:.8rem;font-weight:800;cursor:pointer;transition:.15s ease}
+    .rc-support-tab-v4:hover{color:var(--rc-text)}
+    .rc-support-tab-v4.is-active{background:var(--rc-surface);color:var(--rc-accent);box-shadow:0 1px 3px rgba(15,23,42,.08)}
+    .rc-support-tab-panel-v4{display:grid;gap:1rem}
+    .rc-credit-use-hero-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface)}
+    .rc-credit-use-balance-v4{font-size:1.8rem;line-height:1;font-weight:900;letter-spacing:-.04em;color:var(--rc-text)}
+    .rc-credit-use-balance-v4 span{font-size:.78rem;font-weight:700;color:var(--rc-muted);letter-spacing:0}
+    .rc-credit-catalog-v4{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem}
+    .rc-credit-catalog-card-v4{border:1px solid var(--rc-border);border-radius:.85rem;padding:.8rem;background:var(--rc-surface);display:grid;gap:.25rem}
+    .rc-credit-catalog-card-v4 strong{font-size:.84rem;color:var(--rc-text)}
+    .rc-credit-catalog-card-v4 span{font-size:.72rem;color:var(--rc-muted);line-height:1.35}
+    .rc-credit-catalog-points-v4{color:var(--rc-accent)!important;font-weight:900!important}
+    .rc-credit-request-form-v4{border:1px solid var(--rc-border);border-radius:1rem;padding:1rem;background:var(--rc-surface);display:grid;gap:.8rem}
+    .rc-credit-request-grid-v4{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(120px,.55fr);gap:.7rem}
+    .rc-credit-request-form-v4 label{display:grid;gap:.34rem;font-size:.75rem;font-weight:800;color:var(--rc-text)}
+    .rc-credit-request-form-v4 select,.rc-credit-request-form-v4 input[type="number"],.rc-credit-request-form-v4 textarea{width:100%;border:1px solid var(--rc-border);border-radius:.68rem;background:var(--rc-surface);color:var(--rc-text);padding:.62rem .7rem;outline:none}
+    .rc-credit-request-form-v4 textarea{min-height:6rem;resize:vertical}
+    .rc-credit-quote-v4{display:flex;justify-content:space-between;gap:1rem;align-items:center;padding:.75rem .85rem;border-radius:.8rem;background:var(--rc-soft);border:1px solid var(--rc-border)}
+    .rc-credit-quote-v4 strong{font-size:1rem;color:var(--rc-accent)}
+    .rc-credit-warning-v4{padding:.75rem .85rem;border-radius:.8rem;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.08);font-size:.76rem;line-height:1.45;color:#92400e}
+    .dark .rc-credit-warning-v4{color:#fcd34d}
+    .rc-credit-confirm-v4{display:flex!important;grid-template-columns:none!important;align-items:flex-start;gap:.55rem!important;font-weight:650!important;line-height:1.4}
+    .rc-credit-confirm-v4 input{margin-top:.17rem;accent-color:var(--rc-accent)}
+    .rc-credit-history-v4{display:grid;gap:.45rem}
+    .rc-credit-history-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .8rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface)}
+    .rc-credit-history-row-v4 small{display:block;margin-top:.16rem;color:var(--rc-muted);font-size:.68rem}
+    .rc-credit-history-points-v4{font-weight:900;color:var(--rc-accent);white-space:nowrap}
+    .rc-ticket-track-list-v4{display:grid;gap:.5rem}
+    .rc-ticket-track-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;padding:.8rem;border:1px solid var(--rc-border);border-radius:.8rem;background:var(--rc-surface)}
+    .rc-ticket-track-row-v4 span{font-size:.7rem;color:var(--rc-muted)}
+    .rc-ticket-track-status-v4{display:inline-flex;align-items:center;border-radius:999px;padding:.2rem .5rem;background:var(--rc-accent-soft);color:var(--rc-accent)!important;font-weight:800;text-transform:capitalize}
+    @media(max-width:700px){.rc-credit-use-hero-v4,.rc-credit-request-grid-v4{grid-template-columns:1fr}.rc-credit-use-hero-v4 .rc-btn{justify-self:start}}
+</style>
 <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
-            {{-- v10.87: The Support page is intentionally self-contained. --}}
-            <div class="rc-support-page-v1 rc-support-page-clean-v87">
-                @include('filament.partials.support-ticket-form')
+    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: 'ticket' }">
+        <div class="rc-support-tabs-v4" role="tablist" aria-label="Support sections">
+            <button type="button" class="rc-support-tab-v4" :class="supportTab === 'ticket' ? 'is-active' : ''" @click="supportTab = 'ticket'">Support Ticket</button>
+            <button type="button" class="rc-support-tab-v4" :class="supportTab === 'tracking' ? 'is-active' : ''" @click="supportTab = 'tracking'">Ticket Tracking</button>
+            <button type="button" class="rc-support-tab-v4" :class="supportTab === 'credits' ? 'is-active' : ''" @click="supportTab = 'credits'">Credit Usage</button>
+        </div>
+
+        <div class="rc-support-tab-panel-v4" x-show="supportTab === 'ticket'">
+            @include('filament.partials.support-ticket-form')
+        </div>
+
+        <div class="rc-support-tab-panel-v4" x-show="supportTab === 'tracking'" x-cloak
+             x-data="{
+                loading: true,
+                error: '',
+                tickets: [],
+                async loadTickets() {
+                    this.loading = true;
+                    this.error = '';
+                    try {
+                        const response = await fetch(@js(route('support.tickets.index')), {
+                            credentials: 'same-origin',
+                            headers: { 'Accept': 'application/json' },
+                        });
+                        if (!response.ok) throw new Error('Unable to load tickets.');
+                        const payload = await response.json();
+                        this.tickets = Array.isArray(payload)
+                            ? payload
+                            : (Array.isArray(payload.tickets) ? payload.tickets : (Array.isArray(payload.data) ? payload.data : []));
+                    } catch (error) {
+                        this.error = error?.message || 'Unable to load tickets.';
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                ticketTitle(ticket) {
+                    return ticket?.subject || ticket?.title || ('Support Ticket #' + (ticket?.ticket_number || ticket?.id || ''));
+                },
+                ticketDate(ticket) {
+                    const raw = ticket?.updated_at || ticket?.created_at || ticket?.submitted_at;
+                    if (!raw) return '';
+                    const date = new Date(raw);
+                    return Number.isNaN(date.getTime()) ? String(raw) : date.toLocaleString();
+                }
+             }" x-init="loadTickets()">
+            <div class="rc-card">
+                <div class="rc-top" style="align-items:center;">
+                    <div>
+                        <div class="rc-title">Ticket Tracking</div>
+                        <div class="rc-subtle">Follow the latest status of your submitted support requests.</div>
+                    </div>
+                    <button type="button" class="rc-btn" @click="loadTickets()" :disabled="loading">Refresh</button>
+                </div>
             </div>
-        </section>
+            <div x-show="loading" class="rc-empty">Loading your tickets…</div>
+            <div x-show="!loading && error" class="rc-empty" x-text="error"></div>
+            <div x-show="!loading && !error && tickets.length === 0" class="rc-empty">No support tickets found yet.</div>
+            <div class="rc-ticket-track-list-v4" x-show="!loading && !error && tickets.length > 0">
+                <template x-for="ticket in tickets" :key="ticket.id || ticket.ticket_number || ticketTitle(ticket)">
+                    <article class="rc-ticket-track-row-v4">
+                        <div>
+                            <strong x-text="ticketTitle(ticket)"></strong>
+                            <span x-text="ticketDate(ticket)"></span>
+                        </div>
+                        <span class="rc-ticket-track-status-v4" x-text="ticket.status || 'submitted'"></span>
+                    </article>
+                </template>
+            </div>
+        </div>
+
+        <div class="rc-support-tab-panel-v4" x-show="supportTab === 'credits'" x-cloak
+             x-data="{
+                catalog: @js($rcCreditCatalog),
+                balance: {{ (int) $rcCreditBalance }},
+                item: 'graphic',
+                quantity: 1,
+                rush: false,
+                get selected() { return this.catalog[this.item] || { points: 0, name: '' }; },
+                get quotedPoints() {
+                    const base = Number(this.selected.points || 0) * Math.max(1, Number(this.quantity || 1));
+                    return this.rush ? Math.ceil(base * 1.5) : base;
+                },
+                get enough() { return this.quotedPoints > 0 && this.balance >= this.quotedPoints; }
+             }">
+            @if(session('credit_success'))
+                <div class="rc-card" style="border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.08);">
+                    <strong>{{ session('credit_success') }}</strong>
+                </div>
+            @endif
+
+            @if($errors->has('credits') || $errors->has('item_key') || $errors->has('confirm_spend'))
+                <div class="rc-card" style="border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.07);color:#b42318;">
+                    {{ $errors->first('credits') ?: ($errors->first('item_key') ?: $errors->first('confirm_spend')) }}
+                </div>
+            @endif
+
+            <div class="rc-credit-use-hero-v4">
+                <div>
+                    <div class="rc-subtle">Available to use now</div>
+                    <div class="rc-credit-use-balance-v4">{{ number_format($rcCreditBalance) }} <span>credits</span></div>
+                    <div class="rc-subtle" style="margin-top:.35rem;">Choose a PLYRCARD service below. Credits are deducted as soon as the request is submitted.</div>
+                </div>
+                <a class="rc-btn rc-btn-primary" href="{{ url('/admin/my-journey') }}">Get More Credits</a>
+            </div>
+
+            <div>
+                <div class="rc-row-title" style="margin-bottom:.55rem;">Credit Menu</div>
+                <div class="rc-credit-catalog-v4">
+                    @foreach($rcCreditCatalog as $creditKey => $creditItem)
+                        <article class="rc-credit-catalog-card-v4">
+                            <strong>{{ $creditItem['name'] }}</strong>
+                            <span>{{ $creditItem['description'] ?? '' }}</span>
+                            <span class="rc-credit-catalog-points-v4">{{ number_format((int) $creditItem['points']) }} credits</span>
+                        </article>
+                    @endforeach
+                </div>
+            </div>
+
+            <form class="rc-credit-request-form-v4" method="POST" action="{{ route('support.credits.store') }}">
+                @csrf
+                <input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                <div>
+                    <div class="rc-row-title">Use Credits</div>
+                    <div class="rc-subtle">Submit a production request using your current credit balance.</div>
+                </div>
+                <div class="rc-credit-request-grid-v4">
+                    <label>
+                        Service
+                        <select name="item_key" x-model="item" required>
+                            @foreach($rcCreditCatalog as $creditKey => $creditItem)
+                                <option value="{{ $creditKey }}">{{ $creditItem['name'] }} — {{ number_format((int) $creditItem['points']) }} credits</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        Quantity
+                        <input type="number" name="quantity" min="1" max="20" x-model.number="quantity" required>
+                    </label>
+                </div>
+                <label class="rc-credit-confirm-v4">
+                    <input type="checkbox" name="rush" value="1" x-model="rush">
+                    <span><strong>Rush turnaround</strong><br><span class="rc-subtle">48-hour rush requests cost 1.5× the normal credit amount.</span></span>
+                </label>
+                <label>
+                    Request details / notes
+                    <textarea name="notes" maxlength="2000" placeholder="Tell the PLYRCARD team what you need, include links, deadlines, footage notes, or other details."></textarea>
+                </label>
+                <div class="rc-credit-quote-v4">
+                    <div><span class="rc-subtle">Credits deducted on submit</span><div class="rc-subtle" x-show="!enough" style="color:#b42318;">Your current balance is not enough for this request.</div></div>
+                    <strong><span x-text="quotedPoints.toLocaleString()"></span> credits</strong>
+                </div>
+                <div class="rc-credit-warning-v4">
+                    Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If PLYRCARD needs to restore credits, an administrator must apply them manually to your account.
+                </div>
+                <label class="rc-credit-confirm-v4">
+                    <input type="checkbox" name="confirm_spend" value="1" required>
+                    <span>I understand that these credits will be deducted immediately and will not be automatically returned.</span>
+                </label>
+                <div style="display:flex;justify-content:flex-end;">
+                    <button type="submit" class="rc-btn rc-btn-primary" :disabled="!enough">Submit Credit Request</button>
+                </div>
+            </form>
+
+            <div>
+                <div class="rc-row-title" style="margin-bottom:.55rem;">Recent Credit Requests</div>
+                <div class="rc-credit-history-v4">
+                    @forelse($rcSupportCreditRequests as $creditRequest)
+                        <article class="rc-credit-history-row-v4">
+                            <div>
+                                <strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong>
+                                <small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>
+                            </div>
+                            <div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div>
+                        </article>
+                    @empty
+                        <div class="rc-empty">You have not used credits for a service yet.</div>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
             @include('filament.partials.coach-database-header', [
                 'firstName' => $firstName,
@@ -16271,7 +16518,8 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
         // Credit balance card: DOM-only enhancement. No new Blade root elements are
         // emitted, which keeps this Livewire component's original single-root structure.
-        const rcCreditBalance = @json((int) ($rcCatalogUser?->points_available ?? 0));
+        const rcCreditBalance = @json((int) $rcCreditBalance);
+        const rcRecentCreditPurchase = @json($rcRecentCreditPurchaseLabel);
 
         const rcVisible = (element) => {
             if (!element) return false;
@@ -16316,9 +16564,6 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
             const head = rcCreditElement('div', 'rc-sidebar-credit-head-v3');
             const title = rcCreditElement('div', 'rc-sidebar-credit-title-v3');
-            const bolt = rcCreditElement('span', 'rc-sidebar-credit-bolt-v3', '⚡');
-            bolt.setAttribute('aria-hidden', 'true');
-            title.appendChild(bolt);
             title.appendChild(rcCreditElement('span', '', 'Credits'));
 
             const action = rcCreditElement('button', 'rc-sidebar-credit-action-v3', 'Get More');
@@ -16338,10 +16583,10 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
             availableRow.appendChild(rcCreditElement('strong', '', `${Number(rcCreditBalance || 0).toLocaleString()} credits`));
             card.appendChild(availableRow);
 
-            const expiryRow = rcCreditElement('div', 'rc-sidebar-credit-row-v3');
-            expiryRow.appendChild(rcCreditElement('span', '', 'Expiration'));
-            expiryRow.appendChild(rcCreditElement('strong', '', 'No expiration'));
-            card.appendChild(expiryRow);
+            const recentRow = rcCreditElement('div', 'rc-sidebar-credit-row-v3');
+            recentRow.appendChild(rcCreditElement('span', '', 'Recently Purchased'));
+            recentRow.appendChild(rcCreditElement('strong', '', rcRecentCreditPurchase || 'None yet'));
+            card.appendChild(recentRow);
 
             return card;
         };

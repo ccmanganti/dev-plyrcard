@@ -11,6 +11,83 @@ class CreditPointService
     {
         return (int) $user->fresh()->points_available;
     }
+    public function catalog(): array
+    {
+        $configured = (array) config('plyrcard-points.catalog', []);
+
+        $defaults = [
+            'graphic' => ['name' => 'Social graphic', 'points' => 20, 'description' => 'One social graphic.'],
+            'reel' => ['name' => 'Highlight reel', 'points' => 50, 'description' => 'One highlight reel, up to 2 minutes.'],
+            'outreach' => ['name' => 'Coach outreach campaign', 'points' => 30, 'description' => 'One outreach campaign to up to 25 coaches.'],
+            'production_hour' => ['name' => 'Production hour', 'points' => 25, 'description' => 'One shoot or editing hour.'],
+            'photo_batch' => ['name' => 'Photo retouch batch', 'points' => 15, 'description' => 'One photo retouch batch.'],
+            'site_refresh' => ['name' => 'Profile site refresh', 'points' => 15, 'description' => 'One profile-site refresh.'],
+            'film_breakdown' => ['name' => 'Match film breakdown', 'points' => 35, 'description' => 'One match-film breakdown.'],
+        ];
+
+        return collect($defaults)->mapWithKeys(function (array $fallback, string $key) use ($configured): array {
+            $item = array_merge($fallback, (array) ($configured[$key] ?? []));
+            $item['points'] = max(1, (int) ($item['points'] ?? $fallback['points']));
+            $item['name'] = trim((string) ($item['name'] ?? $fallback['name'])) ?: $fallback['name'];
+            $item['description'] = trim((string) ($item['description'] ?? $fallback['description']));
+
+            return [$key => $item];
+        })->all();
+    }
+
+    public function quoteService(string $itemKey, int $quantity = 1, bool $rush = false): array
+    {
+        $itemKey = strtolower(trim($itemKey));
+        $catalog = $this->catalog();
+        $item = $catalog[$itemKey] ?? null;
+
+        if (! $item) {
+            throw ValidationException::withMessages(['item_key' => 'That credit service is not available.']);
+        }
+
+        $quantity = max(1, min(20, $quantity));
+        $unitPrice = (int) $item['points'];
+        $basePoints = $unitPrice * $quantity;
+        $totalPoints = $rush ? (int) ceil($basePoints * 1.5) : $basePoints;
+
+        return [
+            'item_key' => $itemKey,
+            'item_name' => (string) $item['name'],
+            'description' => (string) ($item['description'] ?? ''),
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'modifier' => $rush ? 'rush' : null,
+            'points' => $totalPoints,
+            'catalog_version' => (int) config('plyrcard-points.catalog_version', 1),
+        ];
+    }
+
+    public function spendForServiceRequest(User $user, string $itemKey, int $quantity, bool $rush, string $sourceId, array $meta = []): CreditPointTransaction
+    {
+        $quote = $this->quoteService($itemKey, $quantity, $rush);
+        $sourceId = trim($sourceId);
+
+        if ($sourceId === '') {
+            throw ValidationException::withMessages(['credits' => 'A service request ID is required before credits can be spent.']);
+        }
+
+        return $this->debit($user, (int) $quote['points'], 'service-request:' . $sourceId, [
+            'item_key' => $quote['item_key'],
+            'qty' => $quote['quantity'],
+            'catalog_version' => $quote['catalog_version'],
+            'unit_price' => $quote['unit_price'],
+            'modifier' => $quote['modifier'],
+            'source_type' => 'service_request',
+            'source_id' => $sourceId,
+            'reason' => $quote['item_name'] . ' request',
+            'actor' => 'athlete',
+            'meta' => array_merge([
+                'item_name' => $quote['item_name'],
+                'irreversible_user_redemption' => true,
+            ], $meta),
+        ]);
+    }
+
     public function packagePoints(string $package): int
     {
         $package = strtolower(trim($package));

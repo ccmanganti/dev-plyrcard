@@ -8,6 +8,7 @@ use App\Http\Controllers\JumpstartUpgradeController;
 use App\Http\Controllers\MyJourneyUpgradeController;
 use App\Http\Controllers\BillingCancellationController;
 use App\Http\Controllers\StripeBillingController;
+use App\Http\Controllers\CreditUsageController;
 use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Http\Controllers\PublicClubTeamController;
@@ -62,6 +63,8 @@ Route::middleware('auth')->group(function (): void {
         ->name('support.tickets.store');
     Route::post('/support/tickets/{ticket}/follow-up', [SupportTicketController::class, 'followUp'])
         ->name('support.tickets.follow-up');
+    Route::post('/support/credits/use', [CreditUsageController::class, 'store'])
+        ->name('support.credits.store');
     Route::post('/admin/support-tickets/settings', [SupportTicketSettingsController::class, 'update'])
         ->name('support.ticket-settings.update');
     Route::get('/url-generator-external-tracking', [ExternalTrackingUrlGeneratorController::class, 'index'])
