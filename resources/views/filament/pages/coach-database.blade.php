@@ -10939,30 +10939,58 @@ CSS;
             </div>
         </section>
 <style>
-    .rc-support-tabs-v4{display:flex;gap:.45rem;flex-wrap:wrap;margin-bottom:1rem;padding:.3rem;border:1px solid var(--rc-border);border-radius:.9rem;background:var(--rc-soft)}
-    .rc-support-tab-v4{border:0;background:transparent;color:var(--rc-muted);padding:.62rem .85rem;border-radius:.68rem;font-size:.8rem;font-weight:800;cursor:pointer;transition:.15s ease}
-    .rc-support-tab-v4:hover{color:var(--rc-text)}
-    .rc-support-tab-v4.is-active{background:var(--rc-surface);color:var(--rc-accent);box-shadow:0 1px 3px rgba(15,23,42,.08)}
+    /* Filament-style Support tabs */
+    .rc-support-tabs-v5{display:flex;align-items:flex-end;gap:1.35rem;margin-bottom:1.25rem;border-bottom:1px solid var(--rc-border);overflow-x:auto;scrollbar-width:none}
+    .rc-support-tabs-v5::-webkit-scrollbar{display:none}
+    .rc-support-tab-v5{position:relative;display:inline-flex;align-items:center;gap:.48rem;flex:0 0 auto;border:0;background:transparent;color:var(--rc-muted);padding:.72rem .1rem .78rem;font-size:.82rem;font-weight:700;line-height:1;cursor:pointer;transition:color .15s ease}
+    .rc-support-tab-v5 svg{width:1.05rem;height:1.05rem;flex:0 0 auto}
+    .rc-support-tab-v5:hover{color:var(--rc-text)}
+    .rc-support-tab-v5.is-active{color:var(--rc-accent)}
+    .rc-support-tab-v5.is-active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:999px 999px 0 0;background:var(--rc-accent)}
     .rc-support-tab-panel-v4{display:grid;gap:1rem}
-    .rc-credit-use-hero-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem;border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface)}
-    .rc-credit-use-balance-v4{font-size:1.8rem;line-height:1;font-weight:900;letter-spacing:-.04em;color:var(--rc-text)}
-    .rc-credit-use-balance-v4 span{font-size:.78rem;font-weight:700;color:var(--rc-muted);letter-spacing:0}
-    .rc-credit-catalog-v4{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.65rem}
-    .rc-credit-catalog-card-v4{border:1px solid var(--rc-border);border-radius:.85rem;padding:.8rem;background:var(--rc-surface);display:grid;gap:.25rem}
-    .rc-credit-catalog-card-v4 strong{font-size:.84rem;color:var(--rc-text)}
-    .rc-credit-catalog-card-v4 span{font-size:.72rem;color:var(--rc-muted);line-height:1.35}
-    .rc-credit-catalog-points-v4{color:var(--rc-accent)!important;font-weight:900!important}
-    .rc-credit-request-form-v4{border:1px solid var(--rc-border);border-radius:1rem;padding:1rem;background:var(--rc-surface);display:grid;gap:.8rem}
-    .rc-credit-request-grid-v4{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(120px,.55fr);gap:.7rem}
-    .rc-credit-request-form-v4 label{display:grid;gap:.34rem;font-size:.75rem;font-weight:800;color:var(--rc-text)}
-    .rc-credit-request-form-v4 select,.rc-credit-request-form-v4 input[type="number"],.rc-credit-request-form-v4 textarea{width:100%;border:1px solid var(--rc-border);border-radius:.68rem;background:var(--rc-surface);color:var(--rc-text);padding:.62rem .7rem;outline:none}
-    .rc-credit-request-form-v4 textarea{min-height:6rem;resize:vertical}
-    .rc-credit-quote-v4{display:flex;justify-content:space-between;gap:1rem;align-items:center;padding:.75rem .85rem;border-radius:.8rem;background:var(--rc-soft);border:1px solid var(--rc-border)}
-    .rc-credit-quote-v4 strong{font-size:1rem;color:var(--rc-accent)}
-    .rc-credit-warning-v4{padding:.75rem .85rem;border-radius:.8rem;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.08);font-size:.76rem;line-height:1.45;color:#92400e}
-    .dark .rc-credit-warning-v4{color:#fcd34d}
-    .rc-credit-confirm-v4{display:flex!important;grid-template-columns:none!important;align-items:flex-start;gap:.55rem!important;font-weight:650!important;line-height:1.4}
-    .rc-credit-confirm-v4 input{margin-top:.17rem;accent-color:var(--rc-accent)}
+
+    /* Credit usage */
+    .rc-credit-use-hero-v5{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem 1.05rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface);box-shadow:0 1px 2px rgba(15,23,42,.03)}
+    .rc-credit-use-balance-v5{margin-top:.14rem;font-size:1.75rem;line-height:1;font-weight:800;letter-spacing:-.035em;color:var(--rc-text)}
+    .rc-credit-use-balance-v5 span{font-size:.78rem;font-weight:600;color:var(--rc-muted);letter-spacing:0}
+    .rc-credit-request-form-v5{display:grid;gap:1rem}
+    .rc-credit-section-v5{border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface);overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.03)}
+    .rc-credit-section-head-v5{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:.9rem 1rem;border-bottom:1px solid var(--rc-border)}
+    .rc-credit-section-head-v5 h3{margin:0;font-size:.88rem;font-weight:750;color:var(--rc-text)}
+    .rc-credit-section-head-v5 p{margin:.22rem 0 0;color:var(--rc-muted);font-size:.74rem;line-height:1.4}
+    .rc-credit-service-list-v5{display:grid}
+    .rc-credit-service-row-v5{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem;padding:.9rem 1rem;border-top:1px solid var(--rc-border);transition:background .15s ease,border-color .15s ease}
+    .rc-credit-service-row-v5:first-child{border-top:0}
+    .rc-credit-service-row-v5:hover{background:var(--rc-soft)}
+    .rc-credit-service-row-v5.is-selected{background:rgba(255,99,56,.055);box-shadow:inset 3px 0 0 var(--rc-accent)}
+    .rc-credit-service-main-v5{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.7rem;align-items:start;min-width:0}
+    .rc-credit-service-check-v5{width:1rem;height:1rem;margin-top:.16rem;accent-color:var(--rc-accent)}
+    .rc-credit-service-copy-v5{min-width:0}
+    .rc-credit-service-name-v5{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.82rem;font-weight:750;color:var(--rc-text)}
+    .rc-credit-service-desc-v5{margin-top:.18rem;color:var(--rc-muted);font-size:.72rem;line-height:1.4}
+    .rc-credit-service-base-v5{display:inline-flex;align-items:center;border-radius:999px;padding:.14rem .42rem;background:var(--rc-accent-soft);color:var(--rc-accent);font-size:.65rem;font-weight:800;white-space:nowrap}
+    .rc-credit-service-controls-v5{display:grid;grid-template-columns:5.25rem 7.2rem 6.2rem;gap:.55rem;align-items:end}
+    .rc-credit-mini-field-v5{display:grid;gap:.28rem;color:var(--rc-muted);font-size:.65rem;font-weight:700}
+    .rc-credit-mini-field-v5 input[type="number"]{width:100%;height:2rem;border:1px solid var(--rc-border);border-radius:.5rem;background:var(--rc-surface);color:var(--rc-text);padding:0 .5rem;outline:none}
+    .rc-credit-mini-field-v5 input[type="number"]:focus{border-color:var(--rc-accent);box-shadow:0 0 0 3px var(--rc-accent-soft)}
+    .rc-credit-rush-v5{height:2rem;display:flex;align-items:center;gap:.4rem;border:1px solid var(--rc-border);border-radius:.5rem;padding:0 .55rem;background:var(--rc-surface);color:var(--rc-text);font-size:.7rem;font-weight:700;white-space:nowrap}
+    .rc-credit-rush-v5 input{accent-color:var(--rc-accent)}
+    .rc-credit-row-total-v5{height:2rem;display:flex;align-items:center;justify-content:flex-end;color:var(--rc-accent);font-size:.76rem;font-weight:800;white-space:nowrap}
+    .rc-credit-shared-fields-v5{display:grid;gap:.75rem;padding:1rem}
+    .rc-credit-shared-fields-v5 label{display:grid;gap:.34rem;font-size:.74rem;font-weight:700;color:var(--rc-text)}
+    .rc-credit-shared-fields-v5 textarea{width:100%;min-height:6rem;resize:vertical;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);padding:.65rem .7rem;outline:none}
+    .rc-credit-shared-fields-v5 textarea:focus{border-color:var(--rc-accent);box-shadow:0 0 0 3px var(--rc-accent-soft)}
+    .rc-credit-order-summary-v5{display:grid;gap:.65rem;padding:1rem;border-top:1px solid var(--rc-border);background:var(--rc-soft)}
+    .rc-credit-order-line-v5{display:flex;align-items:center;justify-content:space-between;gap:1rem;font-size:.76rem;color:var(--rc-muted)}
+    .rc-credit-order-line-v5 strong{color:var(--rc-text);font-size:.8rem}
+    .rc-credit-order-line-v5.is-total{padding-top:.65rem;border-top:1px solid var(--rc-border);font-size:.8rem;font-weight:700;color:var(--rc-text)}
+    .rc-credit-order-line-v5.is-total strong{font-size:1rem;color:var(--rc-accent)}
+    .rc-credit-warning-v5{padding:.75rem .85rem;border:1px solid rgba(245,158,11,.28);border-radius:.65rem;background:rgba(245,158,11,.07);color:#92400e;font-size:.74rem;line-height:1.45}
+    .dark .rc-credit-warning-v5{color:#fcd34d}
+    .rc-credit-confirm-v5{display:flex!important;align-items:flex-start;gap:.55rem!important;font-size:.74rem!important;font-weight:650!important;line-height:1.4;color:var(--rc-text)}
+    .rc-credit-confirm-v5 input{margin-top:.14rem;accent-color:var(--rc-accent)}
+    .rc-credit-form-actions-v5{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
+    .rc-credit-form-actions-v5 .rc-subtle.is-error{color:#b42318}
     .rc-credit-history-v4{display:grid;gap:.45rem}
     .rc-credit-history-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .8rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface)}
     .rc-credit-history-row-v4 small{display:block;margin-top:.16rem;color:var(--rc-muted);font-size:.68rem}
@@ -10971,14 +10999,24 @@ CSS;
     .rc-ticket-track-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;padding:.8rem;border:1px solid var(--rc-border);border-radius:.8rem;background:var(--rc-surface)}
     .rc-ticket-track-row-v4 span{font-size:.7rem;color:var(--rc-muted)}
     .rc-ticket-track-status-v4{display:inline-flex;align-items:center;border-radius:999px;padding:.2rem .5rem;background:var(--rc-accent-soft);color:var(--rc-accent)!important;font-weight:800;text-transform:capitalize}
-    @media(max-width:700px){.rc-credit-use-hero-v4,.rc-credit-request-grid-v4{grid-template-columns:1fr}.rc-credit-use-hero-v4 .rc-btn{justify-self:start}}
+    @media(max-width:860px){.rc-credit-service-row-v5{grid-template-columns:1fr}.rc-credit-service-controls-v5{grid-template-columns:5rem minmax(7rem,1fr) auto}}
+    @media(max-width:700px){.rc-credit-use-hero-v5{grid-template-columns:1fr}.rc-credit-use-hero-v5 .rc-btn{justify-self:start}.rc-support-tabs-v5{gap:1rem}.rc-credit-service-controls-v5{grid-template-columns:1fr 1fr}.rc-credit-row-total-v5{grid-column:1/-1;justify-content:flex-start}}
 </style>
 <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
-    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: 'ticket' }">
-        <div class="rc-support-tabs-v4" role="tablist" aria-label="Support sections">
-            <button type="button" class="rc-support-tab-v4" :class="supportTab === 'ticket' ? 'is-active' : ''" @click="supportTab = 'ticket'">Support Ticket</button>
-            <button type="button" class="rc-support-tab-v4" :class="supportTab === 'tracking' ? 'is-active' : ''" @click="supportTab = 'tracking'">Ticket Tracking</button>
-            <button type="button" class="rc-support-tab-v4" :class="supportTab === 'credits' ? 'is-active' : ''" @click="supportTab = 'credits'">Credit Usage</button>
+    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: @js(session('credit_success') || $errors->has('credits') || $errors->has('items') || $errors->has('confirm_spend') ? 'credits' : 'ticket') }">
+        <div class="rc-support-tabs-v5" role="tablist" aria-label="Support sections">
+            <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'ticket' ? 'is-active' : ''" :aria-selected="supportTab === 'ticket'" @click="supportTab = 'ticket'">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 10h8M8 14h5M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-4 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Support Ticket</span>
+            </button>
+            <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'tracking' ? 'is-active' : ''" :aria-selected="supportTab === 'tracking'" @click="supportTab = 'tracking'">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v4l2.5 1.5M21 12a9 9 0 1 1-3.1-6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 4v5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>Ticket Tracking</span>
+            </button>
+            <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'credits' ? 'is-active' : ''" :aria-selected="supportTab === 'credits'" @click="supportTab = 'credits'">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5h16M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4Z" stroke="currentColor" stroke-width="1.7"/><path d="M8 13h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                <span>Credit Usage</span>
+            </button>
         </div>
 
         <div class="rc-support-tab-panel-v4" x-show="supportTab === 'ticket'">
@@ -11048,15 +11086,26 @@ CSS;
              x-data="{
                 catalog: @js($rcCreditCatalog),
                 balance: {{ (int) $rcCreditBalance }},
-                item: 'graphic',
-                quantity: 1,
-                rush: false,
-                get selected() { return this.catalog[this.item] || { points: 0, name: '' }; },
-                get quotedPoints() {
-                    const base = Number(this.selected.points || 0) * Math.max(1, Number(this.quantity || 1));
-                    return this.rush ? Math.ceil(base * 1.5) : base;
+                selections: @js(collect($rcCreditCatalog)->mapWithKeys(fn ($item, $key) => [$key => ['selected' => false, 'quantity' => 1, 'rush' => false]])->all()),
+                pointsFor(key) {
+                    const item = this.catalog[key] || { points: 0 };
+                    const state = this.selections[key] || { selected: false, quantity: 1, rush: false };
+                    if (!state.selected) return 0;
+                    const base = Number(item.points || 0) * Math.max(1, Number(state.quantity || 1));
+                    return state.rush ? Math.ceil(base * 1.5) : base;
                 },
-                get enough() { return this.quotedPoints > 0 && this.balance >= this.quotedPoints; }
+                get selectedCount() {
+                    return Object.values(this.selections).filter(item => item.selected).length;
+                },
+                get quotedPoints() {
+                    return Object.keys(this.selections).reduce((sum, key) => sum + this.pointsFor(key), 0);
+                },
+                get enough() {
+                    return this.selectedCount > 0 && this.quotedPoints > 0 && this.balance >= this.quotedPoints;
+                },
+                get remaining() {
+                    return Math.max(0, this.balance - this.quotedPoints);
+                }
              }">
             @if(session('credit_success'))
                 <div class="rc-card" style="border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.08);">
@@ -11064,77 +11113,150 @@ CSS;
                 </div>
             @endif
 
-            @if($errors->has('credits') || $errors->has('item_key') || $errors->has('confirm_spend'))
+            @php
+                $creditError = $errors->first('credits')
+                    ?: $errors->first('items')
+                    ?: $errors->first('items.*.item_key')
+                    ?: $errors->first('confirm_spend');
+            @endphp
+            @if($creditError)
                 <div class="rc-card" style="border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.07);color:#b42318;">
-                    {{ $errors->first('credits') ?: ($errors->first('item_key') ?: $errors->first('confirm_spend')) }}
+                    {{ $creditError }}
                 </div>
             @endif
 
-            <div class="rc-credit-use-hero-v4">
+            <div class="rc-credit-use-hero-v5">
                 <div>
-                    <div class="rc-subtle">Available to use now</div>
-                    <div class="rc-credit-use-balance-v4">{{ number_format($rcCreditBalance) }} <span>credits</span></div>
-                    <div class="rc-subtle" style="margin-top:.35rem;">Choose a PLYRCARD service below. Credits are deducted as soon as the request is submitted.</div>
+                    <div class="rc-subtle">Available credits</div>
+                    <div class="rc-credit-use-balance-v5">{{ number_format($rcCreditBalance) }} <span>credits</span></div>
+                    <div class="rc-subtle" style="margin-top:.35rem;">Select one or more services. The full order is charged from your credit balance when you submit it.</div>
                 </div>
                 <a class="rc-btn rc-btn-primary" href="{{ url('/admin/my-journey') }}">Get More Credits</a>
             </div>
 
-            <div>
-                <div class="rc-row-title" style="margin-bottom:.55rem;">Credit Menu</div>
-                <div class="rc-credit-catalog-v4">
-                    @foreach($rcCreditCatalog as $creditKey => $creditItem)
-                        <article class="rc-credit-catalog-card-v4">
-                            <strong>{{ $creditItem['name'] }}</strong>
-                            <span>{{ $creditItem['description'] ?? '' }}</span>
-                            <span class="rc-credit-catalog-points-v4">{{ number_format((int) $creditItem['points']) }} credits</span>
-                        </article>
-                    @endforeach
-                </div>
-            </div>
-
-            <form class="rc-credit-request-form-v4" method="POST" action="{{ route('support.credits.store') }}">
+            <form class="rc-credit-request-form-v5" method="POST" action="{{ route('support.credits.store') }}">
                 @csrf
                 <input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                <div>
-                    <div class="rc-row-title">Use Credits</div>
-                    <div class="rc-subtle">Submit a production request using your current credit balance.</div>
-                </div>
-                <div class="rc-credit-request-grid-v4">
-                    <label>
-                        Service
-                        <select name="item_key" x-model="item" required>
-                            @foreach($rcCreditCatalog as $creditKey => $creditItem)
-                                <option value="{{ $creditKey }}">{{ $creditItem['name'] }} — {{ number_format((int) $creditItem['points']) }} credits</option>
-                            @endforeach
-                        </select>
-                    </label>
-                    <label>
-                        Quantity
-                        <input type="number" name="quantity" min="1" max="20" x-model.number="quantity" required>
-                    </label>
-                </div>
-                <label class="rc-credit-confirm-v4">
-                    <input type="checkbox" name="rush" value="1" x-model="rush">
-                    <span><strong>Rush turnaround</strong><br><span class="rc-subtle">48-hour rush requests cost 1.5× the normal credit amount.</span></span>
-                </label>
-                <label>
-                    Request details / notes
-                    <textarea name="notes" maxlength="2000" placeholder="Tell the PLYRCARD team what you need, include links, deadlines, footage notes, or other details."></textarea>
-                </label>
-                <div class="rc-credit-quote-v4">
-                    <div><span class="rc-subtle">Credits deducted on submit</span><div class="rc-subtle" x-show="!enough" style="color:#b42318;">Your current balance is not enough for this request.</div></div>
-                    <strong><span x-text="quotedPoints.toLocaleString()"></span> credits</strong>
-                </div>
-                <div class="rc-credit-warning-v4">
-                    Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If PLYRCARD needs to restore credits, an administrator must apply them manually to your account.
-                </div>
-                <label class="rc-credit-confirm-v4">
-                    <input type="checkbox" name="confirm_spend" value="1" required>
-                    <span>I understand that these credits will be deducted immediately and will not be automatically returned.</span>
-                </label>
-                <div style="display:flex;justify-content:flex-end;">
-                    <button type="submit" class="rc-btn rc-btn-primary" :disabled="!enough">Submit Credit Request</button>
-                </div>
+
+                <section class="rc-credit-section-v5">
+                    <div class="rc-credit-section-head-v5">
+                        <div>
+                            <h3>Select services</h3>
+                            <p>Choose as many services as you need. Quantity and Rush are set separately for each service.</p>
+                        </div>
+                        <div class="rc-subtle"><span x-text="selectedCount"></span> selected</div>
+                    </div>
+
+                    <div class="rc-credit-service-list-v5">
+                        @foreach($rcCreditCatalog as $creditKey => $creditItem)
+                            <article class="rc-credit-service-row-v5" :class="{ 'is-selected': selections['{{ $creditKey }}'].selected }">
+                                <div class="rc-credit-service-main-v5">
+                                    <div>
+                                        <input type="hidden" name="items[{{ $loop->index }}][selected]" value="0">
+                                        <input type="hidden" name="items[{{ $loop->index }}][item_key]" value="{{ $creditKey }}">
+                                        <input
+                                            class="rc-credit-service-check-v5"
+                                            type="checkbox"
+                                            name="items[{{ $loop->index }}][selected]"
+                                            value="1"
+                                            x-model="selections['{{ $creditKey }}'].selected"
+                                            aria-label="Select {{ $creditItem['name'] }}"
+                                        >
+                                    </div>
+                                    <div class="rc-credit-service-copy-v5">
+                                        <div class="rc-credit-service-name-v5">
+                                            <span>{{ $creditItem['name'] }}</span>
+                                            <span class="rc-credit-service-base-v5">{{ number_format((int) $creditItem['points']) }} credits each</span>
+                                        </div>
+                                        <div class="rc-credit-service-desc-v5">{{ $creditItem['description'] ?? '' }}</div>
+                                    </div>
+                                </div>
+
+                                <div class="rc-credit-service-controls-v5">
+                                    <label class="rc-credit-mini-field-v5">
+                                        <span>Quantity</span>
+                                        <input
+                                            type="number"
+                                            name="items[{{ $loop->index }}][quantity]"
+                                            min="1"
+                                            max="20"
+                                            x-model.number="selections['{{ $creditKey }}'].quantity"
+                                            :disabled="!selections['{{ $creditKey }}'].selected"
+                                        >
+                                    </label>
+                                    <label class="rc-credit-mini-field-v5">
+                                        <span>Turnaround</span>
+                                        <span class="rc-credit-rush-v5">
+                                            <input type="hidden" name="items[{{ $loop->index }}][rush]" value="0">
+                                            <input
+                                                type="checkbox"
+                                                name="items[{{ $loop->index }}][rush]"
+                                                value="1"
+                                                x-model="selections['{{ $creditKey }}'].rush"
+                                                :disabled="!selections['{{ $creditKey }}'].selected"
+                                            >
+                                            Rush +50%
+                                        </span>
+                                    </label>
+                                    <label class="rc-credit-mini-field-v5">
+                                        <span>Subtotal</span>
+                                        <span class="rc-credit-row-total-v5" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></span>
+                                    </label>
+                                </div>
+                            </article>
+                        @endforeach
+                    </div>
+                </section>
+
+                <section class="rc-credit-section-v5">
+                    <div class="rc-credit-section-head-v5">
+                        <div>
+                            <h3>Request details</h3>
+                            <p>These notes apply to the services submitted together in this order.</p>
+                        </div>
+                    </div>
+                    <div class="rc-credit-shared-fields-v5">
+                        <label>
+                            Notes / instructions
+                            <textarea name="notes" maxlength="2000" placeholder="Add links, deadlines, footage notes, design direction, or anything the PLYRCARD team should know."></textarea>
+                        </label>
+
+                        <div class="rc-credit-warning-v5">
+                            Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If credits need to be restored, an administrator must apply them manually to your account.
+                        </div>
+
+                        <label class="rc-credit-confirm-v5">
+                            <input type="checkbox" name="confirm_spend" value="1" required>
+                            <span>I understand that the total credits for all selected services will be deducted immediately and will not be automatically returned.</span>
+                        </label>
+                    </div>
+
+                    <div class="rc-credit-order-summary-v5">
+                        <div class="rc-credit-order-line-v5">
+                            <span>Selected services</span>
+                            <strong><span x-text="selectedCount"></span></strong>
+                        </div>
+                        <div class="rc-credit-order-line-v5">
+                            <span>Current balance</span>
+                            <strong>{{ number_format($rcCreditBalance) }} credits</strong>
+                        </div>
+                        <div class="rc-credit-order-line-v5">
+                            <span>Balance after request</span>
+                            <strong><span x-text="remaining.toLocaleString()"></span> credits</strong>
+                        </div>
+                        <div class="rc-credit-order-line-v5 is-total">
+                            <span>Total to deduct</span>
+                            <strong><span x-text="quotedPoints.toLocaleString()"></span> credits</strong>
+                        </div>
+                        <div class="rc-credit-form-actions-v5">
+                            <div>
+                                <span class="rc-subtle" x-show="selectedCount === 0">Select at least one service to continue.</span>
+                                <span class="rc-subtle is-error" x-show="selectedCount > 0 && !enough">Your current balance is not enough for this order.</span>
+                            </div>
+                            <button type="submit" class="rc-btn rc-btn-primary" :disabled="!enough">Submit Credit Request</button>
+                        </div>
+                    </div>
+                </section>
             </form>
 
             <div>

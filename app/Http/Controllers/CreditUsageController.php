@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\CreditServiceRequest;
+use App\Models\User;
 use App\Services\CreditPointService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CreditUsageController extends Controller
 {
@@ -16,69 +19,125 @@ class CreditUsageController extends Controller
         $catalog = $credits->catalog();
 
         $data = $request->validate([
-            'request_token' => ['required', 'string', 'max:100'],
-            'item_key' => ['required', 'string', Rule::in(array_keys($catalog))],
-            'quantity' => ['required', 'integer', 'min:1', 'max:20'],
-            'rush' => ['nullable', 'boolean'],
+            'request_token' => ['required', 'string', 'max:80'],
+            'items' => ['required', 'array', 'min:1', 'max:20'],
+            'items.*.selected' => ['nullable', 'boolean'],
+            'items.*.item_key' => ['required', 'string', Rule::in(array_keys($catalog))],
+            'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:20'],
+            'items.*.rush' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'confirm_spend' => ['accepted'],
         ]);
 
-        $user = $request->user();
-        $rush = (bool) ($data['rush'] ?? false);
-        $quote = $credits->quoteService((string) $data['item_key'], (int) $data['quantity'], $rush);
+        $selected = collect($data['items'])
+            ->values()
+            ->filter(fn (array $item): bool => (bool) ($item['selected'] ?? false));
 
-        $serviceRequest = DB::transaction(function () use ($user, $data, $rush, $quote, $credits): CreditServiceRequest {
+        if ($selected->isEmpty()) {
+            throw ValidationException::withMessages([
+                'items' => 'Select at least one service to use your credits.',
+            ]);
+        }
+
+        $quotes = $selected
+            ->map(function (array $item) use ($credits): array {
+                return $credits->quoteService(
+                    (string) $item['item_key'],
+                    max(1, (int) ($item['quantity'] ?? 1)),
+                    (bool) ($item['rush'] ?? false),
+                );
+            })
+            ->values();
+
+        $totalPoints = (int) $quotes->sum('points');
+        $user = $request->user();
+        $batchToken = trim((string) $data['request_token']);
+        $notes = trim((string) ($data['notes'] ?? '')) ?: null;
+
+        /** @var array{requests: Collection<int, CreditServiceRequest>, points: int} $result */
+        $result = DB::transaction(function () use ($user, $quotes, $totalPoints, $batchToken, $notes, $credits): array {
+            // A repeated browser submission with the same batch token must never spend
+            // the same credits twice. Every service row gets a deterministic child token.
             $existing = CreditServiceRequest::query()
                 ->where('user_id', $user->getKey())
-                ->where('request_token', (string) $data['request_token'])
-                ->first();
+                ->where('request_token', 'like', $batchToken . ':%')
+                ->orderBy('id')
+                ->get();
 
-            if ($existing) {
-                return $existing;
+            if ($existing->isNotEmpty()) {
+                return [
+                    'requests' => $existing,
+                    'points' => (int) $existing->sum('points_spent'),
+                ];
             }
 
-            $serviceRequest = CreditServiceRequest::query()->create([
-                'user_id' => $user->getKey(),
-                'request_token' => (string) $data['request_token'],
-                'item_key' => $quote['item_key'],
-                'item_name' => $quote['item_name'],
-                'quantity' => $quote['quantity'],
-                'unit_price_points' => $quote['unit_price'],
-                'modifier' => $quote['modifier'],
-                'points_spent' => $quote['points'],
-                'notes' => trim((string) ($data['notes'] ?? '')) ?: null,
-                'status' => 'submitted',
-            ]);
+            /** @var User $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
 
-            // This is intentionally a permanent debit at submission time. There is
-            // no athlete-facing release/refund path. If credits must be restored,
-            // an admin must add them back through the User Resource adjustment action.
-            $transaction = $credits->spendForServiceRequest(
-                $user,
-                $quote['item_key'],
-                $quote['quantity'],
-                $rush,
-                (string) $serviceRequest->getKey(),
-                [
-                    'request_token' => (string) $data['request_token'],
-                    'notes' => $serviceRequest->notes,
-                ],
-            );
+            if ((int) $lockedUser->points_available < $totalPoints) {
+                throw ValidationException::withMessages([
+                    'credits' => sprintf(
+                        'This request needs %s credits, but you currently have %s available.',
+                        number_format($totalPoints),
+                        number_format((int) $lockedUser->points_available),
+                    ),
+                ]);
+            }
 
-            $serviceRequest->forceFill([
-                'credit_point_transaction_id' => $transaction->getKey(),
-            ])->save();
+            $created = collect();
 
-            return $serviceRequest->fresh();
+            foreach ($quotes as $index => $quote) {
+                $itemRequestToken = $batchToken . ':' . $index;
+
+                $serviceRequest = CreditServiceRequest::query()->create([
+                    'user_id' => $lockedUser->getKey(),
+                    'request_token' => $itemRequestToken,
+                    'item_key' => $quote['item_key'],
+                    'item_name' => $quote['item_name'],
+                    'quantity' => $quote['quantity'],
+                    'unit_price_points' => $quote['unit_price'],
+                    'modifier' => $quote['modifier'],
+                    'points_spent' => $quote['points'],
+                    'notes' => $notes,
+                    'status' => 'submitted',
+                ]);
+
+                // Credit usage is intentionally final at submission time. There is no
+                // athlete-facing release/refund path. Only an admin adjustment can restore it.
+                $transaction = $credits->spendForServiceRequest(
+                    $lockedUser,
+                    $quote['item_key'],
+                    $quote['quantity'],
+                    $quote['modifier'] === 'rush',
+                    (string) $serviceRequest->getKey(),
+                    [
+                        'batch_request_token' => $batchToken,
+                        'request_token' => $itemRequestToken,
+                        'notes' => $serviceRequest->notes,
+                    ],
+                );
+
+                $serviceRequest->forceFill([
+                    'credit_point_transaction_id' => $transaction->getKey(),
+                ])->save();
+
+                $created->push($serviceRequest->fresh());
+            }
+
+            return [
+                'requests' => $created,
+                'points' => $totalPoints,
+            ];
         });
+
+        $count = $result['requests']->count();
 
         return back()->with(
             'credit_success',
             sprintf(
                 '%s submitted. %s credits were deducted from your balance.',
-                $serviceRequest->item_name,
-                number_format((int) $serviceRequest->points_spent),
+                $count === 1 ? '1 service request' : number_format($count) . ' service requests',
+                number_format((int) $result['points']),
             ),
         );
     }
