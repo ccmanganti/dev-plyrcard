@@ -18,6 +18,8 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Tabs;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -93,166 +95,154 @@ class CreditServiceRequestResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make('Request')
-                ->description('Review the player request, update fulfillment status, and keep internal notes. Status changes never return credits automatically.')
-                ->columns(3)
-                ->schema([
-                    Placeholder::make('player_summary')
-                        ->label('Player')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? (trim(($record->user?->first_name ?? '') . ' ' . ($record->user?->last_name ?? '')) ?: ($record->user?->email ?? 'User #' . $record->user_id))
-                            : '-'),
-
-                    Placeholder::make('player_email')
-                        ->label('Player Email')
-                        ->content(fn (?CreditServiceRequest $record): string => $record ? (static::playerEmail($record) ?: 'No valid email') : '-'),
-
-                    Placeholder::make('current_balance')
-                        ->label('Current Credits')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? number_format((int) ($record->user?->points_available ?? 0)) . ' credits'
-                            : '-'),
-
-                    Placeholder::make('service')
-                        ->label('Service')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? $record->item_name . ' × ' . number_format((int) $record->quantity)
-                            : '-'),
-
-                    Placeholder::make('points')
-                        ->label('Credits Spent')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? number_format((int) $record->points_spent) . ' credits'
-                            : '-'),
-
-                    Placeholder::make('rush')
-                        ->label('Rush')
-                        ->content(fn (?CreditServiceRequest $record): string => $record?->modifier === 'rush' ? 'Yes — 48 hour turnaround' : 'No'),
-
-                    Select::make('status')
-                        ->label('Status')
-                        ->options(CreditServiceRequest::statusOptions())
-                        ->required(),
-
-                    Placeholder::make('managed_by')
-                        ->label('Last Managed By')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? (trim(($record->managedBy?->first_name ?? '') . ' ' . ($record->managedBy?->last_name ?? '')) ?: ($record->managedBy?->email ?? 'Not assigned'))
-                            : '-'),
-
-                    Placeholder::make('submitted_at')
-                        ->label('Submitted')
-                        ->content(fn (?CreditServiceRequest $record): string => optional($record?->created_at)->format('M j, Y g:i A') ?: '-'),
-
-                    Textarea::make('admin_notes')
-                        ->label('Internal Admin Notes')
-                        ->placeholder('Fulfillment notes, next steps, vendor details, or anything the internal team should know.')
-                        ->rows(5)
-                        ->maxLength(5000)
-                        ->columnSpanFull(),
-                ]),
-
-            Section::make('Player Notes')
-                ->schema([
-                    Placeholder::make('player_notes')
-                        ->label('Notes submitted with this request')
-                        ->content(fn (?CreditServiceRequest $record): HtmlString => new HtmlString(
-                            '<div style="white-space:pre-wrap;line-height:1.6">' . e((string) ($record?->notes ?: 'No notes were provided.')) . '</div>'
-                        )),
-                ]),
-
-            Section::make('Player Resources')
-                ->description('Reference files uploaded by the player for this specific service request.')
-                ->schema([
-                    Placeholder::make('request_resources_display')
-                        ->label('Uploaded Resources')
-                        ->content(fn (?CreditServiceRequest $record): HtmlString => static::requestResourceLinks($record)),
-                ]),
-
-            Section::make('Delivery')
-                ->description('Files and links provided to the player for this service request.')
-                ->columns(3)
-                ->schema([
-                    Placeholder::make('delivery_status')
-                        ->label('Provided')
-                        ->content(fn (?CreditServiceRequest $record): string => $record?->provided_at
-                            ? $record->provided_at->format('M j, Y g:i A')
-                            : 'Not provided yet'),
-
-                    Placeholder::make('provided_by')
-                        ->label('Provided By')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? (trim(($record->providedBy?->first_name ?? '') . ' ' . ($record->providedBy?->last_name ?? '')) ?: ($record->providedBy?->email ?? '—'))
-                            : '—'),
-
-                    Placeholder::make('delivery_file')
-                        ->label('File')
-                        ->content(function (?CreditServiceRequest $record): HtmlString {
-                            if (! $record?->delivery_file_path) {
-                                return new HtmlString('<span style="color:#6b7280">No file uploaded.</span>');
-                            }
-
-                            $url = Storage::disk('public')->url($record->delivery_file_path);
-
-                            return new HtmlString('<a href="' . e($url) . '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;text-decoration:none">Open delivered file</a>');
-                        }),
-
-                    Placeholder::make('delivery_link')
-                        ->label('Delivery Link')
-                        ->content(function (?CreditServiceRequest $record): HtmlString {
-                            if (! $record?->delivery_url) {
-                                return new HtmlString('<span style="color:#6b7280">No external link.</span>');
-                            }
-
-                            return new HtmlString('<a href="' . e($record->delivery_url) . '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;text-decoration:none">Open delivery link</a>');
-                        }),
-
-                    Placeholder::make('delivery_notes')
-                        ->label('Delivery Notes')
-                        ->content(fn (?CreditServiceRequest $record): HtmlString => new HtmlString(
-                            '<div style="white-space:pre-wrap;line-height:1.6">' . e((string) ($record?->delivery_notes ?: 'No delivery notes.')) . '</div>'
-                        ))
-                        ->columnSpan(2),
-                ]),
-
-            Section::make('Batch')
-                ->description('Multi-service submissions are stored as separate service requests so each deliverable can be managed independently.')
-                ->schema([
-                    Placeholder::make('batch_services')
-                        ->label('Services in the same submission')
-                        ->content(fn (?CreditServiceRequest $record): HtmlString => static::batchSummary($record)),
-                ]),
-
-            Section::make('Credit Audit')
-                ->columns(3)
-                ->schema([
-                    Placeholder::make('original_spend')
-                        ->label('Originally Spent')
-                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format((int) $record->points_spent) . ' credits' : '-'),
-                    Placeholder::make('returned')
-                        ->label('Manually Returned')
-                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format((int) $record->credits_returned) . ' credits' : '-'),
-                    Placeholder::make('still_returnable')
-                        ->label('Eligible for Manual Return')
-                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format($record->refundableCredits()) . ' credits' : '-'),
-                    Placeholder::make('credit_transaction')
-                        ->label('Original Ledger Transaction')
-                        ->content(fn (?CreditServiceRequest $record): string => $record?->credit_point_transaction_id
-                            ? '#' . $record->credit_point_transaction_id
-                            : 'Not linked'),
-                    Placeholder::make('admin_alert')
-                        ->label('Admin Alert Email')
-                        ->content(fn (?CreditServiceRequest $record): string => $record
-                            ? match ($record->email_alert_status) {
-                                'sent' => 'Sent ' . (optional($record->email_alerted_at)->format('M j, Y g:i A') ?: ''),
-                                'failed' => 'Failed' . ($record->email_alert_error ? ': ' . $record->email_alert_error : ''),
-                                default => 'Not recorded',
-                            }
-                            : '-'),
-                    Placeholder::make('last_player_contact')
-                        ->label('Last Player Contact')
-                        ->content(fn (?CreditServiceRequest $record): string => optional($record?->admin_contacted_at)->format('M j, Y g:i A') ?: 'Not contacted yet'),
-                ]),
+            Tabs::make('credit_request_tabs')
+                ->id('credit-request-tabs')
+                ->persistTab()
+                ->contained(true)
+                ->tabs([
+                    Tab::make('Request')
+                        ->icon('heroicon-m-clipboard-document-list')
+                        ->schema([
+                            Section::make('Request Overview')
+                                ->description('Review the service, update its status, and keep internal notes. Status changes never return credits automatically.')
+                                ->columns(3)
+                                ->schema([
+                                    Placeholder::make('player_summary')
+                                        ->label('Player')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record
+                                            ? (trim(($record->user?->first_name ?? '') . ' ' . ($record->user?->last_name ?? '')) ?: ($record->user?->email ?? 'User #' . $record->user_id))
+                                            : '-'),
+                                    Placeholder::make('player_email')
+                                        ->label('Player Email')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? (static::playerEmail($record) ?: 'No valid email') : '-'),
+                                    Placeholder::make('current_balance')
+                                        ->label('Current Credits')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format((int) ($record->user?->points_available ?? 0)) . ' credits' : '-'),
+                                    Placeholder::make('service')
+                                        ->label('Service')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? $record->item_name . ' × ' . number_format((int) $record->quantity) : '-'),
+                                    Placeholder::make('points')
+                                        ->label('Credits Spent')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format((int) $record->points_spent) . ' credits' : '-'),
+                                    Placeholder::make('rush')
+                                        ->label('Rush')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record?->modifier === 'rush' ? 'Yes — 48 hour turnaround' : 'No'),
+                                    Select::make('status')
+                                        ->label('Status')
+                                        ->options(CreditServiceRequest::statusOptions())
+                                        ->required(),
+                                    Placeholder::make('managed_by')
+                                        ->label('Last Managed By')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record
+                                            ? (trim(($record->managedBy?->first_name ?? '') . ' ' . ($record->managedBy?->last_name ?? '')) ?: ($record->managedBy?->email ?? 'Not assigned'))
+                                            : '-'),
+                                    Placeholder::make('submitted_at')
+                                        ->label('Submitted')
+                                        ->content(fn (?CreditServiceRequest $record): string => optional($record?->created_at)->format('M j, Y g:i A') ?: '-'),
+                                    Textarea::make('admin_notes')
+                                        ->label('Internal Admin Notes')
+                                        ->placeholder('Fulfillment notes, next steps, vendor details, or anything the internal team should know.')
+                                        ->rows(5)
+                                        ->maxLength(5000)
+                                        ->columnSpanFull(),
+                                ]),
+                        ]),
+                    Tab::make('Player Submission')
+                        ->icon('heroicon-m-paper-clip')
+                        ->schema([
+                            Section::make('Player Notes')
+                                ->schema([
+                                    Placeholder::make('player_notes')
+                                        ->label('Instructions submitted with this request')
+                                        ->content(fn (?CreditServiceRequest $record): HtmlString => new HtmlString(
+                                            '<div style="white-space:pre-wrap;line-height:1.6">' . e((string) ($record?->notes ?: 'No notes were provided.')) . '</div>'
+                                        )),
+                                ]),
+                            Section::make('Player Resources')
+                                ->description('Reference files uploaded by the player for this specific service request.')
+                                ->schema([
+                                    Placeholder::make('request_resources_display')
+                                        ->label('Uploaded Resources')
+                                        ->content(fn (?CreditServiceRequest $record): HtmlString => static::requestResourceLinks($record)),
+                                ]),
+                            Section::make('Same Submission')
+                                ->description('Other services submitted in the same checkout.')
+                                ->schema([
+                                    Placeholder::make('batch_services')
+                                        ->label('Services in this batch')
+                                        ->content(fn (?CreditServiceRequest $record): HtmlString => static::batchSummary($record)),
+                                ]),
+                        ]),
+                    Tab::make('Fulfillment & Audit')
+                        ->icon('heroicon-m-check-badge')
+                        ->schema([
+                            Section::make('Delivery')
+                                ->description('Files and links provided to the player for this service request.')
+                                ->columns(3)
+                                ->schema([
+                                    Placeholder::make('delivery_status')
+                                        ->label('Provided')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record?->provided_at ? $record->provided_at->format('M j, Y g:i A') : 'Not provided yet'),
+                                    Placeholder::make('provided_by')
+                                        ->label('Provided By')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record
+                                            ? (trim(($record->providedBy?->first_name ?? '') . ' ' . ($record->providedBy?->last_name ?? '')) ?: ($record->providedBy?->email ?? '—'))
+                                            : '—'),
+                                    Placeholder::make('delivery_file')
+                                        ->label('File')
+                                        ->content(function (?CreditServiceRequest $record): HtmlString {
+                                            if (! $record?->delivery_file_path) {
+                                                return new HtmlString('<span style="color:#6b7280">No file uploaded.</span>');
+                                            }
+                                            $url = Storage::disk('public')->url($record->delivery_file_path);
+                                            return new HtmlString('<a href="' . e($url) . '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;text-decoration:none">Open delivered file</a>');
+                                        }),
+                                    Placeholder::make('delivery_link')
+                                        ->label('Delivery Link')
+                                        ->content(function (?CreditServiceRequest $record): HtmlString {
+                                            if (! $record?->delivery_url) {
+                                                return new HtmlString('<span style="color:#6b7280">No external link.</span>');
+                                            }
+                                            return new HtmlString('<a href="' . e($record->delivery_url) . '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;text-decoration:none">Open delivery link</a>');
+                                        }),
+                                    Placeholder::make('delivery_notes')
+                                        ->label('Delivery Notes')
+                                        ->content(fn (?CreditServiceRequest $record): HtmlString => new HtmlString(
+                                            '<div style="white-space:pre-wrap;line-height:1.6">' . e((string) ($record?->delivery_notes ?: 'No delivery notes.')) . '</div>'
+                                        ))
+                                        ->columnSpan(2),
+                                ]),
+                            Section::make('Credit Audit')
+                                ->columns(3)
+                                ->schema([
+                                    Placeholder::make('original_spend')
+                                        ->label('Originally Spent')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format((int) $record->points_spent) . ' credits' : '-'),
+                                    Placeholder::make('returned')
+                                        ->label('Manually Returned')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format((int) $record->credits_returned) . ' credits' : '-'),
+                                    Placeholder::make('still_returnable')
+                                        ->label('Eligible for Manual Return')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record ? number_format($record->refundableCredits()) . ' credits' : '-'),
+                                    Placeholder::make('credit_transaction')
+                                        ->label('Original Ledger Transaction')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record?->credit_point_transaction_id ? '#' . $record->credit_point_transaction_id : 'Not linked'),
+                                    Placeholder::make('admin_alert')
+                                        ->label('Admin Alert Email')
+                                        ->content(fn (?CreditServiceRequest $record): string => $record
+                                            ? match ($record->email_alert_status) {
+                                                'sent' => 'Sent ' . (optional($record->email_alerted_at)->format('M j, Y g:i A') ?: ''),
+                                                'failed' => 'Failed' . ($record->email_alert_error ? ': ' . $record->email_alert_error : ''),
+                                                default => 'Not recorded',
+                                            }
+                                            : '-'),
+                                    Placeholder::make('last_player_contact')
+                                        ->label('Last Player Contact')
+                                        ->content(fn (?CreditServiceRequest $record): string => optional($record?->admin_contacted_at)->format('M j, Y g:i A') ?: 'Not contacted yet'),
+                                ]),
+                        ]),
+                ])
+                ->columnSpanFull(),
         ]);
     }
 
@@ -373,7 +363,7 @@ class CreditServiceRequestResource extends Resource
                     ->iconButton()
                     ->tooltip('Review request')
                     ->slideOver()
-                    ->modalWidth('5xl'),
+                    ->modalWidth('4xl'),
 
                 Action::make('followUp')
                     ->label('Follow Up')

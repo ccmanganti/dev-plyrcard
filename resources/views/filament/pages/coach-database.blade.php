@@ -11018,8 +11018,8 @@ CSS;
     .rc-credit-detail-field-v7{display:grid;gap:.35rem;font-size:.7rem;font-weight:750;color:var(--rc-muted)}
     .rc-credit-detail-field-v7 textarea{width:100%;min-height:92px;resize:vertical;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);padding:.65rem .7rem;font:inherit;font-size:.75rem;line-height:1.45;outline:none}
     .rc-credit-detail-field-v7 textarea:focus{border-color:var(--rc-accent);box-shadow:0 0 0 3px rgba(255,99,56,.08)}
-    .rc-credit-upload-v7{display:grid;gap:.45rem;align-content:start;padding:.7rem;border:1px dashed var(--rc-border);border-radius:.65rem;background:var(--rc-soft)}
-    .rc-credit-upload-v7 input[type=file]{width:100%;font-size:.72rem;color:var(--rc-text)}.rc-credit-upload-v7 small{font-size:.64rem;line-height:1.4;color:var(--rc-muted)}
+    .rc-credit-native-file-v8{display:block;width:100%;font:inherit;font-size:.72rem;color:var(--rc-text);background:transparent;border:0;padding:0;appearance:auto!important}
+    .rc-credit-native-help-v8{font-size:.64rem;line-height:1.4;color:var(--rc-muted);font-weight:500}
     .rc-credit-file-list-v7{display:flex;flex-wrap:wrap;gap:.35rem}.rc-credit-file-chip-v7{display:inline-flex;align-items:center;max-width:100%;padding:.26rem .45rem;border:1px solid var(--rc-border);border-radius:.5rem;background:var(--rc-surface);font-size:.64rem;font-weight:700;color:var(--rc-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .rc-credit-review-list-v7{display:grid;gap:.6rem;padding:1rem}
     .rc-credit-review-row-v7{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.9rem;padding:.8rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-surface)}
@@ -11029,6 +11029,12 @@ CSS;
     .rc-credit-history-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .8rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface)}
     .rc-credit-history-row-v4 small{display:block;margin-top:.16rem;color:var(--rc-muted);font-size:.68rem}
     .rc-credit-history-points-v4{font-weight:900;color:var(--rc-accent);white-space:nowrap}
+    .rc-credit-history-shell-v8{display:grid;gap:.7rem}
+    .rc-credit-history-tabs-v8{display:flex;align-items:center;gap:1rem;border-bottom:1px solid var(--rc-border)}
+    .rc-credit-history-tab-v8{position:relative;border:0;background:transparent;padding:.55rem 0 .65rem;color:var(--rc-muted);font-size:.72rem;font-weight:750;cursor:pointer}
+    .rc-credit-history-tab-v8.is-active{color:var(--rc-accent)}
+    .rc-credit-history-tab-v8.is-active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:99px;background:var(--rc-accent)}
+    .rc-credit-history-count-v8{margin-left:.25rem;padding:.1rem .35rem;border-radius:999px;background:var(--rc-soft);color:inherit;font-size:.62rem}
     .rc-ticket-track-list-v4{display:grid;gap:.5rem}
     .rc-ticket-track-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;padding:.8rem;border:1px solid var(--rc-border);border-radius:.8rem;background:var(--rc-surface)}
     .rc-ticket-track-row-v4 span{font-size:.7rem;color:var(--rc-muted)}
@@ -11190,7 +11196,7 @@ CSS;
                                 <div class="rc-credit-detail-head-v7"><div><strong>{{ $creditItem['name'] }}</strong><span>Qty <span x-text="selections['{{ $creditKey }}'].quantity"></span><span x-show="selections['{{ $creditKey }}'].rush"> · Rush</span></span></div><strong style="color:var(--rc-accent)" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></strong></div>
                                 <div class="rc-credit-detail-grid-v7">
                                     <label class="rc-credit-detail-field-v7">Instructions / notes<textarea name="items[{{ $loop->index }}][notes]" maxlength="2000" x-model="selections['{{ $creditKey }}'].notes" :disabled="!selections['{{ $creditKey }}'].selected" placeholder="Add links, footage notes, design direction, deadlines, or anything specific to this service."></textarea></label>
-                                    <label class="rc-credit-detail-field-v7">Reference resources<div class="rc-credit-upload-v7"><input type="file" name="items[{{ $loop->index }}][resources][]" multiple :disabled="!selections['{{ $creditKey }}'].selected" x-on:change="rememberResources('{{ $creditKey }}', $event)"><small>Optional. Up to 5 files, 50 MB each. Images, video, audio, PDF, Office files, ZIP, or TXT.</small><div class="rc-credit-file-list-v7" x-show="(resourceNames['{{ $creditKey }}'] || []).length"><template x-for="name in (resourceNames['{{ $creditKey }}'] || [])" :key="name"><span class="rc-credit-file-chip-v7" x-text="name"></span></template></div></div></label>
+                                    <label class="rc-credit-detail-field-v7">Reference resources<input class="rc-credit-native-file-v8" type="file" name="items[{{ $loop->index }}][resources][]" multiple :disabled="!selections['{{ $creditKey }}'].selected" x-on:change="rememberResources('{{ $creditKey }}', $event)"><small class="rc-credit-native-help-v8">Optional. Up to 5 files, 50 MB each. Images, video, audio, PDF, Office files, ZIP, or TXT.</small><div class="rc-credit-file-list-v7" x-show="(resourceNames['{{ $creditKey }}'] || []).length"><template x-for="name in (resourceNames['{{ $creditKey }}'] || [])" :key="name"><span class="rc-credit-file-chip-v7" x-text="name"></span></template></div></label>
                                 </div>
                             </article>
                         @endforeach
@@ -11213,13 +11219,29 @@ CSS;
                     </div>
                 </section>
             </form>
-            <div><div class="rc-row-title" style="margin-bottom:.55rem;">Recent Credit Requests</div><div class="rc-credit-history-v4">
-                @forelse($rcSupportCreditRequests as $creditRequest)
-                    <article class="rc-credit-history-row-v4"><div><strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong><small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>@if($creditRequest->notes)<small style="display:block;margin-top:.3rem;white-space:pre-wrap;">Instructions: {{ $creditRequest->notes }}</small>@endif @if(is_array($creditRequest->request_resources) && count($creditRequest->request_resources))<small style="display:block;margin-top:.3rem;">{{ count($creditRequest->request_resources) }} resource file(s) submitted.</small>@endif @if($creditRequest->delivery_file_path || $creditRequest->delivery_url)<div class="rc-credit-delivery-v6">@if($creditRequest->delivery_file_path)<a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) }}" target="_blank" rel="noopener">Open File</a>@endif @if($creditRequest->delivery_url)<a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener">Open Delivery Link</a>@endif</div>@if($creditRequest->delivery_notes)<small style="display:block;margin-top:.35rem;white-space:pre-wrap;">{{ $creditRequest->delivery_notes }}</small>@endif @endif</div><div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div></article>
-                @empty
-                    <div class="rc-empty">You have not used credits for a service yet.</div>
-                @endforelse
-            </div></div>
+            @php
+                $rcActiveCreditRequests = $rcSupportCreditRequests->whereIn('status', ['submitted', 'reviewed', 'in_progress'])->values();
+                $rcCompletedCreditRequests = $rcSupportCreditRequests->whereIn('status', ['completed', 'declined'])->values();
+            @endphp
+            <div class="rc-credit-history-shell-v8" x-data="{ historyTab: 'active' }">
+                <div class="rc-row-title">Request History</div>
+                <div class="rc-credit-history-tabs-v8" role="tablist" aria-label="Credit request history">
+                    <button type="button" class="rc-credit-history-tab-v8" :class="historyTab === 'active' ? 'is-active' : ''" @click="historyTab = 'active'">Active <span class="rc-credit-history-count-v8">{{ $rcActiveCreditRequests->count() }}</span></button>
+                    <button type="button" class="rc-credit-history-tab-v8" :class="historyTab === 'completed' ? 'is-active' : ''" @click="historyTab = 'completed'">Completed <span class="rc-credit-history-count-v8">{{ $rcCompletedCreditRequests->count() }}</span></button>
+                    <button type="button" class="rc-credit-history-tab-v8" :class="historyTab === 'all' ? 'is-active' : ''" @click="historyTab = 'all'">All <span class="rc-credit-history-count-v8">{{ $rcSupportCreditRequests->count() }}</span></button>
+                </div>
+                <div class="rc-credit-history-v4">
+                    @forelse($rcSupportCreditRequests as $creditRequest)
+                        @php $rcHistoryGroup = in_array($creditRequest->status, ['completed', 'declined'], true) ? 'completed' : 'active'; @endphp
+                        <article class="rc-credit-history-row-v4" x-show="historyTab === 'all' || historyTab === '{{ $rcHistoryGroup }}'" x-cloak>
+                            <div><strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong><small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>@if($creditRequest->notes)<small style="display:block;margin-top:.3rem;white-space:pre-wrap;">Instructions: {{ $creditRequest->notes }}</small>@endif @if(is_array($creditRequest->request_resources) && count($creditRequest->request_resources))<small style="display:block;margin-top:.3rem;">{{ count($creditRequest->request_resources) }} resource file(s) submitted.</small>@endif @if($creditRequest->delivery_file_path || $creditRequest->delivery_url)<div class="rc-credit-delivery-v6">@if($creditRequest->delivery_file_path)<a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) }}" target="_blank" rel="noopener">Open File</a>@endif @if($creditRequest->delivery_url)<a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener">Open Delivery Link</a>@endif</div>@if($creditRequest->delivery_notes)<small style="display:block;margin-top:.35rem;white-space:pre-wrap;">{{ $creditRequest->delivery_notes }}</small>@endif @endif</div>
+                            <div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div>
+                        </article>
+                    @empty
+                        <div class="rc-empty">You have not used credits for a service yet.</div>
+                    @endforelse
+                </div>
+            </div>
         </div>
     </div>
 </section>

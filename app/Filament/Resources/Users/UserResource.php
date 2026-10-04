@@ -2222,72 +2222,113 @@ class UserResource extends Resource
                 ->iconButton()
                 ->tooltip('Manage Credits')
                 ->modalHeading(fn (User $record): string => 'Manage Credits — ' . trim($record->first_name . ' ' . $record->last_name))
-                ->modalDescription('Credit changes are written to the append-only ledger. Use a positive number to add credits and a negative number to deduct credits.')
+                ->modalDescription('Adjust the balance through the ledger, then review the user’s credit activity and service requests in the tabs below.')
+                ->modalWidth('3xl')
+                ->modalSubmitActionLabel('Apply Adjustment')
                 ->fillForm(fn (User $record): array => [
-                    'credit_adjustment' => null,
+                    'credit_adjustment' => 0,
                     'credit_reason' => '',
                 ])
                 ->form([
-                    Placeholder::make('current_credit_balance')
-                        ->label('Current Balance')
-                        ->content(fn (User $record): string => number_format((int) ($record->points_available ?? 0)) . ' credits'),
-
-                    TextInput::make('credit_adjustment')
-                        ->label('Credit Adjustment')
-                        ->helperText('Examples: 100 adds 100 credits. -25 deducts 25 credits. The balance cannot go below zero.')
-                        ->numeric()
-                        ->required()
-                        ->rule('not_in:0'),
-
-                    Textarea::make('credit_reason')
-                        ->label('Reason')
-                        ->placeholder('Why are these credits being changed?')
-                        ->rows(3)
-                        ->required()
-                        ->maxLength(500),
-
-                    Placeholder::make('recent_credit_activity')
-                        ->label('Recent Credit Activity')
-                        ->content(function (User $record): HtmlString {
-                            $rows = $record->creditPointTransactions()->latest('id')->limit(8)->get();
-                            if ($rows->isEmpty()) {
-                                return new HtmlString('<div class="text-sm text-gray-500">No credit activity yet.</div>');
-                            }
-
-                            $html = $rows->map(function ($row): string {
-                                $meta = (array) ($row->meta ?? []);
-                                $positive = in_array($row->type, ['grant', 'release', 'refund'], true)
-                                    || ($row->type === 'adjust' && (int) ($meta['adjust_sign'] ?? 1) > 0);
-                                $sign = $positive ? '+' : '-';
-                                $reason = e((string) ($row->reason ?: str($row->type)->headline()));
-                                $date = e(optional($row->created_at)->format('M j, Y g:i A') ?: '');
-                                return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid rgba(148,163,184,.18)"><div><strong>' . $reason . '</strong><div style="font-size:12px;color:#6b7280">' . $date . '</div></div><strong>' . $sign . number_format((int) $row->points) . '</strong></div>';
-                            })->implode('');
-
-                            return new HtmlString('<div>' . $html . '</div>');
-                        }),
-
-                    Placeholder::make('recent_credit_requests')
-                        ->label('Recent Credit Requests')
-                        ->content(function (User $record): HtmlString {
-                            if (! \Illuminate\Support\Facades\Schema::hasTable('credit_service_requests')) {
-                                return new HtmlString('<div class="text-sm text-gray-500">Credit service requests are not installed yet.</div>');
-                            }
-
-                            $rows = $record->creditServiceRequests()->latest('id')->limit(6)->get();
-                            if ($rows->isEmpty()) {
-                                return new HtmlString('<div class="text-sm text-gray-500">No credit service requests yet.</div>');
-                            }
-
-                            $html = $rows->map(function ($row): string {
-                                $name = e((string) $row->item_name);
-                                $status = e(str((string) $row->status)->replace('_', ' ')->title()->toString());
-                                $date = e(optional($row->created_at)->format('M j, Y g:i A') ?: '');
-                                return '<div style="display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid rgba(148,163,184,.18)"><div><strong>' . $name . ' × ' . (int) $row->quantity . '</strong><div style="font-size:12px;color:#6b7280">' . $status . ' · ' . $date . '</div></div><strong>-' . number_format((int) $row->points_spent) . '</strong></div>';
-                            })->implode('');
-
-                            return new HtmlString('<div>' . $html . '</div>');
-                        }),
+                    Tabs::make('manage_credit_tabs')
+                        ->id('manage-credit-tabs')
+                        ->contained(true)
+                        ->tabs([
+                            Tab::make('Adjust Balance')
+                                ->icon('heroicon-m-adjustments-horizontal')
+                                ->schema([
+                                    Section::make('Balance Adjustment')
+                                        ->description('Use the −5 and +5 buttons or type the exact amount. Positive values add credits; negative values deduct credits.')
+                                        ->schema([
+                                            Placeholder::make('current_credit_balance')
+                                                ->label('Current Balance')
+                                                ->content(fn (User $record): HtmlString => new HtmlString(
+                                                    '<div style="font-size:1.5rem;font-weight:800;line-height:1.1">' . number_format((int) ($record->points_available ?? 0)) . ' <span style="font-size:.8rem;font-weight:600;color:#6b7280">credits</span></div>'
+                                                )),
+                                            TextInput::make('credit_adjustment')
+                                                ->label('Adjustment Amount')
+                                                ->numeric()
+                                                ->step(5)
+                                                ->live()
+                                                ->required()
+                                                ->rule('not_in:0')
+                                                ->helperText('Use the buttons in increments of 5, or type any exact whole-number adjustment.')
+                                                ->prefixAction(
+                                                    Action::make('subtractFiveCredits')
+                                                        ->icon('heroicon-m-minus')
+                                                        ->tooltip('Subtract 5 credits')
+                                                        ->action(function (Get $get, Set $set): void {
+                                                            $set('credit_adjustment', (int) ($get('credit_adjustment') ?? 0) - 5);
+                                                        })
+                                                )
+                                                ->suffixAction(
+                                                    Action::make('addFiveCredits')
+                                                        ->icon('heroicon-m-plus')
+                                                        ->tooltip('Add 5 credits')
+                                                        ->action(function (Get $get, Set $set): void {
+                                                            $set('credit_adjustment', (int) ($get('credit_adjustment') ?? 0) + 5);
+                                                        })
+                                                ),
+                                            Textarea::make('credit_reason')
+                                                ->label('Reason')
+                                                ->placeholder('Why is this credit adjustment being made?')
+                                                ->rows(3)
+                                                ->required()
+                                                ->maxLength(500),
+                                        ]),
+                                ]),
+                            Tab::make('Credit Activity')
+                                ->icon('heroicon-m-clock')
+                                ->schema([
+                                    Section::make('Recent Credit Activity')
+                                        ->schema([
+                                            Placeholder::make('recent_credit_activity')
+                                                ->label('')
+                                                ->content(function (User $record): HtmlString {
+                                                    $rows = $record->creditPointTransactions()->latest('id')->limit(12)->get();
+                                                    if ($rows->isEmpty()) {
+                                                        return new HtmlString('<div class="text-sm text-gray-500">No credit activity yet.</div>');
+                                                    }
+                                                    $html = $rows->map(function ($row): string {
+                                                        $meta = (array) ($row->meta ?? []);
+                                                        $positive = in_array($row->type, ['grant', 'release', 'refund'], true)
+                                                            || ($row->type === 'adjust' && (int) ($meta['adjust_sign'] ?? 1) > 0);
+                                                        $sign = $positive ? '+' : '-';
+                                                        $reason = e((string) ($row->reason ?: str($row->type)->headline()));
+                                                        $date = e(optional($row->created_at)->format('M j, Y g:i A') ?: '');
+                                                        return '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(148,163,184,.18)"><div><strong>' . $reason . '</strong><div style="font-size:12px;color:#6b7280">' . $date . '</div></div><strong>' . $sign . number_format((int) $row->points) . '</strong></div>';
+                                                    })->implode('');
+                                                    return new HtmlString('<div>' . $html . '</div>');
+                                                }),
+                                        ]),
+                                ]),
+                            Tab::make('Credit Requests')
+                                ->icon('heroicon-m-clipboard-document-list')
+                                ->schema([
+                                    Section::make('Recent Credit Requests')
+                                        ->schema([
+                                            Placeholder::make('recent_credit_requests')
+                                                ->label('')
+                                                ->content(function (User $record): HtmlString {
+                                                    if (! \Illuminate\Support\Facades\Schema::hasTable('credit_service_requests')) {
+                                                        return new HtmlString('<div class="text-sm text-gray-500">Credit service requests are not installed yet.</div>');
+                                                    }
+                                                    $rows = $record->creditServiceRequests()->latest('id')->limit(10)->get();
+                                                    if ($rows->isEmpty()) {
+                                                        return new HtmlString('<div class="text-sm text-gray-500">No credit service requests yet.</div>');
+                                                    }
+                                                    $html = $rows->map(function ($row): string {
+                                                        $name = e((string) $row->item_name);
+                                                        $status = e(str((string) $row->status)->replace('_', ' ')->title()->toString());
+                                                        $date = e(optional($row->created_at)->format('M j, Y g:i A') ?: '');
+                                                        return '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid rgba(148,163,184,.18)"><div><strong>' . $name . ' × ' . (int) $row->quantity . '</strong><div style="font-size:12px;color:#6b7280">' . $status . ' · ' . $date . '</div></div><strong>-' . number_format((int) $row->points_spent) . '</strong></div>';
+                                                    })->implode('');
+                                                    return new HtmlString('<div>' . $html . '</div>');
+                                                }),
+                                        ]),
+                                ]),
+                        ])
+                        ->columnSpanFull(),
                 ])
                 ->action(function (User $record, array $data): void {
                     $points = (int) ($data['credit_adjustment'] ?? 0);
