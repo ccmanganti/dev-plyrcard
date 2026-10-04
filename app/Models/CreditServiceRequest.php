@@ -30,6 +30,11 @@ class CreditServiceRequest extends Model
         'admin_contacted_at',
         'last_admin_subject',
         'last_admin_message',
+        'delivery_file_path',
+        'delivery_url',
+        'delivery_notes',
+        'provided_at',
+        'provided_by_user_id',
         'email_alerted_at',
         'email_alert_status',
         'email_alert_error',
@@ -46,6 +51,7 @@ class CreditServiceRequest extends Model
             'reviewed_at' => 'datetime',
             'completed_at' => 'datetime',
             'admin_contacted_at' => 'datetime',
+            'provided_at' => 'datetime',
             'email_alerted_at' => 'datetime',
         ];
     }
@@ -90,6 +96,11 @@ class CreditServiceRequest extends Model
     public function managedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'managed_by_user_id');
+    }
+
+    public function providedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'provided_by_user_id');
     }
 
     public static function statusOptions(): array

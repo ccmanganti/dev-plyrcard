@@ -5,12 +5,12 @@ namespace App\Filament\Resources\CreditServiceRequests;
 use App\Filament\Resources\CreditServiceRequests\Pages\EditCreditServiceRequest;
 use App\Filament\Resources\CreditServiceRequests\Pages\ListCreditServiceRequests;
 use App\Models\CreditServiceRequest;
-use App\Services\AdminSupportEmailService;
 use App\Services\CreditPointService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -27,6 +27,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -159,6 +160,52 @@ class CreditServiceRequestResource extends Resource
                         )),
                 ]),
 
+            Section::make('Delivery')
+                ->description('Files and links provided to the player for this service request.')
+                ->columns(3)
+                ->schema([
+                    Placeholder::make('delivery_status')
+                        ->label('Provided')
+                        ->content(fn (?CreditServiceRequest $record): string => $record?->provided_at
+                            ? $record->provided_at->format('M j, Y g:i A')
+                            : 'Not provided yet'),
+
+                    Placeholder::make('provided_by')
+                        ->label('Provided By')
+                        ->content(fn (?CreditServiceRequest $record): string => $record
+                            ? (trim(($record->providedBy?->first_name ?? '') . ' ' . ($record->providedBy?->last_name ?? '')) ?: ($record->providedBy?->email ?? '—'))
+                            : '—'),
+
+                    Placeholder::make('delivery_file')
+                        ->label('File')
+                        ->content(function (?CreditServiceRequest $record): HtmlString {
+                            if (! $record?->delivery_file_path) {
+                                return new HtmlString('<span style="color:#6b7280">No file uploaded.</span>');
+                            }
+
+                            $url = Storage::disk('public')->url($record->delivery_file_path);
+
+                            return new HtmlString('<a href="' . e($url) . '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;text-decoration:none">Open delivered file</a>');
+                        }),
+
+                    Placeholder::make('delivery_link')
+                        ->label('Delivery Link')
+                        ->content(function (?CreditServiceRequest $record): HtmlString {
+                            if (! $record?->delivery_url) {
+                                return new HtmlString('<span style="color:#6b7280">No external link.</span>');
+                            }
+
+                            return new HtmlString('<a href="' . e($record->delivery_url) . '" target="_blank" rel="noopener" style="color:#16a34a;font-weight:700;text-decoration:none">Open delivery link</a>');
+                        }),
+
+                    Placeholder::make('delivery_notes')
+                        ->label('Delivery Notes')
+                        ->content(fn (?CreditServiceRequest $record): HtmlString => new HtmlString(
+                            '<div style="white-space:pre-wrap;line-height:1.6">' . e((string) ($record?->delivery_notes ?: 'No delivery notes.')) . '</div>'
+                        ))
+                        ->columnSpan(2),
+                ]),
+
             Section::make('Batch')
                 ->description('Multi-service submissions are stored as separate service requests so each deliverable can be managed independently.')
                 ->schema([
@@ -203,7 +250,7 @@ class CreditServiceRequestResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['user', 'managedBy']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['user', 'managedBy', 'providedBy']))
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('user_name')
@@ -312,68 +359,84 @@ class CreditServiceRequestResource extends Resource
                     ->slideOver()
                     ->modalWidth('5xl'),
 
-                Action::make('contactPlayer')
-                    ->label('Contact Player')
+                Action::make('followUp')
+                    ->label('Follow Up')
                     ->icon('heroicon-m-envelope')
                     ->iconButton()
-                    ->tooltip('Send player an admin support email')
-                    ->modalHeading(fn (CreditServiceRequest $record): string => 'Contact Player — ' . $record->item_name)
+                    ->tooltip('Follow up using Admin Support')
+                    ->action(function (CreditServiceRequest $record, \Livewire\Component $livewire): void {
+                        $livewire->dispatch(
+                            'open-credit-request-follow-up',
+                            requestId: (int) $record->getKey(),
+                        )->to(\App\Livewire\AdminSupportMessenger::class);
+                    }),
+
+                Action::make('provide')
+                    ->label('Provide')
+                    ->icon('heroicon-m-arrow-up-tray')
+                    ->iconButton()
+                    ->tooltip('Provide file or delivery link')
+                    ->color('success')
+                    ->modalHeading(fn (CreditServiceRequest $record): string => 'Provide — ' . $record->item_name)
+                    ->modalDescription('Upload the finished file, paste a delivery link, or provide both. Providing the request marks this service as completed.')
                     ->fillForm(fn (CreditServiceRequest $record): array => [
-                        'subject' => '[PLYRCARD Credit Request #' . $record->getKey() . '] Update on your ' . $record->item_name . ' request',
-                        'message' => '',
+                        'delivery_file_path' => $record->delivery_file_path,
+                        'delivery_url' => $record->delivery_url,
+                        'delivery_notes' => $record->delivery_notes,
                     ])
                     ->form([
-                        TextInput::make('subject')
-                            ->required()
-                            ->maxLength(180),
-                        Textarea::make('message')
-                            ->label('Message')
-                            ->rows(8)
-                            ->required()
-                            ->maxLength(5000),
+                        FileUpload::make('delivery_file_path')
+                            ->label('Upload File')
+                            ->disk('public')
+                            ->directory('credit-service-deliveries')
+                            ->visibility('public')
+                            ->downloadable()
+                            ->openable()
+                            ->maxSize(51200)
+                            ->helperText('Optional when a delivery link is provided. Maximum 50 MB.'),
+
+                        TextInput::make('delivery_url')
+                            ->label('Delivery Link')
+                            ->url()
+                            ->maxLength(2000)
+                            ->placeholder('https://...')
+                            ->helperText('Optional when a file is uploaded.'),
+
+                        Textarea::make('delivery_notes')
+                            ->label('Delivery Notes')
+                            ->rows(5)
+                            ->maxLength(3000)
+                            ->placeholder('Add a short note about what was delivered, revisions, file contents, or next steps.'),
                     ])
                     ->action(function (CreditServiceRequest $record, array $data): void {
-                        $record->loadMissing('user');
-                        $recipient = static::playerEmail($record);
-
-                        if (! $record->user || ! $recipient) {
-                            Notification::make()
-                                ->title('No valid player email is available.')
-                                ->danger()
-                                ->send();
-                            return;
+                        $file = $data['delivery_file_path'] ?? null;
+                        if (is_array($file)) {
+                            $file = collect($file)->filter()->first();
                         }
 
-                        $result = app(AdminSupportEmailService::class)->send(
-                            user: $record->user,
-                            recipient: $recipient,
-                            subject: trim((string) $data['subject']),
-                            body: trim((string) $data['message']),
-                            variables: [
-                                'admin_link' => url('/admin/coach-database/support'),
-                                'support_link' => url('/admin/coach-database/support'),
-                            ],
-                            concern: 'custom',
-                        );
+                        $file = trim((string) $file) ?: null;
+                        $url = trim((string) ($data['delivery_url'] ?? '')) ?: null;
+                        $notes = trim((string) ($data['delivery_notes'] ?? '')) ?: null;
 
-                        if (! ($result['success'] ?? false)) {
-                            Notification::make()
-                                ->title('Player email could not be sent.')
-                                ->body((string) ($result['error'] ?? 'Unknown email error.'))
-                                ->danger()
-                                ->send();
-                            return;
+                        if (! $file && ! $url) {
+                            throw ValidationException::withMessages([
+                                'delivery_file_path' => 'Upload a file or provide a delivery link before completing this request.',
+                            ]);
                         }
 
                         $record->forceFill([
-                            'admin_contacted_at' => now(),
-                            'last_admin_subject' => trim((string) $data['subject']),
-                            'last_admin_message' => trim((string) $data['message']),
+                            'delivery_file_path' => $file,
+                            'delivery_url' => $url,
+                            'delivery_notes' => $notes,
+                            'provided_at' => now(),
+                            'provided_by_user_id' => auth()->id(),
                             'managed_by_user_id' => auth()->id(),
+                            'status' => 'completed',
                         ])->save();
 
                         Notification::make()
-                            ->title('Player email sent.')
+                            ->title('Request provided to the player.')
+                            ->body('The delivery is now available in the player’s Credit Usage history.')
                             ->success()
                             ->send();
                     }),

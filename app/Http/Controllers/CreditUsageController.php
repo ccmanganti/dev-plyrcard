@@ -31,7 +31,7 @@ class CreditUsageController extends Controller
             'items.*.item_key' => ['required', 'string', Rule::in(array_keys($catalog))],
             'items.*.quantity' => ['nullable', 'integer', 'min:1', 'max:20'],
             'items.*.rush' => ['nullable', 'boolean'],
-            'notes' => ['nullable', 'string', 'max:2000'],
+            'items.*.notes' => ['nullable', 'string', 'max:2000'],
             'confirm_spend' => ['accepted'],
         ]);
 
@@ -47,21 +47,25 @@ class CreditUsageController extends Controller
 
         $quotes = $selected
             ->map(function (array $item) use ($credits): array {
-                return $credits->quoteService(
+                $quote = $credits->quoteService(
                     (string) $item['item_key'],
                     max(1, (int) ($item['quantity'] ?? 1)),
                     (bool) ($item['rush'] ?? false),
                 );
+
+                // Instructions belong to the individual service, not the whole batch.
+                $quote['notes'] = trim((string) ($item['notes'] ?? '')) ?: null;
+
+                return $quote;
             })
             ->values();
 
         $totalPoints = (int) $quotes->sum('points');
         $user = $request->user();
         $batchToken = trim((string) $data['request_token']);
-        $notes = trim((string) ($data['notes'] ?? '')) ?: null;
 
         /** @var array{requests: Collection<int, CreditServiceRequest>, points: int, created_new: bool} $result */
-        $result = DB::transaction(function () use ($user, $quotes, $totalPoints, $batchToken, $notes, $credits): array {
+        $result = DB::transaction(function () use ($user, $quotes, $totalPoints, $batchToken, $credits): array {
             $existing = CreditServiceRequest::query()
                 ->where('user_id', $user->getKey())
                 ->where('request_token', 'like', $batchToken . ':%')
@@ -103,7 +107,7 @@ class CreditUsageController extends Controller
                     'unit_price_points' => $quote['unit_price'],
                     'modifier' => $quote['modifier'],
                     'points_spent' => $quote['points'],
-                    'notes' => $notes,
+                    'notes' => $quote['notes'],
                     'status' => 'submitted',
                 ]);
 

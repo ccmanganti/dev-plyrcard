@@ -118,15 +118,18 @@ class SupportAlertService
 
         $services = $requests->map(function ($request): string {
             $rush = $request->modifier === 'rush' ? ' (Rush)' : '';
-            return '- ' . $request->item_name . ' × ' . number_format((int) $request->quantity)
+            $line = '- ' . $request->item_name . ' × ' . number_format((int) $request->quantity)
                 . $rush . ' — ' . number_format((int) $request->points_spent) . ' credits';
+
+            $notes = trim((string) ($request->notes ?? ''));
+            if ($notes !== '') {
+                $line .= "\n  Instructions: " . $notes;
+            }
+
+            return $line;
         })->implode("\n");
 
-        $notes = trim((string) ($first->notes ?? ''));
-        $message = "Requested services:\n" . $services;
-        if ($notes !== '') {
-            $message .= "\n\nPlayer notes:\n" . $notes;
-        }
+        $message = "Requested services and instructions:\n" . $services;
 
         $html = $this->layout(
             heading: 'Credits used — service request submitted',

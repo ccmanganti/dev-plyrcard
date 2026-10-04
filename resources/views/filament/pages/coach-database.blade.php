@@ -10968,6 +10968,12 @@ CSS;
     .rc-credit-service-copy-v5{min-width:0}
     .rc-credit-service-name-v5{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;font-size:.82rem;font-weight:750;color:var(--rc-text)}
     .rc-credit-service-desc-v5{margin-top:.18rem;color:var(--rc-muted);font-size:.72rem;line-height:1.4}
+    .rc-credit-item-note-v6{margin-top:.65rem}
+    .rc-credit-item-note-v6 label{display:grid;gap:.32rem;font-size:.7rem;font-weight:750;color:var(--rc-muted)}
+    .rc-credit-item-note-v6 textarea{width:100%;min-height:74px;resize:vertical;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);padding:.62rem .7rem;font:inherit;font-size:.75rem;line-height:1.45;outline:none}
+    .rc-credit-item-note-v6 textarea:focus{border-color:var(--rc-accent);box-shadow:0 0 0 3px rgba(255,99,56,.08)}
+    .rc-credit-delivery-v6{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.42rem}
+    .rc-credit-delivery-v6 a{display:inline-flex;align-items:center;gap:.3rem;border:1px solid rgba(22,163,74,.24);border-radius:.55rem;background:rgba(22,163,74,.08);color:#16a34a;padding:.32rem .5rem;font-size:.68rem;font-weight:800;text-decoration:none}
     .rc-credit-service-base-v5{display:inline-flex;align-items:center;border-radius:999px;padding:.14rem .42rem;background:var(--rc-accent-soft);color:var(--rc-accent);font-size:.65rem;font-weight:800;white-space:nowrap}
     .rc-credit-service-controls-v5{display:grid;grid-template-columns:5.25rem 7.2rem 6.2rem;gap:.55rem;align-items:end}
     .rc-credit-mini-field-v5{display:grid;gap:.28rem;color:var(--rc-muted);font-size:.65rem;font-weight:700}
@@ -11169,6 +11175,17 @@ CSS;
                                             <span class="rc-credit-service-base-v5">{{ number_format((int) $creditItem['points']) }} credits each</span>
                                         </div>
                                         <div class="rc-credit-service-desc-v5">{{ $creditItem['description'] ?? '' }}</div>
+                                        <div class="rc-credit-item-note-v6" x-show="selections['{{ $creditKey }}'].selected" x-cloak>
+                                            <label>
+                                                Instructions for this service
+                                                <textarea
+                                                    name="items[{{ $loop->index }}][notes]"
+                                                    maxlength="2000"
+                                                    :disabled="!selections['{{ $creditKey }}'].selected"
+                                                    placeholder="Add the links, footage notes, design direction, deadline details, or anything specific to this service."
+                                                >{{ old('items.' . $loop->index . '.notes') }}</textarea>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
 
@@ -11211,16 +11228,11 @@ CSS;
                 <section class="rc-credit-section-v5">
                     <div class="rc-credit-section-head-v5">
                         <div>
-                            <h3>Request details</h3>
-                            <p>These notes apply to the services submitted together in this order.</p>
+                            <h3>Confirm request</h3>
+                            <p>Each selected service keeps its own quantity, Rush setting, and instructions.</p>
                         </div>
                     </div>
                     <div class="rc-credit-shared-fields-v5">
-                        <label>
-                            Notes / instructions
-                            <textarea name="notes" maxlength="2000" placeholder="Add links, deadlines, footage notes, design direction, or anything the PLYRCARD team should know."></textarea>
-                        </label>
-
                         <div class="rc-credit-warning-v5">
                             Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If credits need to be restored, an administrator must apply them manually to your account.
                         </div>
@@ -11267,6 +11279,22 @@ CSS;
                             <div>
                                 <strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong>
                                 <small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>
+                                @if($creditRequest->notes)
+                                    <small style="display:block;margin-top:.3rem;white-space:pre-wrap;">Instructions: {{ $creditRequest->notes }}</small>
+                                @endif
+                                @if($creditRequest->delivery_file_path || $creditRequest->delivery_url)
+                                    <div class="rc-credit-delivery-v6">
+                                        @if($creditRequest->delivery_file_path)
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) }}" target="_blank" rel="noopener">Open File</a>
+                                        @endif
+                                        @if($creditRequest->delivery_url)
+                                            <a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener">Open Delivery Link</a>
+                                        @endif
+                                    </div>
+                                    @if($creditRequest->delivery_notes)
+                                        <small style="display:block;margin-top:.35rem;white-space:pre-wrap;">{{ $creditRequest->delivery_notes }}</small>
+                                    @endif
+                                @endif
                             </div>
                             <div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div>
                         </article>
