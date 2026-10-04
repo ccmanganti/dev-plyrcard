@@ -10997,6 +10997,10 @@ CSS;
     .rc-credit-confirm-v5 input{margin-top:.14rem;accent-color:var(--rc-accent)}
     .rc-credit-form-actions-v5{display:flex;align-items:center;justify-content:space-between;gap:.8rem;flex-wrap:wrap}
     .rc-credit-form-actions-v5 .rc-subtle.is-error{color:#b42318}
+    .rc-credit-submit-v6{min-width:11.8rem;display:inline-flex!important;align-items:center;justify-content:center;gap:.5rem;transition:transform .16s ease,opacity .16s ease,box-shadow .16s ease}
+    .rc-credit-submit-v6.is-submitting{cursor:wait;opacity:.9;transform:translateY(1px);box-shadow:none!important}
+    .rc-credit-submit-spinner-v6{width:1rem;height:1rem;border:2px solid rgba(255,255,255,.42);border-top-color:#fff;border-radius:999px;animation:rc-credit-submit-spin-v6 .68s linear infinite}
+    @keyframes rc-credit-submit-spin-v6{to{transform:rotate(360deg)}}
     .rc-credit-history-v4{display:grid;gap:.45rem}
     .rc-credit-history-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .8rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface)}
     .rc-credit-history-row-v4 small{display:block;margin-top:.16rem;color:var(--rc-muted);font-size:.68rem}
@@ -11092,6 +11096,7 @@ CSS;
              x-data="{
                 catalog: @js($rcCreditCatalog),
                 balance: {{ (int) $rcCreditBalance }},
+                submitting: false,
                 selections: @js(collect($rcCreditCatalog)->mapWithKeys(fn ($item, $key) => [$key => ['selected' => false, 'quantity' => 1, 'rush' => false]])->all()),
                 pointsFor(key) {
                     const item = this.catalog[key] || { points: 0 };
@@ -11140,7 +11145,7 @@ CSS;
                 <a class="rc-btn rc-btn-primary" href="{{ url('/admin/my-journey') }}">Get More Credits</a>
             </div>
 
-            <form class="rc-credit-request-form-v5" method="POST" action="{{ route('support.credits.store') }}">
+            <form class="rc-credit-request-form-v5" method="POST" action="{{ route('support.credits.store') }}" x-on:submit="if (!enough || submitting) { $event.preventDefault(); return; } submitting = true">
                 @csrf
                 <input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
 
@@ -11265,7 +11270,11 @@ CSS;
                                 <span class="rc-subtle" x-show="selectedCount === 0">Select at least one service to continue.</span>
                                 <span class="rc-subtle is-error" x-show="selectedCount > 0 && !enough">Your current balance is not enough for this order.</span>
                             </div>
-                            <button type="submit" class="rc-btn rc-btn-primary" :disabled="!enough">Submit Credit Request</button>
+                            <button type="submit" class="rc-btn rc-btn-primary rc-credit-submit-v6" :class="{ 'is-submitting': submitting }" :disabled="!enough || submitting" :aria-busy="submitting ? 'true' : 'false'">
+                                <span class="rc-credit-submit-spinner-v6" x-show="submitting" x-cloak aria-hidden="true"></span>
+                                <span x-show="!submitting">Submit Credit Request</span>
+                                <span x-show="submitting" x-cloak>Submitting Request...</span>
+                            </button>
                         </div>
                     </div>
                 </section>

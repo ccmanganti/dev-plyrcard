@@ -41,7 +41,8 @@ class CreditServiceRequestResource extends Resource
     protected static ?string $navigationLabel = 'Credit Requests';
     protected static ?string $modelLabel = 'Credit Request';
     protected static ?string $pluralModelLabel = 'Credit Requests';
-    protected static string|UnitEnum|null $navigationGroup = 'Support';
+    protected static string|UnitEnum|null $navigationGroup = null;
+    protected static ?string $navigationParentItem = 'Support Tickets';
     protected static ?int $navigationSort = 1;
     protected static ?string $slug = 'credit-service-requests';
 
