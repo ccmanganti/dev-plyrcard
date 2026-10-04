@@ -459,7 +459,7 @@ class CreditServiceRequestResource extends Resource
 
                         Notification::make()
                             ->title('Request provided to the player.')
-                            ->body('The delivery is now available in the player’s Credit Usage history.')
+                            ->body('The delivery is now available in the player’s Request History tab.')
                             ->success()
                             ->send();
                     }),

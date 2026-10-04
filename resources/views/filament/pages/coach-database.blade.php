@@ -59,7 +59,7 @@
         $rcSupportCreditRequests = \App\Models\CreditServiceRequest::query()
             ->where('user_id', $rcCatalogUser->getKey())
             ->latest('id')
-            ->limit(12)
+            ->limit(50)
             ->get();
     }
 @endphp
@@ -11035,6 +11035,27 @@ CSS;
     .rc-credit-history-tab-v8.is-active{color:var(--rc-accent)}
     .rc-credit-history-tab-v8.is-active::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:99px;background:var(--rc-accent)}
     .rc-credit-history-count-v8{margin-left:.25rem;padding:.1rem .35rem;border-radius:999px;background:var(--rc-soft);color:inherit;font-size:.62rem}
+    .rc-support-tab-count-v9{display:inline-flex;align-items:center;justify-content:center;min-width:1.2rem;height:1.2rem;padding:0 .32rem;border-radius:999px;background:var(--rc-soft);color:inherit;font-size:.62rem;font-weight:800}
+    .rc-request-history-page-v9{gap:1rem}
+    .rc-request-history-success-v9{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;padding:.8rem .9rem;border:1px solid rgba(22,163,74,.28);border-radius:.75rem;background:rgba(22,163,74,.08);color:#15803d;font-size:.75rem}.rc-request-history-success-v9 span{color:var(--rc-muted)}
+    .rc-request-history-head-v9{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+    .rc-request-history-stats-v9{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}.rc-request-history-stats-v9>div{display:grid;gap:.2rem;padding:.8rem .9rem;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface)}.rc-request-history-stats-v9 span{font-size:.66rem;color:var(--rc-muted);font-weight:700}.rc-request-history-stats-v9 strong{font-size:1.08rem;color:var(--rc-text)}
+    .rc-request-history-layout-v9{display:grid;grid-template-columns:minmax(18rem,.75fr) minmax(0,1.35fr);gap:1rem;align-items:start}
+    .rc-request-history-list-v9{display:grid;gap:.5rem}
+    .rc-request-history-row-v9{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.78rem .85rem;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface);color:var(--rc-text);text-align:left;cursor:pointer;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}.rc-request-history-row-v9:hover{border-color:rgba(255,99,56,.35);background:rgba(255,99,56,.035)}.rc-request-history-row-v9.is-selected{border-color:rgba(255,99,56,.55);background:rgba(255,99,56,.06);box-shadow:inset 3px 0 0 var(--rc-accent)}
+    .rc-request-history-row-main-v9,.rc-request-history-row-side-v9{display:grid;gap:.25rem;min-width:0}.rc-request-history-row-side-v9{justify-items:end}.rc-request-history-row-title-v9{font-size:.78rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rc-request-history-row-meta-v9{font-size:.65rem;color:var(--rc-muted);line-height:1.4}
+    .rc-request-status-v9{display:inline-flex;align-items:center;width:max-content;border-radius:999px;padding:.22rem .5rem;font-size:.62rem;font-weight:850;white-space:nowrap}.rc-request-status-v9.is-submitted{background:rgba(245,158,11,.12);color:#b45309}.rc-request-status-v9.is-reviewed{background:rgba(59,130,246,.11);color:#2563eb}.rc-request-status-v9.is-progress{background:rgba(139,92,246,.11);color:#7c3aed}.rc-request-status-v9.is-completed{background:rgba(22,163,74,.11);color:#15803d}.rc-request-status-v9.is-declined{background:rgba(239,68,68,.1);color:#dc2626}
+    .rc-request-ready-v9{font-size:.61rem;font-weight:800;color:#15803d}
+    .rc-request-history-detail-v9{position:sticky;top:1rem;min-width:0}.rc-request-detail-card-v9{display:grid;gap:1rem;padding:1rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface);box-shadow:0 1px 2px rgba(15,23,42,.03)}
+    .rc-request-detail-head-v9{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding-bottom:.85rem;border-bottom:1px solid var(--rc-border)}.rc-request-detail-head-v9 h3{margin:.18rem 0 .22rem;font-size:1rem;color:var(--rc-text)}.rc-request-detail-head-v9 p{margin:0;font-size:.68rem;color:var(--rc-muted)}.rc-request-detail-kicker-v9{font-size:.62rem;font-weight:800;color:var(--rc-accent);text-transform:uppercase;letter-spacing:.05em}
+    .rc-request-progress-v9{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.3rem}.rc-request-progress-v9>div{position:relative;display:grid;justify-items:center;gap:.35rem;color:var(--rc-muted);text-align:center}.rc-request-progress-v9>div:not(:last-child)::after{content:"";position:absolute;top:.66rem;left:calc(50% + .7rem);right:calc(-50% + .7rem);height:2px;background:var(--rc-border)}.rc-request-progress-v9>div.is-done:not(:last-child)::after{background:rgba(255,99,56,.45)}.rc-request-progress-v9>div>span{position:relative;z-index:1;width:1.35rem;height:1.35rem;display:flex;align-items:center;justify-content:center;border:1px solid var(--rc-border);border-radius:999px;background:var(--rc-surface);font-size:.62rem;font-weight:850}.rc-request-progress-v9>div.is-done{color:var(--rc-accent)}.rc-request-progress-v9>div.is-done>span{border-color:var(--rc-accent);background:var(--rc-accent);color:#fff}.rc-request-progress-v9 small{font-size:.61rem;font-weight:700}
+    .rc-request-declined-v9{display:grid;gap:.25rem;padding:.75rem .8rem;border:1px solid rgba(239,68,68,.22);border-radius:.7rem;background:rgba(239,68,68,.06);color:#dc2626}.rc-request-declined-v9 span{font-size:.68rem;color:var(--rc-muted)}
+    .rc-request-detail-grid-v9{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem}.rc-request-detail-grid-v9>div{display:grid;gap:.2rem;padding:.65rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-soft)}.rc-request-detail-grid-v9 span{font-size:.61rem;color:var(--rc-muted);font-weight:700}.rc-request-detail-grid-v9 strong{font-size:.72rem;color:var(--rc-text)}
+    .rc-request-detail-section-v9{display:grid;gap:.55rem}.rc-request-detail-section-v9 h4{margin:0;font-size:.76rem;color:var(--rc-text)}.rc-request-copy-v9{margin:0;white-space:pre-wrap;font-size:.7rem;line-height:1.55;color:var(--rc-text)}.rc-request-copy-v9.is-muted{color:var(--rc-muted)}
+    .rc-request-files-v9{display:grid;gap:.4rem}.rc-request-file-v9{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.55rem .65rem;border:1px solid var(--rc-border);border-radius:.6rem;background:var(--rc-soft);font-size:.68rem;color:var(--rc-text)}.rc-request-file-v9>span:first-child{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rc-request-file-actions-v9{display:flex;gap:.45rem;flex:0 0 auto}.rc-request-file-actions-v9 a{color:var(--rc-accent);font-weight:800;text-decoration:none}
+    .rc-request-delivery-section-v9{padding:.8rem;border:1px dashed var(--rc-border);border-radius:.75rem;background:var(--rc-soft)}.rc-request-delivery-section-v9.is-ready{border-style:solid;border-color:rgba(22,163,74,.3);background:rgba(22,163,74,.055)}.rc-request-delivery-head-v9{display:flex;align-items:flex-start;justify-content:space-between;gap:.8rem}.rc-request-delivery-head-v9 h4{margin:0}.rc-request-delivery-head-v9 p{margin:.2rem 0 0;font-size:.66rem;line-height:1.45;color:var(--rc-muted)}.rc-request-delivery-head-v9>span{font-size:.62rem;color:#15803d;font-weight:800}.rc-request-delivery-actions-v9{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.7rem}.rc-request-delivery-primary-v9{background:#16a34a!important;border-color:#16a34a!important;color:#fff!important}.rc-request-delivery-notes-v9{margin:.65rem 0 0;white-space:pre-wrap;font-size:.68rem;line-height:1.5;color:var(--rc-text)}
+    @media(max-width:980px){.rc-request-history-layout-v9{grid-template-columns:1fr}.rc-request-history-detail-v9{position:static}.rc-request-detail-grid-v9{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:640px){.rc-request-history-stats-v9{grid-template-columns:1fr 1fr}.rc-request-history-stats-v9>div:last-child{grid-column:1/-1}.rc-request-detail-grid-v9{grid-template-columns:1fr 1fr}.rc-request-progress-v9 small{font-size:.56rem}.rc-request-history-row-v9{grid-template-columns:1fr}.rc-request-history-row-side-v9{justify-items:start}.rc-request-file-v9{align-items:flex-start;flex-direction:column}.rc-request-history-head-v9{align-items:flex-start;flex-direction:column}}
     .rc-ticket-track-list-v4{display:grid;gap:.5rem}
     .rc-ticket-track-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;padding:.8rem;border:1px solid var(--rc-border);border-radius:.8rem;background:var(--rc-surface)}
     .rc-ticket-track-row-v4 span{font-size:.7rem;color:var(--rc-muted)}
@@ -11043,7 +11064,7 @@ CSS;
     @media(max-width:700px){.rc-credit-use-hero-v5{grid-template-columns:1fr}.rc-credit-use-hero-v5 .rc-btn{justify-self:start}.rc-support-tabs-v5{gap:1rem}.rc-credit-service-controls-v5{grid-template-columns:1fr 1fr}.rc-credit-row-total-v5{grid-column:1/-1;justify-content:flex-start}}
 </style>
 <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
-    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: @js(session('credit_success') || $errors->has('credits') || $errors->has('items') || $errors->has('confirm_spend') ? 'credits' : 'ticket') }">
+    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: @js(session('credit_success') ? 'history' : (($errors->has('credits') || $errors->has('items') || $errors->has('confirm_spend') || $errors->has('items.*.resources') || $errors->has('items.*.resources.*') || $errors->has('items.*.notes')) ? 'credits' : 'ticket')) }">
         <div class="rc-support-tabs-v5" role="tablist" aria-label="Support sections">
             <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'ticket' ? 'is-active' : ''" :aria-selected="supportTab === 'ticket'" @click="supportTab = 'ticket'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 10h8M8 14h5M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-4 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -11056,6 +11077,11 @@ CSS;
             <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'credits' ? 'is-active' : ''" :aria-selected="supportTab === 'credits'" @click="supportTab = 'credits'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5h16M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4Z" stroke="currentColor" stroke-width="1.7"/><path d="M8 13h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
                 <span>Credit Usage</span>
+            </button>
+            <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'history' ? 'is-active' : ''" :aria-selected="supportTab === 'history'" @click="supportTab = 'history'">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 9h9M7.5 13h6M7.5 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                <span>Request History</span>
+                @if($rcSupportCreditRequests->isNotEmpty())<span class="rc-support-tab-count-v9">{{ $rcSupportCreditRequests->count() }}</span>@endif
             </button>
         </div>
 
@@ -11219,29 +11245,156 @@ CSS;
                     </div>
                 </section>
             </form>
-            @php
-                $rcActiveCreditRequests = $rcSupportCreditRequests->whereIn('status', ['submitted', 'reviewed', 'in_progress'])->values();
-                $rcCompletedCreditRequests = $rcSupportCreditRequests->whereIn('status', ['completed', 'declined'])->values();
-            @endphp
-            <div class="rc-credit-history-shell-v8" x-data="{ historyTab: 'active' }">
-                <div class="rc-row-title">Request History</div>
-                <div class="rc-credit-history-tabs-v8" role="tablist" aria-label="Credit request history">
-                    <button type="button" class="rc-credit-history-tab-v8" :class="historyTab === 'active' ? 'is-active' : ''" @click="historyTab = 'active'">Active <span class="rc-credit-history-count-v8">{{ $rcActiveCreditRequests->count() }}</span></button>
-                    <button type="button" class="rc-credit-history-tab-v8" :class="historyTab === 'completed' ? 'is-active' : ''" @click="historyTab = 'completed'">Completed <span class="rc-credit-history-count-v8">{{ $rcCompletedCreditRequests->count() }}</span></button>
-                    <button type="button" class="rc-credit-history-tab-v8" :class="historyTab === 'all' ? 'is-active' : ''" @click="historyTab = 'all'">All <span class="rc-credit-history-count-v8">{{ $rcSupportCreditRequests->count() }}</span></button>
+        </div>
+
+        @php
+            $rcActiveCreditRequests = $rcSupportCreditRequests->whereIn('status', ['submitted', 'reviewed', 'in_progress'])->values();
+            $rcCompletedCreditRequests = $rcSupportCreditRequests->whereIn('status', ['completed', 'declined'])->values();
+            $rcDeliveredCreditRequests = $rcSupportCreditRequests->filter(fn ($request) => filled($request->delivery_file_path) || filled($request->delivery_url))->values();
+            $rcHistoryInitialFilter = $rcActiveCreditRequests->isNotEmpty() ? 'active' : ($rcCompletedCreditRequests->isNotEmpty() ? 'completed' : 'all');
+            $rcActiveFirstRequestId = (int) ($rcActiveCreditRequests->first()?->getKey() ?? 0);
+            $rcCompletedFirstRequestId = (int) ($rcCompletedCreditRequests->first()?->getKey() ?? 0);
+            $rcAllFirstRequestId = (int) ($rcSupportCreditRequests->first()?->getKey() ?? 0);
+            $rcInitialRequestId = $rcHistoryInitialFilter === 'active' ? $rcActiveFirstRequestId : ($rcHistoryInitialFilter === 'completed' ? $rcCompletedFirstRequestId : $rcAllFirstRequestId);
+        @endphp
+        <div class="rc-support-tab-panel-v4 rc-request-history-page-v9" x-show="supportTab === 'history'" x-cloak x-data="{ historyFilter: @js($rcHistoryInitialFilter), selectedRequest: {{ $rcInitialRequestId }} }">
+            @if(session('credit_success'))
+                <div class="rc-request-history-success-v9"><strong>Request submitted.</strong><span>{{ session('credit_success') }}</span></div>
+            @endif
+
+            <div class="rc-request-history-head-v9">
+                <div>
+                    <div class="rc-title">Request History</div>
+                    <div class="rc-subtle">Track every credit request, follow its status, and access files delivered by the PLYRCARD team.</div>
                 </div>
-                <div class="rc-credit-history-v4">
-                    @forelse($rcSupportCreditRequests as $creditRequest)
-                        @php $rcHistoryGroup = in_array($creditRequest->status, ['completed', 'declined'], true) ? 'completed' : 'active'; @endphp
-                        <article class="rc-credit-history-row-v4" x-show="historyTab === 'all' || historyTab === '{{ $rcHistoryGroup }}'" x-cloak>
-                            <div><strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong><small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>@if($creditRequest->notes)<small style="display:block;margin-top:.3rem;white-space:pre-wrap;">Instructions: {{ $creditRequest->notes }}</small>@endif @if(is_array($creditRequest->request_resources) && count($creditRequest->request_resources))<small style="display:block;margin-top:.3rem;">{{ count($creditRequest->request_resources) }} resource file(s) submitted.</small>@endif @if($creditRequest->delivery_file_path || $creditRequest->delivery_url)<div class="rc-credit-delivery-v6">@if($creditRequest->delivery_file_path)<a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) }}" target="_blank" rel="noopener">Open File</a>@endif @if($creditRequest->delivery_url)<a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener">Open Delivery Link</a>@endif</div>@if($creditRequest->delivery_notes)<small style="display:block;margin-top:.35rem;white-space:pre-wrap;">{{ $creditRequest->delivery_notes }}</small>@endif @endif</div>
-                            <div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div>
-                        </article>
-                    @empty
-                        <div class="rc-empty">You have not used credits for a service yet.</div>
-                    @endforelse
-                </div>
+                <button type="button" class="rc-btn rc-btn-primary" @click="supportTab = 'credits'">New Request</button>
             </div>
+
+            <div class="rc-request-history-stats-v9">
+                <div><span>Active</span><strong>{{ $rcActiveCreditRequests->count() }}</strong></div>
+                <div><span>Completed</span><strong>{{ $rcCompletedCreditRequests->count() }}</strong></div>
+                <div><span>Files Ready</span><strong>{{ $rcDeliveredCreditRequests->count() }}</strong></div>
+            </div>
+
+            <div class="rc-credit-history-tabs-v8" role="tablist" aria-label="Filter credit requests">
+                <button type="button" class="rc-credit-history-tab-v8" :class="historyFilter === 'active' ? 'is-active' : ''" @click="historyFilter = 'active'; selectedRequest = {{ $rcActiveFirstRequestId }}">Active <span class="rc-credit-history-count-v8">{{ $rcActiveCreditRequests->count() }}</span></button>
+                <button type="button" class="rc-credit-history-tab-v8" :class="historyFilter === 'completed' ? 'is-active' : ''" @click="historyFilter = 'completed'; selectedRequest = {{ $rcCompletedFirstRequestId }}">Completed <span class="rc-credit-history-count-v8">{{ $rcCompletedCreditRequests->count() }}</span></button>
+                <button type="button" class="rc-credit-history-tab-v8" :class="historyFilter === 'all' ? 'is-active' : ''" @click="historyFilter = 'all'; selectedRequest = {{ $rcAllFirstRequestId }}">All <span class="rc-credit-history-count-v8">{{ $rcSupportCreditRequests->count() }}</span></button>
+            </div>
+
+            @if($rcSupportCreditRequests->isEmpty())
+                <div class="rc-empty">You have not submitted a credit service request yet.</div>
+            @else
+                <div class="rc-request-history-layout-v9">
+                    <div class="rc-request-history-list-v9">
+                        @foreach($rcSupportCreditRequests as $creditRequest)
+                            @php
+                                $rcHistoryGroup = in_array($creditRequest->status, ['completed', 'declined'], true) ? 'completed' : 'active';
+                                $rcDeliveryReady = filled($creditRequest->delivery_file_path) || filled($creditRequest->delivery_url);
+                                $rcStatusClass = match($creditRequest->status) {
+                                    'reviewed' => 'is-reviewed',
+                                    'in_progress' => 'is-progress',
+                                    'completed' => 'is-completed',
+                                    'declined' => 'is-declined',
+                                    default => 'is-submitted',
+                                };
+                            @endphp
+                            <button type="button" class="rc-request-history-row-v9" :class="selectedRequest === {{ (int) $creditRequest->getKey() }} ? 'is-selected' : ''" x-show="historyFilter === 'all' || historyFilter === '{{ $rcHistoryGroup }}'" x-cloak @click="selectedRequest = {{ (int) $creditRequest->getKey() }}">
+                                <span class="rc-request-history-row-main-v9">
+                                    <span class="rc-request-history-row-title-v9">{{ $creditRequest->item_name }}</span>
+                                    <span class="rc-request-history-row-meta-v9">Request #{{ $creditRequest->getKey() }} · Qty {{ (int) $creditRequest->quantity }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }} · {{ optional($creditRequest->created_at)->format('M j, Y') }}</span>
+                                </span>
+                                <span class="rc-request-history-row-side-v9">
+                                    <span class="rc-request-status-v9 {{ $rcStatusClass }}">{{ $creditRequest->statusLabel() }}</span>
+                                    @if($rcDeliveryReady)<span class="rc-request-ready-v9">Delivery ready</span>@endif
+                                </span>
+                            </button>
+                        @endforeach
+                    </div>
+
+                    <div class="rc-request-history-detail-v9">
+                        @foreach($rcSupportCreditRequests as $creditRequest)
+                            @php
+                                $rcRequestResources = collect((array) $creditRequest->request_resources)->filter(fn ($resource) => is_array($resource) && filled($resource['path'] ?? null))->values();
+                                $rcDeliveryFileUrl = filled($creditRequest->delivery_file_path) ? \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) : null;
+                                $rcDeliveryFileName = filled($creditRequest->delivery_file_path) ? basename((string) $creditRequest->delivery_file_path) : null;
+                                $rcStatusRank = match($creditRequest->status) {
+                                    'reviewed' => 2,
+                                    'in_progress' => 3,
+                                    'completed' => 4,
+                                    default => 1,
+                                };
+                                $rcStatusClass = match($creditRequest->status) {
+                                    'reviewed' => 'is-reviewed',
+                                    'in_progress' => 'is-progress',
+                                    'completed' => 'is-completed',
+                                    'declined' => 'is-declined',
+                                    default => 'is-submitted',
+                                };
+                            @endphp
+                            <section class="rc-request-detail-card-v9" x-show="selectedRequest === {{ (int) $creditRequest->getKey() }}" x-cloak>
+                                <div class="rc-request-detail-head-v9">
+                                    <div><span class="rc-request-detail-kicker-v9">Request #{{ $creditRequest->getKey() }}</span><h3>{{ $creditRequest->item_name }}</h3><p>Submitted {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}</p></div>
+                                    <span class="rc-request-status-v9 {{ $rcStatusClass }}">{{ $creditRequest->statusLabel() }}</span>
+                                </div>
+
+                                @if($creditRequest->status === 'declined')
+                                    <div class="rc-request-declined-v9"><strong>Request declined</strong><span>This request is closed. Any credit return, if applicable, must be handled manually by the PLYRCARD team.</span></div>
+                                @else
+                                    <div class="rc-request-progress-v9" aria-label="Request progress">
+                                        @foreach([1 => 'Submitted', 2 => 'Reviewed', 3 => 'In Progress', 4 => 'Completed'] as $stepNumber => $stepLabel)
+                                            <div class="{{ $rcStatusRank >= $stepNumber ? 'is-done' : '' }}"><span>{{ $rcStatusRank > $stepNumber ? '✓' : $stepNumber }}</span><small>{{ $stepLabel }}</small></div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                <div class="rc-request-detail-grid-v9">
+                                    <div><span>Quantity</span><strong>{{ (int) $creditRequest->quantity }}</strong></div>
+                                    <div><span>Turnaround</span><strong>{{ $creditRequest->modifier === 'rush' ? 'Rush +50%' : 'Standard' }}</strong></div>
+                                    <div><span>Credits used</span><strong>{{ number_format((int) $creditRequest->points_spent) }}</strong></div>
+                                    <div><span>Last updated</span><strong>{{ optional($creditRequest->updated_at)->format('M j, Y g:i A') }}</strong></div>
+                                </div>
+
+                                <div class="rc-request-detail-section-v9">
+                                    <h4>Your instructions</h4>
+                                    <p class="rc-request-copy-v9">{{ filled($creditRequest->notes) ? $creditRequest->notes : 'No additional instructions were submitted for this service.' }}</p>
+                                </div>
+
+                                <div class="rc-request-detail-section-v9">
+                                    <h4>Your submitted resources</h4>
+                                    @if($rcRequestResources->isNotEmpty())
+                                        <div class="rc-request-files-v9">
+                                            @foreach($rcRequestResources as $resource)
+                                                @php
+                                                    $rcResourceUrl = \Illuminate\Support\Facades\Storage::disk('public')->url((string) $resource['path']);
+                                                    $rcResourceName = trim((string) ($resource['name'] ?? basename((string) $resource['path']))) ?: 'Resource file';
+                                                @endphp
+                                                <div class="rc-request-file-v9"><span>{{ $rcResourceName }}</span><span class="rc-request-file-actions-v9"><a href="{{ $rcResourceUrl }}" target="_blank" rel="noopener">Open</a><a href="{{ $rcResourceUrl }}" download="{{ $rcResourceName }}">Download</a></span></div>
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <p class="rc-request-copy-v9 is-muted">No resource files were attached to this request.</p>
+                                    @endif
+                                </div>
+
+                                <div class="rc-request-detail-section-v9 rc-request-delivery-section-v9 {{ ($rcDeliveryFileUrl || filled($creditRequest->delivery_url)) ? 'is-ready' : '' }}">
+                                    <div class="rc-request-delivery-head-v9"><div><h4>PLYRCARD delivery</h4><p>{{ ($rcDeliveryFileUrl || filled($creditRequest->delivery_url)) ? 'Your completed files or delivery links are ready.' : 'Your completed files or links will appear here when the team provides them.' }}</p></div>@if($creditRequest->provided_at)<span>{{ optional($creditRequest->provided_at)->format('M j, Y') }}</span>@endif</div>
+                                    @if($rcDeliveryFileUrl || filled($creditRequest->delivery_url))
+                                        <div class="rc-request-delivery-actions-v9">
+                                            @if($rcDeliveryFileUrl)
+                                                <a href="{{ $rcDeliveryFileUrl }}" target="_blank" rel="noopener" class="rc-btn rc-request-delivery-primary-v9">Open File</a>
+                                                <a href="{{ $rcDeliveryFileUrl }}" download="{{ $rcDeliveryFileName }}" class="rc-btn">Download File</a>
+                                            @endif
+                                            @if(filled($creditRequest->delivery_url))<a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener" class="rc-btn">Open Delivery Link</a>@endif
+                                        </div>
+                                        @if(filled($creditRequest->delivery_notes))<p class="rc-request-delivery-notes-v9">{{ $creditRequest->delivery_notes }}</p>@endif
+                                    @endif
+                                </div>
+                            </section>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </section>
