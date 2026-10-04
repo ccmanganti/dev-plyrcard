@@ -11001,6 +11001,30 @@ CSS;
     .rc-credit-submit-v6.is-submitting{cursor:wait;opacity:.9;transform:translateY(1px);box-shadow:none!important}
     .rc-credit-submit-spinner-v6{width:1rem;height:1rem;border:2px solid rgba(255,255,255,.42);border-top-color:#fff;border-radius:999px;animation:rc-credit-submit-spin-v6 .68s linear infinite}
     @keyframes rc-credit-submit-spin-v6{to{transform:rotate(360deg)}}
+    .rc-credit-wizard-v7{display:grid;gap:1rem}
+    .rc-credit-steps-v7{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface);overflow:hidden}
+    .rc-credit-step-v7{position:relative;display:flex;align-items:center;gap:.65rem;padding:.85rem .9rem;color:var(--rc-muted);background:transparent;border:0;border-right:1px solid var(--rc-border);text-align:left}
+    .rc-credit-step-v7:last-child{border-right:0}
+    .rc-credit-step-v7.is-active{color:var(--rc-text);background:rgba(255,99,56,.055)}
+    .rc-credit-step-v7.is-done{color:var(--rc-accent)}
+    .rc-credit-step-number-v7{width:1.75rem;height:1.75rem;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border:1px solid var(--rc-border);border-radius:999px;background:var(--rc-soft);font-size:.7rem;font-weight:850;color:inherit}
+    .rc-credit-step-v7.is-active .rc-credit-step-number-v7,.rc-credit-step-v7.is-done .rc-credit-step-number-v7{border-color:rgba(255,99,56,.35);background:var(--rc-accent);color:#fff}
+    .rc-credit-step-copy-v7{min-width:0;display:grid;gap:.12rem}.rc-credit-step-copy-v7 strong{font-size:.76rem;color:inherit}.rc-credit-step-copy-v7 span{font-size:.65rem;color:var(--rc-muted)}
+    .rc-credit-wizard-actions-v7{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;padding:1rem;border-top:1px solid var(--rc-border);background:var(--rc-soft)}
+    .rc-credit-detail-list-v7{display:grid;gap:.75rem;padding:1rem}
+    .rc-credit-detail-card-v7{display:grid;gap:.75rem;padding:.9rem;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface)}
+    .rc-credit-detail-head-v7{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}.rc-credit-detail-head-v7 strong{font-size:.82rem;color:var(--rc-text)}.rc-credit-detail-head-v7 span{font-size:.7rem;color:var(--rc-muted)}
+    .rc-credit-detail-grid-v7{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75rem}
+    .rc-credit-detail-field-v7{display:grid;gap:.35rem;font-size:.7rem;font-weight:750;color:var(--rc-muted)}
+    .rc-credit-detail-field-v7 textarea{width:100%;min-height:92px;resize:vertical;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);padding:.65rem .7rem;font:inherit;font-size:.75rem;line-height:1.45;outline:none}
+    .rc-credit-detail-field-v7 textarea:focus{border-color:var(--rc-accent);box-shadow:0 0 0 3px rgba(255,99,56,.08)}
+    .rc-credit-upload-v7{display:grid;gap:.45rem;align-content:start;padding:.7rem;border:1px dashed var(--rc-border);border-radius:.65rem;background:var(--rc-soft)}
+    .rc-credit-upload-v7 input[type=file]{width:100%;font-size:.72rem;color:var(--rc-text)}.rc-credit-upload-v7 small{font-size:.64rem;line-height:1.4;color:var(--rc-muted)}
+    .rc-credit-file-list-v7{display:flex;flex-wrap:wrap;gap:.35rem}.rc-credit-file-chip-v7{display:inline-flex;align-items:center;max-width:100%;padding:.26rem .45rem;border:1px solid var(--rc-border);border-radius:.5rem;background:var(--rc-surface);font-size:.64rem;font-weight:700;color:var(--rc-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .rc-credit-review-list-v7{display:grid;gap:.6rem;padding:1rem}
+    .rc-credit-review-row-v7{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.9rem;padding:.8rem;border:1px solid var(--rc-border);border-radius:.7rem;background:var(--rc-surface)}
+    .rc-credit-review-row-v7 strong{font-size:.8rem;color:var(--rc-text)}.rc-credit-review-row-v7 small{display:block;margin-top:.2rem;font-size:.68rem;line-height:1.45;color:var(--rc-muted)}.rc-credit-review-points-v7{font-size:.78rem;font-weight:850;color:var(--rc-accent);white-space:nowrap}
+    @media(max-width:760px){.rc-credit-steps-v7{grid-template-columns:1fr}.rc-credit-step-v7{border-right:0;border-bottom:1px solid var(--rc-border)}.rc-credit-step-v7:last-child{border-bottom:0}.rc-credit-detail-grid-v7{grid-template-columns:1fr}}
     .rc-credit-history-v4{display:grid;gap:.45rem}
     .rc-credit-history-row-v4{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .8rem;border:1px solid var(--rc-border);border-radius:.78rem;background:var(--rc-surface)}
     .rc-credit-history-row-v4 small{display:block;margin-top:.16rem;color:var(--rc-muted);font-size:.68rem}
@@ -11092,226 +11116,110 @@ CSS;
             </div>
         </div>
 
-        <div class="rc-support-tab-panel-v4" x-show="supportTab === 'credits'" x-cloak
-             x-data="{
-                catalog: @js($rcCreditCatalog),
-                balance: {{ (int) $rcCreditBalance }},
-                submitting: false,
-                selections: @js(collect($rcCreditCatalog)->mapWithKeys(fn ($item, $key) => [$key => ['selected' => false, 'quantity' => 1, 'rush' => false]])->all()),
-                pointsFor(key) {
-                    const item = this.catalog[key] || { points: 0 };
-                    const state = this.selections[key] || { selected: false, quantity: 1, rush: false };
-                    if (!state.selected) return 0;
-                    const base = Number(item.points || 0) * Math.max(1, Number(state.quantity || 1));
-                    return state.rush ? Math.ceil(base * 1.5) : base;
-                },
-                get selectedCount() {
-                    return Object.values(this.selections).filter(item => item.selected).length;
-                },
-                get quotedPoints() {
-                    return Object.keys(this.selections).reduce((sum, key) => sum + this.pointsFor(key), 0);
-                },
-                get enough() {
-                    return this.selectedCount > 0 && this.quotedPoints > 0 && this.balance >= this.quotedPoints;
-                },
-                get remaining() {
-                    return Math.max(0, this.balance - this.quotedPoints);
-                }
-             }">
+        @php
+            $rcCreditInitialStep = ($errors->has('confirm_spend') || $errors->has('credits')) ? 3 : (($errors->has('items.*.resources') || $errors->has('items.*.resources.*') || $errors->has('items.*.notes')) ? 2 : 1);
+            $rcCreditSelectionState = collect($rcCreditCatalog)->values()->mapWithKeys(function ($item, $index) use ($rcCreditCatalog) {
+                $key = array_keys($rcCreditCatalog)[$index];
+                return [$key => [
+                    'selected' => (bool) old("items.$index.selected", false),
+                    'quantity' => max(1, (int) old("items.$index.quantity", 1)),
+                    'rush' => (bool) old("items.$index.rush", false),
+                    'notes' => (string) old("items.$index.notes", ''),
+                ]];
+            })->all();
+        @endphp
+        <div class="rc-support-tab-panel-v4" x-show="supportTab === 'credits'" x-cloak x-data="{
+            step: {{ $rcCreditInitialStep }}, submitting: false, catalog: @js($rcCreditCatalog), balance: {{ (int) $rcCreditBalance }}, selections: @js($rcCreditSelectionState), resourceNames: {},
+            pointsFor(key) { const item = this.catalog[key] || { points: 0 }; const state = this.selections[key] || { selected: false, quantity: 1, rush: false }; if (!state.selected) return 0; const base = Number(item.points || 0) * Math.max(1, Number(state.quantity || 1)); return state.rush ? Math.ceil(base * 1.5) : base; },
+            get selectedKeys() { return Object.keys(this.selections).filter(key => this.selections[key]?.selected); },
+            get selectedCount() { return this.selectedKeys.length; },
+            get quotedPoints() { return this.selectedKeys.reduce((sum, key) => sum + this.pointsFor(key), 0); },
+            get enough() { return this.selectedCount > 0 && this.quotedPoints > 0 && this.balance >= this.quotedPoints; },
+            get remaining() { return Math.max(0, this.balance - this.quotedPoints); },
+            nextSelection() { if (!this.enough) return; this.step = 2; this.scrollWizard(); },
+            nextDetails() { if (!this.selectedCount) return; this.step = 3; this.scrollWizard(); },
+            backTo(step) { if (this.submitting) return; this.step = step; this.scrollWizard(); },
+            rememberResources(key, event) { this.resourceNames[key] = Array.from(event?.target?.files || []).map(file => file.name); },
+            scrollWizard() { this.$nextTick(() => this.$refs.creditWizard?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }
+        }" x-ref="creditWizard">
             @if(session('credit_success'))
-                <div class="rc-card" style="border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.08);">
-                    <strong>{{ session('credit_success') }}</strong>
-                </div>
+                <div class="rc-card" style="border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.08);"><strong>{{ session('credit_success') }}</strong></div>
             @endif
-
             @php
-                $creditError = $errors->first('credits')
-                    ?: $errors->first('items')
-                    ?: $errors->first('items.*.item_key')
-                    ?: $errors->first('confirm_spend');
+                $creditError = $errors->first('credits') ?: $errors->first('items') ?: $errors->first('items.*.item_key') ?: $errors->first('items.*.resources') ?: $errors->first('items.*.resources.*') ?: $errors->first('confirm_spend');
             @endphp
             @if($creditError)
-                <div class="rc-card" style="border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.07);color:#b42318;">
-                    {{ $creditError }}
-                </div>
+                <div class="rc-card" style="border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.07);color:#b42318;">{{ $creditError }}</div>
             @endif
-
             <div class="rc-credit-use-hero-v5">
-                <div>
-                    <div class="rc-subtle">Available credits</div>
-                    <div class="rc-credit-use-balance-v5">{{ number_format($rcCreditBalance) }} <span>credits</span></div>
-                    <div class="rc-subtle" style="margin-top:.35rem;">Select one or more services. The full order is charged from your credit balance when you submit it.</div>
-                </div>
+                <div><div class="rc-subtle">Available credits</div><div class="rc-credit-use-balance-v5">{{ number_format($rcCreditBalance) }} <span>credits</span></div><div class="rc-subtle" style="margin-top:.35rem;">Build the request in three simple steps. Credits are deducted only after the final confirmation.</div></div>
                 <a class="rc-btn rc-btn-primary" href="{{ url('/admin/my-journey') }}">Get More Credits</a>
             </div>
-
-            <form class="rc-credit-request-form-v5" method="POST" action="{{ route('support.credits.store') }}" x-on:submit="if (!enough || submitting) { $event.preventDefault(); return; } submitting = true">
+            <form class="rc-credit-request-form-v5 rc-credit-wizard-v7" method="POST" action="{{ route('support.credits.store') }}" enctype="multipart/form-data" x-on:submit="if (step !== 3 || !enough || submitting) { $event.preventDefault(); return; } submitting = true">
                 @csrf
                 <input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-
-                <section class="rc-credit-section-v5">
-                    <div class="rc-credit-section-head-v5">
-                        <div>
-                            <h3>Select services</h3>
-                            <p>Choose as many services as you need. Quantity and Rush are set separately for each service.</p>
-                        </div>
-                        <div class="rc-subtle"><span x-text="selectedCount"></span> selected</div>
-                    </div>
-
+                <div class="rc-credit-steps-v7" aria-label="Credit request steps">
+                    <div class="rc-credit-step-v7" :class="{ 'is-active': step === 1, 'is-done': step > 1 }"><span class="rc-credit-step-number-v7">1</span><span class="rc-credit-step-copy-v7"><strong>Select services</strong><span>Choose services, quantity, and Rush.</span></span></div>
+                    <div class="rc-credit-step-v7" :class="{ 'is-active': step === 2, 'is-done': step > 2 }"><span class="rc-credit-step-number-v7">2</span><span class="rc-credit-step-copy-v7"><strong>Notes & resources</strong><span>Add instructions and files for each service.</span></span></div>
+                    <div class="rc-credit-step-v7" :class="{ 'is-active': step === 3 }"><span class="rc-credit-step-number-v7">3</span><span class="rc-credit-step-copy-v7"><strong>Confirm</strong><span>Review the order before credits are deducted.</span></span></div>
+                </div>
+                <section class="rc-credit-section-v5" x-show="step === 1">
+                    <div class="rc-credit-section-head-v5"><div><h3>1. Select services</h3><p>Choose one or more services. Quantity and Rush are controlled separately for every item.</p></div><div class="rc-subtle"><span x-text="selectedCount"></span> selected</div></div>
                     <div class="rc-credit-service-list-v5">
                         @foreach($rcCreditCatalog as $creditKey => $creditItem)
                             <article class="rc-credit-service-row-v5" :class="{ 'is-selected': selections['{{ $creditKey }}'].selected }">
                                 <div class="rc-credit-service-main-v5">
-                                    <div>
-                                        <input type="hidden" name="items[{{ $loop->index }}][selected]" value="0">
-                                        <input type="hidden" name="items[{{ $loop->index }}][item_key]" value="{{ $creditKey }}">
-                                        <input
-                                            class="rc-credit-service-check-v5"
-                                            type="checkbox"
-                                            name="items[{{ $loop->index }}][selected]"
-                                            value="1"
-                                            x-model="selections['{{ $creditKey }}'].selected"
-                                            aria-label="Select {{ $creditItem['name'] }}"
-                                        >
-                                    </div>
-                                    <div class="rc-credit-service-copy-v5">
-                                        <div class="rc-credit-service-name-v5">
-                                            <span>{{ $creditItem['name'] }}</span>
-                                            <span class="rc-credit-service-base-v5">{{ number_format((int) $creditItem['points']) }} credits each</span>
-                                        </div>
-                                        <div class="rc-credit-service-desc-v5">{{ $creditItem['description'] ?? '' }}</div>
-                                        <div class="rc-credit-item-note-v6" x-show="selections['{{ $creditKey }}'].selected" x-cloak>
-                                            <label>
-                                                Instructions for this service
-                                                <textarea
-                                                    name="items[{{ $loop->index }}][notes]"
-                                                    maxlength="2000"
-                                                    :disabled="!selections['{{ $creditKey }}'].selected"
-                                                    placeholder="Add the links, footage notes, design direction, deadline details, or anything specific to this service."
-                                                >{{ old('items.' . $loop->index . '.notes') }}</textarea>
-                                            </label>
-                                        </div>
-                                    </div>
+                                    <div><input type="hidden" name="items[{{ $loop->index }}][selected]" value="0"><input type="hidden" name="items[{{ $loop->index }}][item_key]" value="{{ $creditKey }}"><input class="rc-credit-service-check-v5" type="checkbox" name="items[{{ $loop->index }}][selected]" value="1" x-model="selections['{{ $creditKey }}'].selected" aria-label="Select {{ $creditItem['name'] }}"></div>
+                                    <div class="rc-credit-service-copy-v5"><div class="rc-credit-service-name-v5"><span>{{ $creditItem['name'] }}</span><span class="rc-credit-service-base-v5">{{ number_format((int) $creditItem['points']) }} credits each</span></div><div class="rc-credit-service-desc-v5">{{ $creditItem['description'] ?? '' }}</div></div>
                                 </div>
-
                                 <div class="rc-credit-service-controls-v5">
-                                    <label class="rc-credit-mini-field-v5">
-                                        <span>Quantity</span>
-                                        <input
-                                            type="number"
-                                            name="items[{{ $loop->index }}][quantity]"
-                                            min="1"
-                                            max="20"
-                                            x-model.number="selections['{{ $creditKey }}'].quantity"
-                                            :disabled="!selections['{{ $creditKey }}'].selected"
-                                        >
-                                    </label>
-                                    <label class="rc-credit-mini-field-v5">
-                                        <span>Turnaround</span>
-                                        <span class="rc-credit-rush-v5">
-                                            <input type="hidden" name="items[{{ $loop->index }}][rush]" value="0">
-                                            <input
-                                                type="checkbox"
-                                                name="items[{{ $loop->index }}][rush]"
-                                                value="1"
-                                                x-model="selections['{{ $creditKey }}'].rush"
-                                                :disabled="!selections['{{ $creditKey }}'].selected"
-                                            >
-                                            Rush +50%
-                                        </span>
-                                    </label>
-                                    <label class="rc-credit-mini-field-v5">
-                                        <span>Subtotal</span>
-                                        <span class="rc-credit-row-total-v5" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></span>
-                                    </label>
+                                    <label class="rc-credit-mini-field-v5"><span>Quantity</span><input type="number" name="items[{{ $loop->index }}][quantity]" min="1" max="20" x-model.number="selections['{{ $creditKey }}'].quantity" :disabled="!selections['{{ $creditKey }}'].selected"></label>
+                                    <label class="rc-credit-mini-field-v5"><span>Turnaround</span><span class="rc-credit-rush-v5"><input type="hidden" name="items[{{ $loop->index }}][rush]" value="0"><input type="checkbox" name="items[{{ $loop->index }}][rush]" value="1" x-model="selections['{{ $creditKey }}'].rush" :disabled="!selections['{{ $creditKey }}'].selected">Rush +50%</span></label>
+                                    <label class="rc-credit-mini-field-v5"><span>Subtotal</span><span class="rc-credit-row-total-v5" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></span></label>
                                 </div>
                             </article>
                         @endforeach
                     </div>
+                    <div class="rc-credit-wizard-actions-v7"><div><span class="rc-subtle" x-show="selectedCount === 0">Select at least one service.</span><span class="rc-subtle is-error" x-show="selectedCount > 0 && !enough">This selection exceeds your available credits.</span><span class="rc-subtle" x-show="enough"><span x-text="selectedCount"></span> service(s) · <span x-text="quotedPoints.toLocaleString()"></span> credits</span></div><button type="button" class="rc-btn rc-btn-primary" :disabled="!enough" x-on:click="nextSelection()">Continue to Notes</button></div>
                 </section>
-
-                <section class="rc-credit-section-v5">
-                    <div class="rc-credit-section-head-v5">
-                        <div>
-                            <h3>Confirm request</h3>
-                            <p>Each selected service keeps its own quantity, Rush setting, and instructions.</p>
-                        </div>
+                <section class="rc-credit-section-v5" x-show="step === 2" x-cloak>
+                    <div class="rc-credit-section-head-v5"><div><h3>2. Notes & resources</h3><p>Add instructions and optional reference files separately for each selected service.</p></div></div>
+                    <div class="rc-credit-detail-list-v7">
+                        @foreach($rcCreditCatalog as $creditKey => $creditItem)
+                            <article class="rc-credit-detail-card-v7" x-show="selections['{{ $creditKey }}'].selected" x-cloak>
+                                <div class="rc-credit-detail-head-v7"><div><strong>{{ $creditItem['name'] }}</strong><span>Qty <span x-text="selections['{{ $creditKey }}'].quantity"></span><span x-show="selections['{{ $creditKey }}'].rush"> · Rush</span></span></div><strong style="color:var(--rc-accent)" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></strong></div>
+                                <div class="rc-credit-detail-grid-v7">
+                                    <label class="rc-credit-detail-field-v7">Instructions / notes<textarea name="items[{{ $loop->index }}][notes]" maxlength="2000" x-model="selections['{{ $creditKey }}'].notes" :disabled="!selections['{{ $creditKey }}'].selected" placeholder="Add links, footage notes, design direction, deadlines, or anything specific to this service."></textarea></label>
+                                    <label class="rc-credit-detail-field-v7">Reference resources<div class="rc-credit-upload-v7"><input type="file" name="items[{{ $loop->index }}][resources][]" multiple :disabled="!selections['{{ $creditKey }}'].selected" x-on:change="rememberResources('{{ $creditKey }}', $event)"><small>Optional. Up to 5 files, 50 MB each. Images, video, audio, PDF, Office files, ZIP, or TXT.</small><div class="rc-credit-file-list-v7" x-show="(resourceNames['{{ $creditKey }}'] || []).length"><template x-for="name in (resourceNames['{{ $creditKey }}'] || [])" :key="name"><span class="rc-credit-file-chip-v7" x-text="name"></span></template></div></div></label>
+                                </div>
+                            </article>
+                        @endforeach
                     </div>
-                    <div class="rc-credit-shared-fields-v5">
-                        <div class="rc-credit-warning-v5">
-                            Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If credits need to be restored, an administrator must apply them manually to your account.
-                        </div>
-
-                        <label class="rc-credit-confirm-v5">
-                            <input type="checkbox" name="confirm_spend" value="1" required>
-                            <span>I understand that the total credits for all selected services will be deducted immediately and will not be automatically returned.</span>
-                        </label>
+                    <div class="rc-credit-wizard-actions-v7"><button type="button" class="rc-btn" x-on:click="backTo(1)">Back</button><button type="button" class="rc-btn rc-btn-primary" x-on:click="nextDetails()">Review Request</button></div>
+                </section>
+                <section class="rc-credit-section-v5" x-show="step === 3" x-cloak>
+                    <div class="rc-credit-section-head-v5"><div><h3>3. Confirm request</h3><p>Review the services and attached information before the credits are permanently deducted.</p></div></div>
+                    <div class="rc-credit-review-list-v7">
+                        @foreach($rcCreditCatalog as $creditKey => $creditItem)
+                            <article class="rc-credit-review-row-v7" x-show="selections['{{ $creditKey }}'].selected" x-cloak>
+                                <div><strong>{{ $creditItem['name'] }} × <span x-text="selections['{{ $creditKey }}'].quantity"></span></strong><small><span x-text="selections['{{ $creditKey }}'].rush ? 'Rush turnaround · ' : 'Standard turnaround · '"></span><span x-text="selections['{{ $creditKey }}'].notes?.trim() ? selections['{{ $creditKey }}'].notes : 'No extra instructions.'"></span></small><small x-show="(resourceNames['{{ $creditKey }}'] || []).length"><span x-text="(resourceNames['{{ $creditKey }}'] || []).length"></span> resource file(s) attached.</small></div><div class="rc-credit-review-points-v7" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></div>
+                            </article>
+                        @endforeach
                     </div>
-
+                    <div class="rc-credit-shared-fields-v5"><div class="rc-credit-warning-v5">Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If credits need to be restored, an administrator must apply them manually to your account.</div><label class="rc-credit-confirm-v5"><input type="checkbox" name="confirm_spend" value="1" required><span>I understand that the total credits for all selected services will be deducted immediately and will not be automatically returned.</span></label></div>
                     <div class="rc-credit-order-summary-v5">
-                        <div class="rc-credit-order-line-v5">
-                            <span>Selected services</span>
-                            <strong><span x-text="selectedCount"></span></strong>
-                        </div>
-                        <div class="rc-credit-order-line-v5">
-                            <span>Current balance</span>
-                            <strong>{{ number_format($rcCreditBalance) }} credits</strong>
-                        </div>
-                        <div class="rc-credit-order-line-v5">
-                            <span>Balance after request</span>
-                            <strong><span x-text="remaining.toLocaleString()"></span> credits</strong>
-                        </div>
-                        <div class="rc-credit-order-line-v5 is-total">
-                            <span>Total to deduct</span>
-                            <strong><span x-text="quotedPoints.toLocaleString()"></span> credits</strong>
-                        </div>
-                        <div class="rc-credit-form-actions-v5">
-                            <div>
-                                <span class="rc-subtle" x-show="selectedCount === 0">Select at least one service to continue.</span>
-                                <span class="rc-subtle is-error" x-show="selectedCount > 0 && !enough">Your current balance is not enough for this order.</span>
-                            </div>
-                            <button type="submit" class="rc-btn rc-btn-primary rc-credit-submit-v6" :class="{ 'is-submitting': submitting }" :disabled="!enough || submitting" :aria-busy="submitting ? 'true' : 'false'">
-                                <span class="rc-credit-submit-spinner-v6" x-show="submitting" x-cloak aria-hidden="true"></span>
-                                <span x-show="!submitting">Submit Credit Request</span>
-                                <span x-show="submitting" x-cloak>Submitting Request...</span>
-                            </button>
-                        </div>
+                        <div class="rc-credit-order-line-v5"><span>Selected services</span><strong><span x-text="selectedCount"></span></strong></div><div class="rc-credit-order-line-v5"><span>Current balance</span><strong>{{ number_format($rcCreditBalance) }} credits</strong></div><div class="rc-credit-order-line-v5"><span>Balance after request</span><strong><span x-text="remaining.toLocaleString()"></span> credits</strong></div><div class="rc-credit-order-line-v5 is-total"><span>Total to deduct</span><strong><span x-text="quotedPoints.toLocaleString()"></span> credits</strong></div>
+                        <div class="rc-credit-form-actions-v5"><button type="button" class="rc-btn" :disabled="submitting" x-on:click="backTo(2)">Back</button><button type="submit" class="rc-btn rc-btn-primary rc-credit-submit-v6" :class="{ 'is-submitting': submitting }" :disabled="!enough || submitting" :aria-busy="submitting ? 'true' : 'false'"><span class="rc-credit-submit-spinner-v6" x-show="submitting" x-cloak aria-hidden="true"></span><span x-show="!submitting">Submit Credit Request</span><span x-show="submitting" x-cloak>Submitting Request...</span></button></div>
                     </div>
                 </section>
             </form>
-
-            <div>
-                <div class="rc-row-title" style="margin-bottom:.55rem;">Recent Credit Requests</div>
-                <div class="rc-credit-history-v4">
-                    @forelse($rcSupportCreditRequests as $creditRequest)
-                        <article class="rc-credit-history-row-v4">
-                            <div>
-                                <strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong>
-                                <small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>
-                                @if($creditRequest->notes)
-                                    <small style="display:block;margin-top:.3rem;white-space:pre-wrap;">Instructions: {{ $creditRequest->notes }}</small>
-                                @endif
-                                @if($creditRequest->delivery_file_path || $creditRequest->delivery_url)
-                                    <div class="rc-credit-delivery-v6">
-                                        @if($creditRequest->delivery_file_path)
-                                            <a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) }}" target="_blank" rel="noopener">Open File</a>
-                                        @endif
-                                        @if($creditRequest->delivery_url)
-                                            <a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener">Open Delivery Link</a>
-                                        @endif
-                                    </div>
-                                    @if($creditRequest->delivery_notes)
-                                        <small style="display:block;margin-top:.35rem;white-space:pre-wrap;">{{ $creditRequest->delivery_notes }}</small>
-                                    @endif
-                                @endif
-                            </div>
-                            <div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div>
-                        </article>
-                    @empty
-                        <div class="rc-empty">You have not used credits for a service yet.</div>
-                    @endforelse
-                </div>
-            </div>
+            <div><div class="rc-row-title" style="margin-bottom:.55rem;">Recent Credit Requests</div><div class="rc-credit-history-v4">
+                @forelse($rcSupportCreditRequests as $creditRequest)
+                    <article class="rc-credit-history-row-v4"><div><strong>{{ $creditRequest->item_name }} × {{ (int) $creditRequest->quantity }}</strong><small>{{ str($creditRequest->status)->replace('_', ' ')->title() }} · {{ optional($creditRequest->created_at)->format('M j, Y g:i A') }}{{ $creditRequest->modifier === 'rush' ? ' · Rush' : '' }}</small>@if($creditRequest->notes)<small style="display:block;margin-top:.3rem;white-space:pre-wrap;">Instructions: {{ $creditRequest->notes }}</small>@endif @if(is_array($creditRequest->request_resources) && count($creditRequest->request_resources))<small style="display:block;margin-top:.3rem;">{{ count($creditRequest->request_resources) }} resource file(s) submitted.</small>@endif @if($creditRequest->delivery_file_path || $creditRequest->delivery_url)<div class="rc-credit-delivery-v6">@if($creditRequest->delivery_file_path)<a href="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($creditRequest->delivery_file_path) }}" target="_blank" rel="noopener">Open File</a>@endif @if($creditRequest->delivery_url)<a href="{{ $creditRequest->delivery_url }}" target="_blank" rel="noopener">Open Delivery Link</a>@endif</div>@if($creditRequest->delivery_notes)<small style="display:block;margin-top:.35rem;white-space:pre-wrap;">{{ $creditRequest->delivery_notes }}</small>@endif @endif</div><div class="rc-credit-history-points-v4">-{{ number_format((int) $creditRequest->points_spent) }}</div></article>
+                @empty
+                    <div class="rc-empty">You have not used credits for a service yet.</div>
+                @endforelse
+            </div></div>
         </div>
     </div>
 </section>

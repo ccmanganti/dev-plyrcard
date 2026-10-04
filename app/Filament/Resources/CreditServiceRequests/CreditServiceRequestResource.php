@@ -37,13 +37,13 @@ class CreditServiceRequestResource extends Resource
 {
     protected static ?string $model = CreditServiceRequest::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
     protected static ?string $navigationLabel = 'Credit Requests';
     protected static ?string $modelLabel = 'Credit Request';
     protected static ?string $pluralModelLabel = 'Credit Requests';
     protected static string|UnitEnum|null $navigationGroup = null;
-    protected static ?string $navigationParentItem = 'Support Tickets';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationParentItem = null;
+    protected static ?int $navigationSort = 7;
     protected static ?string $slug = 'credit-service-requests';
 
     protected static function canManage(): bool
@@ -159,6 +159,14 @@ class CreditServiceRequestResource extends Resource
                         ->content(fn (?CreditServiceRequest $record): HtmlString => new HtmlString(
                             '<div style="white-space:pre-wrap;line-height:1.6">' . e((string) ($record?->notes ?: 'No notes were provided.')) . '</div>'
                         )),
+                ]),
+
+            Section::make('Player Resources')
+                ->description('Reference files uploaded by the player for this specific service request.')
+                ->schema([
+                    Placeholder::make('request_resources_display')
+                        ->label('Uploaded Resources')
+                        ->content(fn (?CreditServiceRequest $record): HtmlString => static::requestResourceLinks($record)),
                 ]),
 
             Section::make('Delivery')
@@ -302,6 +310,13 @@ class CreditServiceRequestResource extends Resource
                     ->tooltip(fn (CreditServiceRequest $record): string => $record->batchToken())
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                TextColumn::make('resource_count')
+                    ->label('Resources')
+                    ->state(fn (CreditServiceRequest $record): int => count((array) $record->request_resources))
+                    ->badge()
+                    ->color(fn (int $state): string => $state > 0 ? 'info' : 'gray')
+                    ->toggleable(),
+
                 TextColumn::make('created_at')
                     ->label('Requested')
                     ->dateTime('M j, Y g:i A')
@@ -371,6 +386,23 @@ class CreditServiceRequestResource extends Resource
                             requestId: (int) $record->getKey(),
                         )->to(\App\Livewire\AdminSupportMessenger::class);
                     }),
+
+                Action::make('resources')
+                    ->label('Resources')
+                    ->icon('heroicon-m-paper-clip')
+                    ->iconButton()
+                    ->tooltip('Open player-uploaded resources')
+                    ->color('info')
+                    ->visible(fn (CreditServiceRequest $record): bool => count((array) $record->request_resources) > 0)
+                    ->modalHeading(fn (CreditServiceRequest $record): string => 'Resources — ' . $record->item_name)
+                    ->modalDescription('Open or download the files the player attached to this service request.')
+                    ->form([
+                        Placeholder::make('resource_files')
+                            ->label('Player Uploads')
+                            ->content(fn (CreditServiceRequest $record): HtmlString => static::requestResourceLinks($record)),
+                    ])
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
 
                 Action::make('provide')
                     ->label('Provide')
@@ -517,6 +549,35 @@ class CreditServiceRequestResource extends Resource
                             ->send();
                     }),
             ]);
+    }
+
+    protected static function requestResourceLinks(?CreditServiceRequest $record): HtmlString
+    {
+        $resources = collect((array) ($record?->request_resources ?? []))
+            ->filter(fn ($resource): bool => is_array($resource) && filled($resource['path'] ?? null))
+            ->values();
+        if ($resources->isEmpty()) {
+            return new HtmlString('<span style="color:#6b7280">No resources uploaded.</span>');
+        }
+        $html = '<div style="display:grid;gap:.55rem">';
+        foreach ($resources as $resource) {
+            $path = (string) $resource['path'];
+            $name = trim((string) ($resource['name'] ?? basename($path))) ?: basename($path);
+            $url = Storage::disk('public')->url($path);
+            $size = static::formatBytes((int) ($resource['size'] ?? 0));
+            $html .= '<div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.7rem .75rem;border:1px solid #e5e7eb;border-radius:.65rem">'
+                . '<div style="min-width:0"><strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' . e($name) . '</strong><span style="font-size:.72rem;color:#6b7280">' . e($size) . '</span></div>'
+                . '<div style="display:flex;gap:.4rem;flex:0 0 auto"><a href="' . e($url) . '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:700;text-decoration:none">Open</a><a href="' . e($url) . '" download="' . e($name) . '" style="color:#16a34a;font-weight:700;text-decoration:none">Download</a></div></div>';
+        }
+        return new HtmlString($html . '</div>');
+    }
+
+    protected static function formatBytes(int $bytes): string
+    {
+        if ($bytes <= 0) return 'File';
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $index = min((int) floor(log($bytes, 1024)), count($units) - 1);
+        return number_format($bytes / (1024 ** $index), $index === 0 ? 0 : 1) . ' ' . $units[$index];
     }
 
     protected static function playerEmail(CreditServiceRequest $record): ?string
