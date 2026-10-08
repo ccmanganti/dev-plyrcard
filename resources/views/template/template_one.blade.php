@@ -624,6 +624,7 @@ HTML;
 
             return [
                 'id' => $schedule->id,
+                'created_at' => optional($schedule->created_at)->toIso8601String(),
                 'title' => $formatScheduleTitle($schedule),
                 'date' => $date?->format('Y-m-d'),
                 'year' => $date?->format('Y'),
@@ -3057,26 +3058,35 @@ HTML;
                     .replace(/'/g, "&#039;");
             }
 
-            function setDefaultToNextUpcomingMatch() {
+            function setDefaultToMostRecentlyCreatedMatch() {
                 if (!schedules.length) {
                     return;
                 }
 
-                const sortedSchedules = [...schedules].sort((a, b) => {
-                    return getScheduleDateTime(a).getTime() - getScheduleDateTime(b).getTime();
-                });
+                const mostRecentlyCreated = [...schedules].sort((a, b) => {
+                    const aCreated = a.created_at ? Date.parse(a.created_at) : Number.NaN;
+                    const bCreated = b.created_at ? Date.parse(b.created_at) : Number.NaN;
 
-                const nextUpcoming = sortedSchedules.find(item => getScheduleDateTime(item).getTime() >= now.getTime()) || sortedSchedules[0];
+                    if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) {
+                        return bCreated - aCreated;
+                    }
 
-                if (!nextUpcoming) {
+                    if (Number.isFinite(aCreated) !== Number.isFinite(bCreated)) {
+                        return Number.isFinite(bCreated) ? 1 : -1;
+                    }
+
+                    return Number(b.id || 0) - Number(a.id || 0);
+                })[0];
+
+                if (!mostRecentlyCreated || !mostRecentlyCreated.date) {
                     return;
                 }
 
-                selectedYear = nextUpcoming.year || selectedYear;
-                selectedMonth = nextUpcoming.month || selectedMonth;
+                selectedYear = mostRecentlyCreated.year || selectedYear;
+                selectedMonth = mostRecentlyCreated.month || selectedMonth;
 
                 const weeks = getWeeksForMonth(selectedYear, selectedMonth);
-                const weekIndex = weeks.findIndex(week => week.some(day => day.iso === nextUpcoming.date));
+                const weekIndex = weeks.findIndex(week => week.some(day => day.iso === mostRecentlyCreated.date));
                 selectedWeekIndex = weekIndex >= 0 ? weekIndex : 0;
             }
 
@@ -3119,7 +3129,7 @@ HTML;
             resetBtn.addEventListener("click", function () {
                 searchTerm = "";
                 searchInput.value = "";
-                setDefaultToNextUpcomingMatch();
+                setDefaultToMostRecentlyCreatedMatch();
                 render();
             });
 
@@ -3146,7 +3156,7 @@ HTML;
                 return;
             }
 
-            setDefaultToNextUpcomingMatch();
+            setDefaultToMostRecentlyCreatedMatch();
             render();
         });
     </script>

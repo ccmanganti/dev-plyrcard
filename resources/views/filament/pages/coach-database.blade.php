@@ -3838,9 +3838,17 @@ discoverSelectedIds: [],
             grid-template-columns: 2.35rem minmax(0,1fr) auto;
             gap: .6rem;
             align-items: center;
+            width: 100%;
+            border: 0;
+            background: transparent;
+            padding: 0;
+            text-align: left;
+            font: inherit;
             text-decoration: none;
             color: inherit;
+            cursor: pointer;
         }
+        .rc-home-activity-v2.is-static { cursor: default; }
         .rc-home-activity-icon-v2 {
             width: 2.05rem;
             height: 2.05rem;
@@ -6409,7 +6417,25 @@ discoverSelectedIds: [],
                 // No zero-engagement school fallback and no legacy all-purpose lead score.
                 $dashboardInterestedSchools = collect($this->dashboardMostInterestedSchools ?? [])->take(4)->values()->all();
                 $dashboardRadarSchools = collect($this->dashboardOutreachRadarSchools ?? [])->take(4)->values()->all();
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values()->all();
+                // Hide unresolved historical tracking rows that only carry the
+                // data-layer fallback label "Known coach contact". These events can
+                // still contribute to aggregate engagement totals, but should not be
+                // presented to the player as if a real coach name was resolved.
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])
+                    ->filter(function ($activity): bool {
+                        if (! is_array($activity)) {
+                            return false;
+                        }
+                        $identityText = strtolower(trim(implode(' ', [
+                            (string) ($activity['coach_name'] ?? ''),
+                            (string) ($activity['name'] ?? ''),
+                            (string) ($activity['title'] ?? ''),
+                            (string) ($activity['copy'] ?? ''),
+                        ])));
+                        return ! str_contains($identityText, 'known coach contact');
+                    })
+                    ->values()
+                    ->all();
                 $authUser = auth()->user();
                 $athleteName = trim((string) (method_exists($authUser, 'getFilamentName') ? $authUser?->getFilamentName() : ''));
                 if ($athleteName === '') {
@@ -6729,10 +6755,38 @@ discoverSelectedIds: [],
                         $icon = '⊞';
                     }
                     $time = $activity['time'] ?? null;
+                    $schoolId = trim((string) (
+                        $activity['school_id']
+                        ?? $activity['school_business_id']
+                        ?? $activity['business_id']
+                        ?? $activity['company_id']
+                        ?? $activity['ghl_business_id']
+                        ?? data_get($activity, 'coach.school_id')
+                        ?? data_get($activity, 'coach.business_id')
+                        ?? ''
+                    ));
+                    $schoolName = trim((string) (
+                        $activity['school_name']
+                        ?? $activity['school']
+                        ?? $activity['company_name']
+                        ?? $activity['business_name']
+                        ?? data_get($activity, 'coach.school')
+                        ?? data_get($activity, 'coach.school_name')
+                        ?? data_get($activity, 'coach.company_name')
+                        ?? ''
+                    ));
+                    $schoolReference = ($schoolId !== '' || $schoolName !== '')
+                        ? [
+                            'id' => $schoolId,
+                            'school_id' => $schoolId,
+                            'name' => $schoolName,
+                            'school_name' => $schoolName,
+                        ]
+                        : null;
                     return [
                         'title' => (string) ($activity['title'] ?? 'Recruiting activity'),
                         'copy' => trim(strip_tags((string) ($activity['copy'] ?? 'Recruiting update'))) ?: 'Recruiting update',
-                        'url' => $activity['url'] ?? '#',
+                        'school_ref' => $schoolReference,
                         'tone' => $tone,
                         'icon' => $icon,
                         'time_label' => $formatActivityTimeLabel($time),
@@ -7238,14 +7292,25 @@ discoverSelectedIds: [],
                         </div>
                         <div class="rc-home-activity-list-v2">
                             @forelse($dashboardActivityRows as $activityRow)
-                                <a class="rc-home-activity-v2" href="{{ $activityRow['url'] ?? '#' }}">
-                                    <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
-                                    <span class="rc-home-activity-copy-v2">
-                                        <strong>{{ $activityRow['title'] ?? 'Recruiting activity' }}</strong>
-                                        <small>{{ $activityRow['copy'] ?? 'Recruiting update' }}</small>
-                                    </span>
-                                    <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
-                                </a>
+                                @if(!empty($activityRow['school_ref']))
+                                    <button type="button" class="rc-home-activity-v2" x-on:click.stop="openGlobalSchool(@js($activityRow['school_ref']))" title="View school and coaching staff">
+                                        <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
+                                        <span class="rc-home-activity-copy-v2">
+                                            <strong>{{ $activityRow['title'] ?? 'Recruiting activity' }}</strong>
+                                            <small>{{ $activityRow['copy'] ?? 'Recruiting update' }}</small>
+                                        </span>
+                                        <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
+                                    </button>
+                                @else
+                                    <div class="rc-home-activity-v2 is-static">
+                                        <span class="rc-home-activity-icon-v2 is-{{ $activityRow['tone'] ?? 'blue' }}">{{ $activityRow['icon'] ?? '◉' }}</span>
+                                        <span class="rc-home-activity-copy-v2">
+                                            <strong>{{ $activityRow['title'] ?? 'Recruiting activity' }}</strong>
+                                            <small>{{ $activityRow['copy'] ?? 'Recruiting update' }}</small>
+                                        </span>
+                                        <span class="rc-home-activity-time-v2">{{ $activityRow['time_label'] ?? 'Recent' }}</span>
+                                    </div>
+                                @endif
                             @empty
                                 <div class="rc-home-empty-v2">Recent coach views, social clicks, email sends, and replies will appear here after the next sync.</div>
                             @endforelse
@@ -7641,7 +7706,20 @@ discoverSelectedIds: [],
         <div class="rc-dashboard-persistent-v1033" x-show="activeSection === 'dashboard'" style="{{ ($section === 'dashboard' || $isStatDrawerOpen) ? '' : 'display:none;' }}">
             @php
                 $dashboardMetrics = $this->dashboardMetrics;
-                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])->values();
+                $dashboardRecentActivity = collect($this->dashboardRecentActivity ?? [])
+                    ->filter(function ($activity): bool {
+                        if (! is_array($activity)) {
+                            return false;
+                        }
+                        $identityText = strtolower(trim(implode(' ', [
+                            (string) ($activity['coach_name'] ?? ''),
+                            (string) ($activity['name'] ?? ''),
+                            (string) ($activity['title'] ?? ''),
+                            (string) ($activity['copy'] ?? ''),
+                        ])));
+                        return ! str_contains($identityText, 'known coach contact');
+                    })
+                    ->values();
                 $xClicks = (int) ($dashboardMetrics['x_click_count'] ?? $dashboardMetrics['x_clicks'] ?? $dashboardMetrics['twitter_clicks'] ?? 0);
                 $igClicks = (int) ($dashboardMetrics['instagram_click_count'] ?? $dashboardMetrics['instagram_clicks'] ?? 0);
                 $ytClicks = (int) ($dashboardMetrics['youtube_click_count'] ?? $dashboardMetrics['youtube_clicks'] ?? 0);
