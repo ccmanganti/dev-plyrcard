@@ -6,8 +6,9 @@
     ];
 @endphp
 <style>
-    .plyr-stripe-modal[hidden]{display:none!important}.plyr-stripe-modal{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:20px}.plyr-stripe-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(4px)}.plyr-stripe-card{position:relative;width:min(560px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid rgba(15,23,42,.12);box-shadow:0 28px 80px rgba(15,23,42,.28);padding:22px}.dark .plyr-stripe-card{background:#0b0d10;color:#fff;border-color:rgba(255,255,255,.12)}.plyr-stripe-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}.plyr-stripe-head h3{margin:4px 0 0;font-size:24px}.plyr-stripe-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#ff6338}.plyr-stripe-close{border:1px solid #e5e7eb;background:transparent;border-radius:10px;width:38px;height:38px;cursor:pointer;color:inherit}.plyr-stripe-summary{padding:12px 14px;border-radius:12px;background:#f8fafc;margin-bottom:14px;color:#475467;font-size:13px}.dark .plyr-stripe-summary{background:#15181e;color:#cbd5e1}.plyr-stripe-element{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.plyr-stripe-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}.plyr-stripe-btn{border:1px solid #d0d5dd;border-radius:10px;padding:10px 15px;background:#fff;font-weight:750;cursor:pointer}.plyr-stripe-btn.primary{background:#ff6338;border-color:#ff6338;color:#fff}.plyr-stripe-status{margin-top:12px;font-size:12px;color:#667085}.plyr-stripe-status.error{color:#b42318}.plyr-stripe-status.success{color:#067647}.plyr-stripe-loading{padding:28px;text-align:center;color:#667085}
+    .plyr-stripe-modal[hidden]{display:none!important}.plyr-stripe-modal{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:20px}.plyr-stripe-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(4px)}.plyr-stripe-card{position:relative;width:min(560px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid rgba(15,23,42,.12);box-shadow:0 28px 80px rgba(15,23,42,.28);padding:22px}.dark .plyr-stripe-card{background:#0b0d10;color:#fff;border-color:rgba(255,255,255,.12)}.plyr-stripe-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}.plyr-stripe-head h3{margin:4px 0 0;font-size:24px}.plyr-stripe-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#ff6338}.plyr-stripe-close{border:1px solid #e5e7eb;background:transparent;border-radius:10px;width:38px;height:38px;cursor:pointer;color:inherit}.plyr-stripe-summary{padding:12px 14px;border-radius:12px;background:#f8fafc;margin-bottom:14px;color:#475467;font-size:13px}.dark .plyr-stripe-summary{background:#15181e;color:#cbd5e1}.plyr-stripe-element{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.plyr-stripe-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}.plyr-stripe-btn{border:1px solid #d0d5dd;border-radius:10px;padding:10px 15px;background:#fff;font-weight:750;cursor:pointer}.plyr-stripe-btn.primary{background:#ff6338;border-color:#ff6338;color:#fff}.plyr-stripe-status{margin-top:12px;font-size:12px;color:#667085}.plyr-stripe-status.error{color:#b42318}.plyr-stripe-status.success{color:#067647}.plyr-stripe-loading{padding:28px;text-align:center;color:#667085}.plyr-purchase-thank-you[hidden]{display:none!important}.plyr-purchase-thank-you{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:100001;display:flex;align-items:center;gap:9px;max-width:min(620px,calc(100vw - 28px));padding:10px 12px;border:1px solid rgba(22,163,74,.28);border-radius:12px;background:#f0fdf4;box-shadow:0 14px 36px rgba(15,23,42,.16);color:#166534;font-size:13px}.plyr-purchase-thank-you strong{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;background:#15803d;color:#fff;font-size:10px;font-weight:900;letter-spacing:.08em;line-height:1;text-transform:uppercase}.dark .plyr-purchase-thank-you{background:#102318;color:#bbf7d0;border-color:rgba(74,222,128,.28)}
 </style>
+<div class="plyr-purchase-thank-you" data-plyr-purchase-thank-you hidden role="status" aria-live="polite"><strong>Thank you</strong><span data-plyr-purchase-thank-you-copy></span></div>
 <div class="plyr-stripe-modal" id="plyr-stripe-upgrade-modal" hidden>
     <div class="plyr-stripe-backdrop" data-stripe-close></div>
     <div class="plyr-stripe-card" role="dialog" aria-modal="true" aria-labelledby="plyr-stripe-title">
@@ -28,6 +29,17 @@
     let stripe = null, elements = null, activeType = null, statusTimer = null, confirming = false;
     const q = s => modal.querySelector(s);
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
+    const purchaseThankYou=document.querySelector('[data-plyr-purchase-thank-you]');
+    const showPurchaseThankYou=message=>{
+        if(!purchaseThankYou||!message)return;
+        const copy=purchaseThankYou.querySelector('[data-plyr-purchase-thank-you-copy]');
+        if(copy)copy.textContent=message;
+        purchaseThankYou.hidden=false;
+    };
+    try {
+        const stored=sessionStorage.getItem('plyrcard.purchaseThankYou');
+        if(stored){sessionStorage.removeItem('plyrcard.purchaseThankYou');showPurchaseThankYou(stored);}
+    } catch (_) {}
     const setStatus = (text, tone='') => { const el=q('[data-stripe-status]'); el.textContent=text||''; el.className='plyr-stripe-status '+tone; };
     const cardHint = card => {
         if(!card || !card.last_four) return '';
@@ -74,6 +86,11 @@
                 statusTimer=null;
                 setStatus(data.message||'Payment confirmed. Updating your account…','success');
                 setConfirmBusy(true,'Confirmed');
+                const route=routes[activeType]||{};
+                const message=(activeType==='jumpstart'||activeType==='amplify')
+                    ? `Your ${route.title||'credit'} purchase is complete. Your updated credits are now available.`
+                    : `Your ${route.title||'purchase'} is complete and your account has been updated.`;
+                try { sessionStorage.setItem('plyrcard.purchaseThankYou',message); } catch (_) {}
                 setTimeout(()=>window.location.reload(),450);
                 return;
             }

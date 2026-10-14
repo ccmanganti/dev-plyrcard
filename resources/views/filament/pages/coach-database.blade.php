@@ -11115,7 +11115,7 @@ CSS;
     .rc-credit-history-count-v8{margin-left:.25rem;padding:.1rem .35rem;border-radius:999px;background:var(--rc-soft);color:inherit;font-size:.62rem}
     .rc-support-tab-count-v9{display:inline-flex;align-items:center;justify-content:center;min-width:1.2rem;height:1.2rem;padding:0 .32rem;border-radius:999px;background:var(--rc-soft);color:inherit;font-size:.62rem;font-weight:800}
     .rc-request-history-page-v9{gap:1rem}
-    .rc-request-history-success-v9{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;padding:.8rem .9rem;border:1px solid rgba(22,163,74,.28);border-radius:.75rem;background:rgba(22,163,74,.08);color:#15803d;font-size:.75rem}.rc-request-history-success-v9 span{color:var(--rc-muted)}
+    .rc-request-history-success-v9{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.72rem .8rem;border:1px solid rgba(22,163,74,.28);border-radius:.75rem;background:rgba(22,163,74,.08);color:#15803d;font-size:.75rem}.rc-request-history-success-v9 .rc-thank-you-label-v10{display:inline-flex;align-items:center;padding:.24rem .48rem;border-radius:999px;background:#15803d;color:#fff;font-size:.62rem;font-weight:900;letter-spacing:.08em;line-height:1;text-transform:uppercase}.rc-request-history-success-v9 strong{font-size:.76rem;color:#166534}.rc-request-history-success-v9 span:not(.rc-thank-you-label-v10){color:var(--rc-muted)}
     .rc-request-history-head-v9{display:flex;align-items:center;justify-content:space-between;gap:1rem}
     .rc-request-history-stats-v9{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}.rc-request-history-stats-v9>div{display:grid;gap:.2rem;padding:.8rem .9rem;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface)}.rc-request-history-stats-v9 span{font-size:.66rem;color:var(--rc-muted);font-weight:700}.rc-request-history-stats-v9 strong{font-size:1.08rem;color:var(--rc-text)}
     .rc-request-history-layout-v9{display:grid;grid-template-columns:minmax(18rem,.75fr) minmax(0,1.35fr);gap:1rem;align-items:start}
@@ -11337,7 +11337,7 @@ CSS;
         @endphp
         <div class="rc-support-tab-panel-v4 rc-request-history-page-v9" x-show="supportTab === 'history'" x-cloak x-data="{ historyFilter: @js($rcHistoryInitialFilter), selectedRequest: {{ $rcInitialRequestId }} }">
             @if(session('credit_success'))
-                <div class="rc-request-history-success-v9"><strong>Request submitted.</strong><span>{{ session('credit_success') }}</span></div>
+                <div class="rc-request-history-success-v9"><span class="rc-thank-you-label-v10">Thank you</span><strong>Request submitted.</strong><span>{{ session('credit_success') }}</span></div>
             @endif
 
             <div class="rc-request-history-head-v9">

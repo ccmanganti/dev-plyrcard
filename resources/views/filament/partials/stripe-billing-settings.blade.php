@@ -18,9 +18,13 @@
     $settingsBrand = strtoupper((string) ($settingsBilling->payment_brand ?: 'CARD'));
     $settingsHistory = collect($settingsSummary['history'] ?? []);
     $settingsPeriodEnd = filled($settingsSummary['current_period_end'] ?? null) ? \Illuminate\Support\Carbon::parse($settingsSummary['current_period_end']) : null;
+    $settingsBillingThankYou = session('success') === 'Billing information saved.';
 @endphp
 <style>
-    [data-stripe-card-modal][hidden]{display:none!important;}
+    [data-stripe-card-modal][hidden],[data-billing-thank-you][hidden]{display:none!important;}
+    .rc-billing-thank-you-v1{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:0 0 1rem;padding:.7rem .8rem;border:1px solid rgba(22,163,74,.28);border-radius:.75rem;background:rgba(22,163,74,.08);font-size:.75rem;color:#166534}
+    .rc-billing-thank-you-v1 strong{display:inline-flex;align-items:center;padding:.24rem .48rem;border-radius:999px;background:#15803d;color:#fff;font-size:.62rem;font-weight:900;letter-spacing:.08em;line-height:1;text-transform:uppercase}
+    .rc-billing-thank-you-v1 span{color:#166534;font-weight:650}
 </style>
 <div class="rc-settings-card-v72" id="billing-payments" data-stripe-billing-settings
      data-summary-url="{{ route('billing.stripe.summary') }}"
@@ -37,6 +41,10 @@
             <h2 style="margin:0;">Billing &amp; Payments</h2>
             <p style="margin:.2rem 0 0;color:var(--rc-muted);">Manage your My Journey subscription, payment method, billing details, credit balance, and payment history.</p>
         </div>
+    </div>
+    <div class="rc-billing-thank-you-v1" data-billing-thank-you @if(! $settingsBillingThankYou) hidden @endif>
+        <strong>Thank you</strong>
+        <span data-billing-thank-you-copy>{{ $settingsBillingThankYou ? 'Your billing information has been updated successfully.' : '' }}</span>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.65rem;margin-bottom:1rem;">
         <div class="rc-card is-flat"><div class="rc-subtle">Stripe</div><strong>{{ $settingsStripeConnected ? 'Connected' : 'Not connected yet' }}</strong></div>
@@ -143,6 +151,19 @@
     window.__plyrStripeBillingSettingsBound = true;
     let stripe = null, elements = null, activeRoot = null, setupIntentId = null;
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
+    const showThankYou = (root, message) => {
+        const notice=root?.querySelector('[data-billing-thank-you]');
+        const copy=notice?.querySelector('[data-billing-thank-you-copy]');
+        if(!notice||!copy)return;
+        copy.textContent=message;
+        notice.hidden=false;
+    };
+    document.querySelectorAll('[data-stripe-billing-settings]').forEach(root => {
+        try {
+            const message=sessionStorage.getItem('plyrcard.billingThankYou');
+            if(message){sessionStorage.removeItem('plyrcard.billingThankYou');showThankYou(root,message);}
+        } catch (_) {}
+    });
     const req = async (url, method='POST', body={}) => {
         const response = await fetch(url, {
             method,
@@ -223,6 +244,7 @@
                 if(status) status.textContent='Card confirmed. Updating your subscription…';
                 await req(root.dataset.cardCompleteUrl,'POST',{setup_intent_id:setupIntentId});
                 if(status) status.textContent='Payment method updated. Refreshing…';
+                try { sessionStorage.setItem('plyrcard.billingThankYou','Your payment method has been updated successfully.'); } catch (_) {}
                 saveButton.textContent='Saved';
                 setTimeout(()=>window.location.reload(),450);
             }catch(error){
