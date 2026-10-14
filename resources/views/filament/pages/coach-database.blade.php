@@ -11116,6 +11116,7 @@ CSS;
     .rc-support-tab-count-v9{display:inline-flex;align-items:center;justify-content:center;min-width:1.2rem;height:1.2rem;padding:0 .32rem;border-radius:999px;background:var(--rc-soft);color:inherit;font-size:.62rem;font-weight:800}
     .rc-request-history-page-v9{gap:1rem}
     .rc-request-history-success-v9{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.72rem .8rem;border:1px solid rgba(22,163,74,.28);border-radius:.75rem;background:rgba(22,163,74,.08);color:#15803d;font-size:.75rem}.rc-request-history-success-v9 .rc-thank-you-label-v10{display:inline-flex;align-items:center;padding:.24rem .48rem;border-radius:999px;background:#15803d;color:#fff;font-size:.62rem;font-weight:900;letter-spacing:.08em;line-height:1;text-transform:uppercase}.rc-request-history-success-v9 strong{font-size:.76rem;color:#166534}.rc-request-history-success-v9 span:not(.rc-thank-you-label-v10){color:var(--rc-muted)}
+    .rc-credit-thank-you-overlay-v11{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:1.5rem;background:rgba(248,250,252,.96);backdrop-filter:blur(8px)}.rc-credit-thank-you-card-v11{width:min(35rem,100%);text-align:center;padding:2.6rem 1.8rem;border:1px solid rgba(22,163,74,.22);border-radius:1.5rem;background:#fff;box-shadow:0 28px 90px rgba(15,23,42,.18)}.rc-credit-thank-you-icon-v11{width:4.5rem;height:4.5rem;margin:0 auto 1.1rem;border-radius:999px;display:grid;place-items:center;background:#dcfce7;color:#15803d;font-size:2rem;font-weight:900}.rc-credit-thank-you-kicker-v11{font-size:.68rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#15803d}.rc-credit-thank-you-card-v11 h2{margin:.5rem 0 .65rem;font-size:2rem;line-height:1.08;color:#111827}.rc-credit-thank-you-card-v11 p{margin:0 auto;max-width:27rem;color:#667085;font-size:.9rem;line-height:1.65}.rc-credit-thank-you-actions-v11{display:flex;justify-content:center;margin-top:1.25rem}.dark .rc-credit-thank-you-overlay-v11{background:rgba(8,10,13,.96)}.dark .rc-credit-thank-you-card-v11{background:#111318;border-color:rgba(74,222,128,.2)}.dark .rc-credit-thank-you-card-v11 h2{color:#fff}.dark .rc-credit-thank-you-card-v11 p{color:#cbd5e1}
     .rc-request-history-head-v9{display:flex;align-items:center;justify-content:space-between;gap:1rem}
     .rc-request-history-stats-v9{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem}.rc-request-history-stats-v9>div{display:grid;gap:.2rem;padding:.8rem .9rem;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface)}.rc-request-history-stats-v9 span{font-size:.66rem;color:var(--rc-muted);font-weight:700}.rc-request-history-stats-v9 strong{font-size:1.08rem;color:var(--rc-text)}
     .rc-request-history-layout-v9{display:grid;grid-template-columns:minmax(18rem,.75fr) minmax(0,1.35fr);gap:1rem;align-items:start}
@@ -11143,6 +11144,18 @@ CSS;
 </style>
 <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
     <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: @js(session('credit_success') ? 'history' : (($errors->has('credits') || $errors->has('items') || $errors->has('confirm_spend') || $errors->has('items.*.resources') || $errors->has('items.*.resources.*') || $errors->has('items.*.notes')) ? 'credits' : 'ticket')) }">
+        @if(session('credit_success'))
+            <div class="rc-credit-thank-you-overlay-v11" data-credit-thank-you-overlay role="status" aria-live="assertive">
+                <div class="rc-credit-thank-you-card-v11">
+                    <div class="rc-credit-thank-you-icon-v11" aria-hidden="true">✓</div>
+                    <div class="rc-credit-thank-you-kicker-v11">Request submitted</div>
+                    <h2>Thank you!</h2>
+                    <p>{{ session('credit_success') }} You can track the request and access delivered files from Request History.</p>
+                    <div class="rc-credit-thank-you-actions-v11"><button class="rc-btn rc-btn-primary" type="button" onclick="this.closest('[data-credit-thank-you-overlay]').remove();document.documentElement.style.removeProperty('overflow')">View Request History</button></div>
+                </div>
+            </div>
+            <script>document.documentElement.style.overflow='hidden';</script>
+        @endif
         <div class="rc-support-tabs-v5" role="tablist" aria-label="Support sections">
             <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'ticket' ? 'is-active' : ''" :aria-selected="supportTab === 'ticket'" @click="supportTab = 'ticket'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 10h8M8 14h5M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-4 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>

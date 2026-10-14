@@ -22,9 +22,16 @@
 @endphp
 <style>
     [data-stripe-card-modal][hidden],[data-billing-thank-you][hidden]{display:none!important;}
-    .rc-billing-thank-you-v1{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;margin:0 0 1rem;padding:.7rem .8rem;border:1px solid rgba(22,163,74,.28);border-radius:.75rem;background:rgba(22,163,74,.08);font-size:.75rem;color:#166534}
-    .rc-billing-thank-you-v1 strong{display:inline-flex;align-items:center;padding:.24rem .48rem;border-radius:999px;background:#15803d;color:#fff;font-size:.62rem;font-weight:900;letter-spacing:.08em;line-height:1;text-transform:uppercase}
-    .rc-billing-thank-you-v1 span{color:#166534;font-weight:650}
+    .rc-billing-thank-you-v2{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:1.5rem;background:rgba(248,250,252,.96);backdrop-filter:blur(8px)}
+    .rc-billing-thank-you-card-v2{width:min(35rem,100%);text-align:center;padding:2.6rem 1.8rem;border:1px solid rgba(22,163,74,.22);border-radius:1.5rem;background:#fff;box-shadow:0 28px 90px rgba(15,23,42,.18)}
+    .rc-billing-thank-you-icon-v2{width:4.5rem;height:4.5rem;margin:0 auto 1.1rem;border-radius:999px;display:grid;place-items:center;background:#dcfce7;color:#15803d;font-size:2rem;font-weight:900}
+    .rc-billing-thank-you-kicker-v2{font-size:.68rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#15803d}
+    .rc-billing-thank-you-card-v2 h2{margin:.5rem 0 .65rem;font-size:2rem;line-height:1.08;color:#111827}
+    .rc-billing-thank-you-card-v2 p{margin:0 auto;max-width:27rem;color:#667085;font-size:.9rem;line-height:1.65}
+    .rc-billing-thank-you-actions-v2{display:flex;justify-content:center;margin-top:1.25rem}
+    .dark .rc-billing-thank-you-v2{background:rgba(8,10,13,.96)}
+    .dark .rc-billing-thank-you-card-v2{background:#111318;border-color:rgba(74,222,128,.2)}
+    .dark .rc-billing-thank-you-card-v2 h2{color:#fff}.dark .rc-billing-thank-you-card-v2 p{color:#cbd5e1}
 </style>
 <div class="rc-settings-card-v72" id="billing-payments" data-stripe-billing-settings
      data-summary-url="{{ route('billing.stripe.summary') }}"
@@ -42,9 +49,14 @@
             <p style="margin:.2rem 0 0;color:var(--rc-muted);">Manage your My Journey subscription, payment method, billing details, credit balance, and payment history.</p>
         </div>
     </div>
-    <div class="rc-billing-thank-you-v1" data-billing-thank-you @if(! $settingsBillingThankYou) hidden @endif>
-        <strong>Thank you</strong>
-        <span data-billing-thank-you-copy>{{ $settingsBillingThankYou ? 'Your billing information has been updated successfully.' : '' }}</span>
+    <div class="rc-billing-thank-you-v2" data-billing-thank-you @if(! $settingsBillingThankYou) hidden @endif role="status" aria-live="assertive">
+        <div class="rc-billing-thank-you-card-v2">
+            <div class="rc-billing-thank-you-icon-v2" aria-hidden="true">✓</div>
+            <div class="rc-billing-thank-you-kicker-v2">Billing updated</div>
+            <h2>Thank you!</h2>
+            <p data-billing-thank-you-copy>{{ $settingsBillingThankYou ? 'Your billing information has been updated successfully.' : '' }}</p>
+            <div class="rc-billing-thank-you-actions-v2"><button class="rc-btn rc-btn-primary" type="button" data-billing-thank-you-close>Continue</button></div>
+        </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:.65rem;margin-bottom:1rem;">
         <div class="rc-card is-flat"><div class="rc-subtle">Stripe</div><strong>{{ $settingsStripeConnected ? 'Connected' : 'Not connected yet' }}</strong></div>
@@ -151,18 +163,22 @@
     window.__plyrStripeBillingSettingsBound = true;
     let stripe = null, elements = null, activeRoot = null, setupIntentId = null;
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
-    const showThankYou = (root, message) => {
+    const showThankYou=(root,message,options={})=>{
         const notice=root?.querySelector('[data-billing-thank-you]');
         const copy=notice?.querySelector('[data-billing-thank-you-copy]');
         if(!notice||!copy)return;
         copy.textContent=message;
         notice.hidden=false;
+        document.documentElement.style.overflow='hidden';
+        if(options.reload)setTimeout(()=>window.location.reload(),2200);
     };
-    document.querySelectorAll('[data-stripe-billing-settings]').forEach(root => {
-        try {
-            const message=sessionStorage.getItem('plyrcard.billingThankYou');
-            if(message){sessionStorage.removeItem('plyrcard.billingThankYou');showThankYou(root,message);}
-        } catch (_) {}
+    const hideThankYou=root=>{
+        const notice=root?.querySelector('[data-billing-thank-you]');
+        if(notice)notice.hidden=true;
+        document.documentElement.style.removeProperty('overflow');
+    };
+    document.querySelectorAll('[data-stripe-billing-settings]').forEach(root=>{
+        if(!root.querySelector('[data-billing-thank-you]')?.hidden)document.documentElement.style.overflow='hidden';
     });
     const req = async (url, method='POST', body={}) => {
         const response = await fetch(url, {
@@ -186,6 +202,12 @@
         stripe=null; elements=null; activeRoot=null; setupIntentId=null;
     };
     document.addEventListener('click', async event => {
+        const thankYouClose=event.target.closest('[data-billing-thank-you-close]');
+        if(thankYouClose){
+            event.preventDefault();
+            hideThankYou(rootFor(thankYouClose));
+            return;
+        }
         const updateButton=event.target.closest('[data-stripe-card-update]');
         if(updateButton){
             event.preventDefault();
@@ -243,10 +265,10 @@
                 if(!setupIntentId) throw new Error('Stripe confirmed the card but did not return the SetupIntent ID.');
                 if(status) status.textContent='Card confirmed. Updating your subscription…';
                 await req(root.dataset.cardCompleteUrl,'POST',{setup_intent_id:setupIntentId});
-                if(status) status.textContent='Payment method updated. Refreshing…';
-                try { sessionStorage.setItem('plyrcard.billingThankYou','Your payment method has been updated successfully.'); } catch (_) {}
+                if(status) status.textContent='Payment method updated.';
                 saveButton.textContent='Saved';
-                setTimeout(()=>window.location.reload(),450);
+                closeCardPanel(root);
+                showThankYou(root,'Your payment method has been updated successfully.',{reload:true});
             }catch(error){
                 if(status) status.textContent=error.message||'Unable to save card.';
                 saveButton.disabled=false;
