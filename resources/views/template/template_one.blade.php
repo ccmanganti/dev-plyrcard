@@ -3058,35 +3058,45 @@ HTML;
                     .replace(/'/g, "&#039;");
             }
 
-            function setDefaultToMostRecentlyCreatedMatch() {
+            function setDefaultToNextUpcomingMatch() {
                 if (!schedules.length) {
                     return;
                 }
 
-                const mostRecentlyCreated = [...schedules].sort((a, b) => {
+                const nowTimestamp = Date.now();
+                const byGameDateAscending = (a, b) => {
+                    const dateDifference = getScheduleDateTime(a).getTime() - getScheduleDateTime(b).getTime();
+                    if (dateDifference !== 0) {
+                        return dateDifference;
+                    }
+
                     const aCreated = a.created_at ? Date.parse(a.created_at) : Number.NaN;
                     const bCreated = b.created_at ? Date.parse(b.created_at) : Number.NaN;
-
                     if (Number.isFinite(aCreated) && Number.isFinite(bCreated) && aCreated !== bCreated) {
                         return bCreated - aCreated;
                     }
 
-                    if (Number.isFinite(aCreated) !== Number.isFinite(bCreated)) {
-                        return Number.isFinite(bCreated) ? 1 : -1;
-                    }
-
                     return Number(b.id || 0) - Number(a.id || 0);
-                })[0];
+                };
 
-                if (!mostRecentlyCreated || !mostRecentlyCreated.date) {
+                const upcomingSchedules = schedules
+                    .filter(item => item.date && getScheduleDateTime(item).getTime() >= nowTimestamp)
+                    .sort(byGameDateAscending);
+
+                const targetSchedule = upcomingSchedules[0]
+                    || [...schedules]
+                        .filter(item => item.date)
+                        .sort((a, b) => byGameDateAscending(b, a))[0];
+
+                if (!targetSchedule) {
                     return;
                 }
 
-                selectedYear = mostRecentlyCreated.year || selectedYear;
-                selectedMonth = mostRecentlyCreated.month || selectedMonth;
+                selectedYear = targetSchedule.year || selectedYear;
+                selectedMonth = targetSchedule.month || selectedMonth;
 
                 const weeks = getWeeksForMonth(selectedYear, selectedMonth);
-                const weekIndex = weeks.findIndex(week => week.some(day => day.iso === mostRecentlyCreated.date));
+                const weekIndex = weeks.findIndex(week => week.some(day => day.iso === targetSchedule.date));
                 selectedWeekIndex = weekIndex >= 0 ? weekIndex : 0;
             }
 
@@ -3129,7 +3139,7 @@ HTML;
             resetBtn.addEventListener("click", function () {
                 searchTerm = "";
                 searchInput.value = "";
-                setDefaultToMostRecentlyCreatedMatch();
+                setDefaultToNextUpcomingMatch();
                 render();
             });
 
@@ -3156,7 +3166,7 @@ HTML;
                 return;
             }
 
-            setDefaultToMostRecentlyCreatedMatch();
+            setDefaultToNextUpcomingMatch();
             render();
         });
     </script>
