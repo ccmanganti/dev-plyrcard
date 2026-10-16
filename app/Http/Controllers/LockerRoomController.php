@@ -418,6 +418,9 @@ class LockerRoomController extends Controller
         $user = Auth::user();
         abort_unless($user, 403);
         $this->ensureScheduleAccess($user);
+        if ($request->hasFile('schedule_csv')) {
+            return $this->importScheduleCsv($request, $user, $dataService);
+        }
         $data = $this->validatedScheduleData($request);
         $data['created_by_user_id'] = $user->id;
         $schedule = Schedule::create($data);
@@ -782,6 +785,308 @@ class LockerRoomController extends Controller
             ->orderBy('sort_order')
             ->orderBy('id')
             ->value('id');
+    }
+    protected function importScheduleCsv(Request $request, $user, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    {
+        $file = $request->file('schedule_csv');
+        if (! $file || ! $file->isValid()) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'Please choose a valid CSV file.',
+                'errors' => [],
+            ]);
+        }
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if (! in_array($extension, ['csv', 'txt'], true) || (int) $file->getSize() > 5 * 1024 * 1024) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'Use a CSV file no larger than 5 MB.',
+                'errors' => [],
+            ]);
+        }
+        $handle = fopen($file->getRealPath(), 'rb');
+        if (! is_resource($handle)) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'The CSV file could not be opened.',
+                'errors' => [],
+            ]);
+        }
+        $header = fgetcsv($handle);
+        if (! is_array($header)) {
+            fclose($handle);
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'The CSV file does not contain a header row.',
+                'errors' => [],
+            ]);
+        }
+        $header = array_map(function ($value): string {
+            $value = preg_replace('/^\xEF\xBB\xBF/', '', (string) $value) ?? (string) $value;
+            $value = strtolower(trim($value));
+            return trim((string) preg_replace('/[^a-z0-9]+/', '_', $value), '_');
+        }, $header);
+        $columnMap = $this->scheduleCsvColumnMap($header);
+        if (! isset($columnMap['game_date'], $columnMap['opponent'])) {
+            fclose($handle);
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'The CSV must include Date and Opponent / Event Name columns.',
+                'errors' => [],
+            ]);
+        }
+        $rawRows = [];
+        $rowNumber = 1;
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNumber++;
+            if (count($rawRows) >= 250) {
+                fclose($handle);
+                return $this->scheduleImportResponse($request, $user, $dataService, [
+                    'success' => false,
+                    'imported' => 0,
+                    'duplicates' => 0,
+                    'invalid' => 0,
+                    'message' => 'A single import can contain up to 250 schedule rows.',
+                    'errors' => [],
+                ]);
+            }
+            if (collect($row)->every(fn ($value) => trim((string) $value) === '')) {
+                continue;
+            }
+            $rawRows[] = ['row_number' => $rowNumber, 'values' => $row];
+        }
+        fclose($handle);
+        if ($rawRows === []) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'The CSV does not contain any schedule rows.',
+                'errors' => [],
+            ]);
+        }
+        $existingFingerprints = Schedule::query()
+            ->where(function ($query) use ($user): void {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            })
+            ->get(['game_date', 'game_time', 'opponent'])
+            ->mapWithKeys(function (Schedule $schedule): array {
+                $date = optional($schedule->game_date)->format('Y-m-d') ?: '';
+                $time = $this->normalizeScheduleImportTime((string) ($schedule->game_time ?? ''));
+                return [$this->scheduleImportFingerprint($date, $time, (string) $schedule->opponent) => true];
+            })
+            ->all();
+        $validRows = [];
+        $errors = [];
+        $duplicates = 0;
+        foreach ($rawRows as $rawRow) {
+            $parsed = $this->parseScheduleCsvRow($rawRow['values'], $columnMap, (int) $rawRow['row_number']);
+            if (! $parsed['valid']) {
+                $errors[] = 'Row ' . $rawRow['row_number'] . ': ' . implode(' ', $parsed['errors']);
+                continue;
+            }
+            $data = $parsed['data'];
+            $fingerprint = $this->scheduleImportFingerprint($data['game_date'], $data['game_time'], $data['opponent']);
+            if (isset($existingFingerprints[$fingerprint])) {
+                $duplicates++;
+                continue;
+            }
+            $existingFingerprints[$fingerprint] = true;
+            $validRows[] = $data;
+        }
+        $imported = 0;
+        if ($validRows !== []) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($validRows, $user, &$imported): void {
+                foreach ($validRows as $data) {
+                    $data['created_by_user_id'] = $user->id;
+                    $schedule = Schedule::create($data);
+                    $schedule->users()->syncWithoutDetaching([$user->id]);
+                    $imported++;
+                }
+            });
+        }
+        $invalid = count($errors);
+        $message = $imported > 0
+            ? "Imported {$imported} schedule " . ($imported === 1 ? 'event.' : 'events.')
+            : 'No new schedule events were imported.';
+        return $this->scheduleImportResponse($request, $user, $dataService, [
+            'success' => $imported > 0,
+            'imported' => $imported,
+            'duplicates' => $duplicates,
+            'invalid' => $invalid,
+            'message' => $message,
+            'errors' => array_slice($errors, 0, 12),
+        ]);
+    }
+    protected function scheduleImportResponse(Request $request, $user, LockerRoomDataService $dataService, array $result): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => (bool) ($result['success'] ?? false),
+                'message' => (string) ($result['message'] ?? 'Schedule import finished.'),
+                'import_result' => $result,
+                'data' => $dataService->snapshot($user->fresh()),
+            ], ($result['success'] ?? false) ? 200 : 422);
+        }
+        return back()->with('schedule_import_result', $result);
+    }
+    protected function scheduleCsvColumnMap(array $header): array
+    {
+        $aliases = [
+            'title' => ['event_type', 'type', 'title', 'event'],
+            'game_date' => ['date', 'game_date', 'event_date'],
+            'game_time' => ['time', 'game_time', 'event_time'],
+            'opponent' => ['opponent_event_name', 'opponent', 'event_name', 'opponent_or_event_name'],
+            'location' => ['location', 'city', 'address'],
+            'venue' => ['venue', 'field', 'field_venue', 'field_or_venue'],
+            'is_home' => ['home_away', 'is_home', 'home_or_away'],
+            'status' => ['status'],
+            'result' => ['result'],
+            'score' => ['score'],
+            'notes' => ['notes', 'note'],
+        ];
+        $map = [];
+        foreach ($aliases as $field => $names) {
+            foreach ($names as $name) {
+                $index = array_search($name, $header, true);
+                if ($index !== false) {
+                    $map[$field] = (int) $index;
+                    break;
+                }
+            }
+        }
+        return $map;
+    }
+    protected function parseScheduleCsvRow(array $row, array $columnMap, int $rowNumber): array
+    {
+        $value = function (string $field) use ($row, $columnMap): string {
+            if (! isset($columnMap[$field])) {
+                return '';
+            }
+            return trim((string) ($row[$columnMap[$field]] ?? ''));
+        };
+        $errors = [];
+        $opponent = $value('opponent');
+        if ($opponent === '') {
+            $errors[] = 'Opponent / Event Name is required.';
+        } elseif (mb_strlen($opponent) > 255) {
+            $errors[] = 'Opponent / Event Name is too long.';
+        }
+        $date = $this->normalizeScheduleImportDate($value('game_date'));
+        if ($date === null) {
+            $errors[] = 'Date is invalid. Use YYYY-MM-DD or MM/DD/YYYY.';
+        }
+        $time = $this->normalizeScheduleImportTime($value('game_time'));
+        if ($value('game_time') !== '' && $time === null) {
+            $errors[] = 'Time is invalid. Use HH:MM or a time such as 9:30 AM.';
+        }
+        $status = strtolower($value('status'));
+        $status = $status === 'canceled' ? 'cancelled' : $status;
+        if ($status === '') {
+            $status = 'upcoming';
+        }
+        if (! in_array($status, ['upcoming', 'completed', 'cancelled', 'postponed'], true)) {
+            $errors[] = 'Status must be upcoming, completed, cancelled, or postponed.';
+        }
+        $homeAway = strtolower($value('is_home'));
+        $isHome = false;
+        if ($homeAway !== '') {
+            if (in_array($homeAway, ['home', '1', 'true', 'yes', 'y'], true)) {
+                $isHome = true;
+            } elseif (in_array($homeAway, ['away', '0', 'false', 'no', 'n'], true)) {
+                $isHome = false;
+            } else {
+                $errors[] = 'Home / Away must be Home, Away, Yes/No, or 1/0.';
+            }
+        }
+        foreach (['title', 'location', 'venue', 'result', 'score'] as $field) {
+            if (mb_strlen($value($field)) > 255) {
+                $errors[] = ucfirst(str_replace('_', ' ', $field)) . ' is too long.';
+            }
+        }
+        if (mb_strlen($value('notes')) > 5000) {
+            $errors[] = 'Notes are too long.';
+        }
+        if ($errors !== []) {
+            return ['valid' => false, 'errors' => $errors, 'data' => []];
+        }
+        return [
+            'valid' => true,
+            'errors' => [],
+            'data' => [
+                'title' => $value('title') !== '' ? $value('title') : 'Game',
+                'opponent' => $opponent,
+                'status' => $status,
+                'game_date' => $date,
+                'game_time' => $time,
+                'location' => $value('location') ?: null,
+                'venue' => $value('venue') ?: null,
+                'result' => $value('result') ?: null,
+                'score' => $value('score') ?: null,
+                'notes' => $value('notes') ?: null,
+                'is_home' => $isHome,
+            ],
+        ];
+    }
+    protected function normalizeScheduleImportDate(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        foreach (['Y-m-d', 'm/d/Y', 'n/j/Y', 'm/d/y', 'n/j/y', 'F j, Y', 'F j Y', 'M j, Y', 'M j Y'] as $format) {
+            try {
+                $date = \Illuminate\Support\Carbon::createFromFormat($format, $value);
+                if ($date && $date->format($format) === $value) {
+                    return $date->format('Y-m-d');
+                }
+            } catch (\Throwable) {
+            }
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($value)->format('Y-m-d');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+    protected function normalizeScheduleImportTime(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        foreach (['H:i', 'H:i:s', 'g:i A', 'g:iA', 'h:i A', 'h:iA', 'g A', 'gA'] as $format) {
+            try {
+                $time = \Illuminate\Support\Carbon::createFromFormat($format, $value);
+                if ($time) {
+                    return $time->format('H:i');
+                }
+            } catch (\Throwable) {
+            }
+        }
+        return null;
+    }
+    protected function scheduleImportFingerprint(string $date, ?string $time, string $opponent): string
+    {
+        $opponent = strtolower(trim((string) preg_replace('/\s+/', ' ', $opponent)));
+        return implode('|', [$date, $time ?: '', $opponent]);
     }
     protected function validatedScheduleData(Request $request): array
     {
