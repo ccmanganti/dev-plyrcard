@@ -949,7 +949,7 @@ class LockerRoomController extends Controller
     }
     protected function scheduleCsvColumnMap(array $header, array $requestedMap = []): array
     {
-        $allowedFields = ['title', 'game_date', 'game_time', 'opponent', 'location', 'venue', 'is_home', 'status', 'result', 'score', 'notes'];
+        $allowedFields = ['game_date', 'game_time', 'opponent', 'location', 'venue'];
         if ($requestedMap !== []) {
             $map = [];
             foreach ($allowedFields as $field) {
@@ -968,17 +968,11 @@ class LockerRoomController extends Controller
             return $map;
         }
         $aliases = [
-            'title' => ['event_type', 'type', 'title', 'event'],
             'game_date' => ['date', 'game_date', 'event_date', 'match_date', 'game_day'],
             'game_time' => ['time', 'game_time', 'event_time', 'kickoff', 'kickoff_time', 'start_time'],
             'opponent' => ['opponent_event_name', 'opponent', 'event_name', 'opponent_or_event_name', 'match', 'team'],
             'location' => ['location', 'city', 'address', 'match_location'],
             'venue' => ['venue', 'field', 'field_venue', 'field_or_venue', 'stadium'],
-            'is_home' => ['home_away', 'is_home', 'home_or_away'],
-            'status' => ['status'],
-            'result' => ['result'],
-            'score' => ['score'],
-            'notes' => ['notes', 'note', 'comments', 'description'],
         ];
         $map = [];
         foreach ($aliases as $field => $names) {
@@ -1015,32 +1009,10 @@ class LockerRoomController extends Controller
         if ($value('game_time') !== '' && $time === null) {
             $errors[] = 'Time is invalid. Use HH:MM or a time such as 9:30 AM.';
         }
-        $status = strtolower($value('status'));
-        $status = $status === 'canceled' ? 'cancelled' : $status;
-        if ($status === '') {
-            $status = 'upcoming';
-        }
-        if (! in_array($status, ['upcoming', 'completed', 'cancelled', 'postponed'], true)) {
-            $errors[] = 'Status must be upcoming, completed, cancelled, or postponed.';
-        }
-        $homeAway = strtolower($value('is_home'));
-        $isHome = false;
-        if ($homeAway !== '') {
-            if (in_array($homeAway, ['home', '1', 'true', 'yes', 'y'], true)) {
-                $isHome = true;
-            } elseif (in_array($homeAway, ['away', '0', 'false', 'no', 'n'], true)) {
-                $isHome = false;
-            } else {
-                $errors[] = 'Home / Away must be Home, Away, Yes/No, or 1/0.';
-            }
-        }
-        foreach (['title', 'location', 'venue', 'result', 'score'] as $field) {
+        foreach (['location', 'venue'] as $field) {
             if (mb_strlen($value($field)) > 255) {
-                $errors[] = ucfirst(str_replace('_', ' ', $field)) . ' is too long.';
+                $errors[] = ucfirst($field) . ' is too long.';
             }
-        }
-        if (mb_strlen($value('notes')) > 5000) {
-            $errors[] = 'Notes are too long.';
         }
         if ($errors !== []) {
             return ['valid' => false, 'errors' => $errors, 'data' => []];
@@ -1049,17 +1021,17 @@ class LockerRoomController extends Controller
             'valid' => true,
             'errors' => [],
             'data' => [
-                'title' => $value('title') !== '' ? $value('title') : 'Game',
+                'title' => 'Game',
                 'opponent' => $opponent,
-                'status' => $status,
+                'status' => 'upcoming',
                 'game_date' => $date,
                 'game_time' => $time,
                 'location' => $value('location') ?: null,
                 'venue' => $value('venue') ?: null,
-                'result' => $value('result') ?: null,
-                'score' => $value('score') ?: null,
-                'notes' => $value('notes') ?: null,
-                'is_home' => $isHome,
+                'result' => null,
+                'score' => null,
+                'notes' => null,
+                'is_home' => false,
             ],
         ];
     }

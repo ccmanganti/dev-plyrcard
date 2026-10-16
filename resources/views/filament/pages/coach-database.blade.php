@@ -11610,7 +11610,7 @@ CSS;
                 <div class="rc-import-overlay-v91 {{ $scheduleImportResult ? 'is-open' : '' }}" id="rc-schedule-import-overlay-v91" wire:ignore>
                     <div class="rc-import-modal-v91" role="dialog" aria-modal="true" aria-labelledby="rc-schedule-import-title-v91">
                         <div class="rc-import-head-v91">
-                            <div><h2 id="rc-schedule-import-title-v91">Import Schedule from CSV</h2><p>Upload any CSV, map its columns, review the rows, then import.</p></div>
+                            <div><h2 id="rc-schedule-import-title-v91">Import Schedule from CSV</h2><p>Upload any CSV, map the basic game details, review the rows, then import.</p></div>
                             <button type="button" class="rc-import-close-v91" data-rc-import-close-v91 aria-label="Close">&times;</button>
                         </div>
                         <div class="rc-import-steps-v91" id="rc-schedule-import-steps-v91">
@@ -11623,7 +11623,7 @@ CSS;
                             <div class="rc-import-body-v91">
                                 <section class="rc-import-panel-v91 {{ $scheduleImportResult ? '' : 'is-active' }}" data-rc-import-panel-v91="1">
                                     <h3 style="margin:0 0 .35rem;font-size:1rem;">1. Choose your CSV file</h3>
-                                    <p class="rc-import-help-v91" style="margin-top:0;">Your column names can be anything. The next step lets you manually tell PLYRCARD what each column means.</p>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">Your column names can be anything. The next step lets you map only the basic game details PLYRCARD needs.</p>
                                     <div class="rc-import-upload-v91">
                                         <input type="file" name="schedule_csv" id="rc-schedule-csv-file-v91" accept=".csv,text/csv,text/plain">
                                         <div class="rc-import-help-v91">The CSV needs a header row and at least one schedule row. Up to 250 rows and 5 MB per import.</div>
@@ -11636,17 +11636,11 @@ CSS;
                                     <p class="rc-import-help-v91" style="margin-top:0;">We suggest matches when possible, but you can change every field. Only <b>Date</b> and <b>Opponent / Event Name</b> are required.</p>
                                     <div class="rc-import-map-grid-v91">
                                         @foreach([
-                                            'title' => ['Event Type', false, 'Game, Showcase, Tournament, etc.'],
                                             'game_date' => ['Date', true, 'Required'],
                                             'game_time' => ['Time', false, 'Kickoff or start time'],
                                             'opponent' => ['Opponent / Event Name', true, 'Required'],
-                                            'location' => ['Location', false, 'City, state, address, etc.'],
-                                            'venue' => ['Venue / Field', false, 'Field, stadium, campus, etc.'],
-                                            'is_home' => ['Home / Away', false, 'Home, Away, Yes/No, or 1/0'],
-                                            'status' => ['Status', false, 'Upcoming, completed, cancelled, postponed'],
-                                            'result' => ['Result', false, 'Win, loss, draw, etc.'],
-                                            'score' => ['Score', false, 'Final or current score'],
-                                            'notes' => ['Notes', false, 'Extra details or comments'],
+                                            'location' => ['Location', false, 'City, state, or address'],
+                                            'venue' => ['Field / Venue', false, 'Field, stadium, or campus'],
                                         ] as $mapField => [$mapLabel, $mapRequired, $mapHint])
                                             <div class="rc-import-map-row-v91">
                                                 <div class="rc-import-map-label-v91"><b>{{ $mapLabel }}{{ $mapRequired ? ' *' : '' }}</b><span>{{ $mapHint }}</span></div>
@@ -11661,7 +11655,7 @@ CSS;
                                     <h3 style="margin:0 0 .35rem;font-size:1rem;">3. Preview & validate</h3>
                                     <p class="rc-import-help-v91" style="margin-top:0;">Review the mapped rows before importing. Invalid rows are highlighted and will be skipped.</p>
                                     <div class="rc-import-summary-v91"><div class="rc-import-summary-card-v91"><strong id="rc-import-total-v91">0</strong><span>Total rows</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-valid-v91">0</strong><span>Ready</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-invalid-v91">0</strong><span>Needs attention</span></div></div>
-                                    <div class="rc-import-table-wrap-v91"><table class="rc-import-table-v91"><thead><tr><th>Row</th><th>Date</th><th>Time</th><th>Type</th><th>Opponent / Event</th><th>Location</th><th>Venue</th><th>Home/Away</th><th>Status</th><th>Check</th></tr></thead><tbody id="rc-schedule-import-preview-v91"></tbody></table></div>
+                                    <div class="rc-import-table-wrap-v91"><table class="rc-import-table-v91"><thead><tr><th>Row</th><th>Date</th><th>Time</th><th>Opponent / Event</th><th>Location</th><th>Field / Venue</th><th>Check</th></tr></thead><tbody id="rc-schedule-import-preview-v91"></tbody></table></div>
                                     <div class="rc-import-status-v91" id="rc-schedule-import-preview-status-v91"></div>
                                 </section>
                                 <section class="rc-import-panel-v91" data-rc-import-panel-v91="4">
@@ -11787,9 +11781,8 @@ CSS;
         let validRows = 0;
         let invalidRows = 0;
         const fieldAliases = {
-            title:['event_type','type','title','event'], game_date:['date','game_date','event_date','match_date','game_day'], game_time:['time','game_time','event_time','kickoff','kickoff_time','start_time'],
-            opponent:['opponent_event_name','opponent','event_name','opponent_or_event_name','match','team'], location:['location','city','address','match_location'], venue:['venue','field','field_venue','field_or_venue','stadium'],
-            is_home:['home_away','is_home','home_or_away'], status:['status'], result:['result'], score:['score'], notes:['notes','note','comments','description']
+            game_date:['date','game_date','event_date','match_date','game_day'], game_time:['time','game_time','event_time','kickoff','kickoff_time','start_time'],
+            opponent:['opponent_event_name','opponent','event_name','opponent_or_event_name','match','team'], location:['location','city','address','match_location'], venue:['venue','field','field_venue','field_or_venue','stadium']
         };
         const normalizeHeader = value => String(value || '').replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
@@ -11878,15 +11871,13 @@ CSS;
             if (!validateMappings(true)) return false;
             validRows = 0; invalidRows = 0; const preview = [];
             parsedRows.forEach((row, index) => {
-                const get = field => mappedValue(field, row); const errors = []; const date = get('game_date'); const time = get('game_time'); const opponent = get('opponent'); const status = get('status').toLowerCase(); const homeAway = get('is_home').toLowerCase();
+                const get = field => mappedValue(field, row); const errors = []; const date = get('game_date'); const time = get('game_time'); const opponent = get('opponent');
                 if (!isValidDate(date)) errors.push('Invalid date'); if (!opponent) errors.push('Missing opponent/event'); if (!isValidTime(time)) errors.push('Invalid time');
-                if (status && !['upcoming','completed','cancelled','canceled','postponed'].includes(status)) errors.push('Invalid status');
-                if (homeAway && !['home','away','1','0','true','false','yes','no','y','n'].includes(homeAway)) errors.push('Invalid home/away');
                 if (errors.length) invalidRows++; else validRows++; if (index < 50) preview.push({number:index+2,row,get,errors});
             });
             if (totalEl) totalEl.textContent = String(parsedRows.length); if (validEl) validEl.textContent = String(validRows); if (invalidEl) invalidEl.textContent = String(invalidRows);
             if (confirmValidEl) confirmValidEl.textContent = `${validRows} valid ${validRows === 1 ? 'row is' : 'rows are'} ready`;
-            previewBody.innerHTML = preview.map(item => `<tr class="${item.errors.length ? 'rc-import-row-error-v91' : ''}"><td>${item.number}</td><td>${escapeHtml(item.get('game_date'))}</td><td>${escapeHtml(item.get('game_time') || '—')}</td><td>${escapeHtml(item.get('title') || 'Game')}</td><td>${escapeHtml(item.get('opponent'))}</td><td>${escapeHtml(item.get('location') || '—')}</td><td>${escapeHtml(item.get('venue') || '—')}</td><td>${escapeHtml(item.get('is_home') || '—')}</td><td>${escapeHtml(item.get('status') || 'upcoming')}</td><td>${item.errors.length ? escapeHtml(item.errors.join(', ')) : 'Ready'}</td></tr>`).join('');
+            previewBody.innerHTML = preview.map(item => `<tr class="${item.errors.length ? 'rc-import-row-error-v91' : ''}"><td>${item.number}</td><td>${escapeHtml(item.get('game_date'))}</td><td>${escapeHtml(item.get('game_time') || '—')}</td><td>${escapeHtml(item.get('opponent'))}</td><td>${escapeHtml(item.get('location') || '—')}</td><td>${escapeHtml(item.get('venue') || '—')}</td><td>${item.errors.length ? escapeHtml(item.errors.join(', ')) : 'Ready'}</td></tr>`).join('');
             const extra = parsedRows.length > 50 ? ` Showing the first 50 of ${parsedRows.length} rows.` : '';
             setStatus(previewStatus, invalidRows ? `${invalidRows} row${invalidRows === 1 ? '' : 's'} need attention and will be skipped.${extra}` : `All ${validRows} rows look ready.${extra}`, invalidRows === 0);
             goToStep(3); return true;
@@ -11903,7 +11894,7 @@ CSS;
         mapSelects.forEach(select => select.addEventListener('change', () => { updateMapSample(select); validateMappings(true); }));
         fileInput?.addEventListener('change', () => setStatus(fileStatus, fileInput.files?.[0] ? `${fileInput.files[0].name} selected. Click Map Columns to continue.` : '', true));
         templateBtn?.addEventListener('click', () => {
-            const csv = 'event_type,date,time,opponent_event_name,location,venue,home_away,status,result,score,notes\nGame,2026-10-24,09:00,Wilmington Hammerheads,Wilmington NC,nCino Sports Park,Away,upcoming,,,Regular season game\nShowcase,2026-11-01,14:30,College Showcase,Raleigh NC,WRAL Soccer Park,,upcoming,,,Recruiting showcase\n';
+            const csv = 'date,time,opponent_event_name,location,venue\n2026-10-24,09:00,Wilmington Hammerheads,Wilmington NC,nCino Sports Park\n2026-11-01,14:30,NC Courage,Raleigh NC,WRAL Soccer Park\n';
             const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})); const link = document.createElement('a'); link.href = url; link.download = 'plyrcard-schedule-template.csv'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 500);
         });
         form.addEventListener('submit', event => { if (!validateMappings(true) || validRows < 1) { event.preventDefault(); return; } submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; });
