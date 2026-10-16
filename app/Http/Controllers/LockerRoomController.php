@@ -1009,11 +1009,18 @@ class LockerRoomController extends Controller
                 $time = $this->normalizeScheduleImportTime((string) ($schedule->game_time ?? ''));
                 return [$this->scheduleImportFingerprint($date, $time, (string) $schedule->opponent) => true];
             })->all();
+        $fieldMap = $this->scheduleIcsFieldMap((array) $request->input('schedule_ics_map', []));
+        if (! isset($fieldMap['game_date'], $fieldMap['opponent'])) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false, 'imported' => 0, 'duplicates' => 0, 'invalid' => 0,
+                'message' => 'Map an ICS source to Date and another source to Opponent / Event Name before importing.', 'errors' => [],
+            ]);
+        }
         $validRows = [];
         $errors = [];
         $duplicates = 0;
         foreach ($eventBlocks as $index => $block) {
-            $parsed = $this->parseScheduleIcsEvent((string) $block, $calendarTimezone, $calendarName, $index + 1);
+            $parsed = $this->parseScheduleIcsEvent((string) $block, $calendarTimezone, $calendarName, $index + 1, $fieldMap);
             if (! $parsed['valid']) {
                 $errors[] = 'Event ' . ($index + 1) . ': ' . implode(' ', $parsed['errors']);
                 continue;
@@ -1051,7 +1058,35 @@ class LockerRoomController extends Controller
             'timezone' => $calendarTimezone,
         ]);
     }
-    protected function parseScheduleIcsEvent(string $block, string $calendarTimezone, string $calendarName, int $eventNumber): array
+    protected function scheduleIcsFieldMap(array $requestedMap = []): array
+    {
+        $allowedSources = [
+            'game_date' => ['start_date'],
+            'game_time' => ['start_time'],
+            'opponent' => ['detected_opponent', 'description_first', 'summary'],
+            'location' => ['location', 'detected_venue', 'description_first', 'summary'],
+            'venue' => ['detected_venue', 'location', 'description_first', 'summary'],
+        ];
+        $defaults = [
+            'game_date' => 'start_date',
+            'game_time' => 'start_time',
+            'opponent' => 'detected_opponent',
+            'location' => 'location',
+            'venue' => 'detected_venue',
+        ];
+        if ($requestedMap === []) {
+            return $defaults;
+        }
+        $map = [];
+        foreach ($allowedSources as $field => $sources) {
+            $source = trim((string) ($requestedMap[$field] ?? ''));
+            if ($source !== '' && in_array($source, $sources, true)) {
+                $map[$field] = $source;
+            }
+        }
+        return $map;
+    }
+    protected function parseScheduleIcsEvent(string $block, string $calendarTimezone, string $calendarName, int $eventNumber, array $fieldMap): array
     {
         $properties = [];
         foreach (explode("\n", trim($block)) as $line) {
@@ -1083,27 +1118,60 @@ class LockerRoomController extends Controller
             ->values()->all();
         $matchup = trim((string) ($descriptionLines[0] ?? ''));
         $teamName = trim((string) preg_replace('/\s+(games?|schedule|calendar)\s*$/i', '', $calendarName));
-        [$opponent, $isHome] = $this->scheduleIcsOpponent($matchup, $summary, $teamName);
-        if ($opponent === '') {
-            return ['valid' => false, 'errors' => ['Opponent / Event Name could not be detected.'], 'data' => []];
-        }
+        [$detectedOpponent, $isHome] = $this->scheduleIcsOpponent($matchup, $summary, $teamName);
         $location = trim($this->icsUnescapeText((string) (($properties['LOCATION'][0]['value'] ?? ''))));
-        $venue = $this->scheduleIcsVenue($descriptionLines);
+        $detectedVenue = $this->scheduleIcsVenue($descriptionLines);
+        $sources = [
+            'start_date' => $dateTime['date'] ?? '',
+            'start_time' => $dateTime['time'] ?? '',
+            'detected_opponent' => $detectedOpponent,
+            'description_first' => $matchup,
+            'summary' => $summary,
+            'location' => $location,
+            'detected_venue' => $detectedVenue,
+        ];
+        $value = function (string $field) use ($fieldMap, $sources): string {
+            $source = $fieldMap[$field] ?? null;
+            return $source ? trim((string) ($sources[$source] ?? '')) : '';
+        };
+        $errors = [];
+        $gameDate = $this->normalizeScheduleImportDate($value('game_date'));
+        if ($gameDate === null) {
+            $errors[] = 'Date is invalid.';
+        }
+        $gameTime = $this->normalizeScheduleImportTime($value('game_time'));
+        if ($value('game_time') !== '' && $gameTime === null) {
+            $errors[] = 'Time is invalid.';
+        }
+        $opponent = $value('opponent');
+        if ($opponent === '') {
+            $errors[] = 'Opponent / Event Name is required.';
+        } elseif (mb_strlen($opponent) > 255) {
+            $errors[] = 'Opponent / Event Name is too long.';
+        }
+        foreach (['location', 'venue'] as $field) {
+            if (mb_strlen($value($field)) > 255) {
+                $errors[] = ucfirst($field) . ' is too long.';
+            }
+        }
+        if ($errors !== []) {
+            return ['valid' => false, 'errors' => $errors, 'data' => []];
+        }
         return [
             'valid' => true,
             'errors' => [],
             'data' => [
                 'title' => 'Game',
-                'opponent' => mb_substr($opponent, 0, 255),
+                'opponent' => $opponent,
                 'status' => 'upcoming',
-                'game_date' => $dateTime['date'],
-                'game_time' => $dateTime['time'],
-                'location' => $location !== '' ? mb_substr($location, 0, 255) : null,
-                'venue' => $venue !== '' ? mb_substr($venue, 0, 255) : null,
+                'game_date' => $gameDate,
+                'game_time' => $gameTime,
+                'location' => $value('location') ?: null,
+                'venue' => $value('venue') ?: null,
                 'result' => null,
                 'score' => null,
                 'notes' => null,
-                'is_home' => $isHome,
+                'is_home' => ($fieldMap['opponent'] ?? '') === 'detected_opponent' ? $isHome : false,
             ],
         ];
     }

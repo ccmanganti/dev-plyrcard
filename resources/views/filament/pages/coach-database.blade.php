@@ -5945,7 +5945,7 @@ discoverSelectedIds: [],
         .rc-import-head-v91 p { margin:.2rem 0 0;color:var(--rc-muted);font-size:.84rem; }
         .rc-import-close-v91 { width:2rem;height:2rem;border:0;border-radius:.65rem;background:transparent;color:var(--rc-muted);font-size:1.35rem;cursor:pointer; }
         .rc-import-close-v91:hover { background:rgba(15,23,42,.05);color:var(--rc-text); }
-        .rc-import-steps-v91 { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--rc-border); }
+        .rc-import-steps-v91 { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--rc-border); }
         .rc-import-step-v91 { display:flex;gap:.55rem;align-items:center;padding:.72rem .8rem;color:var(--rc-muted);font-size:.78rem;font-weight:700;border-right:1px solid var(--rc-border); }
         .rc-import-step-v91:last-child { border-right:0; }
         .rc-import-step-v91.is-active { color:#ff6338;background:rgba(255,99,56,.06); }
@@ -11610,31 +11610,32 @@ CSS;
                 <div class="rc-import-overlay-v91 {{ $scheduleImportResult ? 'is-open' : '' }}" id="rc-schedule-import-overlay-v91" wire:ignore>
                     <div class="rc-import-modal-v91" role="dialog" aria-modal="true" aria-labelledby="rc-schedule-import-title-v91">
                         <div class="rc-import-head-v91">
-                            <div><h2 id="rc-schedule-import-title-v91">Import Schedule</h2><p>Upload a CSV or ICS calendar file, review what PLYRCARD found, then import.</p></div>
+                            <div><h2 id="rc-schedule-import-title-v91">Import Schedule</h2><p>Choose a CSV or ICS file, check the field mapping and preview, then import.</p></div>
                             <button type="button" class="rc-import-close-v91" data-rc-import-close-v91 aria-label="Close">&times;</button>
                         </div>
                         <div class="rc-import-steps-v91" id="rc-schedule-import-steps-v91">
-                            @foreach([1 => 'Upload', 2 => 'Map / Detect', 3 => 'Preview', 4 => 'Confirm', 5 => 'Complete'] as $stepNumber => $stepLabel)
-                                <div class="rc-import-step-v91 {{ $scheduleImportResult ? ($stepNumber < 5 ? 'is-done' : ($stepNumber === 5 ? 'is-active' : '')) : ($stepNumber === 1 ? 'is-active' : '') }}" data-rc-import-step-indicator-v91="{{ $stepNumber }}"><span class="rc-import-step-num-v91">{{ $stepNumber }}</span><span>{{ $stepLabel }}</span></div>
+                            @foreach([1 => 'Choose File', 2 => 'Map & Preview', 3 => 'Complete'] as $stepNumber => $stepLabel)
+                                <div class="rc-import-step-v91 {{ $scheduleImportResult ? ($stepNumber < 3 ? 'is-done' : 'is-active') : ($stepNumber === 1 ? 'is-active' : '') }}" data-rc-import-step-indicator-v91="{{ $stepNumber }}"><span class="rc-import-step-num-v91">{{ $stepNumber }}</span><span>{{ $stepLabel }}</span></div>
                             @endforeach
                         </div>
                         <form method="POST" action="{{ route('locker-room.schedule.store') }}" enctype="multipart/form-data" id="rc-schedule-import-form-v91">
                             @csrf
                             <div class="rc-import-body-v91">
                                 <section class="rc-import-panel-v91 {{ $scheduleImportResult ? '' : 'is-active' }}" data-rc-import-panel-v91="1">
-                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">1. Choose a schedule file</h3>
-                                    <p class="rc-import-help-v91" style="margin-top:0;">Use a CSV spreadsheet or an ICS calendar export. CSV columns can be mapped manually; ICS calendar fields are detected automatically.</p>
+                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">1. Choose your schedule file</h3>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">Upload a CSV spreadsheet or an ICS calendar export. Nothing is imported until you review it.</p>
                                     <div class="rc-import-upload-v91">
                                         <input type="file" name="schedule_file" id="rc-schedule-csv-file-v91" accept=".csv,.ics,text/csv,text/calendar,text/plain">
-                                        <div class="rc-import-help-v91">Supports CSV and ICS. Up to 250 events and 5 MB per import. ICS date-only events are imported with Time TBD.</div>
+                                        <div class="rc-import-help-v91">CSV and ICS supported · up to 250 events · maximum 5 MB. Date-only ICS events stay as <b>Time TBD</b>.</div>
                                         <div style="margin-top:.8rem;"><button type="button" class="rc-btn" id="rc-schedule-template-download-v91">Download Optional CSV Template</button></div>
                                     </div>
                                     <div class="rc-import-status-v91" id="rc-schedule-import-file-status-v91"></div>
                                 </section>
                                 <section class="rc-import-panel-v91" data-rc-import-panel-v91="2">
-                                    <h3 id="rc-import-step2-title-v91" style="margin:0 0 .35rem;font-size:1rem;">2. Map your columns</h3>
-                                    <p id="rc-import-step2-help-v91" class="rc-import-help-v91" style="margin-top:0;">We suggest matches when possible, but you can change every field. Only <b>Date</b> and <b>Opponent / Event Name</b> are required.</p>
-                                    <div class="rc-import-map-grid-v91" id="rc-import-csv-map-grid-v91">
+                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">2. Map fields & review</h3>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">PLYRCARD suggests the mapping. Change any field if needed, then check the preview below. Only <b>Date</b> and <b>Opponent / Event Name</b> are required.</p>
+                                    <div class="rc-import-status-v91 is-visible is-good" id="rc-import-source-info-v91"></div>
+                                    <div class="rc-import-map-grid-v91" id="rc-import-map-grid-v91">
                                         @foreach([
                                             'game_date' => ['Date', true, 'Required'],
                                             'game_time' => ['Time', false, 'Kickoff or start time'],
@@ -11644,36 +11645,21 @@ CSS;
                                         ] as $mapField => [$mapLabel, $mapRequired, $mapHint])
                                             <div class="rc-import-map-row-v91">
                                                 <div class="rc-import-map-label-v91"><b>{{ $mapLabel }}{{ $mapRequired ? ' *' : '' }}</b><span>{{ $mapHint }}</span></div>
-                                                <select name="schedule_csv_map[{{ $mapField }}]" data-rc-schedule-map-v91="{{ $mapField }}" data-required="{{ $mapRequired ? '1' : '0' }}"><option value="">{{ $mapRequired ? 'Select a CSV column...' : 'Do not import this field' }}</option></select>
+                                                <select name="schedule_csv_map[{{ $mapField }}]" data-rc-schedule-map-v91="{{ $mapField }}" data-required="{{ $mapRequired ? '1' : '0' }}"><option value="">{{ $mapRequired ? 'Select a source...' : 'Do not import this field' }}</option></select>
                                                 <div class="rc-import-map-sample-v91" data-rc-schedule-map-sample-v91="{{ $mapField }}">Sample: —</div>
                                             </div>
                                         @endforeach
                                     </div>
-                                    <div id="rc-import-ics-detect-v91" class="rc-import-checklist-v91" style="display:none;">
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b>ICS calendar detected</b><p>PLYRCARD reads the calendar date, local game time, matchup, location, and field/venue automatically.</p></div></div>
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b id="rc-import-ics-timezone-v91">Calendar timezone</b><p>Date-only events are kept as Time TBD instead of being forced to 12:00 AM.</p></div></div>
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b id="rc-import-ics-count-v91">0 events detected</b><p>You will review every detected event in the next step before anything is imported.</p></div></div>
-                                    </div>
                                     <div class="rc-import-status-v91" id="rc-schedule-import-map-status-v91"></div>
-                                </section>
-                                <section class="rc-import-panel-v91" data-rc-import-panel-v91="3">
-                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">3. Preview & validate</h3>
-                                    <p class="rc-import-help-v91" style="margin-top:0;">Review the detected schedule rows before importing. Invalid rows are highlighted and will be skipped.</p>
-                                    <div class="rc-import-summary-v91"><div class="rc-import-summary-card-v91"><strong id="rc-import-total-v91">0</strong><span>Total rows</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-valid-v91">0</strong><span>Ready</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-invalid-v91">0</strong><span>Needs attention</span></div></div>
+                                    <div class="rc-import-summary-v91" style="margin-top:1rem;"><div class="rc-import-summary-card-v91"><strong id="rc-import-total-v91">0</strong><span>Total rows</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-valid-v91">0</strong><span>Ready</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-invalid-v91">0</strong><span>Needs attention</span></div></div>
                                     <div class="rc-import-table-wrap-v91"><table class="rc-import-table-v91"><thead><tr><th>Row</th><th>Date</th><th>Time</th><th>Opponent / Event</th><th>Location</th><th>Field / Venue</th><th>Check</th></tr></thead><tbody id="rc-schedule-import-preview-v91"></tbody></table></div>
                                     <div class="rc-import-status-v91" id="rc-schedule-import-preview-status-v91"></div>
-                                </section>
-                                <section class="rc-import-panel-v91" data-rc-import-panel-v91="4">
-                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">4. Confirm import</h3>
-                                    <p id="rc-import-confirm-help-v91" class="rc-import-help-v91" style="margin-top:0;">Only valid rows will be created. The server re-reads the same file before saving.</p>
-                                    <div class="rc-import-checklist-v91">
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b id="rc-import-confirm-valid-v91">0 valid rows are ready</b><p>Invalid rows will be skipped and reported after the import.</p></div></div>
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b id="rc-import-method-title-v91">Your CSV column mapping is preserved</b><p id="rc-import-method-copy-v91">PLYRCARD will use the exact columns you selected when the file reaches the server.</p></div></div>
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b>Duplicate protection is enabled</b><p>An existing event with the same date, time, and opponent/event name will not be created again.</p></div></div>
-                                        <div class="rc-import-check-v91"><span>✓</span><div><b>Your current schedule stays intact</b><p>This import only adds new schedule rows. It does not overwrite existing events.</p></div></div>
+                                    <div class="rc-import-checklist-v91" style="margin-top:.9rem;">
+                                        <div class="rc-import-check-v91"><span>✓</span><div><b>Duplicate protection is on</b><p>Same date, time, and opponent/event name will not be imported twice.</p></div></div>
+                                        <div class="rc-import-check-v91"><span>✓</span><div><b>Existing schedules stay untouched</b><p>The import only adds valid new events.</p></div></div>
                                     </div>
                                 </section>
-                                <section class="rc-import-panel-v91 {{ $scheduleImportResult ? 'is-active' : '' }}" data-rc-import-panel-v91="5">
+                                <section class="rc-import-panel-v91 {{ $scheduleImportResult ? 'is-active' : '' }}" data-rc-import-panel-v91="3">
                                     @if($scheduleImportResult)
                                         <div class="rc-import-result-v91"><div class="rc-import-result-icon-v91">{{ ($scheduleImportResult['imported'] ?? 0) > 0 ? '✓' : '!' }}</div><h3 style="margin:0;">Import Complete</h3><p class="rc-import-help-v91">{{ $scheduleImportResult['message'] ?? 'Schedule import finished.' }}</p></div>
                                         <div class="rc-import-summary-v91"><div class="rc-import-summary-card-v91"><strong>{{ (int) ($scheduleImportResult['imported'] ?? 0) }}</strong><span>Imported</span></div><div class="rc-import-summary-card-v91"><strong>{{ (int) ($scheduleImportResult['duplicates'] ?? 0) }}</strong><span>Duplicates skipped</span></div><div class="rc-import-summary-card-v91"><strong>{{ (int) ($scheduleImportResult['invalid'] ?? 0) }}</strong><span>Invalid skipped</span></div></div>
@@ -11687,7 +11673,7 @@ CSS;
                                 <button type="button" class="rc-btn" id="rc-import-back-v91" style="display:none;">Back</button>
                                 <div class="rc-import-actions-right-v91">
                                     <button type="button" class="rc-btn" data-rc-import-close-v91>Cancel</button>
-                                    <button type="button" class="rc-btn rc-btn-primary" id="rc-import-next-v91">Map Columns</button>
+                                    <button type="button" class="rc-btn rc-btn-primary" id="rc-import-next-v91">Continue</button>
                                     <button type="submit" class="rc-btn rc-btn-primary" id="rc-import-submit-v91" style="display:none;">Import Schedule</button>
                                     <button type="button" class="rc-btn rc-btn-primary" id="rc-import-done-v91" style="{{ $scheduleImportResult ? '' : 'display:none;' }}">Done</button>
                                 </div>
@@ -11771,23 +11757,15 @@ CSS;
         const fileStatus = document.getElementById('rc-schedule-import-file-status-v91');
         const mapStatus = document.getElementById('rc-schedule-import-map-status-v91');
         const previewStatus = document.getElementById('rc-schedule-import-preview-status-v91');
+        const sourceInfo = document.getElementById('rc-import-source-info-v91');
         const totalEl = document.getElementById('rc-import-total-v91');
         const validEl = document.getElementById('rc-import-valid-v91');
         const invalidEl = document.getElementById('rc-import-invalid-v91');
-        const confirmValidEl = document.getElementById('rc-import-confirm-valid-v91');
-        const csvMapGrid = document.getElementById('rc-import-csv-map-grid-v91');
-        const icsDetect = document.getElementById('rc-import-ics-detect-v91');
-        const icsTimezone = document.getElementById('rc-import-ics-timezone-v91');
-        const icsCount = document.getElementById('rc-import-ics-count-v91');
-        const step2Title = document.getElementById('rc-import-step2-title-v91');
-        const step2Help = document.getElementById('rc-import-step2-help-v91');
-        const methodTitle = document.getElementById('rc-import-method-title-v91');
-        const methodCopy = document.getElementById('rc-import-method-copy-v91');
         const panels = Array.from(overlay.querySelectorAll('[data-rc-import-panel-v91]'));
         const indicators = Array.from(overlay.querySelectorAll('[data-rc-import-step-indicator-v91]'));
         const mapSelects = Array.from(overlay.querySelectorAll('[data-rc-schedule-map-v91]'));
-        const hasServerResult = overlay.querySelector('[data-rc-import-panel-v91="5"].is-active') !== null;
-        let currentStep = hasServerResult ? 5 : 1;
+        const hasServerResult = overlay.querySelector('[data-rc-import-panel-v91="3"].is-active') !== null;
+        let currentStep = hasServerResult ? 3 : 1;
         let fileMode = 'csv';
         let rawHeader = [];
         let normalizedHeader = [];
@@ -11796,9 +11774,20 @@ CSS;
         let invalidRows = 0;
         let detectedTimezone = '';
         const fieldAliases = {
-            game_date:['date','game_date','event_date','match_date','game_day'], game_time:['time','game_time','event_time','kickoff','kickoff_time','start_time'],
-            opponent:['opponent_event_name','opponent','event_name','opponent_or_event_name','match','team'], location:['location','city','address','match_location'], venue:['venue','field','field_venue','field_or_venue','stadium']
+            game_date:['date','game_date','event_date','match_date','game_day'],
+            game_time:['time','game_time','event_time','kickoff','kickoff_time','start_time'],
+            opponent:['opponent_event_name','opponent','event_name','opponent_or_event_name','match','team'],
+            location:['location','city','address','match_location'],
+            venue:['venue','field','field_venue','field_or_venue','stadium']
         };
+        const icsSources = {
+            game_date:[['start_date','Event start date (DTSTART)']],
+            game_time:[['start_time','Event start time (DTSTART)']],
+            opponent:[['detected_opponent','Detected matchup / opponent'],['description_first','Description - first line'],['summary','Summary / event title']],
+            location:[['location','Location (LOCATION)'],['detected_venue','Detected field / venue'],['description_first','Description - first line'],['summary','Summary / event title']],
+            venue:[['detected_venue','Detected field / venue'],['location','Location (LOCATION)'],['description_first','Description - first line'],['summary','Summary / event title']]
+        };
+        const icsDefaults = {game_date:'start_date',game_time:'start_time',opponent:'detected_opponent',location:'location',venue:'detected_venue'};
         const normalizeHeader = value => String(value || '').replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
         function parseCsv(text) {
@@ -11814,34 +11803,28 @@ CSS;
             if (cell !== '' || row.length) { row.push(cell); if (row.some(value => String(value).trim() !== '')) rows.push(row); }
             return rows;
         }
-        function icsUnescape(value) {
-            return String(value || '').replace(/\\[nN]/g, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\').trim();
-        }
+        function icsUnescape(value) { return String(value || '').replace(/\\[nN]/g, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\').trim(); }
         function icsCalendarValue(text, name) {
             const match = text.match(new RegExp('^' + name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':(.+)$', 'mi'));
             return match ? String(match[1] || '').trim() : '';
         }
         function timezoneParts(date, timeZone) {
             try {
-                const parts = new Intl.DateTimeFormat('en-CA', {timeZone, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'}).formatToParts(date);
+                const parts = new Intl.DateTimeFormat('en-CA', {timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
                 const pick = type => parts.find(part => part.type === type)?.value || '';
-                return {date:`${pick('year')}-${pick('month')}-${pick('day')}`, time:`${pick('hour')}:${pick('minute')}`};
+                return {date:`${pick('year')}-${pick('month')}-${pick('day')}`,time:`${pick('hour')}:${pick('minute')}`};
             } catch (_) { return null; }
         }
         function parseIcsStart(rawName, value, calendarTimezone) {
-            value = String(value || '').trim();
-            if (!value) return null;
-            const dateOnly = /VALUE=DATE/i.test(rawName) || /^\d{8}$/.test(value);
-            if (dateOnly) return {date:`${value.slice(0,4)}-${value.slice(4,6)}-${value.slice(6,8)}`, time:''};
+            value = String(value || '').trim(); if (!value) return null;
+            if (/VALUE=DATE/i.test(rawName) || /^\d{8}$/.test(value)) return {date:`${value.slice(0,4)}-${value.slice(4,6)}-${value.slice(6,8)}`,time:''};
             const match = value.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?(Z)?$/i);
-            if (match) {
-                if (match[7]) {
-                    const date = new Date(Date.UTC(Number(match[1]), Number(match[2])-1, Number(match[3]), Number(match[4]), Number(match[5]), Number(match[6] || 0)));
-                    return timezoneParts(date, calendarTimezone || 'UTC') || {date:`${match[1]}-${match[2]}-${match[3]}`, time:`${match[4]}:${match[5]}`};
-                }
-                return {date:`${match[1]}-${match[2]}-${match[3]}`, time:`${match[4]}:${match[5]}`};
+            if (!match) return null;
+            if (match[7]) {
+                const date = new Date(Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3]),Number(match[4]),Number(match[5]),Number(match[6] || 0)));
+                return timezoneParts(date, calendarTimezone || 'UTC') || {date:`${match[1]}-${match[2]}-${match[3]}`,time:`${match[4]}:${match[5]}`};
             }
-            return null;
+            return {date:`${match[1]}-${match[2]}-${match[3]}`,time:`${match[4]}:${match[5]}`};
         }
         function parseIcs(text) {
             const unfolded = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\n[ \t]/g, '');
@@ -11851,143 +11834,145 @@ CSS;
             const blocks = [...unfolded.matchAll(/BEGIN:VEVENT\n([\s\S]*?)\nEND:VEVENT/g)].map(match => match[1]);
             const events = blocks.map((block, index) => {
                 const props = {};
-                block.split('\n').forEach(line => {
-                    const pos = line.indexOf(':'); if (pos < 0) return;
-                    const rawName = line.slice(0, pos).trim(); const name = rawName.split(';')[0].toUpperCase();
-                    if (!props[name]) props[name] = []; props[name].push({rawName, value:line.slice(pos + 1)});
-                });
-                const startProp = props.DTSTART?.[0]; const start = startProp ? parseIcsStart(startProp.rawName, startProp.value, calendarTimezone) : null;
+                block.split('\n').forEach(line => { const pos = line.indexOf(':'); if (pos < 0) return; const rawName = line.slice(0,pos).trim(); const name = rawName.split(';')[0].toUpperCase(); if (!props[name]) props[name] = []; props[name].push({rawName,value:line.slice(pos+1)}); });
+                const startProp = props.DTSTART?.[0]; const start = startProp ? parseIcsStart(startProp.rawName,startProp.value,calendarTimezone) : null;
                 const description = icsUnescape(props.DESCRIPTION?.[0]?.value || '').replace(/<br\s*\/?>/gi, '\n');
                 const lines = description.split('\n').map(line => line.replace(/<[^>]*>/g, '').trim()).filter(Boolean);
                 const summary = icsUnescape(props.SUMMARY?.[0]?.value || '');
-                let candidate = lines[0] || summary || '';
-                let isHome = false;
+                const descriptionFirst = lines[0] || '';
+                let candidate = descriptionFirst || summary || ''; let isHome = false;
                 if (teamName) {
                     const escapedTeam = teamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); let match;
                     if ((match = candidate.match(new RegExp('^' + escapedTeam + '\\s+at\\s+(.+)$','i')))) { candidate = match[1].trim(); isHome = false; }
                     else if ((match = candidate.match(new RegExp('^(.+)\\s+at\\s+' + escapedTeam + '$','i')))) { candidate = match[1].trim(); isHome = true; }
                     else if ((match = candidate.match(new RegExp('^' + escapedTeam + '\\s+(?:vs\\.?|versus)\\s+(.+)$','i')))) { candidate = match[1].trim(); isHome = true; }
+                    else if ((match = candidate.match(new RegExp('^(.+)\\s+(?:vs\\.?|versus)\\s+' + escapedTeam + '$','i')))) { candidate = match[1].trim(); isHome = false; }
                 }
                 candidate = candidate.replace(/\s+-\s+Game\s*$/i, '').trim();
                 const venueCandidates = lines.slice(1).filter(line => !/^(arrive\s+by|uniform\s*:|start\s+time\b)/i.test(line));
-                return {number:index+1, game_date:start?.date || '', game_time:start?.time || '', opponent:candidate, location:icsUnescape(props.LOCATION?.[0]?.value || ''), venue:venueCandidates.at(-1) || '', is_home:isHome, timezone:calendarTimezone};
+                return {number:index+1,start_date:start?.date || '',start_time:start?.time || '',detected_opponent:candidate,description_first:descriptionFirst,summary,location:icsUnescape(props.LOCATION?.[0]?.value || ''),detected_venue:venueCandidates.at(-1) || '',is_home:isHome,timezone:calendarTimezone};
             });
-            return {events, timezone:calendarTimezone, calendarName};
+            return {events,timezone:calendarTimezone,calendarName};
         }
         function isValidDate(value) {
             value = String(value || '').trim(); if (!value) return false;
             if (/^\d{4}-\d{2}-\d{2}$/.test(value)) { const d = new Date(value + 'T12:00:00'); return !Number.isNaN(d.getTime()); }
-            if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(value)) { const parts = value.split('/').map(Number); const year = parts[2] < 100 ? 2000 + parts[2] : parts[2]; const d = new Date(year, parts[0]-1, parts[1]); return d.getFullYear() === year && d.getMonth() === parts[0]-1 && d.getDate() === parts[1]; }
+            if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(value)) { const parts = value.split('/').map(Number); const year = parts[2] < 100 ? 2000 + parts[2] : parts[2]; const d = new Date(year,parts[0]-1,parts[1]); return d.getFullYear() === year && d.getMonth() === parts[0]-1 && d.getDate() === parts[1]; }
             return !Number.isNaN(Date.parse(value));
         }
-        function isValidTime(value) {
-            value = String(value || '').trim(); if (!value) return true;
-            return /^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value) || /^(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:AM|PM)$/i.test(value);
-        }
+        function isValidTime(value) { value = String(value || '').trim(); if (!value) return true; return /^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value) || /^(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:AM|PM)$/i.test(value); }
         function setStatus(el, message, good) { if (!el) return; el.textContent = message || ''; el.classList.toggle('is-visible', !!message); el.classList.toggle('is-good', !!good); }
-        function getMapIndex(field) { const select = mapSelects.find(item => item.dataset.rcScheduleMapV91 === field); if (!select || select.value === '') return -1; const index = Number(select.value); return Number.isInteger(index) ? index : -1; }
-        function mappedValue(field, row) { const index = getMapIndex(field); return index >= 0 ? String(row[index] ?? '').trim() : ''; }
+        function selectedSource(field) { const select = mapSelects.find(item => item.dataset.rcScheduleMapV91 === field); return select?.value ?? ''; }
+        function mappedValue(field, row) {
+            const source = selectedSource(field); if (source === '') return '';
+            if (fileMode === 'ics') return String(row?.[source] ?? '').trim();
+            const index = Number(source); return Number.isInteger(index) && index >= 0 ? String(row?.[index] ?? '').trim() : '';
+        }
         function updateMapSample(select) {
             const field = select.dataset.rcScheduleMapV91; const sample = overlay.querySelector(`[data-rc-schedule-map-sample-v91="${field}"]`); if (!sample) return;
-            const index = select.value === '' ? -1 : Number(select.value); let value = '—';
-            if (index >= 0) { const row = parsedRows.find(item => Array.isArray(item) && String(item[index] ?? '').trim() !== ''); value = row ? String(row[index] ?? '').trim() : 'No sample value'; }
+            const source = select.value; let value = '—';
+            if (source !== '') { const row = parsedRows.find(item => mappedValue(field,item) !== ''); value = row ? mappedValue(field,row) : 'No sample value'; }
             sample.textContent = `Sample: ${value || '—'}`;
         }
         function validateMappings(showMessage = true) {
-            if (fileMode === 'ics') return true;
             const missing = mapSelects.filter(select => select.dataset.required === '1' && select.value === '').map(select => select.closest('.rc-import-map-row-v91')?.querySelector('b')?.textContent?.replace(' *','') || 'Required field');
             if (missing.length) { if (showMessage) setStatus(mapStatus, `Map the required field${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}.`, false); return false; }
             const mappedCount = mapSelects.filter(select => select.value !== '').length;
-            if (showMessage) setStatus(mapStatus, `${mappedCount} field${mappedCount === 1 ? '' : 's'} mapped. You can continue to preview.`, true);
+            if (showMessage) setStatus(mapStatus, `${mappedCount} field${mappedCount === 1 ? '' : 's'} mapped. Change anything that does not look right in the preview.`, true);
             return true;
         }
-        function populateMappingOptions() {
+        function populateCsvMappingOptions() {
             mapSelects.forEach(select => {
                 const field = select.dataset.rcScheduleMapV91; const required = select.dataset.required === '1';
+                select.name = `schedule_csv_map[${field}]`;
                 select.innerHTML = `<option value="">${required ? 'Select a CSV column...' : 'Do not import this field'}</option>`;
-                rawHeader.forEach((header, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `${String.fromCharCode(65 + (index % 26))}: ${String(header || '').trim() || `Column ${index + 1}`}`; select.appendChild(option); });
+                rawHeader.forEach((header,index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `${index + 1}. ${String(header || '').trim() || `Column ${index + 1}`}`; select.appendChild(option); });
                 const aliases = fieldAliases[field] || []; const suggested = normalizedHeader.findIndex(header => aliases.includes(header)); if (suggested >= 0) select.value = String(suggested);
                 updateMapSample(select);
             });
-            const suggestedCount = mapSelects.filter(select => select.value !== '').length;
-            setStatus(mapStatus, `${suggestedCount} field${suggestedCount === 1 ? '' : 's'} auto-mapped. Review the selections and change anything that does not match your CSV.`, true);
         }
-        function configureStep2() {
-            const isIcs = fileMode === 'ics';
-            if (csvMapGrid) csvMapGrid.style.display = isIcs ? 'none' : '';
-            if (icsDetect) icsDetect.style.display = isIcs ? '' : 'none';
-            if (step2Title) step2Title.textContent = isIcs ? '2. Calendar detected' : '2. Map your columns';
-            if (step2Help) step2Help.innerHTML = isIcs ? 'ICS files use standard calendar fields, so there is nothing to map manually. Review what PLYRCARD detected before continuing.' : 'We suggest matches when possible, but you can change every field. Only <b>Date</b> and <b>Opponent / Event Name</b> are required.';
-            if (methodTitle) methodTitle.textContent = isIcs ? 'ICS calendar fields are detected automatically' : 'Your CSV column mapping is preserved';
-            if (methodCopy) methodCopy.textContent = isIcs ? 'PLYRCARD will read the same calendar fields again on the server before creating events.' : 'PLYRCARD will use the exact columns you selected when the file reaches the server.';
-            if (icsTimezone) icsTimezone.textContent = `Calendar timezone: ${detectedTimezone || 'UTC / floating time'}`;
-            if (icsCount) icsCount.textContent = `${parsedRows.length} ${parsedRows.length === 1 ? 'event' : 'events'} detected`;
+        function populateIcsMappingOptions() {
+            mapSelects.forEach(select => {
+                const field = select.dataset.rcScheduleMapV91; const required = select.dataset.required === '1';
+                select.name = `schedule_ics_map[${field}]`;
+                select.innerHTML = `<option value="">${required ? 'Select an ICS field...' : 'Do not import this field'}</option>`;
+                (icsSources[field] || []).forEach(([value,label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; select.appendChild(option); });
+                select.value = icsDefaults[field] || '';
+                updateMapSample(select);
+            });
+        }
+        function refreshPreview() {
+            if (!validateMappings(false)) { validRows = 0; invalidRows = parsedRows.length; if (previewBody) previewBody.innerHTML = ''; if (totalEl) totalEl.textContent = String(parsedRows.length); if (validEl) validEl.textContent = '0'; if (invalidEl) invalidEl.textContent = String(parsedRows.length); setStatus(previewStatus, 'Map Date and Opponent / Event Name to see the preview.', false); return false; }
+            validRows = 0; invalidRows = 0; const preview = [];
+            parsedRows.forEach((row,index) => {
+                const errors = []; const date = mappedValue('game_date',row); const time = mappedValue('game_time',row); const opponent = mappedValue('opponent',row);
+                if (!isValidDate(date)) errors.push('Invalid date'); if (!opponent) errors.push('Missing opponent/event'); if (!isValidTime(time)) errors.push('Invalid time');
+                if (errors.length) invalidRows++; else validRows++;
+                if (index < 50) preview.push({number:fileMode === 'ics' ? index + 1 : index + 2,row,errors});
+            });
+            if (totalEl) totalEl.textContent = String(parsedRows.length); if (validEl) validEl.textContent = String(validRows); if (invalidEl) invalidEl.textContent = String(invalidRows);
+            if (previewBody) previewBody.innerHTML = preview.map(item => `<tr class="${item.errors.length ? 'rc-import-row-error-v91' : ''}"><td>${item.number}</td><td>${escapeHtml(mappedValue('game_date',item.row))}</td><td>${escapeHtml(mappedValue('game_time',item.row) || 'Time TBD')}</td><td>${escapeHtml(mappedValue('opponent',item.row))}</td><td>${escapeHtml(mappedValue('location',item.row) || '—')}</td><td>${escapeHtml(mappedValue('venue',item.row) || '—')}</td><td>${item.errors.length ? escapeHtml(item.errors.join(', ')) : 'Ready'}</td></tr>`).join('');
+            const extra = parsedRows.length > 50 ? ` Showing the first 50 of ${parsedRows.length} events.` : '';
+            setStatus(previewStatus, invalidRows ? `${validRows} ready. ${invalidRows} ${invalidRows === 1 ? 'event needs' : 'events need'} attention and will be skipped.${extra}` : `All ${validRows} events look ready.${extra}`, invalidRows === 0);
+            return validRows > 0;
         }
         function goToStep(step) {
-            currentStep = Math.max(1, Math.min(5, step));
-            panels.forEach(panel => panel.classList.toggle('is-active', Number(panel.dataset.rcImportPanelV91) === currentStep));
-            indicators.forEach(indicator => { const number = Number(indicator.dataset.rcImportStepIndicatorV91); indicator.classList.toggle('is-active', number === currentStep); indicator.classList.toggle('is-done', number < currentStep); });
-            backBtn.style.display = currentStep >= 2 && currentStep <= 4 ? '' : 'none';
-            nextBtn.style.display = currentStep >= 1 && currentStep <= 3 ? '' : 'none';
-            nextBtn.textContent = currentStep === 1 ? 'Continue' : (currentStep === 2 ? 'Preview Events' : 'Continue');
-            submitBtn.style.display = currentStep === 4 ? '' : 'none'; doneBtn.style.display = currentStep === 5 ? '' : 'none';
-            overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => { if (currentStep === 5 && btn.textContent.trim() === 'Cancel') btn.style.display = 'none'; else btn.style.display = ''; });
+            currentStep = Math.max(1,Math.min(3,step));
+            panels.forEach(panel => panel.classList.toggle('is-active',Number(panel.dataset.rcImportPanelV91) === currentStep));
+            indicators.forEach(indicator => { const number = Number(indicator.dataset.rcImportStepIndicatorV91); indicator.classList.toggle('is-active',number === currentStep); indicator.classList.toggle('is-done',number < currentStep); });
+            backBtn.style.display = currentStep === 2 ? '' : 'none';
+            nextBtn.style.display = currentStep === 1 ? '' : 'none';
+            submitBtn.style.display = currentStep === 2 ? '' : 'none';
+            doneBtn.style.display = currentStep === 3 ? '' : 'none';
+            overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => { if (currentStep === 3 && btn.textContent.trim() === 'Cancel') btn.style.display = 'none'; else btn.style.display = ''; });
         }
         function resetImport() {
             form.reset(); fileMode = 'csv'; rawHeader = []; normalizedHeader = []; parsedRows = []; validRows = 0; invalidRows = 0; detectedTimezone = '';
-            if (previewBody) previewBody.innerHTML = ''; if (totalEl) totalEl.textContent = '0'; if (validEl) validEl.textContent = '0'; if (invalidEl) invalidEl.textContent = '0';
-            mapSelects.forEach(select => { select.innerHTML = `<option value="">${select.dataset.required === '1' ? 'Select a CSV column...' : 'Do not import this field'}</option>`; updateMapSample(select); });
-            setStatus(fileStatus, '', false); setStatus(mapStatus, '', false); setStatus(previewStatus, '', false); configureStep2(); goToStep(1);
+            if (previewBody) previewBody.innerHTML = ''; if (totalEl) totalEl.textContent = '0'; if (validEl) validEl.textContent = '0'; if (invalidEl) invalidEl.textContent = '0'; if (sourceInfo) sourceInfo.textContent = '';
+            mapSelects.forEach(select => { select.name = `schedule_csv_map[${select.dataset.rcScheduleMapV91}]`; select.innerHTML = `<option value="">${select.dataset.required === '1' ? 'Select a source...' : 'Do not import this field'}</option>`; updateMapSample(select); });
+            setStatus(fileStatus,'',false); setStatus(mapStatus,'',false); setStatus(previewStatus,'',false); goToStep(1);
         }
         function closeImport() { overlay.classList.remove('is-open'); document.body.style.overflow = ''; }
         function openImport() { resetImport(); overlay.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
         async function loadFile() {
             const file = fileInput?.files?.[0];
-            if (!file) { setStatus(fileStatus, 'Choose a CSV or ICS file first.', false); return false; }
-            if (file.size > 5 * 1024 * 1024) { setStatus(fileStatus, 'The file must be 5 MB or smaller.', false); return false; }
+            if (!file) { setStatus(fileStatus,'Choose a CSV or ICS file first.',false); return false; }
+            if (file.size > 5 * 1024 * 1024) { setStatus(fileStatus,'The file must be 5 MB or smaller.',false); return false; }
             const text = await file.text(); const extension = (file.name.split('.').pop() || '').toLowerCase();
             fileMode = extension === 'ics' || /BEGIN:VCALENDAR/i.test(text) ? 'ics' : 'csv';
             if (fileMode === 'ics') {
                 const parsed = parseIcs(text); parsedRows = parsed.events; detectedTimezone = parsed.timezone || 'UTC';
-                if (!parsedRows.length) { setStatus(fileStatus, 'The ICS file does not contain any calendar events.', false); return false; }
-                if (parsedRows.length > 250) { setStatus(fileStatus, 'A single import can contain up to 250 schedule events.', false); return false; }
-                configureStep2(); setStatus(fileStatus, `${file.name} loaded with ${parsedRows.length} calendar ${parsedRows.length === 1 ? 'event' : 'events'}.`, true); setStatus(mapStatus, `ICS detected. Times will use ${detectedTimezone}; date-only events will show Time TBD.`, true); goToStep(2); return true;
+                if (!parsedRows.length) { setStatus(fileStatus,'The ICS file does not contain any calendar events.',false); return false; }
+                if (parsedRows.length > 250) { setStatus(fileStatus,'A single import can contain up to 250 schedule events.',false); return false; }
+                populateIcsMappingOptions();
+                if (sourceInfo) sourceInfo.textContent = `ICS calendar · ${parsedRows.length} event${parsedRows.length === 1 ? '' : 's'} · timezone ${detectedTimezone}. Suggested mappings are selected, but you can change them.`;
+                setStatus(fileStatus,`${file.name} loaded successfully.`,true);
+            } else {
+                const rows = parseCsv(text);
+                if (rows.length < 2) { setStatus(fileStatus,'The CSV needs a header row and at least one schedule row.',false); return false; }
+                if (rows.length - 1 > 250) { setStatus(fileStatus,'A single import can contain up to 250 schedule rows.',false); return false; }
+                rawHeader = rows[0].map(value => String(value ?? '').replace(/^\uFEFF/, '').trim()); normalizedHeader = rawHeader.map(normalizeHeader); parsedRows = rows.slice(1).filter(row => row.some(value => String(value).trim() !== ''));
+                if (!parsedRows.length) { setStatus(fileStatus,'The CSV does not contain any schedule rows.',false); return false; }
+                populateCsvMappingOptions();
+                if (sourceInfo) sourceInfo.textContent = `CSV · ${rawHeader.length} columns · ${parsedRows.length} schedule rows. Suggested mappings are selected, but you can change them.`;
+                setStatus(fileStatus,`${file.name} loaded successfully.`,true);
             }
-            const rows = parseCsv(text);
-            if (rows.length < 2) { setStatus(fileStatus, 'The CSV needs a header row and at least one schedule row.', false); return false; }
-            if (rows.length - 1 > 250) { setStatus(fileStatus, 'A single import can contain up to 250 schedule rows.', false); return false; }
-            rawHeader = rows[0].map(value => String(value ?? '').replace(/^\uFEFF/, '').trim()); normalizedHeader = rawHeader.map(normalizeHeader); parsedRows = rows.slice(1).filter(row => row.some(value => String(value).trim() !== ''));
-            if (!parsedRows.length) { setStatus(fileStatus, 'The CSV does not contain any schedule rows.', false); return false; }
-            populateMappingOptions(); configureStep2(); setStatus(fileStatus, `${file.name} loaded with ${rawHeader.length} columns and ${parsedRows.length} schedule rows.`, true); goToStep(2); return true;
+            validateMappings(true); refreshPreview(); goToStep(2); return true;
         }
-        function previewRows() {
-            if (!validateMappings(true)) return false;
-            validRows = 0; invalidRows = 0; const preview = [];
-            parsedRows.forEach((row, index) => {
-                const get = field => fileMode === 'ics' ? String(row[field] ?? '').trim() : mappedValue(field, row);
-                const errors = []; const date = get('game_date'); const time = get('game_time'); const opponent = get('opponent');
-                if (!isValidDate(date)) errors.push('Invalid date'); if (!opponent) errors.push('Missing opponent/event'); if (!isValidTime(time)) errors.push('Invalid time');
-                if (errors.length) invalidRows++; else validRows++; if (index < 50) preview.push({number:fileMode === 'ics' ? index + 1 : index + 2,get,errors});
-            });
-            if (totalEl) totalEl.textContent = String(parsedRows.length); if (validEl) validEl.textContent = String(validRows); if (invalidEl) invalidEl.textContent = String(invalidRows);
-            if (confirmValidEl) confirmValidEl.textContent = `${validRows} valid ${validRows === 1 ? 'event is' : 'events are'} ready`;
-            previewBody.innerHTML = preview.map(item => `<tr class="${item.errors.length ? 'rc-import-row-error-v91' : ''}"><td>${item.number}</td><td>${escapeHtml(item.get('game_date'))}</td><td>${escapeHtml(item.get('game_time') || 'Time TBD')}</td><td>${escapeHtml(item.get('opponent'))}</td><td>${escapeHtml(item.get('location') || '—')}</td><td>${escapeHtml(item.get('venue') || '—')}</td><td>${item.errors.length ? escapeHtml(item.errors.join(', ')) : 'Ready'}</td></tr>`).join('');
-            const extra = parsedRows.length > 50 ? ` Showing the first 50 of ${parsedRows.length} events.` : '';
-            setStatus(previewStatus, invalidRows ? `${invalidRows} ${invalidRows === 1 ? 'event needs' : 'events need'} attention and will be skipped.${extra}` : `All ${validRows} events look ready.${extra}`, invalidRows === 0); goToStep(3); return true;
-        }
-        openBtn.addEventListener('click', openImport);
-        overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => btn.addEventListener('click', closeImport));
-        doneBtn?.addEventListener('click', closeImport); backBtn?.addEventListener('click', () => goToStep(currentStep - 1));
-        nextBtn?.addEventListener('click', async () => { if (currentStep === 1) await loadFile(); else if (currentStep === 2) previewRows(); else if (currentStep === 3) { if (validRows < 1) { setStatus(previewStatus, 'At least one valid event is required before importing.', false); return; } goToStep(4); } });
-        mapSelects.forEach(select => select.addEventListener('change', () => { updateMapSample(select); validateMappings(true); }));
-        fileInput?.addEventListener('change', () => setStatus(fileStatus, fileInput.files?.[0] ? `${fileInput.files[0].name} selected. Click Continue to inspect it.` : '', true));
-        templateBtn?.addEventListener('click', () => { const csv = 'date,time,opponent_event_name,location,venue\n2026-10-24,09:00,Wilmington Hammerheads,Wilmington NC,nCino Sports Park\n2026-11-01,14:30,NC Courage,Raleigh NC,WRAL Soccer Park\n'; const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})); const link = document.createElement('a'); link.href = url; link.download = 'plyrcard-schedule-template.csv'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 500); });
-        form.addEventListener('submit', event => { if ((fileMode === 'csv' && !validateMappings(true)) || validRows < 1) { event.preventDefault(); return; } submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; });
-        overlay.addEventListener('click', event => { if (event.target === overlay && currentStep !== 5) closeImport(); });
-        configureStep2(); goToStep(currentStep); if (hasServerResult) { overlay.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
+        openBtn.addEventListener('click',openImport);
+        overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => btn.addEventListener('click',closeImport));
+        doneBtn?.addEventListener('click',closeImport);
+        backBtn?.addEventListener('click',() => goToStep(1));
+        nextBtn?.addEventListener('click',loadFile);
+        mapSelects.forEach(select => select.addEventListener('change',() => { updateMapSample(select); validateMappings(true); refreshPreview(); }));
+        fileInput?.addEventListener('change',() => setStatus(fileStatus,fileInput.files?.[0] ? `${fileInput.files[0].name} selected. Click Continue.` : '',true));
+        templateBtn?.addEventListener('click',() => { const csv = 'date,time,opponent_event_name,location,venue\n2026-10-24,09:00,Wilmington Hammerheads,Wilmington NC,nCino Sports Park\n2026-11-01,14:30,NC Courage,Raleigh NC,WRAL Soccer Park\n'; const url = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'})); const link = document.createElement('a'); link.href = url; link.download = 'plyrcard-schedule-template.csv'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url),500); });
+        form.addEventListener('submit',event => { if (!validateMappings(true) || !refreshPreview() || validRows < 1) { event.preventDefault(); return; } submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; });
+        overlay.addEventListener('click',event => { if (event.target === overlay && currentStep !== 3) closeImport(); });
+        goToStep(currentStep); if (hasServerResult) { overlay.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
     }
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initScheduleCsvImportV91, {once:true}); else initScheduleCsvImportV91();
-    document.addEventListener('livewire:navigated', initScheduleCsvImportV91);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',initScheduleCsvImportV91,{once:true}); else initScheduleCsvImportV91();
+    document.addEventListener('livewire:navigated',initScheduleCsvImportV91);
 })();
 </script>
 <section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
