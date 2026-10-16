@@ -418,8 +418,8 @@ class LockerRoomController extends Controller
         $user = Auth::user();
         abort_unless($user, 403);
         $this->ensureScheduleAccess($user);
-        if ($request->hasFile('schedule_csv')) {
-            return $this->importScheduleCsv($request, $user, $dataService);
+        if ($request->hasFile('schedule_file') || $request->hasFile('schedule_csv')) {
+            return $this->importScheduleFile($request, $user, $dataService);
         }
         $data = $this->validatedScheduleData($request);
         $data['created_by_user_id'] = $user->id;
@@ -786,9 +786,48 @@ class LockerRoomController extends Controller
             ->orderBy('id')
             ->value('id');
     }
-    protected function importScheduleCsv(Request $request, $user, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
+    protected function importScheduleFile(Request $request, $user, LockerRoomDataService $dataService): RedirectResponse|JsonResponse
     {
-        $file = $request->file('schedule_csv');
+        $file = $request->file('schedule_file') ?: $request->file('schedule_csv');
+        if (! $file || ! $file->isValid()) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'Please choose a valid CSV or ICS file.',
+                'errors' => [],
+            ]);
+        }
+        if ((int) $file->getSize() > 5 * 1024 * 1024) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'Use a CSV or ICS file no larger than 5 MB.',
+                'errors' => [],
+            ]);
+        }
+        $extension = strtolower((string) $file->getClientOriginalExtension());
+        if ($extension === 'ics') {
+            return $this->importScheduleIcs($request, $user, $dataService, $file);
+        }
+        if (! in_array($extension, ['csv', 'txt'], true)) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false,
+                'imported' => 0,
+                'duplicates' => 0,
+                'invalid' => 0,
+                'message' => 'Only CSV and ICS schedule files are supported.',
+                'errors' => [],
+            ]);
+        }
+        return $this->importScheduleCsv($request, $user, $dataService, $file);
+    }
+    protected function importScheduleCsv(Request $request, $user, LockerRoomDataService $dataService, $file = null): RedirectResponse|JsonResponse
+    {
+        $file = $file ?: ($request->file('schedule_file') ?: $request->file('schedule_csv'));
         if (! $file || ! $file->isValid()) {
             return $this->scheduleImportResponse($request, $user, $dataService, [
                 'success' => false,
@@ -796,17 +835,6 @@ class LockerRoomController extends Controller
                 'duplicates' => 0,
                 'invalid' => 0,
                 'message' => 'Please choose a valid CSV file.',
-                'errors' => [],
-            ]);
-        }
-        $extension = strtolower((string) $file->getClientOriginalExtension());
-        if (! in_array($extension, ['csv', 'txt'], true) || (int) $file->getSize() > 5 * 1024 * 1024) {
-            return $this->scheduleImportResponse($request, $user, $dataService, [
-                'success' => false,
-                'imported' => 0,
-                'duplicates' => 0,
-                'invalid' => 0,
-                'message' => 'Use a CSV file no larger than 5 MB.',
                 'errors' => [],
             ]);
         }
@@ -934,6 +962,245 @@ class LockerRoomController extends Controller
             'message' => $message,
             'errors' => array_slice($errors, 0, 12),
         ]);
+    }
+    protected function importScheduleIcs(Request $request, $user, LockerRoomDataService $dataService, $file): RedirectResponse|JsonResponse
+    {
+        $contents = @file_get_contents($file->getRealPath());
+        if (! is_string($contents) || trim($contents) === '') {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false, 'imported' => 0, 'duplicates' => 0, 'invalid' => 0,
+                'message' => 'The ICS calendar file could not be read.', 'errors' => [],
+            ]);
+        }
+        $contents = str_replace(["\r\n", "\r"], "\n", $contents);
+        $contents = preg_replace("/\n[ \t]/", '', $contents) ?? $contents;
+        if (! str_contains(strtoupper($contents), 'BEGIN:VCALENDAR')) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false, 'imported' => 0, 'duplicates' => 0, 'invalid' => 0,
+                'message' => 'The selected file is not a valid ICS calendar.', 'errors' => [],
+            ]);
+        }
+        $calendarTimezone = $this->scheduleIcsCalendarValue($contents, 'X-WR-TIMEZONE')
+            ?: $this->scheduleIcsCalendarValue($contents, 'TZID')
+            ?: 'UTC';
+        $calendarName = $this->icsUnescapeText($this->scheduleIcsCalendarValue($contents, 'X-WR-CALNAME'));
+        preg_match_all('/BEGIN:VEVENT\n(.*?)\nEND:VEVENT/s', $contents, $matches);
+        $eventBlocks = $matches[1] ?? [];
+        if ($eventBlocks === []) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false, 'imported' => 0, 'duplicates' => 0, 'invalid' => 0,
+                'message' => 'The ICS file does not contain any calendar events.', 'errors' => [],
+            ]);
+        }
+        if (count($eventBlocks) > 250) {
+            return $this->scheduleImportResponse($request, $user, $dataService, [
+                'success' => false, 'imported' => 0, 'duplicates' => 0, 'invalid' => 0,
+                'message' => 'A single import can contain up to 250 schedule events.', 'errors' => [],
+            ]);
+        }
+        $existingFingerprints = Schedule::query()
+            ->where(function ($query) use ($user): void {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            })
+            ->get(['game_date', 'game_time', 'opponent'])
+            ->mapWithKeys(function (Schedule $schedule): array {
+                $date = optional($schedule->game_date)->format('Y-m-d') ?: '';
+                $time = $this->normalizeScheduleImportTime((string) ($schedule->game_time ?? ''));
+                return [$this->scheduleImportFingerprint($date, $time, (string) $schedule->opponent) => true];
+            })->all();
+        $validRows = [];
+        $errors = [];
+        $duplicates = 0;
+        foreach ($eventBlocks as $index => $block) {
+            $parsed = $this->parseScheduleIcsEvent((string) $block, $calendarTimezone, $calendarName, $index + 1);
+            if (! $parsed['valid']) {
+                $errors[] = 'Event ' . ($index + 1) . ': ' . implode(' ', $parsed['errors']);
+                continue;
+            }
+            $data = $parsed['data'];
+            $fingerprint = $this->scheduleImportFingerprint($data['game_date'], $data['game_time'], $data['opponent']);
+            if (isset($existingFingerprints[$fingerprint])) {
+                $duplicates++;
+                continue;
+            }
+            $existingFingerprints[$fingerprint] = true;
+            $validRows[] = $data;
+        }
+        $imported = 0;
+        if ($validRows !== []) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($validRows, $user, &$imported): void {
+                foreach ($validRows as $data) {
+                    $data['created_by_user_id'] = $user->id;
+                    $schedule = Schedule::create($data);
+                    $schedule->users()->syncWithoutDetaching([$user->id]);
+                    $imported++;
+                }
+            });
+        }
+        return $this->scheduleImportResponse($request, $user, $dataService, [
+            'success' => $imported > 0,
+            'imported' => $imported,
+            'duplicates' => $duplicates,
+            'invalid' => count($errors),
+            'message' => $imported > 0
+                ? "Imported {$imported} schedule " . ($imported === 1 ? 'event from ICS.' : 'events from ICS.')
+                : 'No new schedule events were imported from the ICS calendar.',
+            'errors' => array_slice($errors, 0, 12),
+            'source_type' => 'ICS',
+            'timezone' => $calendarTimezone,
+        ]);
+    }
+    protected function parseScheduleIcsEvent(string $block, string $calendarTimezone, string $calendarName, int $eventNumber): array
+    {
+        $properties = [];
+        foreach (explode("\n", trim($block)) as $line) {
+            $position = strpos($line, ':');
+            if ($position === false) {
+                continue;
+            }
+            $rawName = trim(substr($line, 0, $position));
+            $name = strtoupper((string) strtok($rawName, ';'));
+            if ($name === '') {
+                continue;
+            }
+            $properties[$name][] = ['raw_name' => $rawName, 'value' => substr($line, $position + 1)];
+        }
+        $dtstart = $properties['DTSTART'][0] ?? null;
+        if (! is_array($dtstart)) {
+            return ['valid' => false, 'errors' => ['Start date is missing.'], 'data' => []];
+        }
+        $dateTime = $this->parseScheduleIcsDateTime((string) $dtstart['raw_name'], (string) $dtstart['value'], $calendarTimezone);
+        if (! $dateTime) {
+            return ['valid' => false, 'errors' => ['Start date/time is invalid.'], 'data' => []];
+        }
+        $summary = $this->icsUnescapeText((string) (($properties['SUMMARY'][0]['value'] ?? '')));
+        $description = $this->icsUnescapeText((string) (($properties['DESCRIPTION'][0]['value'] ?? '')));
+        $description = preg_replace('/<br\s*\/?>/i', "\n", $description) ?? $description;
+        $descriptionLines = collect(explode("\n", $description))
+            ->map(fn ($line) => trim((string) strip_tags(html_entity_decode((string) $line, ENT_QUOTES | ENT_HTML5, 'UTF-8'))))
+            ->filter(fn ($line) => $line !== '')
+            ->values()->all();
+        $matchup = trim((string) ($descriptionLines[0] ?? ''));
+        $teamName = trim((string) preg_replace('/\s+(games?|schedule|calendar)\s*$/i', '', $calendarName));
+        [$opponent, $isHome] = $this->scheduleIcsOpponent($matchup, $summary, $teamName);
+        if ($opponent === '') {
+            return ['valid' => false, 'errors' => ['Opponent / Event Name could not be detected.'], 'data' => []];
+        }
+        $location = trim($this->icsUnescapeText((string) (($properties['LOCATION'][0]['value'] ?? ''))));
+        $venue = $this->scheduleIcsVenue($descriptionLines);
+        return [
+            'valid' => true,
+            'errors' => [],
+            'data' => [
+                'title' => 'Game',
+                'opponent' => mb_substr($opponent, 0, 255),
+                'status' => 'upcoming',
+                'game_date' => $dateTime['date'],
+                'game_time' => $dateTime['time'],
+                'location' => $location !== '' ? mb_substr($location, 0, 255) : null,
+                'venue' => $venue !== '' ? mb_substr($venue, 0, 255) : null,
+                'result' => null,
+                'score' => null,
+                'notes' => null,
+                'is_home' => $isHome,
+            ],
+        ];
+    }
+    protected function parseScheduleIcsDateTime(string $rawName, string $value, string $calendarTimezone): ?array
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+        $isDateOnly = str_contains(strtoupper($rawName), 'VALUE=DATE') || preg_match('/^\d{8}$/', $value) === 1;
+        if ($isDateOnly) {
+            $date = \DateTimeImmutable::createFromFormat('!Ymd', substr($value, 0, 8), new \DateTimeZone('UTC'));
+            return $date ? ['date' => $date->format('Y-m-d'), 'time' => null] : null;
+        }
+        $timezoneName = $calendarTimezone;
+        if (preg_match('/(?:^|;)TZID=([^;:]+)/i', $rawName, $match)) {
+            $timezoneName = trim($match[1], '" ');
+        }
+        try {
+            $timezone = new \DateTimeZone($timezoneName ?: 'UTC');
+        } catch (\Throwable) {
+            $timezone = new \DateTimeZone('UTC');
+        }
+        $isUtc = str_ends_with(strtoupper($value), 'Z');
+        $sourceTimezone = $isUtc ? new \DateTimeZone('UTC') : $timezone;
+        $cleanValue = $isUtc ? substr($value, 0, -1) : $value;
+        $dateTime = null;
+        foreach (['!Ymd\\THis', '!Ymd\\THi'] as $format) {
+            $candidate = \DateTimeImmutable::createFromFormat($format, $cleanValue, $sourceTimezone);
+            if ($candidate instanceof \DateTimeImmutable) {
+                $dateTime = $candidate;
+                break;
+            }
+        }
+        if (! $dateTime && preg_match('/^[0-9]{8}T[0-9]{4,6}[+-][0-9]{4}$/', $value)) {
+            foreach (['!Ymd\\THisO', '!Ymd\\THiO'] as $format) {
+                $candidate = \DateTimeImmutable::createFromFormat($format, $value);
+                if ($candidate instanceof \DateTimeImmutable) {
+                    $dateTime = $candidate->setTimezone($timezone);
+                    break;
+                }
+            }
+        }
+        if (! $dateTime) {
+            return null;
+        }
+        if ($isUtc) {
+            $dateTime = $dateTime->setTimezone($timezone);
+        }
+        return ['date' => $dateTime->format('Y-m-d'), 'time' => $dateTime->format('H:i')];
+    }
+    protected function scheduleIcsOpponent(string $matchup, string $summary, string $teamName): array
+    {
+        $candidate = trim($matchup) !== '' ? trim($matchup) : trim($summary);
+        if ($candidate === '') {
+            return ['', false];
+        }
+        if ($teamName !== '') {
+            $team = preg_quote($teamName, '/');
+            if (preg_match('/^' . $team . '\s+at\s+(.+)$/i', $candidate, $match)) {
+                return [trim($match[1]), false];
+            }
+            if (preg_match('/^(.+)\s+at\s+' . $team . '$/i', $candidate, $match)) {
+                return [trim($match[1]), true];
+            }
+            if (preg_match('/^' . $team . '\s+(?:vs\.?|versus)\s+(.+)$/i', $candidate, $match)) {
+                return [trim($match[1]), true];
+            }
+            if (preg_match('/^(.+)\s+(?:vs\.?|versus)\s+' . $team . '$/i', $candidate, $match)) {
+                return [trim($match[1]), false];
+            }
+        }
+        $candidate = preg_replace('/\s+-\s+Game\s*$/i', '', $candidate) ?? $candidate;
+        return [trim($candidate), false];
+    }
+    protected function scheduleIcsVenue(array $descriptionLines): string
+    {
+        $candidates = [];
+        foreach (array_slice($descriptionLines, 1) as $line) {
+            $line = trim((string) $line);
+            if ($line === '' || preg_match('/^(arrive\s+by|uniform\s*:|start\s+time\b)/i', $line)) {
+                continue;
+            }
+            $candidates[] = $line;
+        }
+        return trim((string) ($candidates[count($candidates) - 1] ?? ''));
+    }
+    protected function scheduleIcsCalendarValue(string $contents, string $property): string
+    {
+        if (preg_match('/^' . preg_quote($property, '/') . ':(.+)$/mi', $contents, $match)) {
+            return trim((string) $match[1]);
+        }
+        return '';
+    }
+    protected function icsUnescapeText(string $value): string
+    {
+        return str_replace(['\\n', '\\N', '\\,', '\\;', '\\\\'], ["\n", "\n", ',', ';', '\\'], trim($value));
     }
     protected function scheduleImportResponse(Request $request, $user, LockerRoomDataService $dataService, array $result): RedirectResponse|JsonResponse
     {
