@@ -5939,13 +5939,13 @@ discoverSelectedIds: [],
         .rc-schedule-title-actions-v91 { display:flex;align-items:center;gap:.55rem;flex-wrap:wrap; }
         .rc-import-overlay-v91 { position:fixed;inset:0;z-index:99999;display:none;align-items:center;justify-content:center;padding:1rem;background:rgba(15,23,42,.58);backdrop-filter:blur(4px); }
         .rc-import-overlay-v91.is-open { display:flex; }
-        .rc-import-modal-v91 { width:min(920px,96vw);max-height:92vh;overflow:auto;border-radius:1.15rem;background:var(--rc-surface);box-shadow:0 28px 80px rgba(15,23,42,.28);border:1px solid var(--rc-border); }
+        .rc-import-modal-v91 { width:min(1040px,96vw);max-height:92vh;overflow:auto;border-radius:1.15rem;background:var(--rc-surface);box-shadow:0 28px 80px rgba(15,23,42,.28);border:1px solid var(--rc-border); }
         .rc-import-head-v91 { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:1rem 1.1rem;border-bottom:1px solid var(--rc-border); }
         .rc-import-head-v91 h2 { margin:0;font-size:1.12rem; }
         .rc-import-head-v91 p { margin:.2rem 0 0;color:var(--rc-muted);font-size:.84rem; }
         .rc-import-close-v91 { width:2rem;height:2rem;border:0;border-radius:.65rem;background:transparent;color:var(--rc-muted);font-size:1.35rem;cursor:pointer; }
         .rc-import-close-v91:hover { background:rgba(15,23,42,.05);color:var(--rc-text); }
-        .rc-import-steps-v91 { display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--rc-border); }
+        .rc-import-steps-v91 { display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--rc-border); }
         .rc-import-step-v91 { display:flex;gap:.55rem;align-items:center;padding:.72rem .8rem;color:var(--rc-muted);font-size:.78rem;font-weight:700;border-right:1px solid var(--rc-border); }
         .rc-import-step-v91:last-child { border-right:0; }
         .rc-import-step-v91.is-active { color:#ff6338;background:rgba(255,99,56,.06); }
@@ -5961,6 +5961,12 @@ discoverSelectedIds: [],
         .rc-import-help-v91 { margin:.7rem 0 0;color:var(--rc-muted);font-size:.8rem;line-height:1.55; }
         .rc-import-columns-v91 { display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.75rem; }
         .rc-import-columns-v91 span { padding:.25rem .48rem;border-radius:999px;background:#fff;border:1px solid var(--rc-border);font-size:.7rem;color:var(--rc-text); }
+        .rc-import-map-grid-v91 { display:grid;gap:.55rem;margin-top:.8rem; }
+        .rc-import-map-row-v91 { display:grid;grid-template-columns:minmax(160px,.75fr) minmax(220px,1fr) minmax(180px,.85fr);gap:.7rem;align-items:center;padding:.65rem .7rem;border:1px solid var(--rc-border);border-radius:.8rem;background:#fff; }
+        .rc-import-map-label-v91 b { display:block;font-size:.8rem;color:var(--rc-text); }
+        .rc-import-map-label-v91 span { display:block;margin-top:.12rem;font-size:.7rem;color:var(--rc-muted); }
+        .rc-import-map-row-v91 select { width:100%;min-height:2.35rem;border:1px solid #cbd5e1;border-radius:.65rem;background:#fff;color:var(--rc-text);padding:.45rem .65rem;font-size:.78rem; }
+        .rc-import-map-sample-v91 { min-width:0;padding:.45rem .55rem;border-radius:.6rem;background:#f8fafc;color:var(--rc-muted);font-size:.72rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
         .rc-import-status-v91 { margin-top:.8rem;padding:.72rem .8rem;border-radius:.75rem;background:#fff7ed;color:#9a3412;font-size:.8rem;display:none; }
         .rc-import-status-v91.is-visible { display:block; }
         .rc-import-status-v91.is-good { background:#ecfdf5;color:#047857; }
@@ -5982,7 +5988,7 @@ discoverSelectedIds: [],
         .rc-import-result-v91 { text-align:center;padding:.6rem 0 .2rem; }
         .rc-import-result-icon-v91 { width:3rem;height:3rem;margin:0 auto .7rem;border-radius:999px;display:flex;align-items:center;justify-content:center;background:#dcfce7;color:#047857;font-size:1.45rem;font-weight:900; }
         .rc-import-error-list-v91 { margin:.8rem 0 0;padding:.75rem 1rem;border-radius:.8rem;background:#fff7ed;color:#9a3412;font-size:.78rem;text-align:left; }
-        @media (max-width:760px){ .rc-import-steps-v91{grid-template-columns:1fr 1fr}.rc-import-step-v91:nth-child(2){border-right:0}.rc-import-summary-v91{grid-template-columns:1fr}.rc-schedule-title-actions-v91{width:100%}.rc-schedule-title-actions-v91 .rc-btn{flex:1} }
+        @media (max-width:760px){ .rc-import-steps-v91{grid-template-columns:1fr 1fr}.rc-import-step-v91{border-bottom:1px solid var(--rc-border)}.rc-import-map-row-v91{grid-template-columns:1fr}.rc-import-summary-v91{grid-template-columns:1fr}.rc-schedule-title-actions-v91{width:100%}.rc-schedule-title-actions-v91 .rc-btn{flex:1} }
         .rc-icon-clean-v72 { width:2rem;height:2rem;border:0;background:transparent;color:var(--rc-muted);border-radius:.55rem;cursor:pointer;display:grid;place-items:center; }
         .rc-icon-clean-v72:hover { background:var(--rc-soft);color:#ff6338; }
         .rc-settings-page-v72 { display:grid;gap:1rem; }
@@ -11604,12 +11610,12 @@ CSS;
                 <div class="rc-import-overlay-v91 {{ $scheduleImportResult ? 'is-open' : '' }}" id="rc-schedule-import-overlay-v91" wire:ignore>
                     <div class="rc-import-modal-v91" role="dialog" aria-modal="true" aria-labelledby="rc-schedule-import-title-v91">
                         <div class="rc-import-head-v91">
-                            <div><h2 id="rc-schedule-import-title-v91">Import Schedule from CSV</h2><p>Add many games or events in a few guided steps.</p></div>
+                            <div><h2 id="rc-schedule-import-title-v91">Import Schedule from CSV</h2><p>Upload any CSV, map its columns, review the rows, then import.</p></div>
                             <button type="button" class="rc-import-close-v91" data-rc-import-close-v91 aria-label="Close">&times;</button>
                         </div>
                         <div class="rc-import-steps-v91" id="rc-schedule-import-steps-v91">
-                            @foreach([1 => 'Upload', 2 => 'Preview', 3 => 'Confirm', 4 => 'Complete'] as $stepNumber => $stepLabel)
-                                <div class="rc-import-step-v91 {{ $scheduleImportResult ? ($stepNumber < 4 ? 'is-done' : ($stepNumber === 4 ? 'is-active' : '')) : ($stepNumber === 1 ? 'is-active' : '') }}" data-rc-import-step-indicator-v91="{{ $stepNumber }}"><span class="rc-import-step-num-v91">{{ $stepNumber }}</span><span>{{ $stepLabel }}</span></div>
+                            @foreach([1 => 'Upload', 2 => 'Map Columns', 3 => 'Preview', 4 => 'Confirm', 5 => 'Complete'] as $stepNumber => $stepLabel)
+                                <div class="rc-import-step-v91 {{ $scheduleImportResult ? ($stepNumber < 5 ? 'is-done' : ($stepNumber === 5 ? 'is-active' : '')) : ($stepNumber === 1 ? 'is-active' : '') }}" data-rc-import-step-indicator-v91="{{ $stepNumber }}"><span class="rc-import-step-num-v91">{{ $stepNumber }}</span><span>{{ $stepLabel }}</span></div>
                             @endforeach
                         </div>
                         <form method="POST" action="{{ route('locker-room.schedule.store') }}" enctype="multipart/form-data" id="rc-schedule-import-form-v91">
@@ -11617,32 +11623,58 @@ CSS;
                             <div class="rc-import-body-v91">
                                 <section class="rc-import-panel-v91 {{ $scheduleImportResult ? '' : 'is-active' }}" data-rc-import-panel-v91="1">
                                     <h3 style="margin:0 0 .35rem;font-size:1rem;">1. Choose your CSV file</h3>
-                                    <p class="rc-import-help-v91" style="margin-top:0;">Start with our template, fill one event per row, then upload the finished CSV here.</p>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">Your column names can be anything. The next step lets you manually tell PLYRCARD what each column means.</p>
                                     <div class="rc-import-upload-v91">
                                         <input type="file" name="schedule_csv" id="rc-schedule-csv-file-v91" accept=".csv,text/csv,text/plain">
-                                        <div class="rc-import-help-v91">Required: <b>Date</b> and <b>Opponent / Event Name</b>. Up to 250 rows and 5 MB per import.</div>
-                                        <div class="rc-import-columns-v91"><span>Event Type</span><span>Date</span><span>Time</span><span>Opponent / Event Name</span><span>Location</span><span>Venue</span><span>Home / Away</span><span>Status</span><span>Result</span><span>Score</span><span>Notes</span></div>
-                                        <div style="margin-top:.8rem;"><button type="button" class="rc-btn" id="rc-schedule-template-download-v91">Download CSV Template</button></div>
+                                        <div class="rc-import-help-v91">The CSV needs a header row and at least one schedule row. Up to 250 rows and 5 MB per import.</div>
+                                        <div style="margin-top:.8rem;"><button type="button" class="rc-btn" id="rc-schedule-template-download-v91">Download Optional CSV Template</button></div>
                                     </div>
                                     <div class="rc-import-status-v91" id="rc-schedule-import-file-status-v91"></div>
                                 </section>
                                 <section class="rc-import-panel-v91" data-rc-import-panel-v91="2">
-                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">2. Preview & validate</h3>
-                                    <p class="rc-import-help-v91" style="margin-top:0;">Review the rows before importing. Invalid rows are highlighted and will be skipped.</p>
+                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">2. Map your columns</h3>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">We suggest matches when possible, but you can change every field. Only <b>Date</b> and <b>Opponent / Event Name</b> are required.</p>
+                                    <div class="rc-import-map-grid-v91">
+                                        @foreach([
+                                            'title' => ['Event Type', false, 'Game, Showcase, Tournament, etc.'],
+                                            'game_date' => ['Date', true, 'Required'],
+                                            'game_time' => ['Time', false, 'Kickoff or start time'],
+                                            'opponent' => ['Opponent / Event Name', true, 'Required'],
+                                            'location' => ['Location', false, 'City, state, address, etc.'],
+                                            'venue' => ['Venue / Field', false, 'Field, stadium, campus, etc.'],
+                                            'is_home' => ['Home / Away', false, 'Home, Away, Yes/No, or 1/0'],
+                                            'status' => ['Status', false, 'Upcoming, completed, cancelled, postponed'],
+                                            'result' => ['Result', false, 'Win, loss, draw, etc.'],
+                                            'score' => ['Score', false, 'Final or current score'],
+                                            'notes' => ['Notes', false, 'Extra details or comments'],
+                                        ] as $mapField => [$mapLabel, $mapRequired, $mapHint])
+                                            <div class="rc-import-map-row-v91">
+                                                <div class="rc-import-map-label-v91"><b>{{ $mapLabel }}{{ $mapRequired ? ' *' : '' }}</b><span>{{ $mapHint }}</span></div>
+                                                <select name="schedule_csv_map[{{ $mapField }}]" data-rc-schedule-map-v91="{{ $mapField }}" data-required="{{ $mapRequired ? '1' : '0' }}"><option value="">{{ $mapRequired ? 'Select a CSV column...' : 'Do not import this field' }}</option></select>
+                                                <div class="rc-import-map-sample-v91" data-rc-schedule-map-sample-v91="{{ $mapField }}">Sample: —</div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <div class="rc-import-status-v91" id="rc-schedule-import-map-status-v91"></div>
+                                </section>
+                                <section class="rc-import-panel-v91" data-rc-import-panel-v91="3">
+                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">3. Preview & validate</h3>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">Review the mapped rows before importing. Invalid rows are highlighted and will be skipped.</p>
                                     <div class="rc-import-summary-v91"><div class="rc-import-summary-card-v91"><strong id="rc-import-total-v91">0</strong><span>Total rows</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-valid-v91">0</strong><span>Ready</span></div><div class="rc-import-summary-card-v91"><strong id="rc-import-invalid-v91">0</strong><span>Needs attention</span></div></div>
                                     <div class="rc-import-table-wrap-v91"><table class="rc-import-table-v91"><thead><tr><th>Row</th><th>Date</th><th>Time</th><th>Type</th><th>Opponent / Event</th><th>Location</th><th>Venue</th><th>Home/Away</th><th>Status</th><th>Check</th></tr></thead><tbody id="rc-schedule-import-preview-v91"></tbody></table></div>
                                     <div class="rc-import-status-v91" id="rc-schedule-import-preview-status-v91"></div>
                                 </section>
-                                <section class="rc-import-panel-v91" data-rc-import-panel-v91="3">
-                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">3. Confirm import</h3>
-                                    <p class="rc-import-help-v91" style="margin-top:0;">Only valid rows will be created. The server validates everything again before saving.</p>
+                                <section class="rc-import-panel-v91" data-rc-import-panel-v91="4">
+                                    <h3 style="margin:0 0 .35rem;font-size:1rem;">4. Confirm import</h3>
+                                    <p class="rc-import-help-v91" style="margin-top:0;">Only valid rows will be created. The server re-reads the same file and uses the mappings you selected.</p>
                                     <div class="rc-import-checklist-v91">
                                         <div class="rc-import-check-v91"><span>✓</span><div><b id="rc-import-confirm-valid-v91">0 valid rows are ready</b><p>Invalid rows will be skipped and reported after the import.</p></div></div>
+                                        <div class="rc-import-check-v91"><span>✓</span><div><b>Your manual column mapping is preserved</b><p>PLYRCARD will not guess different columns when the file reaches the server.</p></div></div>
                                         <div class="rc-import-check-v91"><span>✓</span><div><b>Duplicate protection is enabled</b><p>An existing event with the same date, time, and opponent/event name will not be created again.</p></div></div>
                                         <div class="rc-import-check-v91"><span>✓</span><div><b>Your current schedule stays intact</b><p>This import only adds new schedule rows. It does not overwrite existing events.</p></div></div>
                                     </div>
                                 </section>
-                                <section class="rc-import-panel-v91 {{ $scheduleImportResult ? 'is-active' : '' }}" data-rc-import-panel-v91="4">
+                                <section class="rc-import-panel-v91 {{ $scheduleImportResult ? 'is-active' : '' }}" data-rc-import-panel-v91="5">
                                     @if($scheduleImportResult)
                                         <div class="rc-import-result-v91"><div class="rc-import-result-icon-v91">{{ ($scheduleImportResult['imported'] ?? 0) > 0 ? '✓' : '!' }}</div><h3 style="margin:0;">Import Complete</h3><p class="rc-import-help-v91">{{ $scheduleImportResult['message'] ?? 'Schedule import finished.' }}</p></div>
                                         <div class="rc-import-summary-v91"><div class="rc-import-summary-card-v91"><strong>{{ (int) ($scheduleImportResult['imported'] ?? 0) }}</strong><span>Imported</span></div><div class="rc-import-summary-card-v91"><strong>{{ (int) ($scheduleImportResult['duplicates'] ?? 0) }}</strong><span>Duplicates skipped</span></div><div class="rc-import-summary-card-v91"><strong>{{ (int) ($scheduleImportResult['invalid'] ?? 0) }}</strong><span>Invalid skipped</span></div></div>
@@ -11656,7 +11688,7 @@ CSS;
                                 <button type="button" class="rc-btn" id="rc-import-back-v91" style="display:none;">Back</button>
                                 <div class="rc-import-actions-right-v91">
                                     <button type="button" class="rc-btn" data-rc-import-close-v91>Cancel</button>
-                                    <button type="button" class="rc-btn rc-btn-primary" id="rc-import-next-v91">Preview File</button>
+                                    <button type="button" class="rc-btn rc-btn-primary" id="rc-import-next-v91">Map Columns</button>
                                     <button type="submit" class="rc-btn rc-btn-primary" id="rc-import-submit-v91" style="display:none;">Import Schedule</button>
                                     <button type="button" class="rc-btn rc-btn-primary" id="rc-import-done-v91" style="{{ $scheduleImportResult ? '' : 'display:none;' }}">Done</button>
                                 </div>
@@ -11738,6 +11770,7 @@ CSS;
         const templateBtn = document.getElementById('rc-schedule-template-download-v91');
         const previewBody = document.getElementById('rc-schedule-import-preview-v91');
         const fileStatus = document.getElementById('rc-schedule-import-file-status-v91');
+        const mapStatus = document.getElementById('rc-schedule-import-map-status-v91');
         const previewStatus = document.getElementById('rc-schedule-import-preview-status-v91');
         const totalEl = document.getElementById('rc-import-total-v91');
         const validEl = document.getElementById('rc-import-valid-v91');
@@ -11745,15 +11778,18 @@ CSS;
         const confirmValidEl = document.getElementById('rc-import-confirm-valid-v91');
         const panels = Array.from(overlay.querySelectorAll('[data-rc-import-panel-v91]'));
         const indicators = Array.from(overlay.querySelectorAll('[data-rc-import-step-indicator-v91]'));
-        const hasServerResult = overlay.querySelector('[data-rc-import-panel-v91="4"].is-active') !== null;
-        let currentStep = hasServerResult ? 4 : 1;
+        const mapSelects = Array.from(overlay.querySelectorAll('[data-rc-schedule-map-v91]'));
+        const hasServerResult = overlay.querySelector('[data-rc-import-panel-v91="5"].is-active') !== null;
+        let currentStep = hasServerResult ? 5 : 1;
+        let rawHeader = [];
+        let normalizedHeader = [];
         let parsedRows = [];
         let validRows = 0;
         let invalidRows = 0;
-        const aliases = {
-            event_type:['event_type','type','title','event'], date:['date','game_date','event_date'], time:['time','game_time','event_time'],
-            opponent:['opponent_event_name','opponent','event_name','opponent_or_event_name'], location:['location','city','address'], venue:['venue','field','field_venue','field_or_venue'],
-            home_away:['home_away','is_home','home_or_away'], status:['status'], result:['result'], score:['score'], notes:['notes','note']
+        const fieldAliases = {
+            title:['event_type','type','title','event'], game_date:['date','game_date','event_date','match_date','game_day'], game_time:['time','game_time','event_time','kickoff','kickoff_time','start_time'],
+            opponent:['opponent_event_name','opponent','event_name','opponent_or_event_name','match','team'], location:['location','city','address','match_location'], venue:['venue','field','field_venue','field_or_venue','stadium'],
+            is_home:['home_away','is_home','home_or_away'], status:['status'], result:['result'], score:['score'], notes:['notes','note','comments','description']
         };
         const normalizeHeader = value => String(value || '').replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
         const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
@@ -11761,27 +11797,14 @@ CSS;
             const rows = []; let row = []; let cell = ''; let quoted = false;
             for (let i = 0; i < text.length; i++) {
                 const ch = text[i];
-                if (quoted) {
-                    if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; continue; }
-                    if (ch === '"') { quoted = false; continue; }
-                    cell += ch; continue;
-                }
+                if (quoted) { if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; continue; } if (ch === '"') { quoted = false; continue; } cell += ch; continue; }
                 if (ch === '"') { quoted = true; continue; }
                 if (ch === ',') { row.push(cell); cell = ''; continue; }
-                if (ch === '\n' || ch === '\r') {
-                    if (ch === '\r' && text[i + 1] === '\n') i++;
-                    row.push(cell); cell = '';
-                    if (row.some(value => String(value).trim() !== '')) rows.push(row);
-                    row = []; continue;
-                }
+                if (ch === '\n' || ch === '\r') { if (ch === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; if (row.some(value => String(value).trim() !== '')) rows.push(row); row = []; continue; }
                 cell += ch;
             }
             if (cell !== '' || row.length) { row.push(cell); if (row.some(value => String(value).trim() !== '')) rows.push(row); }
             return rows;
-        }
-        function columnIndex(header, names) {
-            for (const name of names) { const index = header.indexOf(name); if (index !== -1) return index; }
-            return -1;
         }
         function isValidDate(value) {
             value = String(value || '').trim(); if (!value) return false;
@@ -11793,76 +11816,99 @@ CSS;
             value = String(value || '').trim(); if (!value) return true;
             return /^(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value) || /^(?:1[0-2]|0?[1-9])(?::[0-5]\d)?\s*(?:AM|PM)$/i.test(value);
         }
-        function setStatus(el, message, good) {
-            if (!el) return; el.textContent = message || ''; el.classList.toggle('is-visible', !!message); el.classList.toggle('is-good', !!good);
+        function setStatus(el, message, good) { if (!el) return; el.textContent = message || ''; el.classList.toggle('is-visible', !!message); el.classList.toggle('is-good', !!good); }
+        function getMapIndex(field) { const select = mapSelects.find(item => item.dataset.rcScheduleMapV91 === field); if (!select || select.value === '') return -1; const index = Number(select.value); return Number.isInteger(index) ? index : -1; }
+        function mappedValue(field, row) { const index = getMapIndex(field); return index >= 0 ? String(row[index] ?? '').trim() : ''; }
+        function updateMapSample(select) {
+            const field = select.dataset.rcScheduleMapV91; const sample = overlay.querySelector(`[data-rc-schedule-map-sample-v91="${field}"]`); if (!sample) return;
+            const index = select.value === '' ? -1 : Number(select.value); let value = '—';
+            if (index >= 0) { const row = parsedRows.find(item => String(item[index] ?? '').trim() !== ''); value = row ? String(row[index] ?? '').trim() : 'No sample value'; }
+            sample.textContent = `Sample: ${value || '—'}`;
+        }
+        function validateMappings(showMessage = true) {
+            const missing = mapSelects.filter(select => select.dataset.required === '1' && select.value === '').map(select => select.closest('.rc-import-map-row-v91')?.querySelector('b')?.textContent?.replace(' *','') || 'Required field');
+            if (missing.length) { if (showMessage) setStatus(mapStatus, `Map the required field${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}.`, false); return false; }
+            const mappedCount = mapSelects.filter(select => select.value !== '').length;
+            if (showMessage) setStatus(mapStatus, `${mappedCount} field${mappedCount === 1 ? '' : 's'} mapped. You can continue to preview.`, true);
+            return true;
+        }
+        function populateMappingOptions() {
+            mapSelects.forEach(select => {
+                const field = select.dataset.rcScheduleMapV91; const required = select.dataset.required === '1';
+                select.innerHTML = `<option value="">${required ? 'Select a CSV column...' : 'Do not import this field'}</option>`;
+                rawHeader.forEach((header, index) => { const option = document.createElement('option'); option.value = String(index); option.textContent = `${String.fromCharCode(65 + (index % 26))}: ${String(header || '').trim() || `Column ${index + 1}`}`; select.appendChild(option); });
+                const aliases = fieldAliases[field] || []; const suggested = normalizedHeader.findIndex(header => aliases.includes(header)); if (suggested >= 0) select.value = String(suggested);
+                updateMapSample(select);
+            });
+            validateMappings(false);
+            const suggestedCount = mapSelects.filter(select => select.value !== '').length;
+            setStatus(mapStatus, `${suggestedCount} field${suggestedCount === 1 ? '' : 's'} auto-mapped. Review the selections and change anything that does not match your CSV.`, true);
         }
         function goToStep(step) {
-            currentStep = Math.max(1, Math.min(4, step));
+            currentStep = Math.max(1, Math.min(5, step));
             panels.forEach(panel => panel.classList.toggle('is-active', Number(panel.dataset.rcImportPanelV91) === currentStep));
-            indicators.forEach(indicator => {
-                const number = Number(indicator.dataset.rcImportStepIndicatorV91);
-                indicator.classList.toggle('is-active', number === currentStep);
-                indicator.classList.toggle('is-done', number < currentStep);
-            });
-            backBtn.style.display = currentStep === 2 || currentStep === 3 ? '' : 'none';
-            nextBtn.style.display = currentStep === 1 || currentStep === 2 ? '' : 'none';
-            nextBtn.textContent = currentStep === 1 ? 'Preview File' : 'Continue';
-            submitBtn.style.display = currentStep === 3 ? '' : 'none';
-            doneBtn.style.display = currentStep === 4 ? '' : 'none';
-            overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => { if (currentStep === 4 && btn.textContent.trim() === 'Cancel') btn.style.display = 'none'; else btn.style.display = ''; });
+            indicators.forEach(indicator => { const number = Number(indicator.dataset.rcImportStepIndicatorV91); indicator.classList.toggle('is-active', number === currentStep); indicator.classList.toggle('is-done', number < currentStep); });
+            backBtn.style.display = currentStep >= 2 && currentStep <= 4 ? '' : 'none';
+            nextBtn.style.display = currentStep >= 1 && currentStep <= 3 ? '' : 'none';
+            nextBtn.textContent = currentStep === 1 ? 'Map Columns' : (currentStep === 2 ? 'Preview Rows' : 'Continue');
+            submitBtn.style.display = currentStep === 4 ? '' : 'none';
+            doneBtn.style.display = currentStep === 5 ? '' : 'none';
+            overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => { if (currentStep === 5 && btn.textContent.trim() === 'Cancel') btn.style.display = 'none'; else btn.style.display = ''; });
         }
         function resetImport() {
-            form.reset(); parsedRows = []; validRows = 0; invalidRows = 0;
-            if (previewBody) previewBody.innerHTML = '';
-            if (totalEl) totalEl.textContent = '0'; if (validEl) validEl.textContent = '0'; if (invalidEl) invalidEl.textContent = '0';
-            setStatus(fileStatus, '', false); setStatus(previewStatus, '', false); goToStep(1);
+            form.reset(); rawHeader = []; normalizedHeader = []; parsedRows = []; validRows = 0; invalidRows = 0;
+            if (previewBody) previewBody.innerHTML = ''; if (totalEl) totalEl.textContent = '0'; if (validEl) validEl.textContent = '0'; if (invalidEl) invalidEl.textContent = '0';
+            mapSelects.forEach(select => { select.innerHTML = `<option value="">${select.dataset.required === '1' ? 'Select a CSV column...' : 'Do not import this field'}</option>`; updateMapSample(select); });
+            setStatus(fileStatus, '', false); setStatus(mapStatus, '', false); setStatus(previewStatus, '', false); goToStep(1);
         }
         function closeImport() { overlay.classList.remove('is-open'); document.body.style.overflow = ''; }
         function openImport() { resetImport(); overlay.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
-        async function previewFile() {
+        async function loadFileForMapping() {
             const file = fileInput?.files?.[0];
             if (!file) { setStatus(fileStatus, 'Choose a CSV file first.', false); return false; }
             if (file.size > 5 * 1024 * 1024) { setStatus(fileStatus, 'The CSV must be 5 MB or smaller.', false); return false; }
-            const text = await file.text(); const rows = parseCsv(text);
+            const rows = parseCsv(await file.text());
             if (rows.length < 2) { setStatus(fileStatus, 'The CSV needs a header row and at least one schedule row.', false); return false; }
             if (rows.length - 1 > 250) { setStatus(fileStatus, 'A single import can contain up to 250 schedule rows.', false); return false; }
-            const header = rows[0].map(normalizeHeader);
-            const indexes = {}; Object.entries(aliases).forEach(([field,names]) => indexes[field] = columnIndex(header,names));
-            if (indexes.date < 0 || indexes.opponent < 0) { setStatus(fileStatus, 'Required columns are missing. Include Date and Opponent / Event Name.', false); return false; }
-            parsedRows = rows.slice(1).filter(row => row.some(value => String(value).trim() !== ''));
+            rawHeader = rows[0].map(value => String(value ?? '').replace(/^\uFEFF/, '').trim()); normalizedHeader = rawHeader.map(normalizeHeader); parsedRows = rows.slice(1).filter(row => row.some(value => String(value).trim() !== ''));
+            if (!parsedRows.length) { setStatus(fileStatus, 'The CSV does not contain any schedule rows.', false); return false; }
+            populateMappingOptions(); setStatus(fileStatus, `${file.name} loaded with ${rawHeader.length} columns and ${parsedRows.length} schedule rows.`, true); goToStep(2); return true;
+        }
+        function previewMappedRows() {
+            if (!validateMappings(true)) return false;
             validRows = 0; invalidRows = 0; const preview = [];
             parsedRows.forEach((row, index) => {
-                const get = field => indexes[field] >= 0 ? String(row[indexes[field]] ?? '').trim() : '';
-                const errors = []; const date = get('date'); const time = get('time'); const opponent = get('opponent'); const status = get('status').toLowerCase(); const homeAway = get('home_away').toLowerCase();
-                if (!isValidDate(date)) errors.push('Invalid date');
-                if (!opponent) errors.push('Missing opponent/event');
-                if (!isValidTime(time)) errors.push('Invalid time');
+                const get = field => mappedValue(field, row); const errors = []; const date = get('game_date'); const time = get('game_time'); const opponent = get('opponent'); const status = get('status').toLowerCase(); const homeAway = get('is_home').toLowerCase();
+                if (!isValidDate(date)) errors.push('Invalid date'); if (!opponent) errors.push('Missing opponent/event'); if (!isValidTime(time)) errors.push('Invalid time');
                 if (status && !['upcoming','completed','cancelled','canceled','postponed'].includes(status)) errors.push('Invalid status');
                 if (homeAway && !['home','away','1','0','true','false','yes','no','y','n'].includes(homeAway)) errors.push('Invalid home/away');
-                if (errors.length) invalidRows++; else validRows++;
-                if (index < 50) preview.push({number:index+2,row,get,errors});
+                if (errors.length) invalidRows++; else validRows++; if (index < 50) preview.push({number:index+2,row,get,errors});
             });
             if (totalEl) totalEl.textContent = String(parsedRows.length); if (validEl) validEl.textContent = String(validRows); if (invalidEl) invalidEl.textContent = String(invalidRows);
             if (confirmValidEl) confirmValidEl.textContent = `${validRows} valid ${validRows === 1 ? 'row is' : 'rows are'} ready`;
-            previewBody.innerHTML = preview.map(item => `<tr class="${item.errors.length ? 'rc-import-row-error-v91' : ''}"><td>${item.number}</td><td>${escapeHtml(item.get('date'))}</td><td>${escapeHtml(item.get('time') || '—')}</td><td>${escapeHtml(item.get('event_type') || 'Game')}</td><td>${escapeHtml(item.get('opponent'))}</td><td>${escapeHtml(item.get('location') || '—')}</td><td>${escapeHtml(item.get('venue') || '—')}</td><td>${escapeHtml(item.get('home_away') || '—')}</td><td>${escapeHtml(item.get('status') || 'upcoming')}</td><td>${item.errors.length ? escapeHtml(item.errors.join(', ')) : 'Ready'}</td></tr>`).join('');
+            previewBody.innerHTML = preview.map(item => `<tr class="${item.errors.length ? 'rc-import-row-error-v91' : ''}"><td>${item.number}</td><td>${escapeHtml(item.get('game_date'))}</td><td>${escapeHtml(item.get('game_time') || '—')}</td><td>${escapeHtml(item.get('title') || 'Game')}</td><td>${escapeHtml(item.get('opponent'))}</td><td>${escapeHtml(item.get('location') || '—')}</td><td>${escapeHtml(item.get('venue') || '—')}</td><td>${escapeHtml(item.get('is_home') || '—')}</td><td>${escapeHtml(item.get('status') || 'upcoming')}</td><td>${item.errors.length ? escapeHtml(item.errors.join(', ')) : 'Ready'}</td></tr>`).join('');
             const extra = parsedRows.length > 50 ? ` Showing the first 50 of ${parsedRows.length} rows.` : '';
             setStatus(previewStatus, invalidRows ? `${invalidRows} row${invalidRows === 1 ? '' : 's'} need attention and will be skipped.${extra}` : `All ${validRows} rows look ready.${extra}`, invalidRows === 0);
-            setStatus(fileStatus, `${file.name} loaded successfully.`, true); goToStep(2); return true;
+            goToStep(3); return true;
         }
         openBtn.addEventListener('click', openImport);
         overlay.querySelectorAll('[data-rc-import-close-v91]').forEach(btn => btn.addEventListener('click', closeImport));
         doneBtn?.addEventListener('click', closeImport);
         backBtn?.addEventListener('click', () => goToStep(currentStep - 1));
-        nextBtn?.addEventListener('click', async () => { if (currentStep === 1) await previewFile(); else if (currentStep === 2) { if (validRows < 1) { setStatus(previewStatus, 'At least one valid row is required before importing.', false); return; } goToStep(3); } });
-        fileInput?.addEventListener('change', () => setStatus(fileStatus, fileInput.files?.[0] ? `${fileInput.files[0].name} selected. Click Preview File to continue.` : '', true));
+        nextBtn?.addEventListener('click', async () => {
+            if (currentStep === 1) await loadFileForMapping();
+            else if (currentStep === 2) previewMappedRows();
+            else if (currentStep === 3) { if (validRows < 1) { setStatus(previewStatus, 'At least one valid row is required before importing.', false); return; } goToStep(4); }
+        });
+        mapSelects.forEach(select => select.addEventListener('change', () => { updateMapSample(select); validateMappings(true); }));
+        fileInput?.addEventListener('change', () => setStatus(fileStatus, fileInput.files?.[0] ? `${fileInput.files[0].name} selected. Click Map Columns to continue.` : '', true));
         templateBtn?.addEventListener('click', () => {
             const csv = 'event_type,date,time,opponent_event_name,location,venue,home_away,status,result,score,notes\nGame,2026-10-24,09:00,Wilmington Hammerheads,Wilmington NC,nCino Sports Park,Away,upcoming,,,Regular season game\nShowcase,2026-11-01,14:30,College Showcase,Raleigh NC,WRAL Soccer Park,,upcoming,,,Recruiting showcase\n';
             const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'})); const link = document.createElement('a'); link.href = url; link.download = 'plyrcard-schedule-template.csv'; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 500);
         });
-        form.addEventListener('submit', () => { submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; });
-        overlay.addEventListener('click', event => { if (event.target === overlay && currentStep !== 4) closeImport(); });
-        goToStep(currentStep);
-        if (hasServerResult) { overlay.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
+        form.addEventListener('submit', event => { if (!validateMappings(true) || validRows < 1) { event.preventDefault(); return; } submitBtn.disabled = true; submitBtn.textContent = 'Importing...'; });
+        overlay.addEventListener('click', event => { if (event.target === overlay && currentStep !== 5) closeImport(); });
+        goToStep(currentStep); if (hasServerResult) { overlay.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initScheduleCsvImportV91, {once:true}); else initScheduleCsvImportV91();
     document.addEventListener('livewire:navigated', initScheduleCsvImportV91);

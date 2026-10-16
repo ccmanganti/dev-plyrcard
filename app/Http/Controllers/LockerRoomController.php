@@ -838,7 +838,7 @@ class LockerRoomController extends Controller
             $value = strtolower(trim($value));
             return trim((string) preg_replace('/[^a-z0-9]+/', '_', $value), '_');
         }, $header);
-        $columnMap = $this->scheduleCsvColumnMap($header);
+        $columnMap = $this->scheduleCsvColumnMap($header, (array) $request->input('schedule_csv_map', []));
         if (! isset($columnMap['game_date'], $columnMap['opponent'])) {
             fclose($handle);
             return $this->scheduleImportResponse($request, $user, $dataService, [
@@ -846,7 +846,7 @@ class LockerRoomController extends Controller
                 'imported' => 0,
                 'duplicates' => 0,
                 'invalid' => 0,
-                'message' => 'The CSV must include Date and Opponent / Event Name columns.',
+                'message' => 'Map a CSV column to Date and another column to Opponent / Event Name before importing.',
                 'errors' => [],
             ]);
         }
@@ -947,20 +947,38 @@ class LockerRoomController extends Controller
         }
         return back()->with('schedule_import_result', $result);
     }
-    protected function scheduleCsvColumnMap(array $header): array
+    protected function scheduleCsvColumnMap(array $header, array $requestedMap = []): array
     {
+        $allowedFields = ['title', 'game_date', 'game_time', 'opponent', 'location', 'venue', 'is_home', 'status', 'result', 'score', 'notes'];
+        if ($requestedMap !== []) {
+            $map = [];
+            foreach ($allowedFields as $field) {
+                $rawIndex = $requestedMap[$field] ?? null;
+                if ($rawIndex === null || $rawIndex === '') {
+                    continue;
+                }
+                if (filter_var($rawIndex, FILTER_VALIDATE_INT) === false) {
+                    continue;
+                }
+                $index = (int) $rawIndex;
+                if (array_key_exists($index, $header)) {
+                    $map[$field] = $index;
+                }
+            }
+            return $map;
+        }
         $aliases = [
             'title' => ['event_type', 'type', 'title', 'event'],
-            'game_date' => ['date', 'game_date', 'event_date'],
-            'game_time' => ['time', 'game_time', 'event_time'],
-            'opponent' => ['opponent_event_name', 'opponent', 'event_name', 'opponent_or_event_name'],
-            'location' => ['location', 'city', 'address'],
-            'venue' => ['venue', 'field', 'field_venue', 'field_or_venue'],
+            'game_date' => ['date', 'game_date', 'event_date', 'match_date', 'game_day'],
+            'game_time' => ['time', 'game_time', 'event_time', 'kickoff', 'kickoff_time', 'start_time'],
+            'opponent' => ['opponent_event_name', 'opponent', 'event_name', 'opponent_or_event_name', 'match', 'team'],
+            'location' => ['location', 'city', 'address', 'match_location'],
+            'venue' => ['venue', 'field', 'field_venue', 'field_or_venue', 'stadium'],
             'is_home' => ['home_away', 'is_home', 'home_or_away'],
             'status' => ['status'],
             'result' => ['result'],
             'score' => ['score'],
-            'notes' => ['notes', 'note'],
+            'notes' => ['notes', 'note', 'comments', 'description'],
         ];
         $map = [];
         foreach ($aliases as $field => $names) {
