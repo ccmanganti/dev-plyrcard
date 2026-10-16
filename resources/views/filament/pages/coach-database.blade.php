@@ -5917,17 +5917,25 @@ discoverSelectedIds: [],
         .rc-schedule-grid-v72 { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.85rem; }
         .rc-field-v72 label { display:block;font-size:.76rem;font-weight:700;color:var(--rc-text);margin-bottom:.4rem; }
         .rc-field-v72 input,.rc-field-v72 select { width:100%;border:1px solid var(--rc-border);border-radius:.75rem;background:var(--rc-surface);color:var(--rc-text);padding:.75rem .85rem;outline:0; }
-        .rc-schedule-list-title-v72 { color:var(--rc-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800;margin-top:.5rem; }
-        .rc-schedule-list-v72 { border:1px solid var(--rc-border);border-radius:1.15rem;background:var(--rc-surface);box-shadow:0 12px 28px rgba(15,23,42,.06);overflow:hidden; }
-        .rc-schedule-row-v72 { display:grid;grid-template-columns:5rem minmax(0,1fr) auto;gap:1rem;align-items:center;padding:1rem 1.1rem;border-bottom:1px solid var(--rc-border); }
+        .rc-schedule-list-title-v72 { display:flex;align-items:center;justify-content:space-between;gap:.75rem;color:var(--rc-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800;margin-top:.5rem; }
+        .rc-schedule-list-count-v86 { display:inline-flex;align-items:center;justify-content:center;min-width:1.7rem;height:1.35rem;padding:0 .42rem;border-radius:999px;background:rgba(255,99,56,.10);color:#ff6338;font-size:.7rem;letter-spacing:0; }
+        .rc-schedule-month-v86 { margin-top:.72rem;border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);box-shadow:0 10px 24px rgba(15,23,42,.05);overflow:hidden; }
+        .rc-schedule-month-head-v86 { display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem .95rem;background:rgba(248,250,252,.88);border-bottom:1px solid var(--rc-border); }
+        .rc-schedule-month-head-v86 strong { font-size:.82rem;letter-spacing:.08em;text-transform:uppercase;color:var(--rc-text); }
+        .rc-schedule-month-head-v86 span { font-size:.72rem;color:var(--rc-muted);font-weight:700; }
+        .rc-schedule-list-v72 { background:var(--rc-surface); }
+        .rc-schedule-row-v72 { display:grid;grid-template-columns:5.4rem minmax(0,1fr) auto;gap:.9rem;align-items:center;padding:.88rem .95rem;border-bottom:1px solid var(--rc-border); }
         .rc-schedule-row-v72:last-child { border-bottom:0; }
-        .rc-schedule-date-v72 { text-align:center;border-right:1px solid var(--rc-border);padding-right:.85rem; }
-        .rc-schedule-date-v72 small { display:block;color:#ff6338;font-weight:800;text-transform:uppercase;font-size:.7rem; }
-        .rc-schedule-date-v72 strong { display:block;font-size:1.55rem;line-height:1;color:var(--rc-text); }
-        .rc-schedule-date-v72 span { color:var(--rc-muted);font-size:.75rem; }
-        .rc-schedule-pill-v72 { display:inline-flex;border-radius:999px;padding:.25rem .55rem;background:rgba(99,102,241,.12);color:#6366f1;font-weight:800;font-size:.72rem;margin-right:.45rem; }
-        .rc-schedule-meta-v72 { display:flex;flex-wrap:wrap;gap:1rem;color:var(--rc-muted);font-size:.85rem;margin-top:.55rem; }
-        .rc-schedule-actions-v72 { display:flex;gap:.45rem; }
+        .rc-schedule-row-v72.is-past-v86 { opacity:.72; }
+        .rc-schedule-date-v72 { text-align:center;border-right:1px solid var(--rc-border);padding-right:.8rem; }
+        .rc-schedule-date-v72 small { display:block;color:#ff6338;font-weight:800;text-transform:uppercase;font-size:.66rem;letter-spacing:.05em; }
+        .rc-schedule-date-v72 strong { display:block;font-size:1.5rem;line-height:1.05;color:var(--rc-text); }
+        .rc-schedule-date-v72 .rc-schedule-month-short-v86 { display:block;margin-top:.14rem;color:var(--rc-text);font-size:.72rem;font-weight:800;text-transform:uppercase; }
+        .rc-schedule-date-v72 .rc-schedule-time-v86 { display:block;margin-top:.2rem;color:var(--rc-muted);font-size:.72rem; }
+        .rc-schedule-pill-v72 { display:inline-flex;border-radius:999px;padding:.22rem .5rem;background:rgba(99,102,241,.12);color:#6366f1;font-weight:800;font-size:.7rem;margin-right:.45rem; }
+        .rc-schedule-meta-v72 { display:flex;flex-wrap:wrap;gap:.85rem;color:var(--rc-muted);font-size:.8rem;margin-top:.45rem; }
+        .rc-schedule-actions-v72 { display:flex;gap:.4rem; }
+        .rc-schedule-past-wrap-v86 { margin-top:1rem; }
         .rc-icon-clean-v72 { width:2rem;height:2rem;border:0;background:transparent;color:var(--rc-muted);border-radius:.55rem;cursor:pointer;display:grid;place-items:center; }
         .rc-icon-clean-v72:hover { background:var(--rc-soft);color:#ff6338; }
         .rc-settings-page-v72 { display:grid;gap:1rem; }
@@ -11496,7 +11504,43 @@ CSS;
                 'showNewEmail' => false,
             ])
             @php
-                $scheduleEvents = collect($this->myScheduleEvents ?? [])->values();
+                $scheduleNow = now();
+                $scheduleEvents = collect($this->myScheduleEvents ?? [])->map(function ($event) use ($scheduleNow) {
+                    $event = is_array($event) ? $event : (array) $event;
+                    $rawDate = $event['game_date'] ?? $event['date'] ?? $event['date_iso'] ?? $event['scheduled_date'] ?? $event['starts_at'] ?? null;
+                    $rawTime = $event['game_time'] ?? $event['time_raw'] ?? $event['time_value'] ?? null;
+                    $dateTime = null;
+                    try {
+                        if (filled($rawDate)) {
+                            $dateTime = \Carbon\Carbon::parse($rawDate);
+                        } elseif (filled($event['year'] ?? null) && filled($event['month'] ?? null) && filled($event['date_number'] ?? null)) {
+                            $dateTime = \Carbon\Carbon::create((int) $event['year'], (int) $event['month'], (int) $event['date_number']);
+                        }
+                        if ($dateTime && filled($rawTime)) {
+                            $parsedTime = \Carbon\Carbon::parse($rawTime);
+                            $dateTime->setTime($parsedTime->hour, $parsedTime->minute, $parsedTime->second);
+                        } elseif ($dateTime) {
+                            $dateTime->endOfDay();
+                        }
+                    } catch (\Throwable $e) {
+                        $dateTime = null;
+                    }
+                    $event['_schedule_ts'] = $dateTime?->timestamp;
+                    $event['_schedule_is_past'] = $dateTime ? $dateTime->lt($scheduleNow) : false;
+                    $event['_schedule_month_label'] = $dateTime?->format('F Y')
+                        ?? trim((string) ($event['month_year'] ?? $event['month_label'] ?? $event['month'] ?? 'Date unavailable'));
+                    $event['_schedule_month_short'] = $dateTime?->format('M')
+                        ?? strtoupper(substr((string) ($event['month_short'] ?? $event['month_label'] ?? $event['month'] ?? ''), 0, 3));
+                    $event['_schedule_day'] = $dateTime?->format('D') ?? ($event['day'] ?? '');
+                    $event['_schedule_date_number'] = $dateTime?->format('d') ?? ($event['date_number'] ?? '—');
+                    return $event;
+                })->values();
+                $futureScheduleEvents = $scheduleEvents->filter(fn ($event) => ! $event['_schedule_is_past'])
+                    ->sortBy(fn ($event) => $event['_schedule_ts'] ?? PHP_INT_MAX)->values();
+                $pastScheduleEvents = $scheduleEvents->filter(fn ($event) => $event['_schedule_is_past'])
+                    ->sortByDesc(fn ($event) => $event['_schedule_ts'] ?? 0)->values();
+                $futureScheduleGroups = $futureScheduleEvents->groupBy('_schedule_month_label');
+                $pastScheduleGroups = $pastScheduleEvents->groupBy('_schedule_month_label');
             @endphp
             <div class="rc-schedule-page-v72">
                 <div class="rc-schedule-titlebar-v72">
@@ -11520,21 +11564,48 @@ CSS;
                         <div style="display:flex;justify-content:flex-end;gap:.65rem;"><button class="rc-btn" type="button" wire:click="cancelScheduleEvent">Cancel</button><button class="rc-btn rc-btn-primary" type="submit" wire:loading.attr="disabled" wire:target="saveScheduleEvent">{{ $editingScheduleId ? 'Save Changes' : 'Add Event' }}</button></div>
                     </form>
                 @endif
-                <div class="rc-schedule-list-title-v72">Upcoming ({{ $scheduleEvents->count() }})</div>
-                <div class="rc-schedule-list-v72">
-                    @forelse($scheduleEvents as $event)
-                        <article class="rc-schedule-row-v72">
-                            <div class="rc-schedule-date-v72"><small>{{ strtoupper((string) ($event['day'] ?? '')) }}</small><strong>{{ $event['date_number'] ?? '—' }}</strong><span>{{ $event['time'] ?? '' }}</span></div>
-                            <div>
-                                <div><span class="rc-schedule-pill-v72">{{ $event['type'] ?? 'Game' }}</span><strong>vs {{ $event['opponent'] ?? $event['title'] ?? 'Event' }}</strong></div>
-                                <div class="rc-schedule-meta-v72"><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.7"/></svg>{{ $event['location'] ?: 'Location unavailable' }}</span><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Zm10 2h3a3 3 0 0 1-3 3M7 6H4a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ $event['venue'] ?: 'Venue unavailable' }}</span></div>
+                <div class="rc-schedule-list-title-v72"><span>Upcoming</span><span class="rc-schedule-list-count-v86">{{ $futureScheduleEvents->count() }}</span></div>
+                @forelse($futureScheduleGroups as $monthLabel => $monthEvents)
+                    <div class="rc-schedule-month-v86" wire:key="schedule-month-upcoming-{{ \Illuminate\Support\Str::slug((string) $monthLabel) }}">
+                        <div class="rc-schedule-month-head-v86"><strong>{{ $monthLabel }}</strong><span>{{ $monthEvents->count() }} {{ \Illuminate\Support\Str::plural('event', $monthEvents->count()) }}</span></div>
+                        <div class="rc-schedule-list-v72">
+                            @foreach($monthEvents as $event)
+                                <article class="rc-schedule-row-v72" wire:key="schedule-event-{{ (int) $event['id'] }}">
+                                    <div class="rc-schedule-date-v72"><small>{{ strtoupper((string) ($event['_schedule_day'] ?? '')) }}</small><strong>{{ $event['_schedule_date_number'] ?? '—' }}</strong><span class="rc-schedule-month-short-v86">{{ $event['_schedule_month_short'] ?: '—' }}</span><span class="rc-schedule-time-v86">{{ $event['time'] ?? '' }}</span></div>
+                                    <div>
+                                        <div><span class="rc-schedule-pill-v72">{{ $event['type'] ?? 'Game' }}</span><strong>vs {{ $event['opponent'] ?? $event['title'] ?? 'Event' }}</strong></div>
+                                        <div class="rc-schedule-meta-v72"><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.7"/></svg>{{ $event['location'] ?: 'Location unavailable' }}</span><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Zm10 2h3a3 3 0 0 1-3 3M7 6H4a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ $event['venue'] ?: 'Venue unavailable' }}</span></div>
+                                    </div>
+                                    <div class="rc-schedule-actions-v72"><button type="button" class="rc-icon-clean-v72" wire:click="editScheduleEvent({{ (int) $event['id'] }})" aria-label="Edit event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m13.5 6.5 4 4" stroke="currentColor" stroke-width="1.7"/></svg></button><button type="button" class="rc-icon-clean-v72" wire:click="deleteScheduleEvent({{ (int) $event['id'] }})" wire:confirm="Remove this event?" aria-label="Delete event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+                                </article>
+                            @endforeach
+                        </div>
+                    </div>
+                @empty
+                    <div class="rc-empty" style="padding:1.25rem;border:1px solid var(--rc-border);border-radius:1.05rem;background:var(--rc-surface);">No upcoming games or events.</div>
+                @endforelse
+                @if($pastScheduleEvents->isNotEmpty())
+                    <div class="rc-schedule-past-wrap-v86">
+                        <div class="rc-schedule-list-title-v72"><span>Past Events</span><span class="rc-schedule-list-count-v86">{{ $pastScheduleEvents->count() }}</span></div>
+                        @foreach($pastScheduleGroups as $monthLabel => $monthEvents)
+                            <div class="rc-schedule-month-v86" wire:key="schedule-month-past-{{ \Illuminate\Support\Str::slug((string) $monthLabel) }}">
+                                <div class="rc-schedule-month-head-v86"><strong>{{ $monthLabel }}</strong><span>Most recent first</span></div>
+                                <div class="rc-schedule-list-v72">
+                                    @foreach($monthEvents as $event)
+                                        <article class="rc-schedule-row-v72 is-past-v86" wire:key="schedule-event-{{ (int) $event['id'] }}">
+                                            <div class="rc-schedule-date-v72"><small>{{ strtoupper((string) ($event['_schedule_day'] ?? '')) }}</small><strong>{{ $event['_schedule_date_number'] ?? '—' }}</strong><span class="rc-schedule-month-short-v86">{{ $event['_schedule_month_short'] ?: '—' }}</span><span class="rc-schedule-time-v86">{{ $event['time'] ?? '' }}</span></div>
+                                            <div>
+                                                <div><span class="rc-schedule-pill-v72">{{ $event['type'] ?? 'Game' }}</span><strong>vs {{ $event['opponent'] ?? $event['title'] ?? 'Event' }}</strong></div>
+                                                <div class="rc-schedule-meta-v72"><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="10" r="2.2" stroke="currentColor" stroke-width="1.7"/></svg>{{ $event['location'] ?: 'Location unavailable' }}</span><span><svg class="rc-schedule-icon-v73" viewBox="0 0 24 24" fill="none"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4Zm10 2h3a3 3 0 0 1-3 3M7 6H4a3 3 0 0 0 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ $event['venue'] ?: 'Venue unavailable' }}</span></div>
+                                            </div>
+                                            <div class="rc-schedule-actions-v72"><button type="button" class="rc-icon-clean-v72" wire:click="editScheduleEvent({{ (int) $event['id'] }})" aria-label="Edit event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m13.5 6.5 4 4" stroke="currentColor" stroke-width="1.7"/></svg></button><button type="button" class="rc-icon-clean-v72" wire:click="deleteScheduleEvent({{ (int) $event['id'] }})" wire:confirm="Remove this event?" aria-label="Delete event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+                                        </article>
+                                    @endforeach
+                                </div>
                             </div>
-                            <div class="rc-schedule-actions-v72"><button type="button" class="rc-icon-clean-v72" wire:click="editScheduleEvent({{ (int) $event['id'] }})" aria-label="Edit event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m13.5 6.5 4 4" stroke="currentColor" stroke-width="1.7"/></svg></button><button type="button" class="rc-icon-clean-v72" wire:click="deleteScheduleEvent({{ (int) $event['id'] }})" wire:confirm="Remove this event?" aria-label="Delete event"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
-                        </article>
-                    @empty
-                        <div class="rc-empty" style="padding:1.25rem;">No scheduled games or events yet.</div>
-                    @endforelse
-                </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </section>
 <section class="rc-client-panel-v1033" data-rc-client-section="settings" x-show="activeSection === 'settings'" style="{{ ($section === 'settings') ? '' : 'display:none;' }}">
