@@ -281,6 +281,44 @@ discoverSelectedIds: [],
                     if (Array.isArray(detail.list_keys)) row.list_keys = [...detail.list_keys];
                 }
             },
+            applyGlobalListMembership(detail) {
+                if (!detail) return;
+                const key = String(detail.list_key ?? detail.key ?? '').trim().toLowerCase();
+                const school = detail.school && typeof detail.school === 'object' ? detail.school : {};
+                const id = String(school.id ?? detail.school_id ?? '').trim();
+                if (!key || !id) return;
+                const apply = row => {
+                    if (!row) return;
+                    const previous = Array.isArray(row.list_keys) ? row.list_keys.map(value => String(value)) : [];
+                    const has = previous.some(value => value.toLowerCase() === key);
+                    row.list_keys = detail.in_list
+                        ? (has ? previous : [...previous, key])
+                        : previous.filter(value => value.toLowerCase() !== key);
+                };
+                const row = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : []).find(item =>
+                    [item?.id, item?.school_id, item?.business_id, item?.company_id, item?.ghl_business_id]
+                        .map(value => String(value ?? '').trim()).includes(id)
+                );
+                apply(row);
+                const openId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                if (openId === id) apply(this.optimisticSchool);
+            },
+            broadcastListMembership(school, key, inList) {
+                const id = String(school?.id ?? school?.school_id ?? school?.business_id ?? '').trim();
+                if (!id || !key) return;
+                window.dispatchEvent(new CustomEvent('rc-list-membership-changed', {
+                    detail: {
+                        list_key: String(key).toLowerCase(),
+                        in_list: !!inList,
+                        school_id: id,
+                        school: {
+                            id,
+                            name: String(school?.name ?? school?.school_name ?? school?.school ?? 'School'),
+                            logo_url: String(school?.logo_url ?? school?.school_logo_url ?? school?.business_logo_url ?? school?.logo ?? ''),
+                        },
+                    },
+                }));
+            },
             async refreshDiscoverSchoolScore(schoolId) {
                 const id = String(schoolId || '').trim();
                 if (!id) return;
@@ -583,6 +621,13 @@ discoverSelectedIds: [],
                     const added = Number(result.updated_schools ?? result.school_count ?? ids.length);
                     const listCount = Number(result.list_count ?? (previousCount + added));
                     this.setDiscoverListCount(key, listCount);
+                    ids.forEach(id => {
+                        const school = (Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : []).find(row =>
+                            [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
+                                .map(value => String(value ?? '').trim()).includes(String(id))
+                        ) || { id, name: 'School' };
+                        this.broadcastListMembership(school, key, true);
+                    });
                     this.showDiscoverBulkNotice(added > 0
                         ? `Added ${added} school${added === 1 ? '' : 's'} to ${label}.`
                         : `Selected school${ids.length === 1 ? ' is' : 's are'} already in ${label}.`);
@@ -713,13 +758,15 @@ discoverSelectedIds: [],
                     ? previous.filter(v => String(v).toLowerCase() !== key)
                     : [...previous, key];
                 if (list) this.setDiscoverListCount(key, previousCount + (has ? -1 : 1));
+                this.broadcastListMembership(this.optimisticSchool, key, !has);
                 window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: this.optimisticSchool.list_keys || [] } }));
                 Promise.resolve(this.$wire.call('queueSchoolListMemberships', String(this.optimisticSchool.id), { [key]: !has }))
                     .then(result => {
                         if (!result || result.success === false) {
                             if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
                             if (list) this.setDiscoverListCount(key, previousCount);
-                                        if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
+                            if (this.optimisticSchool) this.broadcastListMembership(this.optimisticSchool, key, has);
+                            if (this.optimisticSchool) window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: !!this.optimisticSchool.is_favorite, list_keys: previous } }));
                             return;
                         }
                         const serverCount = Number(result?.list_counts?.[key]);
@@ -728,7 +775,8 @@ discoverSelectedIds: [],
                     .catch(() => {
                         if (this.optimisticSchool) this.optimisticSchool.list_keys = previous;
                         if (list) this.setDiscoverListCount(key, previousCount);
-                            });
+                        if (this.optimisticSchool) this.broadcastListMembership(this.optimisticSchool, key, has);
+                    });
             },
             discoverInList(key) {
                 const keys = Array.isArray(this.optimisticSchool?.list_keys) ? this.optimisticSchool.list_keys : [];
@@ -6400,6 +6448,7 @@ discoverSelectedIds: [],
         x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
         x-on:rc-school-optimistic-clear.window="closeDiscoverSchool()"
         x-on:rc-discover-school-state.window="applyGlobalSchoolState($event.detail)"
+        x-on:rc-list-membership-changed.window="applyGlobalListMembership($event.detail)"
         x-on:rc-discover-count.window="discoverClientCount = Number($event.detail?.total || 0); discoverClientShown = Number($event.detail?.shown || 0)"
         x-on:rc-discover-conferences.window="discoverAvailableConferences = Array.isArray($event.detail?.conferences) ? $event.detail.conferences : []; if (discoverConference && !discoverAvailableConferences.includes(discoverConference)) discoverConference = ''"
     >
@@ -9296,13 +9345,17 @@ discoverSelectedIds: [],
                                 key:@js($listKey), label:@js($listLabel), items:@js($listSchoolsLight), allSchools:@js($allListSchoolOptions),
                                 addOpen:false, renameOpen:false, confirmDelete:false, deleted:false, expanded:false,
                                 addQuery:'', renameValue:@js($listLabel), adding:{}, removing:{}, savingRename:false, deleting:false, error:'',
+                                normalizeKey(value){ return String(value||'').trim().toLowerCase(); },
                                 get addResults(){ const q=String(this.addQuery||'').trim().toLowerCase(); if(q.length<2)return []; const current=new Set(this.items.map(s=>String(s.id))); return this.allSchools.filter(s=>!current.has(String(s.id))&&String(s.name||'').toLowerCase().includes(q)).slice(0,12); },
                                 get needsCollapse(){ return this.items.length>10; },
-                                async addSchool(s){ const id=String(s?.id||''); if(!id||this.adding[id]||this.items.some(i=>String(i.id)===id))return; const row={id,name:String(s.name||'School'),logo:String(s.logo||''),initials:String(s.initials||'')}; this.error=''; this.items=[...this.items,row]; this.addQuery=''; this.adding={...this.adding,[id]:true}; try{ const r=await $wire.call('queueSchoolListMemberships',id,{[this.key]:true}); if(!r||r.success===false)throw new Error(r?.error||'Unable to add school'); }catch(e){ this.items=this.items.filter(i=>String(i.id)!==id); this.error=e?.message||'Unable to add school.'; }finally{ const n={...this.adding}; delete n[id]; this.adding=n; } },
-                                async removeSchool(s){ const id=String(s?.id||''); if(!id||this.removing[id])return; const ix=this.items.findIndex(i=>String(i.id)===id); if(ix<0)return; const removed=this.items[ix]; this.items=this.items.filter(i=>String(i.id)!==id); this.removing={...this.removing,[id]:true}; try{ const r=await $wire.call('queueSchoolListMemberships',id,{[this.key]:false}); if(!r||r.success===false)throw new Error(r?.error||'Unable to remove school'); }catch(e){ const c=[...this.items]; c.splice(Math.min(ix,c.length),0,removed); this.items=c; this.error=e?.message||'Unable to remove school.'; }finally{ const n={...this.removing}; delete n[id]; this.removing=n; } },
+                                membershipSchool(detail){ const s=detail?.school&&typeof detail.school==='object'?detail.school:{}; const id=String(s.id||detail?.school_id||'').trim(); const name=String(s.name||s.school_name||s.school||'School').trim()||'School'; const logo=String(s.logo_url||s.school_logo_url||s.business_logo_url||s.logo||'').trim(); const initials=name.split(/\s+/).filter(Boolean).slice(0,2).map(p=>String(p).charAt(0)).join('').toUpperCase()||'S'; return {id,name,logo,initials}; },
+                                applyExternalMembership(detail){ if(this.normalizeKey(detail?.list_key||detail?.key)!==this.normalizeKey(this.key))return; const school=this.membershipSchool(detail); if(!school.id)return; const ix=this.items.findIndex(item=>String(item.id)===school.id); if(detail?.in_list){ if(ix<0)this.items=[...this.items,school]; else this.items=this.items.map((item,index)=>index===ix?{...item,...school}:item); }else if(ix>=0){ this.items=this.items.filter(item=>String(item.id)!==school.id); } },
+                                async addSchool(s){ const id=String(s?.id||''); if(!id||this.adding[id]||this.items.some(i=>String(i.id)===id))return; const row={id,name:String(s.name||'School'),logo:String(s.logo||''),initials:String(s.initials||'')}; this.error=''; this.items=[...this.items,row]; window.dispatchEvent(new CustomEvent('rc-list-membership-changed',{detail:{list_key:this.key,in_list:true,school_id:id,school:{id,name:row.name,logo_url:row.logo}}})); this.addQuery=''; this.adding={...this.adding,[id]:true}; try{ const r=await $wire.call('queueSchoolListMemberships',id,{[this.key]:true}); if(!r||r.success===false)throw new Error(r?.error||'Unable to add school'); }catch(e){ this.items=this.items.filter(i=>String(i.id)!==id); window.dispatchEvent(new CustomEvent('rc-list-membership-changed',{detail:{list_key:this.key,in_list:false,school_id:id,school:{id,name:row.name,logo_url:row.logo}}})); this.error=e?.message||'Unable to add school.'; }finally{ const n={...this.adding}; delete n[id]; this.adding=n; } },
+                                async removeSchool(s){ const id=String(s?.id||''); if(!id||this.removing[id])return; const ix=this.items.findIndex(i=>String(i.id)===id); if(ix<0)return; const removed=this.items[ix]; this.items=this.items.filter(i=>String(i.id)!==id); window.dispatchEvent(new CustomEvent('rc-list-membership-changed',{detail:{list_key:this.key,in_list:false,school_id:id,school:{id,name:removed.name,logo_url:removed.logo}}})); this.removing={...this.removing,[id]:true}; try{ const r=await $wire.call('queueSchoolListMemberships',id,{[this.key]:false}); if(!r||r.success===false)throw new Error(r?.error||'Unable to remove school'); }catch(e){ const c=[...this.items]; c.splice(Math.min(ix,c.length),0,removed); this.items=c; window.dispatchEvent(new CustomEvent('rc-list-membership-changed',{detail:{list_key:this.key,in_list:true,school_id:id,school:{id,name:removed.name,logo_url:removed.logo}}})); this.error=e?.message||'Unable to remove school.'; }finally{ const n={...this.removing}; delete n[id]; this.removing=n; } },
                                 async saveRename(){ const next=String(this.renameValue||'').trim(); if(!next||this.savingRename)return; const old=this.label; this.label=next; this.renameOpen=false; this.savingRename=true; this.error=''; try{ const r=await $wire.call('renameRecruitingList',this.key,next); if(!r||r.success===false)throw new Error(r?.error||'Unable to rename list'); this.label=String(r.label||next); this.renameValue=this.label; }catch(e){ this.label=old; this.renameValue=old; this.renameOpen=true; this.error=e?.message||'Unable to rename list.'; }finally{ this.savingRename=false; } },
                                 async deleteList(){ if(this.deleting)return; this.deleting=true; this.error=''; try{ const r=await $wire.call('deleteCustomList',this.key); if(!r||r.success===false)throw new Error(r?.error||'Unable to delete list'); this.confirmDelete=false; this.deleted=true; }catch(e){ this.error=e?.message||'Unable to delete list.'; }finally{ this.deleting=false; } }
                             }"
+                            x-on:rc-list-membership-changed.window="applyExternalMembership($event.detail)"
                         >
                             <div class="rc-list-card-head-v115">
                                 <div class="rc-list-card-title-v115">
@@ -10827,6 +10880,20 @@ CSS;
                                         },
                                         inList(key) { return this.listKeys.map(v => this.normalizeKey(v)).includes(this.normalizeKey(key)); },
                                         isListPending(key) { return Boolean(this.listPending[this.normalizeKey(key)]); },
+                                        broadcastListMembership(key, inList) {
+                                            const id = String(this.schoolId || this.school?.id || '').trim();
+                                            if (!id || !key) return;
+                                            window.dispatchEvent(new CustomEvent('rc-list-membership-changed', { detail: { list_key:this.normalizeKey(key), in_list:!!inList, school_id:id, school:{ id, name:String(this.school?.name || this.school?.school_name || 'School'), logo_url:String(this.school?.logo_url || this.school?.school_logo_url || this.school?.logo || '') } } }));
+                                        },
+                                        applyExternalListMembership(detail) {
+                                            const id = String(detail?.school?.id || detail?.school_id || '').trim();
+                                            if (!id || id !== String(this.schoolId || this.school?.id || '').trim()) return;
+                                            const key = this.normalizeKey(detail?.list_key || detail?.key);
+                                            if (!key) return;
+                                            const has = this.inList(key);
+                                            if (detail?.in_list && !has) this.listKeys = [...this.listKeys, key];
+                                            if (!detail?.in_list && has) this.listKeys = this.listKeys.filter(value => this.normalizeKey(value) !== key);
+                                        },
                                         openSchool() {
                                             if (!this.schoolId && !this.school?.name) return;
                                             const now = Date.now();
@@ -10860,17 +10927,20 @@ CSS;
                                             this.listPending = { ...this.listPending, [key]: true };
                                             this.listKeys = has ? previous.filter(v => this.normalizeKey(v) !== key) : [...previous, key];
                                             this.setListCount(key, optimisticCount);
+                                            this.broadcastListMembership(key, !has);
                                             try {
                                                 const result = await this.$wire.call('queueSchoolListMemberships', this.schoolId, { [key]: !has });
                                                 if (!result || result.success === false) {
                                                     this.listKeys = previous;
                                                     this.setListCount(key, previousCount);
+                                                    this.broadcastListMembership(key, has);
                                                 } else if (result.list_counts && Object.prototype.hasOwnProperty.call(result.list_counts, key)) {
                                                     this.setListCount(key, Number(result.list_counts[key] || 0));
                                                 }
                                             } catch (_) {
                                                 this.listKeys = previous;
                                                 this.setListCount(key, previousCount);
+                                                this.broadcastListMembership(key, has);
                                             } finally {
                                                 const nextPending = { ...this.listPending };
                                                 delete nextPending[key];
@@ -10878,6 +10948,7 @@ CSS;
                                             }
                                         }
                                     }"
+                                    x-on:rc-list-membership-changed.window="applyExternalListMembership($event.detail)"
                                 >
                                     <button type="button" class="rc-profile-action-v56" x-on:click.stop.prevent="openSchool()" x-bind:disabled="openingSchool" title="View school">
                                         <svg x-show="!openingSchool" viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
