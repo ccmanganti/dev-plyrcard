@@ -54,7 +54,6 @@
     }
 
     if ($rcCatalogUser
-        && $rcActiveSectionForSeed === 'support'
         && \Illuminate\Support\Facades\Schema::hasTable('credit_service_requests')) {
         $rcSupportCreditRequests = \App\Models\CreditServiceRequest::query()
             ->where('user_id', $rcCatalogUser->getKey())
@@ -123,6 +122,7 @@
                 compose: 'Compose Email',
                 photos: 'My Photos',
                 support: 'Support',
+                services: 'Services',
                 schedule: 'Schedule'
             },
             openFreeGate(section) {
@@ -6469,7 +6469,7 @@ discoverSelectedIds: [],
                 <a class="rc-plyrcard-preparing-action-v129" href="{{ url('/admin/my-profile') }}">Complete My Profile</a>
             </div>
         @endif
-        <div x-show="!['dashboard','schools','favorites','lists','compose','campaigns','conversations','schedule','settings','support','photos'].includes(activeSection)" style="{{ (! in_array($section, ['dashboard','schools','favorites','lists','compose','campaigns','conversations','schedule','settings','support','photos'], true) && ! $isStatDrawerOpen) ? '' : 'display:none;' }}">
+        <div x-show="!['dashboard','schools','favorites','lists','compose','campaigns','conversations','schedule','settings','support','services','photos'].includes(activeSection)" style="{{ (! in_array($section, ['dashboard','schools','favorites','lists','compose','campaigns','conversations','schedule','settings','support','services','photos'], true) && ! $isStatDrawerOpen) ? '' : 'display:none;' }}">
             <div class="rc-global-search-bar">
                 <div class="rc-global-search-shell" role="search" aria-label="Global Recruiting Center search">
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -11275,19 +11275,7 @@ CSS;
     @media(max-width:700px){.rc-credit-use-hero-v5{grid-template-columns:1fr}.rc-credit-use-hero-v5 .rc-btn{justify-self:start}.rc-support-tabs-v5{gap:1rem}.rc-credit-service-controls-v5{grid-template-columns:1fr 1fr}.rc-credit-row-total-v5{grid-column:1/-1;justify-content:flex-start}}
 </style>
 <section class="rc-client-panel-v1033" data-rc-client-section="support" x-show="activeSection === 'support'" style="{{ ($section === 'support') ? '' : 'display:none;' }}">
-    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: @js(session('credit_success') ? 'history' : (($errors->has('credits') || $errors->has('items') || $errors->has('confirm_spend') || $errors->has('items.*.resources') || $errors->has('items.*.resources.*') || $errors->has('items.*.notes')) ? 'credits' : 'ticket')) }">
-        @if(session('credit_success'))
-            <div class="rc-credit-thank-you-overlay-v11" data-credit-thank-you-overlay role="status" aria-live="assertive">
-                <div class="rc-credit-thank-you-card-v11">
-                    <div class="rc-credit-thank-you-icon-v11" aria-hidden="true">✓</div>
-                    <div class="rc-credit-thank-you-kicker-v11">Request submitted</div>
-                    <h2>Thank you!</h2>
-                    <p>{{ session('credit_success') }} You can track the request and access delivered files from Request History.</p>
-                    <div class="rc-credit-thank-you-actions-v11"><button class="rc-btn rc-btn-primary" type="button" onclick="this.closest('[data-credit-thank-you-overlay]').remove();document.documentElement.style.removeProperty('overflow')">View Request History</button></div>
-                </div>
-            </div>
-            <script>document.documentElement.style.overflow='hidden';</script>
-        @endif
+    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ supportTab: 'ticket' }">
         <div class="rc-support-tabs-v5" role="tablist" aria-label="Support sections">
             <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'ticket' ? 'is-active' : ''" :aria-selected="supportTab === 'ticket'" @click="supportTab = 'ticket'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 10h8M8 14h5M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-4 3v-3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -11296,15 +11284,6 @@ CSS;
             <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'tracking' ? 'is-active' : ''" :aria-selected="supportTab === 'tracking'" @click="supportTab = 'tracking'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 8v4l2.5 1.5M21 12a9 9 0 1 1-3.1-6.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 4v5h-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 <span>Ticket Tracking</span>
-            </button>
-            <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'credits' ? 'is-active' : ''" :aria-selected="supportTab === 'credits'" @click="supportTab = 'credits'">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5h16M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4Z" stroke="currentColor" stroke-width="1.7"/><path d="M8 13h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                <span>Credit Usage</span>
-            </button>
-            <button type="button" role="tab" class="rc-support-tab-v5" :class="supportTab === 'history' ? 'is-active' : ''" :aria-selected="supportTab === 'history'" @click="supportTab = 'history'">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 9h9M7.5 13h6M7.5 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                <span>Request History</span>
-                @if($rcSupportCreditRequests->isNotEmpty())<span class="rc-support-tab-count-v9">{{ $rcSupportCreditRequests->count() }}</span>@endif
             </button>
         </div>
 
@@ -11370,7 +11349,35 @@ CSS;
                 </template>
             </div>
         </div>
+    </div>
+</section>
+<section class="rc-client-panel-v1033" data-rc-client-section="services" x-show="activeSection === 'services'" style="{{ ($section === 'services') ? '' : 'display:none;' }}">
+    <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ serviceTab: @js(session('credit_success') ? 'history' : 'credits') }">
 
+        @if(session('credit_success'))
+            <div class="rc-credit-thank-you-overlay-v11" data-credit-thank-you-overlay role="status" aria-live="assertive">
+                <div class="rc-credit-thank-you-card-v11">
+                    <div class="rc-credit-thank-you-icon-v11" aria-hidden="true">✓</div>
+                    <div class="rc-credit-thank-you-kicker-v11">Request submitted</div>
+                    <h2>Thank you!</h2>
+                    <p>{{ session('credit_success') }} You can track the request and access delivered files from Request History.</p>
+                    <div class="rc-credit-thank-you-actions-v11"><button class="rc-btn rc-btn-primary" type="button" @click="serviceTab = 'history'; $el.closest('[data-credit-thank-you-overlay]').remove(); document.documentElement.style.removeProperty('overflow')">View Request History</button></div>
+                </div>
+            </div>
+            <script>document.documentElement.style.overflow='hidden';</script>
+        @endif
+
+        <div class="rc-support-tabs-v5" role="tablist" aria-label="Services sections">
+            <button type="button" role="tab" class="rc-support-tab-v5" :class="serviceTab === 'credits' ? 'is-active' : ''" :aria-selected="serviceTab === 'credits'" @click="serviceTab = 'credits'">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5h16M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4Z" stroke="currentColor" stroke-width="1.7"/><path d="M8 13h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                <span>Credit Usage</span>
+            </button>
+            <button type="button" role="tab" class="rc-support-tab-v5" :class="serviceTab === 'history' ? 'is-active' : ''" :aria-selected="serviceTab === 'history'" @click="serviceTab = 'history'">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 9h9M7.5 13h6M7.5 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+                <span>Request History</span>
+                @if($rcSupportCreditRequests->isNotEmpty())<span class="rc-support-tab-count-v9">{{ $rcSupportCreditRequests->count() }}</span>@endif
+            </button>
+        </div>
         @php
             $rcCreditInitialStep = ($errors->has('confirm_spend') || $errors->has('credits')) ? 3 : (($errors->has('items.*.resources') || $errors->has('items.*.resources.*') || $errors->has('items.*.notes')) ? 2 : 1);
             $rcCreditSelectionState = collect($rcCreditCatalog)->values()->mapWithKeys(function ($item, $index) use ($rcCreditCatalog) {
@@ -11383,7 +11390,7 @@ CSS;
                 ]];
             })->all();
         @endphp
-        <div class="rc-support-tab-panel-v4" x-show="supportTab === 'credits'" x-cloak x-data="{
+        <div class="rc-support-tab-panel-v4" x-show="serviceTab === 'credits'" x-cloak x-data="{
             step: {{ $rcCreditInitialStep }}, submitting: false, catalog: @js($rcCreditCatalog), balance: {{ (int) $rcCreditBalance }}, selections: @js($rcCreditSelectionState), resourceNames: {},
             pointsFor(key) { const item = this.catalog[key] || { points: 0 }; const state = this.selections[key] || { selected: false, quantity: 1, rush: false }; if (!state.selected) return 0; const base = Number(item.points || 0) * Math.max(1, Number(state.quantity || 1)); return state.rush ? Math.ceil(base * 1.5) : base; },
             get selectedKeys() { return Object.keys(this.selections).filter(key => this.selections[key]?.selected); },
@@ -11480,7 +11487,7 @@ CSS;
             $rcAllFirstRequestId = (int) ($rcSupportCreditRequests->first()?->getKey() ?? 0);
             $rcInitialRequestId = $rcHistoryInitialFilter === 'active' ? $rcActiveFirstRequestId : ($rcHistoryInitialFilter === 'completed' ? $rcCompletedFirstRequestId : $rcAllFirstRequestId);
         @endphp
-        <div class="rc-support-tab-panel-v4 rc-request-history-page-v9" x-show="supportTab === 'history'" x-cloak x-data="{ historyFilter: @js($rcHistoryInitialFilter), selectedRequest: {{ $rcInitialRequestId }} }">
+        <div class="rc-support-tab-panel-v4 rc-request-history-page-v9" x-show="serviceTab === 'history'" x-cloak x-data="{ historyFilter: @js($rcHistoryInitialFilter), selectedRequest: {{ $rcInitialRequestId }} }">
             @if(session('credit_success'))
                 <div class="rc-request-history-success-v9"><span class="rc-thank-you-label-v10">Thank you</span><strong>Request submitted.</strong><span>{{ session('credit_success') }}</span></div>
             @endif
@@ -11490,7 +11497,7 @@ CSS;
                     <div class="rc-title">Request History</div>
                     <div class="rc-subtle">Track every credit request, follow its status, and access files delivered by the PLYRCARD team.</div>
                 </div>
-                <button type="button" class="rc-btn rc-btn-primary" @click="supportTab = 'credits'">New Request</button>
+                <button type="button" class="rc-btn rc-btn-primary" @click="serviceTab = 'credits'">New Request</button>
             </div>
 
             <div class="rc-request-history-stats-v9">
@@ -11618,7 +11625,6 @@ CSS;
                     </div>
                 </div>
             @endif
-        </div>
     </div>
 </section>
 <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
@@ -16723,6 +16729,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         if (/\/(conversations|inbox)$/.test(path)) return 'conversations';
         if (/\/(schedule|my-schedule)$/.test(path)) return 'schedule';
         if (/\/(settings)$/.test(path)) return 'settings';
+        if (/\/(services)$/.test(path)) return 'services';
         if (/\/(support)$/.test(path)) return 'support';
         return null;
     };
@@ -16736,7 +16743,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         }
     };
     const currentRoot = () => document.querySelector('.rc-livewire-root');
-    const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','schedule']);
+    const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','services','schedule']);
     const isFreePlan = () => currentRoot()?.dataset?.rcFreePlan === '1';
     let pendingSection = null;
     let pendingTimer = null;
@@ -16766,6 +16773,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         photos: 'My Photos',
         schedule: 'My Schedule',
         settings: 'Settings',
+        services: 'Services',
         support: 'Support',
     };
     const setPageChrome = (section) => {
@@ -17433,7 +17441,7 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
             return card;
         };
 
-        const rcMountCreditCard = () => {
+        const rcMountCreditCard = () => { return;
             const sidebar = document.querySelector('.fi-sidebar');
             if (!sidebar) return;
 

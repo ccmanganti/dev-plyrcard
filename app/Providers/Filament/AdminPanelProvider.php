@@ -1283,6 +1283,58 @@ class AdminPanelProvider extends PanelProvider
                         .fi-sidebar-nav {
                             scroll-padding-top: 6rem !important;
                         }
+
+                        /* Account, credits, and plan now live in the main content header. */
+                        .plyr-sidebar-footer { padding:0 !important; margin:0 !important; gap:0 !important; }
+                        .plyr-sidebar-footer > .plyr-sidebar-account,
+                        .plyr-sidebar-footer > .plyr-sidebar-plan,
+                        .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
+                        .plyr-top-account-dock-host { width:100%; display:flex; justify-content:flex-end; margin:0 0 1rem; position:relative; z-index:65; }
+                        body > .plyr-top-account-dock { display:none; }
+                        .plyr-top-account-dock-host > .plyr-top-account-dock { display:flex; }
+                        .plyr-top-account-dock { align-items:stretch; justify-content:flex-end; gap:.6rem; flex-wrap:wrap; max-width:100%; }
+                        .plyr-top-account-card { border:1px solid rgba(226,232,240,.96); border-radius:.9rem; background:rgba(255,255,255,.96); box-shadow:0 8px 24px rgba(15,23,42,.06); color:#0f172a; }
+                        .dark .plyr-top-account-card { border-color:rgba(148,163,184,.17); background:rgba(15,23,42,.9); color:#f8fafc; box-shadow:none; }
+                        .plyr-top-credit-card { min-width:14.5rem; padding:.7rem .8rem; }
+                        .plyr-top-credit-head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; margin-bottom:.42rem; }
+                        .plyr-top-credit-head strong { font-size:.75rem; font-weight:800; }
+                        .plyr-top-credit-head a { display:inline-flex; align-items:center; min-height:1.75rem; padding:0 .6rem; border-radius:999px; background:#ff6338; color:#fff; font-size:.68rem; font-weight:800; text-decoration:none; }
+                        .plyr-top-credit-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.16rem 0; font-size:.7rem; color:#7c8798; }
+                        .plyr-top-credit-row strong { color:#0f172a; font-size:.72rem; white-space:nowrap; }
+                        .dark .plyr-top-credit-row { color:#94a3b8; }
+                        .dark .plyr-top-credit-row strong { color:#f8fafc; }
+                        .plyr-top-plan-card { min-width:9.4rem; display:flex; align-items:center; gap:.62rem; padding:.7rem .78rem; text-decoration:none; transition:border-color .16s ease, transform .16s ease, background .16s ease; }
+                        .plyr-top-plan-card:hover { border-color:rgba(255,99,56,.42); transform:translateY(-1px); }
+                        .plyr-top-plan-icon { width:2rem; height:2rem; display:grid; place-items:center; border-radius:.7rem; background:rgba(255,99,56,.1); color:#ff6338; flex:0 0 auto; }
+                        .plyr-top-plan-icon svg { width:1rem; height:1rem; }
+                        .plyr-top-plan-copy { min-width:0; display:grid; gap:.12rem; }
+                        .plyr-top-plan-copy strong { color:inherit; font-size:.76rem; line-height:1.1; }
+                        .plyr-top-plan-copy span { color:#ff6338; font-size:.67rem; font-weight:700; }
+                        .plyr-top-profile-wrap { position:relative; }
+                        .plyr-top-profile-trigger { min-width:12rem; height:100%; display:flex; align-items:center; gap:.62rem; padding:.6rem .72rem; border:1px solid rgba(255,99,56,.42); cursor:pointer; text-align:left; }
+                        .plyr-top-profile-avatar { width:2.25rem; height:2.25rem; border-radius:999px; padding:2px; background:linear-gradient(135deg,#ff6338,#ff8a70); flex:0 0 auto; }
+                        .plyr-top-profile-avatar img { width:100%; height:100%; border-radius:inherit; object-fit:cover; border:2px solid #fff; }
+                        .dark .plyr-top-profile-avatar img { border-color:#0f172a; }
+                        .plyr-top-profile-copy { min-width:0; flex:1; display:grid; gap:.12rem; }
+                        .plyr-top-profile-copy strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.76rem; color:inherit; }
+                        .plyr-top-profile-copy span { font-size:.67rem; color:#ff6338; font-weight:700; }
+                        .plyr-top-profile-chevron { width:.9rem; height:.9rem; flex:0 0 auto; transition:transform .16s ease; }
+                        .plyr-top-profile-menu { position:absolute; top:calc(100% + .45rem); right:0; z-index:120; width:13.5rem; padding:.35rem; border:1px solid rgba(226,232,240,.96); border-radius:.85rem; background:#fff; box-shadow:0 18px 42px rgba(15,23,42,.16); }
+                        .dark .plyr-top-profile-menu { border-color:rgba(148,163,184,.18); background:#0f172a; box-shadow:0 18px 42px rgba(0,0,0,.32); }
+                        .plyr-top-profile-action { width:100%; min-height:2.25rem; display:flex; align-items:center; gap:.55rem; padding:.5rem .58rem; border:0; border-radius:.6rem; background:transparent; color:#334155; font-size:.75rem; font-weight:650; text-decoration:none; cursor:pointer; }
+                        .plyr-top-profile-action:hover { background:rgba(255,99,56,.08); color:#ff6338; }
+                        .dark .plyr-top-profile-action { color:#e2e8f0; }
+                        .plyr-top-profile-action svg { width:.95rem; height:.95rem; }
+                        .plyr-top-profile-separator { height:1px; margin:.25rem .4rem; background:#e5e7eb; }
+                        .dark .plyr-top-profile-separator { background:rgba(148,163,184,.16); }
+                        .plyr-top-profile-action.is-danger { color:#ef5d3c; }
+                        @media(max-width:900px) {
+                            .plyr-top-account-dock-host { justify-content:stretch; }
+                            .plyr-top-account-dock { width:100%; justify-content:stretch; }
+                            .plyr-top-credit-card { flex:1 1 100%; min-width:0; }
+                            .plyr-top-plan-card, .plyr-top-profile-wrap { flex:1 1 calc(50% - .3rem); min-width:0; }
+                            .plyr-top-profile-trigger { width:100%; min-width:0; }
+                        }
                     </style>
                 HTML,
             )
@@ -1950,9 +2002,81 @@ class AdminPanelProvider extends PanelProvider
 
                     $html = Blade::render('@include("partials.navigation", ["activePage" => "admin"])');
 
+                    if ($user) {
+                        $user->loadMissing('roles');
+                        $name = trim((string) ($user->name ?? '')) ?: trim(collect([$user->first_name ?? null, $user->last_name ?? null])->filter()->implode(' ')) ?: 'My Profile';
+                        try { $editProfileUrl = ProfileResource::getUrl('index'); } catch (\Throwable $exception) { $editProfileUrl = url('/admin/my-profile'); }
+                        $settingsUrl = class_exists(\App\Filament\Pages\CoachDatabaseSettings::class) ? \App\Filament\Pages\CoachDatabaseSettings::getUrl() : url('/admin/coach-database/settings');
+                        $logoutUrl = Route::has('filament.admin.auth.logout') ? route('filament.admin.auth.logout') : url('/admin/logout');
+                        $managePlanUrl = class_exists(MyJourney::class) ? MyJourney::getUrl() : url('/admin/my-journey');
+                        $avatarUrl = method_exists($user, 'getFilamentAvatarUrl') ? $user->getFilamentAvatarUrl() : null;
+                        $avatarUrl = $avatarUrl ?: ($user->profile_photo_url ?? null) ?: ($user->avatar_url ?? null) ?: 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=ff6338&color=fff';
+                        $roleNames = method_exists($user, 'getRoleNames') ? $user->getRoleNames() : collect();
+                        $planLabel = match (true) {
+                            $roleNames->contains(fn ($role) => strcasecmp((string) $role, 'My Journey') === 0) => 'My Journey',
+                            $roleNames->contains(fn ($role) => strcasecmp((string) $role, 'Plyr') === 0) => 'Plyr',
+                            $roleNames->contains(fn ($role) => strcasecmp((string) $role, 'PLYR+') === 0) => 'PLYR+',
+                            $roleNames->contains(fn ($role) => strcasecmp((string) $role, 'Free') === 0) => 'Free',
+                            default => $roleNames->first() ?: 'Free',
+                        };
+                        $creditBalance = (int) ($user->points_available ?? 0);
+                        $recentCreditPurchaseLabel = 'None yet';
+                        if (\Illuminate\Support\Facades\Schema::hasTable('credit_point_transactions')) {
+                            $recentPurchase = \App\Models\CreditPointTransaction::query()->where('user_id', $user->getKey())->where('type', 'grant')->whereIn('source_type', ['package_purchase', 'top_up_purchase'])->latest('id')->first();
+                            if ($recentPurchase) {
+                                $package = trim((string) data_get($recentPurchase->meta ?? [], 'package', ''));
+                                $purchaseName = $package !== '' ? str($package)->replace('-', ' ')->title()->toString() : trim((string) ($recentPurchase->reason ?: 'Credit purchase'));
+                                $purchaseDate = optional($recentPurchase->created_at)->format('M j');
+                                $recentCreditPurchaseLabel = $purchaseName . ($purchaseDate ? ' · ' . $purchaseDate : '');
+                            }
+                        }
+                        $html .= Blade::render(<<<'BLADE'
+                            <div id="plyr-top-account-dock" class="plyr-top-account-dock" x-data="{ profileOpen: false }" x-on:keydown.escape.window="profileOpen = false">
+                                <div class="plyr-top-account-card plyr-top-credit-card">
+                                    <div class="plyr-top-credit-head"><strong>Credits</strong><a href="{{ $managePlanUrl }}">Get More</a></div>
+                                    <div class="plyr-top-credit-row"><span>Available</span><strong>{{ number_format($creditBalance) }} credits</strong></div>
+                                    <div class="plyr-top-credit-row"><span>Recently Purchased</span><strong>{{ $recentCreditPurchaseLabel }}</strong></div>
+                                </div>
+                                <a href="{{ $managePlanUrl }}" class="plyr-top-account-card plyr-top-plan-card">
+                                    <span class="plyr-top-plan-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2L5 13h6l-1 9l9-12h-6V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
+                                    <span class="plyr-top-plan-copy"><strong>{{ $planLabel }}</strong><span>Manage Plan</span></span>
+                                </a>
+                                <div class="plyr-top-profile-wrap">
+                                    <button type="button" class="plyr-top-account-card plyr-top-profile-trigger" @click="profileOpen = ! profileOpen" aria-label="Open account menu">
+                                        <span class="plyr-top-profile-avatar"><img src="{{ $avatarUrl }}" alt="{{ $name }}"></span>
+                                        <span class="plyr-top-profile-copy"><strong>{{ $name }}</strong><span>Edit Profile</span></span>
+                                        <svg class="plyr-top-profile-chevron" :style="profileOpen ? 'transform:rotate(180deg)' : ''" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 8L10 11.5L13.5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <div class="plyr-top-profile-menu" x-show="profileOpen" x-cloak x-transition.opacity.scale.origin.top.right @click.outside="profileOpen = false">
+                                        <a href="{{ $editProfileUrl }}" class="plyr-top-profile-action"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4l10.5-10.5a2.83 2.83 0 0 0-4-4L4 16v4Z" stroke="currentColor" stroke-width="1.8"/><path d="M13.5 6.5l4 4" stroke="currentColor" stroke-width="1.8"/></svg><span>Edit Profile</span></a>
+                                        <a href="{{ $settingsUrl }}" class="plyr-top-profile-action"><svg viewBox="0 0 24 24" fill="none"><path d="M12 15.5a3.5 3.5 0 1 0 0-7a3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/><path d="M4 12a8 8 0 1 1 16 0a8 8 0 0 1-16 0Z" stroke="currentColor" stroke-width="1.4"/></svg><span>Settings</span></a>
+                                        <div class="plyr-top-profile-separator"></div>
+                                        <form method="POST" action="{{ $logoutUrl }}" style="margin:0;">@csrf<button type="submit" class="plyr-top-profile-action is-danger"><svg viewBox="0 0 24 24" fill="none"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign Out</span></button></form>
+                                    </div>
+                                </div>
+                            </div>
+                        BLADE, compact('name', 'editProfileUrl', 'settingsUrl', 'logoutUrl', 'managePlanUrl', 'avatarUrl', 'planLabel', 'creditBalance', 'recentCreditPurchaseLabel'));
+                    }
+
                     $html .= <<<'HTML'
                         <script>
                             document.addEventListener('DOMContentLoaded', function () {
+                                const mountPlyrTopAccountDock = () => {
+                                    const dock = document.getElementById('plyr-top-account-dock');
+                                    const main = document.querySelector('.fi-main');
+                                    if (!dock || !main) return;
+                                    let host = main.querySelector(':scope > .plyr-top-account-dock-host');
+                                    if (!host) {
+                                        host = document.createElement('div');
+                                        host.className = 'plyr-top-account-dock-host';
+                                        main.prepend(host);
+                                    }
+                                    if (dock.parentElement !== host) host.appendChild(dock);
+                                };
+                                mountPlyrTopAccountDock();
+                                document.addEventListener('livewire:navigated', mountPlyrTopAccountDock);
+                                window.setTimeout(mountPlyrTopAccountDock, 150);
+                                window.setTimeout(mountPlyrTopAccountDock, 700);
                                 const ORANGE = '#ff6338';
                                 const ORANGE_SOFT = 'rgba(255, 99, 56, .15)';
                                 const ORANGE_SOFT_HOVER = 'rgba(255, 99, 56, .21)';
