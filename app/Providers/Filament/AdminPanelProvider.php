@@ -1299,8 +1299,23 @@ class AdminPanelProvider extends PanelProvider
                             visibility:hidden !important;
                             pointer-events:none !important;
                         }
+                        :root { --plyr-header-tools-width: 6.35rem; --plyr-header-tools-gap: .7rem; }
                         .plyr-top-account-dock { position:fixed; top:1.45rem; right:1.45rem; z-index:90; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
                         body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.65rem; }
+                        /* Reserve a real header slot for Dark + Profile on Recruiting Center pages.
+                           The toolbar remains fixed and consistent, while search/action rows stop
+                           before it so controls never cover the search input. */
+                        html body .rc-livewire-root .rc-home-actions-v2,
+                        html body .rc-livewire-root .rc-global-search-bar,
+                        html body .rc-livewire-root .rc-discover-actions-v29 {
+                            padding-right: calc(var(--plyr-header-tools-width) + var(--plyr-header-tools-gap)) !important;
+                        }
+                        html body .rc-livewire-root .rc-home-search-v2,
+                        html body .rc-livewire-root .rc-global-search-shell,
+                        html body .rc-livewire-root .rc-discover-program-search-v27 {
+                            min-width:0 !important;
+                            max-width:100% !important;
+                        }
                         .plyr-global-dark-toggle,
                         .plyr-top-profile-trigger { width:2.9rem; height:2.9rem; min-width:2.9rem; display:grid; place-items:center; border:1px solid rgba(226,232,240,.96); background:#fff; color:#0f172a; box-shadow:0 8px 22px rgba(15,23,42,.07); cursor:pointer; transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease,background .16s ease; }
                         .plyr-global-dark-toggle { border-radius:.9rem; }
@@ -1354,8 +1369,12 @@ class AdminPanelProvider extends PanelProvider
                         .rc-account-impersonation-bar { position:relative !important; z-index:1000 !important; }
                         .rc-account-impersonation-bar * { pointer-events:auto !important; }
                         @media(max-width:640px){
+                            :root { --plyr-header-tools-width: 5.95rem; --plyr-header-tools-gap: .45rem; }
                             .plyr-top-account-dock { top:.8rem; right:.8rem; }
                             body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.3rem; }
+                            html body .rc-livewire-root .rc-home-actions-v2,
+                            html body .rc-livewire-root .rc-global-search-bar,
+                            html body .rc-livewire-root .rc-discover-actions-v29 { padding-right:0 !important; }
                             .plyr-top-profile-menu { position:fixed; top:4.5rem; right:.75rem; width:min(19rem,calc(100vw - 1.5rem)); }
                         }
                     </style>
