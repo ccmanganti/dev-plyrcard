@@ -138,6 +138,46 @@ class CreditPointService
             ],
         );
     }
+    public function grantTopUp(User $user, int $points, string $pack, string $sourceId, array $meta = []): CreditPointTransaction
+    {
+        $pack = strtolower(trim($pack));
+        $sourceId = trim($sourceId);
+
+        if ($sourceId === '') {
+            throw ValidationException::withMessages(['points' => 'A payment source ID is required before points can be granted.']);
+        }
+
+        if ($points <= 0) {
+            throw ValidationException::withMessages(['points' => 'The point pack must grant at least one point.']);
+        }
+
+        if (! Schema::hasTable('credit_point_transactions') || ! Schema::hasColumn('users', 'points_available')) {
+            throw ValidationException::withMessages([
+                'points' => 'The points ledger is not installed. Run the points migration before processing point-pack purchases.',
+            ]);
+        }
+
+        $packKey = $pack !== '' ? $pack : (string) $points;
+
+        return $this->write(
+            user: $user,
+            type: 'grant',
+            points: $points,
+            idempotencyKey: 'top-up:' . $packKey . ':' . $sourceId,
+            attributes: [
+                'grant_id' => 'grant:top-up:' . $packKey . ':' . $sourceId,
+                'source_type' => 'top_up_purchase',
+                'source_id' => $sourceId,
+                'reason' => number_format($points) . ' Point Pack purchase',
+                'actor' => 'system',
+                'meta' => array_merge([
+                    'point_pack' => $packKey,
+                    'points' => $points,
+                ], $meta),
+            ],
+        );
+    }
+
     public function hasPackageGrant(User $user, string $package, string $sourceId): bool
     {
         $package = strtolower(trim($package));

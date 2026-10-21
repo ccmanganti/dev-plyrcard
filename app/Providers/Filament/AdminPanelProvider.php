@@ -1284,38 +1284,25 @@ class AdminPanelProvider extends PanelProvider
                             scroll-padding-top: 6rem !important;
                         }
 
-                        /* Stable global account toolbar. It renders once and never gets moved by Livewire/SPA navigation. */
+                        /* One account control everywhere. Recruiting Center pages already own
+                           their search + dark-mode row, so the profile dock is inserted directly
+                           after that native dark-mode button. Other Admin pages use the fixed
+                           global Dark + Profile fallback. */
                         .plyr-sidebar-footer { padding:0 !important; margin:0 !important; gap:0 !important; }
                         .plyr-sidebar-footer > .plyr-sidebar-account,
                         .plyr-sidebar-footer > .plyr-sidebar-plan,
                         .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
-                        /* The global toolbar owns dark mode + profile. Some Recruiting Center
-                           styles are emitted later with display:inline-grid!important, so this
-                           selector intentionally has higher specificity to prevent duplicates. */
-                        html body .rc-livewire-root .rc-home-dark-toggle-v2,
-                        html body .rc-livewire-root button.rc-home-dark-toggle-v2,
-                        html body .rc-livewire-root [data-plyr-dark-toggle].rc-home-dark-toggle-v2 {
-                            display:none !important;
-                            visibility:hidden !important;
-                            pointer-events:none !important;
-                        }
-                        :root { --plyr-header-tools-width: 6.35rem; --plyr-header-tools-gap: .7rem; }
                         .plyr-top-account-dock { position:fixed; top:1.45rem; right:1.45rem; z-index:90; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
-                        body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.65rem; }
-                        /* Reserve a real header slot for Dark + Profile on Recruiting Center pages.
-                           The toolbar remains fixed and consistent, while search/action rows stop
-                           before it so controls never cover the search input. */
+                        body:has(.rc-account-impersonation-bar) .plyr-top-account-dock:not(.is-recruiting-inline) { top:4.65rem; }
+                        .plyr-top-account-dock.is-recruiting-inline { position:static !important; inset:auto !important; z-index:80; display:inline-flex; flex:0 0 auto; margin-left:.45rem; vertical-align:middle; }
+                        .plyr-top-account-dock.is-recruiting-inline .plyr-global-dark-toggle { display:none !important; }
+                        .plyr-top-account-dock.is-recruiting-inline .plyr-top-profile-trigger { width:2.9rem; height:2.9rem; min-width:2.9rem; }
                         html body .rc-livewire-root .rc-home-actions-v2,
                         html body .rc-livewire-root .rc-global-search-bar,
-                        html body .rc-livewire-root .rc-discover-actions-v29 {
-                            padding-right: calc(var(--plyr-header-tools-width) + var(--plyr-header-tools-gap)) !important;
-                        }
+                        html body .rc-livewire-root .rc-discover-actions-v29 { min-width:0 !important; }
                         html body .rc-livewire-root .rc-home-search-v2,
                         html body .rc-livewire-root .rc-global-search-shell,
-                        html body .rc-livewire-root .rc-discover-program-search-v27 {
-                            min-width:0 !important;
-                            max-width:100% !important;
-                        }
+                        html body .rc-livewire-root .rc-discover-program-search-v27 { min-width:0 !important; max-width:100% !important; }
                         .plyr-global-dark-toggle,
                         .plyr-top-profile-trigger { width:2.9rem; height:2.9rem; min-width:2.9rem; display:grid; place-items:center; border:1px solid rgba(226,232,240,.96); background:#fff; color:#0f172a; box-shadow:0 8px 22px rgba(15,23,42,.07); cursor:pointer; transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease,background .16s ease; }
                         .plyr-global-dark-toggle { border-radius:.9rem; }
@@ -1369,12 +1356,10 @@ class AdminPanelProvider extends PanelProvider
                         .rc-account-impersonation-bar { position:relative !important; z-index:1000 !important; }
                         .rc-account-impersonation-bar * { pointer-events:auto !important; }
                         @media(max-width:640px){
-                            :root { --plyr-header-tools-width: 5.95rem; --plyr-header-tools-gap: .45rem; }
-                            .plyr-top-account-dock { top:.8rem; right:.8rem; }
-                            body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.3rem; }
-                            html body .rc-livewire-root .rc-home-actions-v2,
-                            html body .rc-livewire-root .rc-global-search-bar,
-                            html body .rc-livewire-root .rc-discover-actions-v29 { padding-right:0 !important; }
+                            .plyr-top-account-dock:not(.is-recruiting-inline) { top:.8rem; right:.8rem; }
+                            body:has(.rc-account-impersonation-bar) .plyr-top-account-dock:not(.is-recruiting-inline) { top:4.3rem; }
+                            .plyr-top-account-dock.is-recruiting-inline { margin-left:.3rem; }
+                            .plyr-top-account-dock.is-recruiting-inline .plyr-top-profile-trigger { width:2.65rem; height:2.65rem; min-width:2.65rem; }
                             .plyr-top-profile-menu { position:fixed; top:4.5rem; right:.75rem; width:min(19rem,calc(100vw - 1.5rem)); }
                         }
                     </style>
@@ -2196,6 +2181,40 @@ class AdminPanelProvider extends PanelProvider
                                     togglePlyrDarkMode();
                                 });
 
+                                let plyrAccountMountFrame = null;
+                                function visibleRecruitingDarkToggle() {
+                                    const root = document.querySelector('.rc-livewire-root');
+                                    if (! root) return null;
+                                    return Array.from(root.querySelectorAll('.rc-home-dark-toggle-v2[data-plyr-dark-toggle]')).find(function (button) {
+                                        const style = window.getComputedStyle(button);
+                                        const rect = button.getBoundingClientRect();
+                                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+                                    }) || null;
+                                }
+
+                                function mountPlyrAccountDock() {
+                                    const dock = document.getElementById('plyr-top-account-dock');
+                                    if (! dock) return;
+                                    const nativeDark = visibleRecruitingDarkToggle();
+                                    if (nativeDark && nativeDark.parentElement) {
+                                        dock.classList.add('is-recruiting-inline');
+                                        if (dock.previousElementSibling !== nativeDark || dock.parentElement !== nativeDark.parentElement) {
+                                            nativeDark.insertAdjacentElement('afterend', dock);
+                                        }
+                                        return;
+                                    }
+                                    dock.classList.remove('is-recruiting-inline');
+                                    if (dock.parentElement !== document.body) document.body.appendChild(dock);
+                                }
+
+                                function schedulePlyrAccountDockMount() {
+                                    if (plyrAccountMountFrame) cancelAnimationFrame(plyrAccountMountFrame);
+                                    plyrAccountMountFrame = requestAnimationFrame(function () {
+                                        plyrAccountMountFrame = null;
+                                        mountPlyrAccountDock();
+                                    });
+                                }
+
                                 function syncPlyrSidebarLogo() {
                                     const logo = document.querySelector('.plyr-sidebar-brand-logo');
 
@@ -2357,17 +2376,18 @@ class AdminPanelProvider extends PanelProvider
                                 updatePlyrDarkButtons();
                                 updateDiscoverSchoolsNavigation();
                                 applyPlyrSidebarActiveState();
+                                schedulePlyrAccountDockMount();
 
-                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); }, 50);
-                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); }, 250);
-                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); }, 800);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); schedulePlyrAccountDockMount(); }, 50);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); schedulePlyrAccountDockMount(); }, 250);
+                                setTimeout(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); schedulePlyrAccountDockMount(); }, 800);
 
-                                document.addEventListener('livewire:navigated', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); });
-                                document.addEventListener('livewire:update', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); });
+                                document.addEventListener('livewire:navigated', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); schedulePlyrAccountDockMount(); });
+                                document.addEventListener('livewire:update', function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); applyPlyrSidebarActiveState(); schedulePlyrAccountDockMount(); });
 
                                 if (window.MutationObserver) {
-                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); schedulePlyrAccountDockMount(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+                                    new MutationObserver(function () { syncPlyrSidebarLogo(); updatePlyrDarkButtons(); updateDiscoverSchoolsNavigation(); schedulePlyrAccountDockMount(); }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] });
                                 }
                             });
                         </script>
