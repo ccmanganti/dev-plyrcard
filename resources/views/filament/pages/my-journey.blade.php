@@ -900,5 +900,4 @@
         })();
     </script>
     {{-- Native Stripe checkout for My Journey + point packages. --}}
-    @include('partials.stripe-upgrade-modal')
 </x-filament-panels::page>

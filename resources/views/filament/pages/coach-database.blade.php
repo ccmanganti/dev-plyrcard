@@ -11438,7 +11438,7 @@ CSS;
                 <div class="rc-points-section-head-v13"><div><h2>Spend your points</h2></div><p>Points are deducted when the request is submitted.</p></div>
                 <div class="rc-points-services-grid-v13">
                     @foreach($rcCreditCatalog as $serviceKey => $serviceItem)
-                        <article class="rc-points-service-v13"><div class="rc-points-service-head-v13"><strong>{{ $serviceItem['name'] }}</strong><span class="rc-points-service-price-v13">{{ number_format((int)$serviceItem['points']) }} <small>pts</small></span></div><p>{{ $serviceItem['description'] ?? '' }}</p><button type="button" class="rc-btn rc-btn-primary" data-service-key="{{ $serviceKey }}" onclick="window.dispatchEvent(new CustomEvent('rc-select-point-service',{detail:{key:this.dataset.serviceKey}}))">Request {{ strtolower($serviceItem['name']) }}</button></article>
+                        <article class="rc-points-service-v13"><div class="rc-points-service-head-v13"><strong>{{ $serviceItem['name'] }}</strong><span class="rc-points-service-price-v13">{{ number_format((int)$serviceItem['points']) }} <small>pts</small></span></div><p>{{ $serviceItem['description'] ?? '' }}</p><button type="button" class="rc-btn rc-btn-primary" data-service-key="{{ $serviceKey }}" x-data="{ opening:false }" x-bind:disabled="opening" x-on:click.prevent="if(opening)return;opening=true;serviceTab='credits';window.dispatchEvent(new CustomEvent('rc-select-point-service',{detail:{key:$el.dataset.serviceKey}}));window.setTimeout(()=>opening=false,650)"><span x-show="!opening">Request {{ strtolower($serviceItem['name']) }}</span><span x-cloak x-show="opening" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening request…</span></button></article>
                     @endforeach
                 </div>
             </section>
@@ -11730,7 +11730,6 @@ CSS;
                     </div>
                 </div>
             @endif
-    @include('partials.stripe-upgrade-modal')
     </div>
 </section>
 <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">

@@ -2092,6 +2092,7 @@ class AdminPanelProvider extends PanelProvider
                                 </div>
                             </div>
                         BLADE, compact('name', 'editProfileUrl', 'settingsUrl', 'logoutUrl', 'managePlanUrl', 'avatarUrl', 'planLabel', 'creditBalance', 'recentCreditPurchaseLabel'));
+                        $html .= Blade::render('@include("partials.stripe-upgrade-modal")');
                     }
 
                     $html .= <<<'HTML'
