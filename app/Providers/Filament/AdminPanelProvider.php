@@ -1284,21 +1284,16 @@ class AdminPanelProvider extends PanelProvider
                             scroll-padding-top: 6rem !important;
                         }
 
-                        /* One stable account control everywhere. Recruiting Center pages reserve
-                           right-side header space for this fixed Dark + Profile pair so it never
-                           overlaps search fields or disappears during Livewire navigation. */
+                        /* Admin/resource account control. Recruiting Center renders its own
+                           inline header controls inside coach-database.blade.php, so this fallback
+                           is never floated over Recruiting Center search fields. */
                         .plyr-sidebar-footer { padding:0 !important; margin:0 !important; gap:0 !important; }
                         .plyr-sidebar-footer > .plyr-sidebar-account,
                         .plyr-sidebar-footer > .plyr-sidebar-plan,
                         .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
-                        .plyr-top-account-dock { position:fixed; top:1.6rem; right:1.45rem; z-index:950; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
+                        .plyr-top-account-dock { position:absolute; top:1.6rem; right:1.45rem; z-index:950; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
                         body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.8rem; }
-                        html body .rc-livewire-root .rc-home-dark-toggle-v2,
-                        html body .rc-livewire-root .rc-home-icon-btn[aria-label*="Theme" i] { display:none !important; }
-                        html body .rc-livewire-root .rc-home-actions-v2,
-                        html body .rc-livewire-root .rc-home-actions,
-                        html body .rc-livewire-root .rc-global-search-bar,
-                        html body .rc-livewire-root .rc-discover-actions-v29 { min-width:0 !important; padding-right:7.2rem !important; box-sizing:border-box !important; }
+                        html body:has(.rc-livewire-root) > .plyr-top-account-dock { display:none !important; }
                         html body .rc-livewire-root .rc-home-search-v2,
                         html body .rc-livewire-root .rc-home-search,
                         html body .rc-livewire-root .rc-global-search-shell,
@@ -1358,11 +1353,7 @@ class AdminPanelProvider extends PanelProvider
                         @media(max-width:640px){
                             .plyr-top-account-dock { top:.8rem; right:.8rem; }
                             body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.3rem; }
-                            html body .rc-livewire-root .rc-home-actions-v2,
-                            html body .rc-livewire-root .rc-home-actions,
-                            html body .rc-livewire-root .rc-global-search-bar,
-                            html body .rc-livewire-root .rc-discover-actions-v29 { padding-right:6.4rem !important; }
-                            .plyr-top-profile-menu { position:fixed; top:4.5rem; right:.75rem; width:min(19rem,calc(100vw - 1.5rem)); }
+                            .plyr-top-account-dock .plyr-top-profile-menu { position:absolute; top:calc(100% + .5rem); right:0; width:min(19rem,calc(100vw - 1.5rem)); }
                         }
                     </style>
                 HTML,
