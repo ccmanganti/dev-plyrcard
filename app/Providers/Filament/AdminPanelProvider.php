@@ -1289,7 +1289,16 @@ class AdminPanelProvider extends PanelProvider
                         .plyr-sidebar-footer > .plyr-sidebar-account,
                         .plyr-sidebar-footer > .plyr-sidebar-plan,
                         .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
-                        .rc-home-dark-toggle-v2 { display:none !important; }
+                        /* The global toolbar owns dark mode + profile. Some Recruiting Center
+                           styles are emitted later with display:inline-grid!important, so this
+                           selector intentionally has higher specificity to prevent duplicates. */
+                        html body .rc-livewire-root .rc-home-dark-toggle-v2,
+                        html body .rc-livewire-root button.rc-home-dark-toggle-v2,
+                        html body .rc-livewire-root [data-plyr-dark-toggle].rc-home-dark-toggle-v2 {
+                            display:none !important;
+                            visibility:hidden !important;
+                            pointer-events:none !important;
+                        }
                         .plyr-top-account-dock { position:fixed; top:1.45rem; right:1.45rem; z-index:90; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
                         body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.65rem; }
                         .plyr-global-dark-toggle,
