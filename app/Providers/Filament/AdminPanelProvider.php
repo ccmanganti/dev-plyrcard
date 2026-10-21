@@ -1284,23 +1284,32 @@ class AdminPanelProvider extends PanelProvider
                             scroll-padding-top: 6rem !important;
                         }
 
-                        /* Account, credits, and plan now live in the main content header. */
+                        /* Stable global account toolbar. It renders once and never gets moved by Livewire/SPA navigation. */
                         .plyr-sidebar-footer { padding:0 !important; margin:0 !important; gap:0 !important; }
                         .plyr-sidebar-footer > .plyr-sidebar-account,
                         .plyr-sidebar-footer > .plyr-sidebar-plan,
                         .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
-                        .plyr-top-account-dock-host { display:inline-flex; align-items:center; position:relative; z-index:40; margin-left:.35rem; }
-                        body > .plyr-top-account-dock { display:none; }
-                        .plyr-top-account-dock-host > .plyr-top-account-dock { display:flex; }
-                        .plyr-top-account-dock { align-items:center; justify-content:center; }
+                        .rc-home-dark-toggle-v2 { display:none !important; }
+                        .plyr-top-account-dock { position:fixed; top:1.45rem; right:1.45rem; z-index:90; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
+                        body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.65rem; }
+                        .plyr-global-dark-toggle,
+                        .plyr-top-profile-trigger { width:2.9rem; height:2.9rem; min-width:2.9rem; display:grid; place-items:center; border:1px solid rgba(226,232,240,.96); background:#fff; color:#0f172a; box-shadow:0 8px 22px rgba(15,23,42,.07); cursor:pointer; transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease,background .16s ease; }
+                        .plyr-global-dark-toggle { border-radius:.9rem; }
+                        .plyr-top-profile-trigger { border-radius:999px; padding:0; border-color:rgba(255,99,56,.35); }
+                        .dark .plyr-global-dark-toggle,
+                        .dark .plyr-top-profile-trigger { border-color:rgba(148,163,184,.2); background:#18181b; color:#f8fafc; }
+                        .plyr-global-dark-toggle:hover,
+                        .plyr-top-profile-trigger:hover,
+                        .plyr-top-profile-wrap:focus-within .plyr-top-profile-trigger { border-color:rgba(255,99,56,.48); transform:translateY(-1px); box-shadow:0 12px 26px rgba(15,23,42,.1); }
+                        .plyr-global-dark-toggle svg { width:1.05rem; height:1.05rem; }
+                        .plyr-global-dark-toggle .plyr-theme-icon-sun { display:none; }
+                        .dark .plyr-global-dark-toggle .plyr-theme-icon-moon { display:none; }
+                        .dark .plyr-global-dark-toggle .plyr-theme-icon-sun { display:block; }
                         .plyr-top-profile-wrap { position:relative; display:inline-flex; }
-                        .plyr-top-profile-trigger { width:2.85rem; height:2.85rem; min-width:2.85rem; padding:0; display:grid; place-items:center; border:1px solid rgba(226,232,240,.96); border-radius:.82rem; background:#fff; box-shadow:0 6px 18px rgba(15,23,42,.06); cursor:pointer; transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease; }
-                        .dark .plyr-top-profile-trigger { border-color:rgba(148,163,184,.2); background:#18181b; }
-                        .plyr-top-profile-trigger:hover,.plyr-top-profile-wrap:focus-within .plyr-top-profile-trigger { border-color:rgba(255,99,56,.42); transform:translateY(-1px); box-shadow:0 10px 22px rgba(15,23,42,.09); }
-                        .plyr-top-profile-avatar { width:2.08rem; height:2.08rem; border-radius:999px; padding:2px; background:linear-gradient(135deg,#ff6338,#ff8a70); display:block; }
+                        .plyr-top-profile-avatar { width:2.35rem; height:2.35rem; border-radius:999px; padding:2px; background:linear-gradient(135deg,#ff6338,#ff8a70); display:block; }
                         .plyr-top-profile-avatar img { width:100%; height:100%; border-radius:inherit; object-fit:cover; border:2px solid #fff; display:block; }
                         .dark .plyr-top-profile-avatar img { border-color:#18181b; }
-                        .plyr-top-profile-menu { position:absolute; top:calc(100% + .5rem); right:0; z-index:90; width:19rem; padding:.5rem; border:1px solid rgba(226,232,240,.96); border-radius:1rem; background:#fff; color:#0f172a; box-shadow:0 18px 42px rgba(15,23,42,.16); }
+                        .plyr-top-profile-menu { position:absolute; top:calc(100% + .5rem); right:0; z-index:120; width:19rem; padding:.5rem; border:1px solid rgba(226,232,240,.96); border-radius:1rem; background:#fff; color:#0f172a; box-shadow:0 18px 42px rgba(15,23,42,.16); }
                         .dark .plyr-top-profile-menu { border-color:rgba(148,163,184,.18); background:#0f172a; color:#f8fafc; box-shadow:0 18px 42px rgba(0,0,0,.32); }
                         .plyr-top-profile-user { display:flex; align-items:center; gap:.65rem; padding:.55rem .55rem .7rem; }
                         .plyr-top-profile-user-copy { min-width:0; display:grid; gap:.12rem; }
@@ -1335,7 +1344,11 @@ class AdminPanelProvider extends PanelProvider
                         .dark .plyr-top-profile-plan-copy span { color:#94a3b8; }
                         .rc-account-impersonation-bar { position:relative !important; z-index:1000 !important; }
                         .rc-account-impersonation-bar * { pointer-events:auto !important; }
-                        @media(max-width:640px){.plyr-top-profile-menu{position:fixed;top:4.5rem;right:.75rem;width:min(19rem,calc(100vw - 1.5rem))}}
+                        @media(max-width:640px){
+                            .plyr-top-account-dock { top:.8rem; right:.8rem; }
+                            body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.3rem; }
+                            .plyr-top-profile-menu { position:fixed; top:4.5rem; right:.75rem; width:min(19rem,calc(100vw - 1.5rem)); }
+                        }
                     </style>
                 HTML,
             )
@@ -2033,6 +2046,10 @@ class AdminPanelProvider extends PanelProvider
                         }
                         $html .= Blade::render(<<<'BLADE'
                             <div id="plyr-top-account-dock" class="plyr-top-account-dock" x-data="{ profileOpen:false, closeTimer:null, show(){clearTimeout(this.closeTimer);this.profileOpen=true}, hide(){clearTimeout(this.closeTimer);this.closeTimer=setTimeout(()=>this.profileOpen=false,180)} }" x-on:keydown.escape.window="profileOpen=false">
+                                <button type="button" class="plyr-global-dark-toggle" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
+                                    <svg class="plyr-theme-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <svg class="plyr-theme-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+                                </button>
                                 <div class="plyr-top-profile-wrap" x-on:mouseenter="show()" x-on:mouseleave="hide()">
                                     <button type="button" class="plyr-top-profile-trigger" @click="profileOpen=!profileOpen" aria-label="Open profile menu" x-bind:aria-expanded="profileOpen?'true':'false'">
                                         <span class="plyr-top-profile-avatar"><img src="{{ $avatarUrl }}" alt="{{ $name }}"></span>
@@ -2052,37 +2069,6 @@ class AdminPanelProvider extends PanelProvider
                     $html .= <<<'HTML'
                         <script>
                             document.addEventListener('DOMContentLoaded', function () {
-                                const mountPlyrTopAccountDock = () => {
-                                    const dock = document.getElementById('plyr-top-account-dock');
-                                    if (!dock) return;
-                                    const darkButtons = Array.from(document.querySelectorAll('[data-plyr-dark-toggle]'));
-                                    const darkButton = darkButtons.find(el => el.getClientRects().length && getComputedStyle(el).display !== 'none');
-                                    if (darkButton && darkButton.parentElement) {
-                                        let host = darkButton.parentElement.querySelector(':scope > .plyr-top-account-dock-host');
-                                        if (!host) {
-                                            host = document.createElement('span');
-                                            host.className = 'plyr-top-account-dock-host';
-                                            darkButton.insertAdjacentElement('afterend', host);
-                                        }
-                                        if (dock.parentElement !== host) host.appendChild(dock);
-                                        return;
-                                    }
-                                    const main = document.querySelector('.fi-main');
-                                    if (!main) return;
-                                    let host = main.querySelector(':scope > .plyr-top-account-dock-host');
-                                    if (!host) {
-                                        host = document.createElement('div');
-                                        host.className = 'plyr-top-account-dock-host';
-                                        main.prepend(host);
-                                    }
-                                    if (dock.parentElement !== host) host.appendChild(dock);
-                                };
-                                mountPlyrTopAccountDock();
-                                document.addEventListener('livewire:navigated', mountPlyrTopAccountDock);
-                                window.addEventListener('rc-client-section', () => setTimeout(mountPlyrTopAccountDock, 30));
-                                window.addEventListener('rc-fast-section', () => setTimeout(mountPlyrTopAccountDock, 30));
-                                window.setTimeout(mountPlyrTopAccountDock, 150);
-                                window.setTimeout(mountPlyrTopAccountDock, 700);
                                 const ORANGE = '#ff6338';
                                 const ORANGE_SOFT = 'rgba(255, 99, 56, .15)';
                                 const ORANGE_SOFT_HOVER = 'rgba(255, 99, 56, .21)';

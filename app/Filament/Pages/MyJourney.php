@@ -114,7 +114,7 @@ class MyJourney extends Page
     }
     public function getPointPacks(): array
     {
-        return collect((array) config('plyrcard-point-packs.packs', []))
+        return collect((array) config('plyrcard-points.point_packs', config('plyrcard-point-packs.packs', [])))
             ->filter(fn (array $pack): bool => (bool) ($pack['enabled'] ?? true) && (int) ($pack['points'] ?? 0) > 0 && (int) ($pack['price_cents'] ?? 0) > 0)
             ->map(fn (array $pack, string $key): array => array_merge($pack, ['key' => $key]))
             ->values()

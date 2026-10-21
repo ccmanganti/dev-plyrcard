@@ -63,7 +63,7 @@
     }
 
     $rcHasJourney = $rcCatalogUser && method_exists($rcCatalogUser, 'hasRole') && ($rcCatalogUser->hasRole('My Journey') || $rcCatalogUser->hasRole('my journey'));
-    $rcPointPacks = collect((array) config('plyrcard-point-packs.packs', []))
+    $rcPointPacks = collect((array) config('plyrcard-points.point_packs', config('plyrcard-point-packs.packs', [])))
         ->filter(fn (array $pack): bool => (bool) ($pack['enabled'] ?? true) && (int) ($pack['points'] ?? 0) > 0 && (int) ($pack['price_cents'] ?? 0) > 0)
         ->map(fn (array $pack, string $key): array => array_merge($pack, ['key' => $key]))
         ->values();

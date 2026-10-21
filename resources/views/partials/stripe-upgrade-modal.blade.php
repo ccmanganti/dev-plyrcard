@@ -4,7 +4,7 @@
         'jumpstart' => ['start' => route('billing.jumpstart.start'), 'status' => route('billing.jumpstart.status'), 'title' => 'Jumpstart'],
         'amplify' => ['start' => route('billing.amplify.start'), 'status' => route('billing.amplify.status'), 'title' => 'Amplify'],
     ];
-    foreach ((array) config('plyrcard-point-packs.packs', []) as $packKey => $pack) {
+    foreach ((array) config('plyrcard-points.point_packs', config('plyrcard-point-packs.packs', [])) as $packKey => $pack) {
         if (! ($pack['enabled'] ?? true)) continue;
         $points = max(0, (int) ($pack['points'] ?? 0));
         if ($points <= 0) continue;

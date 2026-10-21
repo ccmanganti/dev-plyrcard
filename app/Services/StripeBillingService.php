@@ -373,12 +373,17 @@ class StripeBillingService
         $this->assertConfigured();
         $user->loadMissing('roles');
         $packKey = strtolower(trim($packKey));
-        $pack = (array) config('plyrcard-point-packs.packs.' . $packKey, []);
+        $pack = (array) config('plyrcard-points.point_packs.' . $packKey, config('plyrcard-point-packs.packs.' . $packKey, []));
         $points = max(0, (int) ($pack['points'] ?? 0));
         $amount = max(0, (int) ($pack['price_cents'] ?? 0));
+        $productId = trim((string) ($pack['stripe_product_id'] ?? ''));
         if ($pack === [] || ! ($pack['enabled'] ?? true) || $points <= 0 || $amount <= 0) {
             throw new RuntimeException('This point pack is not available.');
         }
+        if ($productId === '') {
+            throw new RuntimeException('The Stripe Product ID for this point pack is not configured.');
+        }
+        $priceId = $this->resolvePriceId($productId, $amount, null);
         if (! method_exists($user, 'hasRole') || ! ($user->hasRole('My Journey') || $user->hasRole('my journey'))) {
             throw new RuntimeException('Point packs are available to active My Journey members.');
         }
@@ -402,6 +407,8 @@ class StripeBillingService
         $meta['plyrcard_charge_type'] = 'point_pack';
         $meta['plyrcard_point_pack'] = $packKey;
         $meta['plyrcard_point_amount'] = (string) $points;
+        $meta['plyrcard_stripe_product_id'] = $productId;
+        $meta['plyrcard_stripe_price_id'] = $priceId;
         $attempt = now()->format('YmdHis') . '-' . $user->getKey();
         $intentParams = [
             'amount' => $amount,
@@ -425,6 +432,8 @@ class StripeBillingService
             'started_at' => now()->toIso8601String(),
             'amount_cents' => $amount,
             'points' => $points,
+            'stripe_product_id' => $productId,
+            'stripe_price_id' => $priceId,
         ]);
         $intentStatus = (string) ($intent['status'] ?? '');
         $billing->forceFill([

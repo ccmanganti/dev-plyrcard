@@ -39,6 +39,32 @@ return [
             'description' => 'One match-film breakdown.',
         ],
     ],
+    'point_packs' => [
+        '100' => [
+            'label' => '100 Point Pack',
+            'points' => (int) env('PLYRCARD_POINT_PACK_100_POINTS', 100),
+            'price_cents' => (int) env('PLYRCARD_POINT_PACK_100_PRICE_CENTS', 9000),
+            'stripe_product_id' => trim((string) env('PLYRCARD_POINT_PACK_100_STRIPE_PRODUCT_ID', '')),
+            'enabled' => filter_var(env('PLYRCARD_POINT_PACK_100_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'note' => 'Quick top-up for smaller service requests.',
+        ],
+        '250' => [
+            'label' => '250 Point Pack',
+            'points' => (int) env('PLYRCARD_POINT_PACK_250_POINTS', 250),
+            'price_cents' => (int) env('PLYRCARD_POINT_PACK_250_PRICE_CENTS', 21000),
+            'stripe_product_id' => trim((string) env('PLYRCARD_POINT_PACK_250_STRIPE_PRODUCT_ID', '')),
+            'enabled' => filter_var(env('PLYRCARD_POINT_PACK_250_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'note' => 'More room to combine services in one recruiting push.',
+        ],
+        '500' => [
+            'label' => '500 Point Pack',
+            'points' => (int) env('PLYRCARD_POINT_PACK_500_POINTS', 500),
+            'price_cents' => (int) env('PLYRCARD_POINT_PACK_500_PRICE_CENTS', 40000),
+            'stripe_product_id' => trim((string) env('PLYRCARD_POINT_PACK_500_STRIPE_PRODUCT_ID', '')),
+            'enabled' => filter_var(env('PLYRCARD_POINT_PACK_500_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'note' => 'Best point-pack value for larger service needs.',
+        ],
+    ],
     'packages' => [
         'jumpstart' => (int) env('PLYRCARD_POINTS_JUMPSTART', 320),
         'amplify' => (int) env('PLYRCARD_POINTS_AMPLIFY', 1280),
