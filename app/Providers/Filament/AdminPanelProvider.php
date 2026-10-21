@@ -1284,23 +1284,23 @@ class AdminPanelProvider extends PanelProvider
                             scroll-padding-top: 6rem !important;
                         }
 
-                        /* One account control everywhere. Recruiting Center pages already own
-                           their search + dark-mode row, so the profile dock is inserted directly
-                           after that native dark-mode button. Other Admin pages use the fixed
-                           global Dark + Profile fallback. */
+                        /* One stable account control everywhere. Recruiting Center pages reserve
+                           right-side header space for this fixed Dark + Profile pair so it never
+                           overlaps search fields or disappears during Livewire navigation. */
                         .plyr-sidebar-footer { padding:0 !important; margin:0 !important; gap:0 !important; }
                         .plyr-sidebar-footer > .plyr-sidebar-account,
                         .plyr-sidebar-footer > .plyr-sidebar-plan,
                         .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
-                        .plyr-top-account-dock { position:fixed; top:1.45rem; right:1.45rem; z-index:90; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
-                        body:has(.rc-account-impersonation-bar) .plyr-top-account-dock:not(.is-recruiting-inline) { top:4.65rem; }
-                        .plyr-top-account-dock.is-recruiting-inline { position:static !important; inset:auto !important; z-index:80; display:inline-flex; flex:0 0 auto; margin-left:.45rem; vertical-align:middle; }
-                        .plyr-top-account-dock.is-recruiting-inline .plyr-global-dark-toggle { display:none !important; }
-                        .plyr-top-account-dock.is-recruiting-inline .plyr-top-profile-trigger { width:2.9rem; height:2.9rem; min-width:2.9rem; }
+                        .plyr-top-account-dock { position:fixed; top:1.6rem; right:1.45rem; z-index:950; display:flex; align-items:center; justify-content:flex-end; gap:.55rem; pointer-events:auto; }
+                        body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.8rem; }
+                        html body .rc-livewire-root .rc-home-dark-toggle-v2,
+                        html body .rc-livewire-root .rc-home-icon-btn[aria-label*="Theme" i] { display:none !important; }
                         html body .rc-livewire-root .rc-home-actions-v2,
+                        html body .rc-livewire-root .rc-home-actions,
                         html body .rc-livewire-root .rc-global-search-bar,
-                        html body .rc-livewire-root .rc-discover-actions-v29 { min-width:0 !important; }
+                        html body .rc-livewire-root .rc-discover-actions-v29 { min-width:0 !important; padding-right:7.2rem !important; box-sizing:border-box !important; }
                         html body .rc-livewire-root .rc-home-search-v2,
+                        html body .rc-livewire-root .rc-home-search,
                         html body .rc-livewire-root .rc-global-search-shell,
                         html body .rc-livewire-root .rc-discover-program-search-v27 { min-width:0 !important; max-width:100% !important; }
                         .plyr-global-dark-toggle,
@@ -1356,10 +1356,12 @@ class AdminPanelProvider extends PanelProvider
                         .rc-account-impersonation-bar { position:relative !important; z-index:1000 !important; }
                         .rc-account-impersonation-bar * { pointer-events:auto !important; }
                         @media(max-width:640px){
-                            .plyr-top-account-dock:not(.is-recruiting-inline) { top:.8rem; right:.8rem; }
-                            body:has(.rc-account-impersonation-bar) .plyr-top-account-dock:not(.is-recruiting-inline) { top:4.3rem; }
-                            .plyr-top-account-dock.is-recruiting-inline { margin-left:.3rem; }
-                            .plyr-top-account-dock.is-recruiting-inline .plyr-top-profile-trigger { width:2.65rem; height:2.65rem; min-width:2.65rem; }
+                            .plyr-top-account-dock { top:.8rem; right:.8rem; }
+                            body:has(.rc-account-impersonation-bar) .plyr-top-account-dock { top:4.3rem; }
+                            html body .rc-livewire-root .rc-home-actions-v2,
+                            html body .rc-livewire-root .rc-home-actions,
+                            html body .rc-livewire-root .rc-global-search-bar,
+                            html body .rc-livewire-root .rc-discover-actions-v29 { padding-right:6.4rem !important; }
                             .plyr-top-profile-menu { position:fixed; top:4.5rem; right:.75rem; width:min(19rem,calc(100vw - 1.5rem)); }
                         }
                     </style>
@@ -2182,27 +2184,9 @@ class AdminPanelProvider extends PanelProvider
                                 });
 
                                 let plyrAccountMountFrame = null;
-                                function visibleRecruitingDarkToggle() {
-                                    const root = document.querySelector('.rc-livewire-root');
-                                    if (! root) return null;
-                                    return Array.from(root.querySelectorAll('.rc-home-dark-toggle-v2[data-plyr-dark-toggle]')).find(function (button) {
-                                        const style = window.getComputedStyle(button);
-                                        const rect = button.getBoundingClientRect();
-                                        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
-                                    }) || null;
-                                }
-
                                 function mountPlyrAccountDock() {
                                     const dock = document.getElementById('plyr-top-account-dock');
                                     if (! dock) return;
-                                    const nativeDark = visibleRecruitingDarkToggle();
-                                    if (nativeDark && nativeDark.parentElement) {
-                                        dock.classList.add('is-recruiting-inline');
-                                        if (dock.previousElementSibling !== nativeDark || dock.parentElement !== nativeDark.parentElement) {
-                                            nativeDark.insertAdjacentElement('afterend', dock);
-                                        }
-                                        return;
-                                    }
                                     dock.classList.remove('is-recruiting-inline');
                                     if (dock.parentElement !== document.body) document.body.appendChild(dock);
                                 }
