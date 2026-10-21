@@ -16,10 +16,10 @@ class CreditPointService
         $configured = (array) config('plyrcard-points.catalog', []);
 
         $defaults = [
-            'graphic' => ['name' => 'Social graphic', 'points' => 20, 'description' => 'One social graphic.'],
-            'reel' => ['name' => 'Highlight reel', 'points' => 50, 'description' => 'One highlight reel, up to 2 minutes.'],
-            'outreach' => ['name' => 'Coach outreach campaign', 'points' => 30, 'description' => 'One outreach campaign to up to 25 coaches.'],
-            'production_hour' => ['name' => 'Production hour', 'points' => 25, 'description' => 'One shoot or editing hour.'],
+            'graphic' => ['name' => 'Social graphic', 'points' => 50, 'description' => 'One social graphic.'],
+            'reel' => ['name' => 'Highlight reel', 'points' => 90, 'description' => 'One highlight reel, up to 2 minutes.'],
+            'outreach' => ['name' => 'Coach outreach campaign', 'points' => 80, 'description' => 'One outreach campaign to up to 25 coaches.'],
+            'production_hour' => ['name' => 'Production hour', 'points' => 50, 'description' => 'One shoot or editing hour.'],
             'photo_batch' => ['name' => 'Photo retouch batch', 'points' => 15, 'description' => 'One photo retouch batch.'],
             'site_refresh' => ['name' => 'Profile site refresh', 'points' => 15, 'description' => 'One profile-site refresh.'],
             'film_breakdown' => ['name' => 'Match film breakdown', 'points' => 35, 'description' => 'One match-film breakdown.'],
@@ -42,7 +42,7 @@ class CreditPointService
         $item = $catalog[$itemKey] ?? null;
 
         if (! $item) {
-            throw ValidationException::withMessages(['item_key' => 'That service is not available.']);
+            throw ValidationException::withMessages(['item_key' => 'That point service is not available.']);
         }
 
         $quantity = max(1, min(20, $quantity));
@@ -97,8 +97,8 @@ class CreditPointService
         // been deployed yet. These values match the product UI and checkout copy.
         if ($configured === null) {
             $configured = match ($package) {
-                'jumpstart' => 100,
-                'amplify' => 600,
+                'jumpstart' => 320,
+                'amplify' => 1280,
                 default => 0,
             };
         }
@@ -138,32 +138,6 @@ class CreditPointService
             ],
         );
     }
-    public function grantTopUp(User $user, int $points, string $packKey, string $sourceId, array $meta = []): CreditPointTransaction
-    {
-        $packKey = strtolower(trim($packKey));
-        $sourceId = trim($sourceId);
-        if ($points <= 0 || $sourceId === '') {
-            throw ValidationException::withMessages(['points' => 'A valid point pack and payment source are required.']);
-        }
-        if (! Schema::hasTable('credit_point_transactions') || ! Schema::hasColumn('users', 'points_available')) {
-            throw ValidationException::withMessages(['points' => 'The points ledger is not installed.']);
-        }
-        return $this->write(
-            user: $user,
-            type: 'grant',
-            points: $points,
-            idempotencyKey: 'point-pack:' . $packKey . ':' . $sourceId,
-            attributes: [
-                'grant_id' => 'point-pack:' . $packKey . ':' . $sourceId,
-                'source_type' => 'top_up_purchase',
-                'source_id' => $sourceId,
-                'reason' => number_format($points) . ' point pack purchase',
-                'actor' => 'system',
-                'meta' => array_merge(['package' => $packKey, 'point_pack' => true], $meta),
-            ],
-        );
-    }
-
     public function hasPackageGrant(User $user, string $package, string $sourceId): bool
     {
         $package = strtolower(trim($package));
@@ -279,7 +253,7 @@ class CreditPointService
             $delta = $this->deltaFor($type, $points, (array) ($attributes['meta'] ?? []));
             $next = (int) $locked->points_available + $delta;
             if ($next < 0) {
-                throw ValidationException::withMessages(['credits' => 'Not enough available points for this request.']);
+                throw ValidationException::withMessages(['credits' => 'Not enough available credit points for this request.']);
             }
             $row = CreditPointTransaction::query()->create(array_merge([
                 'user_id' => $locked->getKey(),
@@ -300,7 +274,7 @@ class CreditPointService
             'grant', 'release', 'refund' => $points,
             'hold', 'debit' => -$points,
             'adjust' => ((int) ($meta['adjust_sign'] ?? 1) < 0 ? -1 : 1) * $points,
-            default => throw ValidationException::withMessages(['type' => 'Unsupported point transaction type.']),
+            default => throw ValidationException::withMessages(['type' => 'Unsupported credit transaction type.']),
         };
     }
     protected function signedDelta(CreditPointTransaction $row): int

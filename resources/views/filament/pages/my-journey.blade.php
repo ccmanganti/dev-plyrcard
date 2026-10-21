@@ -8,6 +8,35 @@
         $serviceCatalog = collect(app(\App\Services\CreditPointService::class)->catalog())->values();
         $pointWorth = $serviceCatalog->map(fn (array $service): array => array_merge($service, ['count_for_balance' => intdiv(max(0, $pointBalance), max(1, (int) ($service['points'] ?? 0)))]));
         $money = fn (int $cents) => '$' . number_format($cents / 100, $cents % 100 === 0 ? 0 : 2);
+        $jumpstartPlan = collect($plans)->firstWhere('key', 'jumpstart');
+        $amplifyPlan = collect($plans)->firstWhere('key', 'amplify');
+        $pointHistory = collect();
+        if (auth()->check() && \Illuminate\Support\Facades\Schema::hasTable('credit_point_transactions')) {
+            $historyRequests = \Illuminate\Support\Facades\Schema::hasTable('credit_service_requests')
+                ? \App\Models\CreditServiceRequest::query()->where('user_id', auth()->id())->latest('id')->limit(50)->get()->keyBy(fn ($request) => (string) $request->getKey())
+                : collect();
+            $pointHistory = \App\Models\CreditPointTransaction::query()->where('user_id', auth()->id())->latest('id')->limit(12)->get()->map(function ($row) use ($historyRequests) {
+                $meta = (array) ($row->meta ?? []);
+                $sign = in_array($row->type, ['grant', 'refund', 'release'], true) ? 1 : (in_array($row->type, ['debit', 'hold'], true) ? -1 : ((int) ($meta['adjust_sign'] ?? 1) < 0 ? -1 : 1));
+                $request = $row->source_type === 'service_request' ? $historyRequests->get((string) $row->source_id) : null;
+                $status = match (true) {
+                    $request !== null => $request->statusLabel(),
+                    in_array($row->source_type, ['package_purchase', 'top_up_purchase'], true) => 'Added',
+                    $row->type === 'refund' || $row->type === 'release' => 'Returned',
+                    $row->type === 'adjust' => 'Adjusted',
+                    $row->type === 'hold' => 'Reserved',
+                    $row->type === 'debit' => 'Used',
+                    default => ucfirst(str_replace('_', ' ', (string) $row->type)),
+                };
+                return [
+                    'date' => optional($row->created_at)->format('M j, Y') ?: '—',
+                    'item' => trim((string) ($row->reason ?: data_get($meta, 'item_name', 'PLYRCARD points activity'))),
+                    'amount' => ($sign > 0 ? '+' : '−') . number_format((int) $row->points),
+                    'positive' => $sign > 0,
+                    'status' => $status,
+                ];
+            })->values();
+        }
         function mjIcon($name) {
             return match ($name) {
                 'user' => '<svg xmlns="http://www\.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.118a7.5 7.5 0 0 1 15 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.5-1.632Z" /></svg>',
@@ -611,14 +640,20 @@
         .mj-worth-item span { display: block; margin-top: .22rem; color: var(--mj-muted); font-size: .73rem; line-height: 1.4; }
         .mj-point-packs { margin-top: 1.25rem; border: 1px solid var(--mj-border); border-radius: 20px; background: var(--mj-panel); box-shadow: var(--mj-shadow-soft); padding: 1.25rem; }
         .dark .mj-point-packs { background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%); box-shadow: var(--mj-shadow); }
-        .mj-pack-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-top: .9rem; }
-        .mj-pack { display: grid; gap: .45rem; min-width: 0; padding: 1rem; border: 1px solid var(--mj-border); border-radius: 14px; background: var(--mj-panel-2); }
+        .mj-pack-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; margin-top: .9rem; }
+        .mj-pack { display: grid; gap: .45rem; min-width: 0; padding: 1rem; border: 1px solid var(--mj-border); border-radius: 14px; background: var(--mj-panel-2); } .mj-pack.is-package{background:var(--mj-panel);border-color:var(--mj-border-strong)} .mj-pack.is-featured{background:var(--mj-orange-soft);border:2px solid var(--mj-orange)} .mj-pack-badge{display:inline-flex;width:max-content;padding:.2rem .5rem;border-radius:999px;background:var(--mj-orange);color:#fff;font-size:.62rem;font-weight:850;text-transform:uppercase;letter-spacing:.06em}
         .mj-pack strong { color: var(--mj-orange); font-size: 1.8rem; line-height: 1; }
         .mj-pack-price { color: var(--mj-heading); font-size: .92rem; font-weight: 800; }
         .mj-pack-note { color: var(--mj-muted); font-size: .74rem; line-height: 1.42; min-height: 2.1em; }
         .mj-pack .mj-btn { margin-top: .35rem; }
         .mj-point-gate { margin-top: .9rem; padding: .9rem 1rem; border-radius: 12px; border: 1px solid rgba(255, 99, 56, .18); background: var(--mj-orange-soft); color: var(--mj-muted); font-size: .82rem; line-height: 1.5; }
-        @media (max-width: 980px) { .mj-points-overview { grid-template-columns: 1fr; } .mj-pack-grid { grid-template-columns: 1fr; } }
+        .mj-point-history { margin-top:1.25rem; border:1px solid var(--mj-border); border-radius:20px; background:var(--mj-panel); box-shadow:var(--mj-shadow-soft); padding:1.25rem; }
+        .mj-history-row { display:grid; grid-template-columns:7rem minmax(0,1fr) 7rem 8rem; gap:.75rem; align-items:center; padding:.72rem 0; border-bottom:1px solid var(--mj-border); font-size:.78rem; }
+        .mj-history-row.is-head { color:var(--mj-muted); font-size:.65rem; font-weight:850; letter-spacing:.07em; text-transform:uppercase; }
+        .mj-history-amount { font-weight:850; }.mj-history-amount.is-add { color:var(--mj-orange); }
+        .mj-history-status { display:inline-flex; width:max-content; padding:.27rem .55rem; border-radius:999px; background:var(--mj-panel-2); font-size:.68rem; font-weight:800; }
+        .mj-history-status[data-status*="Completed"],.mj-history-status[data-status="Added"]{background:rgba(16,185,129,.1);color:#15803d}.mj-history-status[data-status*="Progress"],.mj-history-status[data-status="Reviewed"],.mj-history-status[data-status="Submitted"]{background:rgba(255,99,56,.1);color:#c2410c}.mj-history-status[data-status="Declined"]{background:rgba(239,68,68,.1);color:#b42318}.mj-history-status[data-status="Returned"],.mj-history-status[data-status="Adjusted"]{background:rgba(59,130,246,.1);color:#1d4ed8}
+        @media (max-width: 1180px) { .mj-pack-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } } @media (max-width: 980px) { .mj-points-overview { grid-template-columns: 1fr; } } @media (max-width: 640px) { .mj-pack-grid { grid-template-columns: 1fr; } .mj-history-row{grid-template-columns:5.5rem minmax(0,1fr) 4.5rem}.mj-history-row>div:last-child{grid-column:2/-1} }
         @media (max-width: 640px) { .mj-worth-grid { grid-template-columns: 1fr; } .mj-points-actions .mj-btn { width: 100%; } }
     </style>
     <div class="mj-wrap">
@@ -737,22 +772,51 @@
             @endforeach
         </section>
         <section class="mj-point-packs" id="buy-points">
-            <div class="mj-worth-head"><div><h2>Buy points</h2><p>Point packs are added after Stripe confirms payment. Jumpstart and Amplify keep their existing package behavior.</p></div></div>
-            @if ($hasJourney)
-                <div class="mj-pack-grid">
-                    @foreach ($pointPacks as $pack)
-                        <article class="mj-pack">
-                            <div class="mj-points-kicker">Point Pack</div>
-                            <strong>{{ number_format((int) $pack['points']) }} PTS</strong>
-                            <div class="mj-pack-price">{{ $money((int) $pack['price_cents']) }}</div>
-                            <div class="mj-pack-note">{{ $pack['note'] ?? 'Add points to your PLYRCARD balance.' }}</div>
-                            <button type="button" class="mj-btn ghost" data-plyrcard-point-pack-open="{{ $pack['key'] }}">Buy Points</button>
-                        </article>
-                    @endforeach
-                </div>
-            @else
-                <div class="mj-point-gate">Point packs become available once My Journey is active. You can still choose Jumpstart or Amplify above, including their existing point allocations.</div>
-            @endif
+            <div class="mj-worth-head"><div><h2>Buy points</h2><p>Points land after Stripe confirms payment and do not expire.</p></div></div>
+            <div class="mj-pack-grid">
+                @foreach ($pointPacks as $pack)
+                    <article class="mj-pack">
+                        <div class="mj-points-kicker">Point Pack</div>
+                        <strong>{{ number_format((int) $pack['points']) }} PTS</strong>
+                        <div class="mj-pack-price">for {{ $money((int) $pack['price_cents']) }}</div>
+                        <div class="mj-pack-note">{{ $pack['note'] ?? 'Add points to your PLYRCARD balance.' }}</div>
+                        @if ($hasJourney)
+                            <button type="button" class="mj-btn ghost" data-plyrcard-point-pack-open="{{ $pack['key'] }}">Buy</button>
+                        @else
+                            <a href="#" class="mj-btn disabled" aria-disabled="true" onclick="return false;">My Journey required</a>
+                        @endif
+                    </article>
+                @endforeach
+                @if ($jumpstartPlan)
+                    <article class="mj-pack is-package">
+                        <div class="mj-points-kicker">Jumpstart</div>
+                        <strong>{{ number_format((int) ($jumpstartPlan['points'] ?? 0)) }} PTS</strong>
+                        <div class="mj-pack-price">{{ $jumpstartPlan['price'] }}</div>
+                        <div class="mj-pack-note">One-time recruiting service extension. My Journey remains the base plan.</div>
+                        <button type="button" class="mj-btn ghost" data-plyrcard-jumpstart-open>Add Jumpstart</button>
+                    </article>
+                @endif
+                @if ($amplifyPlan)
+                    <article class="mj-pack is-package is-featured">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem"><div class="mj-points-kicker" style="color:var(--mj-orange)">Amplify</div><span class="mj-pack-badge">Best Value</span></div>
+                        <strong>{{ number_format((int) ($amplifyPlan['points'] ?? 0)) }} PTS</strong>
+                        <div class="mj-pack-price">{{ $amplifyPlan['price'] }}</div>
+                        <div class="mj-pack-note">Larger one-time done-for-you recruiting push. My Journey remains your subscription.</div>
+                        <button type="button" class="mj-btn orange" data-plyrcard-amplify-open>Add Amplify</button>
+                    </article>
+                @endif
+            </div>
+        </section>
+        <section class="mj-point-history">
+            <div class="mj-worth-head"><div><h2>Points history</h2><p>Most recent first. Service requests keep their live fulfillment status.</p></div></div>
+            <div style="margin-top:.75rem">
+                <div class="mj-history-row is-head"><div>Date</div><div>Item</div><div>Points</div><div>Status</div></div>
+                @forelse($pointHistory as $entry)
+                    <div class="mj-history-row"><div style="color:var(--mj-muted)">{{ $entry['date'] }}</div><div style="font-weight:700">{{ $entry['item'] }}</div><div class="mj-history-amount {{ $entry['positive'] ? 'is-add' : '' }}">{{ $entry['amount'] }}</div><div><span class="mj-history-status" data-status="{{ $entry['status'] }}">{{ $entry['status'] }}</span></div></div>
+                @empty
+                    <div style="padding:1rem 0;color:var(--mj-muted);font-size:.82rem">No points activity yet.</div>
+                @endforelse
+            </div>
         </section>
         @if ($this->shouldShowAddons())
             <section class="mj-addon-wrap">

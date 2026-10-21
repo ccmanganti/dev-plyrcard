@@ -1,5 +1,6 @@
 <?php
 namespace App\Filament\Pages;
+use App\Services\CreditPointService;
 use BackedEnum;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Auth;
@@ -128,6 +129,9 @@ class MyJourney extends Page
         $currentPlan = $this->getCurrentPlanKey();
         $amplifyActive = $this->hasAmplifyAccess();
         $jumpstartActive = $this->hasJumpstartAccess();
+        $pointService = app(CreditPointService::class);
+        $jumpstartPoints = $pointService->packagePoints('jumpstart');
+        $amplifyPoints = $pointService->packagePoints('amplify');
         $journeyCents = (int) config('plyrcard-registration.plans.my-journey.recurring_amount_cents', 4900);
         $jumpstartCents = (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900);
         $amplifyCents = (int) config('plyrcard-registration.plans.amplify.setup_fee_cents', 50000);
@@ -193,16 +197,17 @@ class MyJourney extends Page
             [
                 'key' => 'jumpstart',
                 'name' => 'JUMPSTART',
+                'points' => $jumpstartPoints,
                 'price' => $money($jumpstartCents),
                 'suffix' => 'one time',
                 'setup' => $hasMyJourney
                     ? $money($jumpstartCents) . ' Jumpstart service · My Journey stays active'
                     : $money($jumpstartCents) . ' Jumpstart + ' . $money($journeyCents) . ' first My Journey month',
-                'tagline' => '100 pooled PLYRCARD points to spend on the recruiting work you need most.',
+                'tagline' => number_format($jumpstartPoints) . ' pooled PLYRCARD points to spend on the recruiting work you need most.',
                 'accent' => 'blue',
                 'popular' => false,
                 'badge' => null,
-                'button' => $jumpstartActive ? 'BUY 100 MORE POINTS' : 'GET JUMPSTART',
+                'button' => $jumpstartActive ? 'BUY ' . number_format($jumpstartPoints) . ' MORE POINTS' : 'GET JUMPSTART',
                 'button_href' => '#',
                 'opens_jumpstart_checkout' => true,
                 'button_style' => 'blue',
@@ -211,7 +216,7 @@ class MyJourney extends Page
                 'current' => false,
                 'active_addon' => $jumpstartActive,
                 'features' => [
-                    ['text' => '100 pooled PLYRCARD points', 'included' => true],
+                    ['text' => number_format($jumpstartPoints) . ' pooled PLYRCARD points', 'included' => true],
                     ['text' => 'Spend on graphics, reels, outreach, production hours, and supported add-ons', 'included' => true],
                     ['text' => 'Points do not expire', 'included' => true],
                     ['text' => 'My Journey membership included / required', 'included' => true],
@@ -223,16 +228,17 @@ class MyJourney extends Page
             [
                 'key' => 'amplify',
                 'name' => 'AMPLIFY',
+                'points' => $amplifyPoints,
                 'price' => $money($amplifyCents),
                 'suffix' => 'one time',
                 'setup' => $hasMyJourney
                     ? $money($amplifyCents) . ' Amplify service · My Journey stays active'
                     : $money($amplifyCents) . ' Amplify + ' . $money($journeyCents) . ' first My Journey month',
-                'tagline' => '600 pooled PLYRCARD points for a larger done-for-you recruiting push.',
+                'tagline' => number_format($amplifyPoints) . ' pooled PLYRCARD points for a larger done-for-you recruiting push.',
                 'accent' => 'gold',
                 'popular' => true,
                 'badge' => 'Done For You',
-                'button' => $amplifyActive ? 'BUY 600 MORE POINTS' : ($hasMyJourney ? 'BUY AMPLIFY POINTS' : 'GET AMPLIFY'),
+                'button' => $amplifyActive ? 'BUY ' . number_format($amplifyPoints) . ' MORE POINTS' : ($hasMyJourney ? 'BUY AMPLIFY POINTS' : 'GET AMPLIFY'),
                 'button_href' => '#',
                 'opens_my_journey_checkout' => false,
                 'opens_amplify_checkout' => true,
@@ -242,12 +248,12 @@ class MyJourney extends Page
                 'current' => false,
                 'active_addon' => $amplifyActive,
                 'features' => [
-                    ['text' => '600 pooled PLYRCARD points', 'included' => true],
+                    ['text' => number_format($amplifyPoints) . ' pooled PLYRCARD points', 'included' => true],
                     ['text' => 'Use points across reels, graphics, outreach, production hours, and supported add-ons', 'included' => true],
                     ['text' => 'Points do not expire', 'included' => true],
                     ['text' => 'Full onboarding and account setup', 'included' => true],
                 ],
-                'note' => 'Amplify is a one-time 600-point purchase. It does not replace My Journey, and unused points do not expire.',
+                'note' => 'Amplify is a one-time ' . number_format($amplifyPoints) . '-point purchase. It does not replace My Journey, and unused points do not expire.',
             ],
         ];
     }
