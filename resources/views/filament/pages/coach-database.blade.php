@@ -6556,66 +6556,6 @@ discoverSelectedIds: [],
         @if($error)
             <div class="rc-card"><strong>{{ $error }}</strong></div>
         @endif
-        <style>
-            .rc-recruiting-header-v134{display:grid;grid-template-columns:minmax(0,1fr) minmax(26rem,40rem) auto auto;gap:.7rem;align-items:center;margin:0 0 1rem;position:relative;z-index:80}
-            .rc-recruiting-header-copy-v134{min-width:0}.rc-recruiting-header-copy-v134 h1{margin:0;color:var(--rc-text);font-size:clamp(1.65rem,2.2vw,2.2rem);line-height:1.08;font-weight:800;letter-spacing:-.035em}.rc-recruiting-header-copy-v134 p{margin:.32rem 0 0;color:var(--rc-muted);font-size:.9rem}
-            .rc-recruiting-search-v134{position:relative;min-width:0;height:2.85rem;border:1px solid var(--rc-border);background:var(--rc-surface);border-radius:.9rem;display:flex;align-items:center;gap:.55rem;padding:0 .78rem;box-shadow:0 10px 24px rgba(15,23,42,.045)}
-            .rc-recruiting-search-v134>svg{width:1rem;height:1rem;color:var(--rc-muted);flex:0 0 auto}.rc-recruiting-search-v134>input{width:100%;min-width:0;border:0!important;outline:0!important;background:transparent!important;box-shadow:none!important;color:var(--rc-text);font-size:.86rem;padding:0!important}.rc-recruiting-search-v134 kbd{border:1px solid var(--rc-border);border-radius:.42rem;background:var(--rc-soft);padding:.15rem .42rem;color:var(--rc-muted);font-size:.64rem;white-space:nowrap}
-            .rc-recruiting-search-v134 .rc-global-suggestions{top:calc(100% + .4rem);left:0;right:0;z-index:140}
-            .rc-recruiting-header-v134 .plyr-global-dark-toggle,.rc-recruiting-header-v134 .plyr-top-profile-trigger{width:2.85rem;height:2.85rem;min-width:2.85rem}
-            .rc-recruiting-header-v134 .plyr-top-profile-wrap{position:relative}.rc-recruiting-header-v134 .plyr-top-profile-menu{z-index:170}
-            .rc-livewire-root .rc-home-topbar{display:none!important}.rc-livewire-root>.rc-wrap>.rc-global-search-bar,.rc-livewire-root .rc-wrap>div>.rc-global-search-bar{display:none!important}.rc-livewire-root .rc-global-search-bar>.rc-home-dark-toggle-v2,.rc-livewire-root .rc-home-actions .rc-home-icon-btn[aria-label*="Theme" i],.rc-livewire-root .rc-home-dark-toggle-v2{display:none!important}
-            @media(max-width:1100px){.rc-recruiting-header-v134{grid-template-columns:minmax(0,1fr) minmax(18rem,30rem) auto auto}}
-            @media(max-width:820px){.rc-recruiting-header-v134{grid-template-columns:minmax(0,1fr) auto auto}.rc-recruiting-header-copy-v134{grid-column:1/-1}.rc-recruiting-search-v134{grid-column:1/2}}
-            @media(max-width:620px){.rc-recruiting-header-v134{grid-template-columns:1fr auto auto}.rc-recruiting-search-v134{grid-column:1/2}.rc-recruiting-header-copy-v134 h1{font-size:1.55rem}.rc-recruiting-header-copy-v134 p{font-size:.8rem}.rc-recruiting-search-v134 kbd{display:none}}
-        </style>
-        <header class="rc-recruiting-header-v134" x-data="{ profileOpen:false, closeTimer:null, show(){clearTimeout(this.closeTimer);this.profileOpen=true}, hide(){clearTimeout(this.closeTimer);this.closeTimer=setTimeout(()=>this.profileOpen=false,180)} }" x-on:keydown.escape.window="profileOpen=false">
-            <div class="rc-recruiting-header-copy-v134">
-                <h1>Welcome back, {{ $firstName }} <span aria-hidden="true">👋</span></h1>
-                <p>Here's what's happening with your recruiting journey.</p>
-            </div>
-            <div class="rc-recruiting-search-v134" role="search" aria-label="Global Recruiting Center search">
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                <input type="search" placeholder="Search schools, coaches, conferences, divisions, lists..." wire:model.live.debounce.300ms="search">
-                <kbd>Enter</kbd>
-                @if($search !== '')
-                    <div class="rc-global-suggestions">
-                        @if($globalSearchHasSuggestions)
-                            @foreach($globalSearchGroups as $groupKey => $groupLabel)
-                                @if(! empty($globalSearchSuggestions[$groupKey] ?? []))
-                                    <div class="rc-global-suggestion-group">
-                                        <div class="rc-global-suggestion-heading">{{ $groupLabel }}</div>
-                                        @foreach($globalSearchSuggestions[$groupKey] as $suggestion)
-                                            <button type="button" class="rc-global-suggestion-item" wire:click="selectGlobalSearchSuggestion(@js($suggestion['type']), @js($suggestion['value']), @js($suggestion['id']))">
-                                                <span class="rc-global-suggestion-icon">@if(! empty($suggestion['logo_url']))<img src="{{ $suggestion['logo_url'] }}" alt="" onerror="this.style.display='none';this.parentElement.textContent='{{ $globalSearchInitials($suggestion['label'] ?? '') }}';">@else{{ $globalSearchInitials($suggestion['label'] ?? '') }}@endif</span>
-                                                <span class="rc-global-suggestion-copy"><strong>{{ $suggestion['label'] }}</strong><small>{{ $suggestion['detail'] ?: $suggestion['category'] }}</small></span>
-                                                <span class="rc-global-suggestion-category">{{ $suggestion['category'] }}</span>
-                                            </button>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            @endforeach
-                        @else
-                            <div class="rc-global-search-empty">No matching schools, coaches, conferences, divisions, or student lists yet.</div>
-                        @endif
-                    </div>
-                @endif
-            </div>
-            <button type="button" class="plyr-global-dark-toggle" data-plyr-dark-toggle aria-label="Toggle dark mode" aria-pressed="false">
-                <svg class="plyr-theme-icon-moon" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 14.35A8.5 8.5 0 0 1 9.65 3A8.75 8.75 0 1 0 21 14.35Z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                <svg class="plyr-theme-icon-sun" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z" stroke="currentColor" stroke-width="1.9"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M19.07 4.93l-1.41 1.41M6.34 17.66l-1.41 1.41M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
-            </button>
-            <div class="plyr-top-profile-wrap" x-on:mouseenter="show()" x-on:mouseleave="hide()">
-                <button type="button" class="plyr-top-profile-trigger" @click="profileOpen=!profileOpen" aria-label="Open profile menu" x-bind:aria-expanded="profileOpen?'true':'false'"><span class="plyr-top-profile-avatar"><img src="{{ $headerAvatarUrl }}" alt="{{ $headerName }}"></span></button>
-                <div class="plyr-top-profile-menu" x-show="profileOpen" x-cloak x-transition.opacity.scale.origin.top.right @click.outside="profileOpen=false" x-on:mouseenter="show()" x-on:mouseleave="hide()">
-                    <div class="plyr-top-profile-user"><span class="plyr-top-profile-avatar"><img src="{{ $headerAvatarUrl }}" alt="{{ $headerName }}"></span><span class="plyr-top-profile-user-copy"><strong>{{ $headerName }}</strong><span>{{ $headerPlanLabel }}</span></span></div>
-                    <div class="plyr-top-profile-section"><div class="plyr-top-profile-dual-actions"><a href="{{ $headerEditProfileUrl }}" class="plyr-top-profile-pill is-ghost">Edit Profile</a><a href="{{ $headerSettingsUrl }}" class="plyr-top-profile-pill is-ghost">Settings</a></div></div>
-                    <div class="plyr-top-profile-section"><span class="plyr-top-profile-section-label">Points</span><div class="plyr-top-profile-summary-card"><div class="plyr-top-profile-summary-head"><strong>PLYRCARD Points</strong><a href="{{ url('/admin/coach-database/services') }}" class="plyr-top-profile-pill is-solid">Use Points</a></div><div class="plyr-top-profile-stat"><span>Available</span><strong>{{ number_format($headerPointBalance) }} points</strong></div><div class="plyr-top-profile-stat"><span>Recently Purchased</span><strong>{{ $headerRecentPurchase }}</strong></div></div></div>
-                    <div class="plyr-top-profile-section"><span class="plyr-top-profile-section-label">Plan</span><a href="{{ $headerManagePlanUrl }}" class="plyr-top-profile-action"><span class="plyr-top-profile-plan-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L5 13h6l-1 9l9-12h-6V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="plyr-top-profile-plan-copy"><strong>{{ $headerPlanLabel }}</strong><span>Manage Plan</span></span></a></div>
-                    <div class="plyr-top-profile-section"><form method="POST" action="{{ $headerLogoutUrl }}" style="margin:0;">@csrf<button type="submit" class="plyr-top-profile-action is-danger"><svg viewBox="0 0 24 24" fill="none"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign Out</span></button></form></div>
-                </div>
-            </div>
-        </header>
         @if($showAccountPreparationNotice ?? false)
             <div class="rc-plyrcard-preparing-banner-v129" role="status" wire:poll.10s="checkRecruitingAccountReadiness">
                 <div class="rc-plyrcard-preparing-icon-v129" aria-hidden="true">
