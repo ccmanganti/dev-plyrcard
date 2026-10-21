@@ -38,6 +38,74 @@ class PlyrcardSystemEmailService
         );
     }
 
+    public function sendPointsPurchased(User $user, int $points, string $label, int $amountCents = 0): array
+    {
+        $details = [
+            'Points added' => number_format($points),
+            'Purchase' => $label,
+            'New balance' => number_format((int) ($user->fresh()->points_available ?? $user->points_available ?? 0)) . ' points',
+        ];
+        if ($amountCents > 0) $details['Amount'] = '$' . number_format($amountCents / 100, 2);
+        return $this->sendAccountActionNotice(
+            $user,
+            'Your PLYRCARD points are ready',
+            'Points added',
+            'Thanks for your purchase. Your points are now available to use on PLYRCARD services.',
+            $details,
+            'Open Services',
+            rtrim($this->dashboardUrl(), '/') . '/coach-database/services',
+            'points_purchase',
+        );
+    }
+
+    public function sendMyJourneyUpgraded(User $user): array
+    {
+        return $this->sendAccountActionNotice(
+            $user,
+            'My Journey is active',
+            'Upgrade complete',
+            'Your My Journey subscription is active. You now have access to the recruiting workspace and eligible PLYRCARD services.',
+            ['Plan' => 'My Journey', 'Status' => 'Active'],
+            'Open PLYRCARD',
+            $this->dashboardUrl(),
+            'my_journey_upgrade',
+        );
+    }
+
+    public function sendDowngradeRequested(User $user): array
+    {
+        return $this->sendAccountActionNotice(
+            $user,
+            'Your downgrade request was received',
+            'Downgrade requested',
+            'Your My Journey cancellation request was received. Your paid access stays active through the current billing period. Purchased points do not expire.',
+            ['Current plan' => 'My Journey', 'Requested plan' => 'Free', 'Status' => 'Pending end of billing period'],
+            'Manage Plan',
+            rtrim($this->dashboardUrl(), '/') . '/my-journey',
+            'downgrade_requested',
+        );
+    }
+
+    public function sendServiceRequestSubmitted(User $user, array $services, int $totalPoints): array
+    {
+        $serviceLabel = collect($services)->filter()->implode(', ');
+        return $this->sendAccountActionNotice(
+            $user,
+            'Your PLYRCARD service request was submitted',
+            'Service request submitted',
+            'We received your request. You can track its status and download completed files from Services → Request History.',
+            [
+                'Services' => $serviceLabel !== '' ? $serviceLabel : 'PLYRCARD service request',
+                'Points used' => number_format($totalPoints),
+                'Remaining balance' => number_format((int) ($user->fresh()->points_available ?? $user->points_available ?? 0)) . ' points',
+                'Status' => 'Submitted',
+            ],
+            'View Request History',
+            rtrim($this->dashboardUrl(), '/') . '/coach-database/services',
+            'service_request_submitted',
+        );
+    }
+
     /**
      * Backwards-compatible alias for older callers. Registration email
      * verification is no longer part of the signup experience; even if an old
@@ -177,6 +245,28 @@ class PlyrcardSystemEmailService
             html: $html,
             purpose: 'native_mail_test',
         );
+    }
+
+    protected function sendAccountActionNotice(
+        User $user,
+        string $subject,
+        string $label,
+        string $message,
+        array $details,
+        string $actionLabel,
+        string $actionUrl,
+        string $purpose,
+    ): array {
+        $recipient = $this->recipientFor($user);
+        if (! $recipient) return ['success' => false, 'error' => 'The player does not have a valid email address.'];
+        $firstName = $this->escape((string) ($user->first_name ?: 'Player'));
+        $rows = '';
+        foreach ($details as $key => $value) {
+            $rows .= '<tr><td style="padding:8px 0;color:#868E99;font-size:13px;width:145px;vertical-align:top">' . $this->escape((string) $key) . '</td><td style="padding:8px 0;color:#F2F0ED;font-size:14px;font-weight:700">' . $this->escape((string) $value) . '</td></tr>';
+        }
+        $safeUrl = $this->escape($actionUrl);
+        $html = '<!doctype html><html><body style="margin:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,Helvetica,sans-serif"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#0C0E11"><tr><td align="center" style="padding:32px 12px"><table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px"><tr><td style="padding:0 34px 22px;font-size:19px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></td></tr><tr><td bgcolor="#131619" style="background:#131619;border:1px solid #1E242A;border-radius:14px"><table role="presentation" width="100%"><tr><td style="padding:38px 34px 0"><div style="font-family:Courier New,monospace;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#FF5A3C">' . $this->escape($label) . '</div><h1 style="margin:12px 0 0;font-size:31px;line-height:1.12;color:#F2F0ED">Hi ' . $firstName . '.</h1><p style="margin:14px 0 0;font-size:15px;line-height:1.65;color:#AAB0B7">' . $this->escape($message) . '</p></td></tr><tr><td style="padding:24px 34px 0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">' . $rows . '</table></td></tr><tr><td style="padding:26px 34px 34px"><a href="' . $safeUrl . '" style="display:inline-block;padding:14px 24px;background:#FF5A3C;border-radius:10px;color:#fff;text-decoration:none;font-weight:800">' . $this->escape($actionLabel) . '</a></td></tr></table></td></tr><tr><td align="center" style="padding:22px 34px 0;font-size:11.5px;color:#5E6670">PLYRCARD account notification<br>&copy; ' . now()->year . ' PLYRCARD.</td></tr></table></td></tr></table></body></html>';
+        return $this->sendHtml(user: $user, recipient: $recipient, subject: $subject, html: $html, purpose: $purpose);
     }
 
     protected function renderPasswordResetEmail(User $user, string $resetUrl, int $expiresInMinutes): string

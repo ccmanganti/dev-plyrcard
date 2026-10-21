@@ -103,7 +103,7 @@ class SupportAlertService
         $requests = collect($requests)->filter()->values();
 
         if ($requests->isEmpty()) {
-            return ['success' => false, 'sent' => 0, 'recipients' => [], 'error' => 'No credit service requests were provided for the admin alert.'];
+            return ['success' => false, 'sent' => 0, 'recipients' => [], 'error' => 'No service requests were provided for the admin alert.'];
         }
 
         $user->refresh();
@@ -119,7 +119,7 @@ class SupportAlertService
         $services = $requests->map(function ($request): string {
             $rush = $request->modifier === 'rush' ? ' (Rush)' : '';
             $line = '- ' . $request->item_name . ' × ' . number_format((int) $request->quantity)
-                . $rush . ' — ' . number_format((int) $request->points_spent) . ' credits';
+                . $rush . ' — ' . number_format((int) $request->points_spent) . ' points';
 
             $notes = trim((string) ($request->notes ?? ''));
             if ($notes !== '') {
@@ -132,24 +132,24 @@ class SupportAlertService
         $message = "Requested services and instructions:\n" . $services;
 
         $html = $this->layout(
-            heading: 'Credits used — service request submitted',
-            intro: 'A PLYRCARD player used credits and submitted services for fulfillment.',
+            heading: 'Points used — service request submitted',
+            intro: 'A PLYRCARD player used points and submitted services for fulfillment.',
             rows: [
                 'Player' => $name,
                 'Email' => $email ?: 'Not available',
                 'Services' => (string) $requests->count(),
-                'Credits used' => number_format($totalPoints),
-                'Remaining credits' => number_format((int) $user->points_available),
+                'Points used' => number_format($totalPoints),
+                'Remaining points' => number_format((int) $user->points_available),
                 'Batch' => $batchToken,
                 'Submitted' => optional($first->created_at)->format('M j, Y g:i A') ?: now()->format('M j, Y g:i A'),
             ],
             message: $message,
-            actionLabel: 'Open Credit Request',
+            actionLabel: 'Open Service Request',
             actionUrl: $adminUrl,
         );
 
         return $this->sendToAdmins(
-            '[PLYRCARD Credit Request] ' . $name . ' used ' . number_format($totalPoints) . ' credits',
+            '[PLYRCARD Service Request] ' . $name . ' used ' . number_format($totalPoints) . ' points',
             $html,
             $email,
             'credit_service_request',
@@ -467,6 +467,38 @@ class SupportAlertService
     }
 
 
+
+    public function sendPointPurchase(User $user, int $points, string $label, int $amountCents, array $context = []): array
+    {
+        $user->loadMissing('roles');
+        $name = trim(collect([$user->first_name, $user->last_name])->filter()->implode(' ')) ?: ($user->email ?: 'PLYRCARD player');
+        $email = $this->sanitizeEmail((string) $user->email);
+        $rows = [
+            'Player' => $name,
+            'Email' => $email ?: 'Not available',
+            'Purchase' => $label,
+            'Points added' => number_format($points),
+            'Current balance' => number_format((int) ($user->fresh()->points_available ?? $user->points_available ?? 0)) . ' points',
+            'User ID' => (string) $user->getKey(),
+            'Confirmed' => now()->format('M j, Y g:i A'),
+        ];
+        if ($amountCents > 0) $rows['Amount'] = '$' . number_format($amountCents / 100, 2);
+        $html = $this->layout(
+            heading: 'Player purchased points',
+            intro: 'A PLYRCARD player completed a point purchase.',
+            rows: $rows,
+            message: 'The points were added to the player ledger and are available for eligible PLYRCARD services.',
+            actionLabel: 'Open User Management',
+            actionUrl: rtrim((string) config('app.url'), '/') . '/admin/users/users',
+        );
+        return $this->sendToAdmins(
+            '[PLYRCARD Points] ' . $name . ' added ' . number_format($points) . ' points',
+            $html,
+            $email,
+            'points_purchase',
+            array_merge(['user_id' => $user->getKey(), 'points' => $points, 'label' => $label], $context),
+        );
+    }
 
     public function sendSupportReply(SupportTicket $ticket, string $reply): array
 

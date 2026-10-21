@@ -222,7 +222,7 @@ class StripeBillingService
             'customer' => $customerId,
             'payment_method_types' => ['card'],
             'metadata' => $meta,
-            'description' => 'PLYRCARD ' . ucfirst($planKey) . ' credit package',
+            'description' => 'PLYRCARD ' . ucfirst($planKey) . ' points package',
         ];
         if ($savedPaymentMethodId) {
             $intentParams['payment_method'] = $savedPaymentMethodId;
@@ -254,7 +254,7 @@ class StripeBillingService
                 'success' => true,
                 'completed' => true,
                 'used_saved_payment_method' => true,
-                'message' => ucfirst($planKey) . ' was charged to your saved card and the credits were added to your account.',
+                'message' => ucfirst($planKey) . ' was charged to your saved card and the points were added to your account.',
             ]);
         }
         return [
@@ -273,7 +273,7 @@ class StripeBillingService
             'requires_action' => $intentStatus === 'requires_action',
             'message' => $savedPaymentMethodId
                 ? 'Confirm the saved card charge if Stripe asks for additional verification.'
-                : 'Complete the one-time ' . ucfirst($planKey) . ' credit purchase below.',
+                : 'Complete the one-time ' . ucfirst($planKey) . ' points purchase below.',
         ];
     }
     public function upgradeStatus(User $user, string $planKey): array
@@ -299,8 +299,8 @@ class StripeBillingService
                         'success' => true,
                         'completed' => $completed,
                         'message' => $completed
-                            ? ucfirst($planKey) . ' credits were added to your account.'
-                            : ($stripeSucceeded ? 'Stripe payment succeeded. Finishing your credit grant…' : 'Waiting for Stripe payment confirmation…'),
+                            ? ucfirst($planKey) . ' points were added to your account.'
+                            : ($stripeSucceeded ? 'Stripe payment succeeded. Finishing your point grant…' : 'Waiting for Stripe payment confirmation…'),
                     ]);
                 } catch (\Throwable $exception) {
                     Log::info('Stripe one-time upgrade status refresh delayed.', [
@@ -336,7 +336,7 @@ class StripeBillingService
                             'completed' => true,
                             'message' => $planKey === 'my-journey'
                                 ? 'My Journey is active.'
-                                : ucfirst($planKey) . ' credits were added to your account.',
+                                : ucfirst($planKey) . ' points were added to your account.',
                         ]);
                     }
                 }
@@ -367,6 +367,140 @@ class StripeBillingService
             'completed' => $active,
             'message' => $active ? ucfirst(str_replace('-', ' ', $planKey)) . ' is active.' : 'Waiting for Stripe payment confirmation…',
         ]);
+    }
+    public function startPointPack(User $user, string $packKey): array
+    {
+        $this->assertConfigured();
+        $user->loadMissing('roles');
+        $packKey = strtolower(trim($packKey));
+        $pack = (array) config('plyrcard-point-packs.packs.' . $packKey, []);
+        $points = max(0, (int) ($pack['points'] ?? 0));
+        $amount = max(0, (int) ($pack['price_cents'] ?? 0));
+        if ($pack === [] || ! ($pack['enabled'] ?? true) || $points <= 0 || $amount <= 0) {
+            throw new RuntimeException('This point pack is not available.');
+        }
+        if (! method_exists($user, 'hasRole') || ! ($user->hasRole('My Journey') || $user->hasRole('my journey'))) {
+            throw new RuntimeException('Point packs are available to active My Journey members.');
+        }
+        $billing = BillingInformation::query()->firstOrCreate(
+            ['user_id' => $user->getKey()],
+            [
+                'billing_name' => trim((string) (($user->first_name ?? '') . ' ' . ($user->last_name ?? ''))),
+                'billing_email' => $user->email,
+                'billing_phone' => $user->phone,
+                'billing_address_1' => $user->street,
+                'billing_city' => $user->city,
+                'billing_state' => $user->state,
+                'billing_country' => $user->country ?: 'US',
+                'currency' => 'USD',
+            ],
+        );
+        $customerId = $this->ensureCustomer($user, $billing);
+        $savedPaymentMethodId = $this->resolveSavedPaymentMethodId($billing);
+        $meta = $this->metadata($user, $billing, 'point-pack-' . $packKey);
+        $meta['plyrcard_source'] = 'authenticated_point_pack';
+        $meta['plyrcard_charge_type'] = 'point_pack';
+        $meta['plyrcard_point_pack'] = $packKey;
+        $meta['plyrcard_point_amount'] = (string) $points;
+        $attempt = now()->format('YmdHis') . '-' . $user->getKey();
+        $intentParams = [
+            'amount' => $amount,
+            'currency' => strtolower((string) ($billing->currency ?: 'USD')),
+            'customer' => $customerId,
+            'payment_method_types' => ['card'],
+            'metadata' => $meta,
+            'description' => 'PLYRCARD ' . number_format($points) . ' point pack',
+        ];
+        if ($savedPaymentMethodId) {
+            $intentParams['payment_method'] = $savedPaymentMethodId;
+            $intentParams['confirm'] = 'true';
+            $intentParams['off_session'] = 'true';
+        } else {
+            $intentParams['setup_future_usage'] = 'off_session';
+        }
+        $intent = $this->post('/v1/payment_intents', $intentParams, 'plyrcard-point-pack-' . $packKey . '-' . $attempt);
+        $localMeta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
+        data_set($localMeta, 'stripe_point_pack.' . $packKey, [
+            'payment_intent_id' => $intent['id'] ?? null,
+            'started_at' => now()->toIso8601String(),
+            'amount_cents' => $amount,
+            'points' => $points,
+        ]);
+        $intentStatus = (string) ($intent['status'] ?? '');
+        $billing->forceFill([
+            'payment_provider' => 'stripe',
+            'payment_type' => 'card',
+            'payment_status' => $intentStatus === 'succeeded' ? 'paid' : 'payment_form_ready',
+            'stripe_customer_id' => $customerId,
+            'stripe_payment_intent_id' => $intent['id'] ?? $billing->stripe_payment_intent_id,
+            'registration_meta' => $localMeta,
+            'stripe_synced_at' => now(),
+        ])->save();
+        if ($intentStatus === 'succeeded') {
+            $this->handleOneTimePaymentSucceeded($billing->fresh(), $intent);
+            return array_merge($this->billingSummary($user), [
+                'success' => true,
+                'completed' => true,
+                'used_saved_payment_method' => true,
+                'points' => $points,
+                'message' => number_format($points) . ' points were charged to your saved card and added to your account.',
+            ]);
+        }
+        return [
+            'success' => true,
+            'completed' => false,
+            'client_secret' => $intent['client_secret'] ?? null,
+            'publishable_key' => (string) config('services.stripe.key'),
+            'payment_intent_id' => $intent['id'] ?? null,
+            'expected_amount_cents' => $amount,
+            'amount_due_cents' => $amount,
+            'currency' => strtolower((string) ($billing->currency ?: 'USD')),
+            'checkout_mode' => 'point_pack',
+            'points' => $points,
+            'saved_payment_method' => (bool) $savedPaymentMethodId,
+            'saved_payment_method_id' => $savedPaymentMethodId,
+            'saved_card' => $this->savedCardPayload($billing->fresh()),
+            'requires_action' => $intentStatus === 'requires_action',
+            'message' => $savedPaymentMethodId
+                ? 'Confirm the saved card charge if Stripe asks for additional verification.'
+                : 'Add ' . number_format($points) . ' points to your PLYRCARD balance.',
+        ];
+    }
+    public function pointPackStatus(User $user, string $packKey): array
+    {
+        $packKey = strtolower(trim($packKey));
+        $billing = BillingInformation::query()->where('user_id', $user->getKey())->latest('id')->first();
+        if (! $billing) {
+            return ['success' => true, 'completed' => false, 'message' => 'Waiting for Stripe payment confirmation…'];
+        }
+        $intentId = (string) data_get($billing->registration_meta ?? [], 'stripe_point_pack.' . $packKey . '.payment_intent_id', '');
+        if ($intentId === '') {
+            return ['success' => true, 'completed' => false, 'message' => 'Waiting for Stripe payment confirmation…'];
+        }
+        try {
+            $intent = $this->get('/v1/payment_intents/' . rawurlencode($intentId));
+            $stripeSucceeded = (string) ($intent['status'] ?? '') === 'succeeded';
+            if ($stripeSucceeded) {
+                $this->handleOneTimePaymentSucceeded($billing, $intent);
+            }
+            $points = max(0, (int) data_get($intent, 'metadata.plyrcard_point_amount', 0));
+            return array_merge($this->billingSummary($user), [
+                'success' => true,
+                'completed' => $stripeSucceeded,
+                'points' => $points,
+                'message' => $stripeSucceeded
+                    ? number_format($points) . ' points were added to your account.'
+                    : 'Waiting for Stripe payment confirmation…',
+            ]);
+        } catch (\Throwable $exception) {
+            Log::info('Stripe point-pack status refresh delayed.', [
+                'user_id' => $user->getKey(),
+                'pack' => $packKey,
+                'payment_intent_id' => $intentId,
+                'error' => $exception->getMessage(),
+            ]);
+            return ['success' => true, 'completed' => false, 'message' => 'Still confirming your point purchase…'];
+        }
     }
     public function refreshBilling(User $user): BillingInformation
     {
@@ -482,7 +616,7 @@ class StripeBillingService
         data_set($meta,'stripe.cancel_at_period_end',true);
         data_set($meta,'stripe.cancellation_requested_at',now()->toIso8601String());
         $billing->forceFill(['registration_meta'=>$meta,'subscription_status'=>(string)($subscription['status'] ?? $billing->subscription_status)])->save();
-        return array_merge($this->billingSummary($user), ['success'=>true,'message'=>'Your My Journey subscription will cancel at the end of the current billing period. Your purchased credit points do not expire.']);
+        return array_merge($this->billingSummary($user), ['success'=>true,'message'=>'Your My Journey subscription will cancel at the end of the current billing period. Your purchased points do not expire.']);
     }
     public function resumeSubscription(User $user): array
     {
@@ -592,7 +726,10 @@ class StripeBillingService
             'stripe_synced_at' => now(),
             'payment_synced_at' => now(),
         ])->save();
-        if (in_array($plan, ['jumpstart','amplify'], true)) {
+        $chargeType = (string) data_get($intent, 'metadata.plyrcard_charge_type', '');
+        if ($chargeType === 'point_pack') {
+            $this->activatePointPackPurchase($billing->fresh(), $intent);
+        } elseif (in_array($plan, ['jumpstart','amplify'], true)) {
             $this->activateServiceEntitlement($billing->fresh(), $plan, (string) ($intent['id'] ?? ''));
         }
         // Payment history is auxiliary. Never turn a successfully charged and
@@ -639,22 +776,70 @@ class StripeBillingService
         if (! $user || ! in_array($plan, ['jumpstart', 'amplify'], true) || $sourceId === '') {
             return;
         }
-
-        // Credits and the role are one entitlement. Commit them together so we can
-        // never end up with the add-on role present while the credit grant failed.
-        DB::transaction(function () use ($billing, $user, $plan, $sourceId): void {
-            app(CreditPointService::class)->grantPackage(
+        $transaction = DB::transaction(function () use ($billing, $user, $plan, $sourceId) {
+            $transaction = app(CreditPointService::class)->grantPackage(
                 $user,
                 $plan,
                 $sourceId,
                 ['stripe_billing_id' => $billing->getKey()]
             );
-
             $role = $plan === 'jumpstart' ? 'Jumpstart' : 'Amplify';
             if (method_exists($user, 'assignRole') && ! $user->hasRole($role)) {
                 $user->assignRole($role);
             }
+            return $transaction;
         });
+        if (! $transaction->wasRecentlyCreated) {
+            return;
+        }
+        $points = (int) $transaction->points;
+        $label = $plan === 'jumpstart' ? 'Jumpstart' : 'Amplify';
+        $amount = (int) $billing->amount_paid_cents;
+        try {
+            app(PlyrcardSystemEmailService::class)->sendPointsPurchased($user->fresh() ?? $user, $points, $label, $amount);
+        } catch (\Throwable $exception) {
+            Log::warning('PLYRCARD point purchase player email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+        }
+        try {
+            app(SupportAlertService::class)->sendPointPurchase($user->fresh() ?? $user, $points, $label, $amount, ['stripe_payment_intent_id' => $sourceId]);
+        } catch (\Throwable $exception) {
+            Log::warning('PLYRCARD point purchase admin email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+        }
+    }
+    protected function activatePointPackPurchase(BillingInformation $billing, array $intent): void
+    {
+        $user = $billing->user;
+        if (! $user) {
+            return;
+        }
+        $sourceId = trim((string) ($intent['id'] ?? ''));
+        $packKey = strtolower(trim((string) data_get($intent, 'metadata.plyrcard_point_pack', '')));
+        $points = max(0, (int) data_get($intent, 'metadata.plyrcard_point_amount', 0));
+        if ($sourceId === '' || $packKey === '' || $points <= 0) {
+            return;
+        }
+        $amount = (int) ($intent['amount_received'] ?? $intent['amount'] ?? 0);
+        $transaction = app(CreditPointService::class)->grantTopUp($user, $points, $packKey, $sourceId, [
+            'stripe_billing_id' => $billing->getKey(),
+            'amount_cents' => $amount,
+        ]);
+        if (! $transaction->wasRecentlyCreated) {
+            return;
+        }
+        $label = number_format($points) . ' Point Pack';
+        try {
+            app(PlyrcardSystemEmailService::class)->sendPointsPurchased($user->fresh() ?? $user, $points, $label, $amount);
+        } catch (\Throwable $exception) {
+            Log::warning('PLYRCARD point-pack player email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+        }
+        try {
+            app(SupportAlertService::class)->sendPointPurchase($user->fresh() ?? $user, $points, $label, $amount, [
+                'stripe_payment_intent_id' => $sourceId,
+                'point_pack' => $packKey,
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('PLYRCARD point-pack admin email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+        }
     }
     protected function downgradeAfterSubscriptionEnd(BillingInformation $billing): void
     {
@@ -679,7 +864,7 @@ class StripeBillingService
             if (! is_array($intent)) continue;
             $source = (string) data_get($intent, 'metadata.plyrcard_source', '');
             $chargeType = (string) data_get($intent, 'metadata.plyrcard_charge_type', '');
-            if ($source === 'authenticated_upgrade' || $chargeType === 'one_time_credit_package') {
+            if ($source === 'authenticated_upgrade' || $source === 'authenticated_point_pack' || in_array($chargeType, ['one_time_credit_package', 'point_pack'], true)) {
                 $this->persistStripePayment($billing, $intent, (string) ($intent['status'] ?? 'unknown'));
             }
         }
@@ -698,12 +883,32 @@ class StripeBillingService
     protected function persistStripePayment(BillingInformation $billing, array $intent, string $status): void
     {
         if (! class_exists(PaymentTransaction::class) || ! Schema::hasTable('payment_transactions') || empty($intent['id'])) return;
-        $plan=(string)data_get($intent,'metadata.plyrcard_registration_plan','');
-        PaymentTransaction::query()->updateOrCreate(['stripe_payment_intent_id'=>(string)$intent['id']], [
-            'user_id'=>$billing->user_id,'billing_information_id'=>$billing->getKey(),'plan_key'=>$billing->plan_key,
-            'stripe_customer_id'=>$this->idValue($intent['customer'] ?? null),'status'=>$status,'currency'=>strtoupper((string)($intent['currency'] ?? 'USD')),
-            'amount_cents'=>(int)($intent['amount_received'] ?? $intent['amount'] ?? 0),'payment_provider'=>'stripe','payment_mode'=>!empty($intent['livemode'])?'live':'test','live_mode'=>(bool)($intent['livemode'] ?? false),
-            'source_type'=>'one_time_purchase','source_sub_type'=>$plan,'source_name'=>$plan ? ucfirst($plan) . ' credit package' : 'One-time purchase','paid_at'=>$status==='succeeded'?now():null,'synced_at'=>now(),'stripe_payload'=>$intent,
+        $plan = (string) data_get($intent, 'metadata.plyrcard_registration_plan', '');
+        $chargeType = (string) data_get($intent, 'metadata.plyrcard_charge_type', '');
+        $points = max(0, (int) data_get($intent, 'metadata.plyrcard_point_amount', 0));
+        $sourceSubType = $chargeType === 'point_pack'
+            ? (string) data_get($intent, 'metadata.plyrcard_point_pack', 'point-pack')
+            : $plan;
+        $sourceName = $chargeType === 'point_pack' && $points > 0
+            ? number_format($points) . ' Point Pack'
+            : ($plan !== '' ? ucfirst(str_replace('-', ' ', $plan)) . ' points purchase' : 'One-time points purchase');
+        PaymentTransaction::query()->updateOrCreate(['stripe_payment_intent_id' => (string) $intent['id']], [
+            'user_id' => $billing->user_id,
+            'billing_information_id' => $billing->getKey(),
+            'plan_key' => $billing->plan_key,
+            'stripe_customer_id' => $this->idValue($intent['customer'] ?? null),
+            'status' => $status,
+            'currency' => strtoupper((string) ($intent['currency'] ?? 'USD')),
+            'amount_cents' => (int) ($intent['amount_received'] ?? $intent['amount'] ?? 0),
+            'payment_provider' => 'stripe',
+            'payment_mode' => ! empty($intent['livemode']) ? 'live' : 'test',
+            'live_mode' => (bool) ($intent['livemode'] ?? false),
+            'source_type' => 'one_time_purchase',
+            'source_sub_type' => $sourceSubType,
+            'source_name' => $sourceName,
+            'paid_at' => $status === 'succeeded' ? now() : null,
+            'synced_at' => now(),
+            'stripe_payload' => $intent,
         ]);
     }
     protected function syncSubscription(BillingInformation $billing, array $subscription, ?array $invoiceOverride = null): array
@@ -768,6 +973,7 @@ class StripeBillingService
         if (! in_array($checkoutPlan, ['my-journey', 'jumpstart', 'amplify'], true)) {
             $checkoutPlan = 'my-journey';
         }
+        $hadMyJourney = method_exists($user, 'hasRole') && ($user->hasRole('My Journey') || $user->hasRole('my journey'));
         if (method_exists($user, 'assignRole')) {
             if (method_exists($user, 'removeRole') && $user->hasRole('Free')) {
                 $user->removeRole('Free');
@@ -814,6 +1020,21 @@ class StripeBillingService
             'stripe_synced_at' => now(),
             'payment_synced_at' => now(),
         ])->save();
+        $billingReason = is_array($invoice) ? (string) ($invoice['billing_reason'] ?? '') : '';
+        if (! $hadMyJourney && ($billingReason === '' || $billingReason === 'subscription_create')) {
+            try {
+                app(PlyrcardSystemEmailService::class)->sendMyJourneyUpgraded($user->fresh() ?? $user);
+            } catch (\Throwable $exception) {
+                Log::warning('PLYRCARD My Journey player email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+            }
+            try {
+                app(SupportAlertService::class)->sendUpgradeCompleted($user->fresh() ?? $user, 'my-journey', $amountPaid, [
+                    'stripe_invoice_id' => is_array($invoice) ? ($invoice['id'] ?? null) : null,
+                ]);
+            } catch (\Throwable $exception) {
+                Log::warning('PLYRCARD My Journey admin email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+            }
+        }
     }
     protected function syncSubscriptionDefaultPaymentMethod(BillingInformation $billing, array $subscription): void
     {

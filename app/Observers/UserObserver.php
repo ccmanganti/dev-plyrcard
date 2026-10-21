@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Jobs\SyncProfileCompletionToGhl;
 use App\Models\User;
+use App\Services\PlyrcardSystemEmailService;
 use App\Services\ProfileCompletionService;
 use App\Services\SupportAlertService;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,20 @@ class UserObserver
                     'user_id' => $userId,
                     'error' => $exception->getMessage(),
                 ]);
+            }
+
+            // Native registration already sends its welcome email after Stripe/setup work.
+            // Other creation paths (public intake/admin introduction/import) use this observer
+            // so the new player still receives the same account-created notification.
+            if (strtolower(trim((string) $createdUser->registration_source)) !== 'native-registration') {
+                try {
+                    app(PlyrcardSystemEmailService::class)->sendRegistrationWelcome($createdUser);
+                } catch (\Throwable $exception) {
+                    Log::warning('PLYRCARD new user welcome email failed.', [
+                        'user_id' => $userId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             }
         });
     }

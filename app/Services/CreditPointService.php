@@ -42,7 +42,7 @@ class CreditPointService
         $item = $catalog[$itemKey] ?? null;
 
         if (! $item) {
-            throw ValidationException::withMessages(['item_key' => 'That credit service is not available.']);
+            throw ValidationException::withMessages(['item_key' => 'That service is not available.']);
         }
 
         $quantity = max(1, min(20, $quantity));
@@ -68,7 +68,7 @@ class CreditPointService
         $sourceId = trim($sourceId);
 
         if ($sourceId === '') {
-            throw ValidationException::withMessages(['credits' => 'A service request ID is required before credits can be spent.']);
+            throw ValidationException::withMessages(['credits' => 'A service request ID is required before points can be spent.']);
         }
 
         return $this->debit($user, (int) $quote['points'], 'service-request:' . $sourceId, [
@@ -110,18 +110,18 @@ class CreditPointService
         $package = strtolower(trim($package));
         $sourceId = trim($sourceId);
         if ($sourceId === '') {
-            throw ValidationException::withMessages(['credits' => 'A payment source ID is required before credits can be granted.']);
+            throw ValidationException::withMessages(['credits' => 'A payment source ID is required before points can be granted.']);
         }
 
         if (! Schema::hasTable('credit_point_transactions') || ! Schema::hasColumn('users', 'points_available')) {
             throw ValidationException::withMessages([
-                'credits' => 'The credit ledger is not installed. Run the credit-points migration before processing package purchases.',
+                'credits' => 'The points ledger is not installed. Run the points migration before processing package purchases.',
             ]);
         }
 
         $points = $this->packagePoints($package);
         if ($points <= 0) {
-            throw ValidationException::withMessages(['credits' => 'This package does not include credit points.']);
+            throw ValidationException::withMessages(['credits' => 'This package does not include points.']);
         }
         return $this->write(
             user: $user,
@@ -138,6 +138,32 @@ class CreditPointService
             ],
         );
     }
+    public function grantTopUp(User $user, int $points, string $packKey, string $sourceId, array $meta = []): CreditPointTransaction
+    {
+        $packKey = strtolower(trim($packKey));
+        $sourceId = trim($sourceId);
+        if ($points <= 0 || $sourceId === '') {
+            throw ValidationException::withMessages(['points' => 'A valid point pack and payment source are required.']);
+        }
+        if (! Schema::hasTable('credit_point_transactions') || ! Schema::hasColumn('users', 'points_available')) {
+            throw ValidationException::withMessages(['points' => 'The points ledger is not installed.']);
+        }
+        return $this->write(
+            user: $user,
+            type: 'grant',
+            points: $points,
+            idempotencyKey: 'point-pack:' . $packKey . ':' . $sourceId,
+            attributes: [
+                'grant_id' => 'point-pack:' . $packKey . ':' . $sourceId,
+                'source_type' => 'top_up_purchase',
+                'source_id' => $sourceId,
+                'reason' => number_format($points) . ' point pack purchase',
+                'actor' => 'system',
+                'meta' => array_merge(['package' => $packKey, 'point_pack' => true], $meta),
+            ],
+        );
+    }
+
     public function hasPackageGrant(User $user, string $package, string $sourceId): bool
     {
         $package = strtolower(trim($package));
@@ -253,7 +279,7 @@ class CreditPointService
             $delta = $this->deltaFor($type, $points, (array) ($attributes['meta'] ?? []));
             $next = (int) $locked->points_available + $delta;
             if ($next < 0) {
-                throw ValidationException::withMessages(['credits' => 'Not enough available credit points for this request.']);
+                throw ValidationException::withMessages(['credits' => 'Not enough available points for this request.']);
             }
             $row = CreditPointTransaction::query()->create(array_merge([
                 'user_id' => $locked->getKey(),
@@ -274,7 +300,7 @@ class CreditPointService
             'grant', 'release', 'refund' => $points,
             'hold', 'debit' => -$points,
             'adjust' => ((int) ($meta['adjust_sign'] ?? 1) < 0 ? -1 : 1) * $points,
-            default => throw ValidationException::withMessages(['type' => 'Unsupported credit transaction type.']),
+            default => throw ValidationException::withMessages(['type' => 'Unsupported point transaction type.']),
         };
     }
     protected function signedDelta(CreditPointTransaction $row): int

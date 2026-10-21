@@ -4,6 +4,17 @@
         'jumpstart' => ['start' => route('billing.jumpstart.start'), 'status' => route('billing.jumpstart.status'), 'title' => 'Jumpstart'],
         'amplify' => ['start' => route('billing.amplify.start'), 'status' => route('billing.amplify.status'), 'title' => 'Amplify'],
     ];
+    foreach ((array) config('plyrcard-point-packs.packs', []) as $packKey => $pack) {
+        if (! ($pack['enabled'] ?? true)) continue;
+        $points = max(0, (int) ($pack['points'] ?? 0));
+        if ($points <= 0) continue;
+        $stripeUpgradeRoutes['point-pack-' . $packKey] = [
+            'start' => route('billing.point-packs.start', ['pack' => $packKey]),
+            'status' => route('billing.point-packs.status', ['pack' => $packKey]),
+            'title' => number_format($points) . ' Point Pack',
+            'points' => $points,
+        ];
+    }
 @endphp
 <style>
     .plyr-stripe-modal[hidden]{display:none!important}.plyr-stripe-modal{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;padding:20px}.plyr-stripe-backdrop{position:absolute;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(4px)}.plyr-stripe-card{position:relative;width:min(560px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:20px;border:1px solid rgba(15,23,42,.12);box-shadow:0 28px 80px rgba(15,23,42,.28);padding:22px}.dark .plyr-stripe-card{background:#0b0d10;color:#fff;border-color:rgba(255,255,255,.12)}.plyr-stripe-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}.plyr-stripe-head h3{margin:4px 0 0;font-size:24px}.plyr-stripe-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#ff6338}.plyr-stripe-close{border:1px solid #e5e7eb;background:transparent;border-radius:10px;width:38px;height:38px;cursor:pointer;color:inherit}.plyr-stripe-summary{padding:12px 14px;border-radius:12px;background:#f8fafc;margin-bottom:14px;color:#475467;font-size:13px}.dark .plyr-stripe-summary{background:#15181e;color:#cbd5e1}.plyr-stripe-element{padding:14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff}.plyr-stripe-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}.plyr-stripe-btn{border:1px solid #d0d5dd;border-radius:10px;padding:10px 15px;background:#fff;font-weight:750;cursor:pointer}.plyr-stripe-btn.primary{background:#ff6338;border-color:#ff6338;color:#fff}.plyr-stripe-status{margin-top:12px;font-size:12px;color:#667085}.plyr-stripe-status.error{color:#b42318}.plyr-stripe-status.success{color:#067647}.plyr-stripe-loading{padding:28px;text-align:center;color:#667085}.plyr-purchase-thank-you[hidden]{display:none!important}.plyr-purchase-thank-you{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:24px;background:rgba(248,250,252,.96);backdrop-filter:blur(8px)}.plyr-purchase-thank-you-card{width:min(560px,100%);text-align:center;padding:42px 30px;border:1px solid rgba(22,163,74,.22);border-radius:24px;background:#fff;box-shadow:0 28px 90px rgba(15,23,42,.18)}.plyr-purchase-thank-you-icon{width:72px;height:72px;margin:0 auto 18px;border-radius:999px;display:grid;place-items:center;background:#dcfce7;color:#15803d;font-size:34px;font-weight:900}.plyr-purchase-thank-you-kicker{font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#15803d}.plyr-purchase-thank-you h2{margin:8px 0 10px;font-size:34px;line-height:1.08;color:#111827}.plyr-purchase-thank-you p{margin:0 auto;max-width:430px;color:#667085;font-size:15px;line-height:1.65}.plyr-purchase-thank-you-wait{margin-top:18px;font-size:12px;font-weight:700;color:#98a2b3}.dark .plyr-purchase-thank-you{background:rgba(8,10,13,.96)}.dark .plyr-purchase-thank-you-card{background:#111318;border-color:rgba(74,222,128,.2)}.dark .plyr-purchase-thank-you h2{color:#fff}.dark .plyr-purchase-thank-you p{color:#cbd5e1}
@@ -86,8 +97,8 @@
                 setStatus(data.message||'Payment confirmed. Updating your account…','success');
                 setConfirmBusy(true,'Confirmed');
                 const route=routes[activeType]||{};
-                const message=(activeType==='jumpstart'||activeType==='amplify')
-                    ? `Your ${route.title||'credit'} purchase is complete. Your updated credits are now available.`
+                const message=(activeType==='jumpstart'||activeType==='amplify'||String(activeType||'').startsWith('point-pack-'))
+                    ? `Your ${route.title||'points'} purchase is complete. Your updated points are now available.`
                     : `Your ${route.title||'purchase'} is complete and your account has been updated.`;
                 showPurchaseThankYou(message);
                 return;
@@ -145,8 +156,8 @@
                 q('[data-stripe-loading]').hidden=true;
                 setStatus(data.message||route.title+' is active.','success');
                 setConfirmBusy(true,'Confirmed');
-                const message=(activeType==='jumpstart'||activeType==='amplify')
-                    ? `Your ${route.title||'credit'} purchase is complete. Your credits have been added successfully.`
+                const message=(activeType==='jumpstart'||activeType==='amplify'||String(activeType||'').startsWith('point-pack-'))
+                    ? `Your ${route.title||'points'} purchase is complete. Your points have been added successfully.`
                     : `Your ${route.title||'purchase'} is complete and your account has been updated.`;
                 showPurchaseThankYou(message);
                 return;
@@ -183,10 +194,10 @@
         }
     });
     document.addEventListener('click', e => {
-        const a=e.target.closest('[data-plyrcard-my-journey-open],[data-plyrcard-jumpstart-open],[data-plyrcard-amplify-open]');
+        const a=e.target.closest('[data-plyrcard-my-journey-open],[data-plyrcard-jumpstart-open],[data-plyrcard-amplify-open],[data-plyrcard-point-pack-open]');
         if(!a)return;
         e.preventDefault();
-        open(a.hasAttribute('data-plyrcard-jumpstart-open')?'jumpstart':a.hasAttribute('data-plyrcard-amplify-open')?'amplify':'my-journey');
+        const pack=a.getAttribute('data-plyrcard-point-pack-open'); open(pack ? `point-pack-${pack}` : (a.hasAttribute('data-plyrcard-jumpstart-open')?'jumpstart':a.hasAttribute('data-plyrcard-amplify-open')?'amplify':'my-journey'));
     });
 })();
 </script>

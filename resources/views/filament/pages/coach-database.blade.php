@@ -61,6 +61,56 @@
             ->limit(50)
             ->get();
     }
+
+    $rcHasJourney = $rcCatalogUser && method_exists($rcCatalogUser, 'hasRole') && ($rcCatalogUser->hasRole('My Journey') || $rcCatalogUser->hasRole('my journey'));
+    $rcPointPacks = collect((array) config('plyrcard-point-packs.packs', []))
+        ->filter(fn (array $pack): bool => (bool) ($pack['enabled'] ?? true) && (int) ($pack['points'] ?? 0) > 0 && (int) ($pack['price_cents'] ?? 0) > 0)
+        ->map(fn (array $pack, string $key): array => array_merge($pack, ['key' => $key]))
+        ->values();
+    $rcPointGrantedTotal = 0;
+    $rcPointUsedTotal = 0;
+    $rcPointHistory = collect();
+    if ($rcCatalogUser && \Illuminate\Support\Facades\Schema::hasTable('credit_point_transactions')) {
+        $rcPointLedger = \App\Models\CreditPointTransaction::query()
+            ->where('user_id', $rcCatalogUser->getKey())
+            ->latest('id')
+            ->limit(40)
+            ->get();
+        $rcPointGrantedTotal = (int) \App\Models\CreditPointTransaction::query()
+            ->where('user_id', $rcCatalogUser->getKey())
+            ->whereIn('type', ['grant', 'refund', 'release'])
+            ->sum('points');
+        $rcPointUsedTotal = (int) \App\Models\CreditPointTransaction::query()
+            ->where('user_id', $rcCatalogUser->getKey())
+            ->whereIn('type', ['debit', 'hold'])
+            ->sum('points');
+        $requestById = $rcSupportCreditRequests->keyBy(fn ($request) => (string) $request->getKey());
+        $rcPointHistory = $rcPointLedger->map(function ($row) use ($requestById) {
+            $meta = (array) ($row->meta ?? []);
+            $sign = in_array($row->type, ['grant', 'refund', 'release'], true) ? 1 : (in_array($row->type, ['debit', 'hold'], true) ? -1 : ((int) ($meta['adjust_sign'] ?? 1) < 0 ? -1 : 1));
+            $request = $row->source_type === 'service_request' ? $requestById->get((string) $row->source_id) : null;
+            $status = match (true) {
+                $request !== null => $request->statusLabel(),
+                in_array($row->source_type, ['package_purchase', 'top_up_purchase'], true) => 'Added',
+                $row->type === 'refund' || $row->type === 'release' => 'Returned',
+                $row->type === 'adjust' => 'Adjusted',
+                $row->type === 'hold' => 'Reserved',
+                $row->type === 'debit' => 'Used',
+                default => ucfirst(str_replace('_', ' ', (string) $row->type)),
+            };
+            return [
+                'date' => optional($row->created_at)->format('M j, Y') ?: '—',
+                'item' => trim((string) ($row->reason ?: data_get($meta, 'item_name', 'PLYRCARD points activity'))),
+                'amount' => ($sign > 0 ? '+' : '−') . number_format((int) $row->points),
+                'positive' => $sign > 0,
+                'status' => $status,
+            ];
+        })->values();
+    }
+    $rcPointWorth = collect($rcCreditCatalog)->map(function (array $item) use ($rcCreditBalance) {
+        $cost = max(1, (int) ($item['points'] ?? 0));
+        return array_merge($item, ['count_for_balance' => intdiv(max(0, $rcCreditBalance), $cost)]);
+    })->values();
 @endphp
 <div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
@@ -11353,6 +11403,14 @@ CSS;
 </section>
 <section class="rc-client-panel-v1033" data-rc-client-section="services" x-show="activeSection === 'services'" style="{{ ($section === 'services') ? '' : 'display:none;' }}">
     <div class="rc-support-page-v1 rc-support-page-clean-v87" x-data="{ serviceTab: @js(session('credit_success') ? 'history' : 'credits') }">
+        <style id="rc-points-redesign-v12">
+            .rc-points-head-v12{display:flex;justify-content:space-between;align-items:flex-end;gap:1rem;margin-bottom:1rem}.rc-points-head-v12 h1{margin:0;font-size:1.85rem;line-height:1;font-weight:850;letter-spacing:-.035em}.rc-points-head-v12 p{margin:.45rem 0 0;color:var(--rc-muted);font-size:.86rem}.rc-points-plan-v12{display:inline-flex;align-items:center;gap:.38rem;padding:.45rem .72rem;border-radius:999px;background:rgba(16,185,129,.1);color:#15803d;font-size:.72rem;font-weight:800}.rc-points-plan-v12:before{content:'';width:.45rem;height:.45rem;border-radius:50%;background:currentColor}.rc-points-overview-v12{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:.85rem;margin-bottom:1rem}.rc-points-balance-card-v12,.rc-points-worth-card-v12,.rc-points-buy-v12,.rc-points-history-v12{border:1px solid var(--rc-border);border-radius:1rem;background:var(--rc-surface);padding:1rem}.rc-points-balance-top-v12{display:flex;align-items:center;justify-content:space-between;gap:.7rem}.rc-points-balance-number-v12{display:flex;align-items:flex-end;gap:.5rem;margin:.75rem 0}.rc-points-balance-number-v12 strong{font-size:3.35rem;line-height:.88;font-weight:900;letter-spacing:-.055em;color:#c2410c}.rc-points-balance-number-v12 span{padding-bottom:.32rem;color:var(--rc-muted);font-size:.75rem;font-weight:700}.rc-points-breakdown-v12{display:flex;gap:.85rem;flex-wrap:wrap;color:var(--rc-muted);font-size:.72rem}.rc-points-breakdown-v12 b{color:var(--rc-text)}.rc-points-worth-grid-v12{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;margin-top:.7rem}.rc-points-worth-item-v12{padding:.68rem;border:1px solid var(--rc-border);border-radius:.72rem;background:var(--rc-soft)}.rc-points-worth-item-v12 strong{display:block;font-size:.76rem}.rc-points-worth-item-v12 span{display:block;margin-top:.18rem;color:var(--rc-muted);font-size:.68rem}.rc-points-section-head-v12{display:flex;justify-content:space-between;gap:1rem;align-items:flex-end;margin-bottom:.75rem}.rc-points-section-head-v12 h2{margin:0;font-size:1rem}.rc-points-section-head-v12 p{margin:0;color:var(--rc-muted);font-size:.72rem}.rc-points-pack-grid-v12{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}.rc-points-pack-v12{display:grid;gap:.42rem;padding:.85rem;border:1px solid var(--rc-border);border-radius:.82rem;background:var(--rc-soft)}.rc-points-pack-v12 .eyebrow{font-size:.62rem;font-weight:850;letter-spacing:.08em;color:var(--rc-muted);text-transform:uppercase}.rc-points-pack-v12 .pts{font-size:1.6rem;line-height:1;font-weight:900;color:#c2410c}.rc-points-pack-v12 .price{font-size:.82rem;font-weight:800}.rc-points-pack-v12 .note{min-height:2.2rem;color:var(--rc-muted);font-size:.68rem;line-height:1.4}.rc-points-history-table-v12{display:grid}.rc-points-history-row-v12{display:grid;grid-template-columns:7rem minmax(0,1fr) 7rem 8rem;gap:.7rem;align-items:center;padding:.65rem 0;border-bottom:1px solid var(--rc-border);font-size:.72rem}.rc-points-history-row-v12.is-head{font-size:.62rem;font-weight:850;letter-spacing:.07em;color:var(--rc-muted);text-transform:uppercase}.rc-points-history-row-v12 .amt{font-weight:850}.rc-points-history-row-v12 .amt.is-add{color:#c2410c}.rc-points-history-status-v12{display:inline-flex;width:max-content;padding:.25rem .5rem;border-radius:999px;background:var(--rc-soft);font-weight:800}.rc-points-history-status-v12[data-status*="Completed"],.rc-points-history-status-v12[data-status="Added"]{background:rgba(16,185,129,.1);color:#15803d}.rc-points-history-status-v12[data-status*="Progress"],.rc-points-history-status-v12[data-status="Reviewed"],.rc-points-history-status-v12[data-status="Submitted"]{background:rgba(255,99,56,.1);color:#c2410c}.rc-points-history-status-v12[data-status="Declined"]{background:rgba(239,68,68,.1);color:#b42318}.rc-points-history-status-v12[data-status="Returned"],.rc-points-history-status-v12[data-status="Adjusted"]{background:rgba(59,130,246,.1);color:#1d4ed8}.rc-points-history-status-v12[data-status="Used"]{background:rgba(100,116,139,.12);color:#475569}.rc-credit-service-list-v5{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem!important}.rc-credit-service-row-v5{grid-template-columns:1fr!important;border-radius:.85rem!important;background:var(--rc-soft)!important}.rc-credit-service-controls-v5{grid-template-columns:5rem minmax(7rem,1fr) auto!important}.rc-support-tabs-v5{margin-bottom:.9rem}.rc-points-buy-v12,.rc-points-history-v12{margin-top:.9rem}@media(max-width:900px){.rc-points-overview-v12,.rc-points-worth-grid-v12,.rc-credit-service-list-v5{grid-template-columns:1fr!important}.rc-points-pack-grid-v12{grid-template-columns:1fr}.rc-points-history-row-v12{grid-template-columns:6rem minmax(0,1fr) 5.5rem}.rc-points-history-row-v12>div:last-child{grid-column:2/-1}}
+        </style>
+        <div class="rc-points-head-v12"><div><h1>PLYR Points</h1><p>Mix and match services. Spend your points the way you want. Purchased points never expire.</p></div>@if($rcCatalogUser && method_exists($rcCatalogUser,'hasRole') && $rcCatalogUser->hasRole('My Journey'))<span class="rc-points-plan-v12">My Journey · Active</span>@endif</div>
+        <div class="rc-points-overview-v12">
+            <section class="rc-points-balance-card-v12"><div class="rc-points-balance-top-v12"><strong>Your balance</strong><span class="rc-points-plan-v12" style="background:var(--rc-soft);color:var(--rc-muted);">Never expire</span></div><div class="rc-points-balance-number-v12"><strong>{{ number_format($rcCreditBalance) }}</strong><span>points available</span></div><div class="rc-points-breakdown-v12"><span><b>{{ number_format($rcPointUsedTotal) }}</b> used</span><span><b>{{ number_format($rcPointGrantedTotal) }}</b> added/returned</span><span><b>{{ number_format($rcCreditBalance) }}</b> available</span></div></section>
+            <section class="rc-points-worth-card-v12"><div class="rc-points-section-head-v12"><div><h2>What your points can get you</h2><p>Based on your current balance and the live PLYRCARD service catalog.</p></div></div><div class="rc-points-worth-grid-v12">@foreach($rcPointWorth as $worth)<div class="rc-points-worth-item-v12"><strong>{{ $worth['name'] }}</strong><span>{{ number_format((int)$worth['points']) }} points each · your balance covers {{ number_format((int)$worth['count_for_balance']) }}</span></div>@endforeach</div></section>
+        </div>
 
         @if(session('credit_success'))
             <div class="rc-credit-thank-you-overlay-v11" data-credit-thank-you-overlay role="status" aria-live="assertive">
@@ -11370,7 +11428,7 @@ CSS;
         <div class="rc-support-tabs-v5" role="tablist" aria-label="Services sections">
             <button type="button" role="tab" class="rc-support-tab-v5" :class="serviceTab === 'credits' ? 'is-active' : ''" :aria-selected="serviceTab === 'credits'" @click="serviceTab = 'credits'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7.5h16M6.5 4h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5v-11A2.5 2.5 0 0 1 6.5 4Z" stroke="currentColor" stroke-width="1.7"/><path d="M8 13h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-                <span>Credit Usage</span>
+                <span>Use Points</span>
             </button>
             <button type="button" role="tab" class="rc-support-tab-v5" :class="serviceTab === 'history' ? 'is-active' : ''" :aria-selected="serviceTab === 'history'" @click="serviceTab = 'history'">
                 <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4.5h14a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 9h9M7.5 13h6M7.5 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
@@ -11414,16 +11472,16 @@ CSS;
                 <div class="rc-card" style="border-color:rgba(239,68,68,.35);background:rgba(239,68,68,.07);color:#b42318;">{{ $creditError }}</div>
             @endif
             <div class="rc-credit-use-hero-v5">
-                <div><div class="rc-subtle">Available credits</div><div class="rc-credit-use-balance-v5">{{ number_format($rcCreditBalance) }} <span>credits</span></div><div class="rc-subtle" style="margin-top:.35rem;">Build the request in three simple steps. Credits are deducted only after the final confirmation.</div></div>
-                <a class="rc-btn rc-btn-primary" href="{{ url('/admin/my-journey') }}">Get More Credits</a>
+                <div><div class="rc-subtle">Available points</div><div class="rc-credit-use-balance-v5">{{ number_format($rcCreditBalance) }} <span>points</span></div><div class="rc-subtle" style="margin-top:.35rem;">Build the request in three simple steps. Points are deducted only after the final confirmation.</div></div>
+                <a class="rc-btn rc-btn-primary" href="{{ url('/admin/my-journey') }}">Buy Points</a>
             </div>
             <form class="rc-credit-request-form-v5 rc-credit-wizard-v7" method="POST" action="{{ route('support.credits.store') }}" enctype="multipart/form-data" x-on:submit="if (step !== 3 || !enough || submitting) { $event.preventDefault(); return; } submitting = true">
                 @csrf
                 <input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
-                <div class="rc-credit-steps-v7" aria-label="Credit request steps">
+                <div class="rc-credit-steps-v7" aria-label="Point request steps">
                     <div class="rc-credit-step-v7" :class="{ 'is-active': step === 1, 'is-done': step > 1 }"><span class="rc-credit-step-number-v7">1</span><span class="rc-credit-step-copy-v7"><strong>Select services</strong><span>Choose services, quantity, and Rush.</span></span></div>
                     <div class="rc-credit-step-v7" :class="{ 'is-active': step === 2, 'is-done': step > 2 }"><span class="rc-credit-step-number-v7">2</span><span class="rc-credit-step-copy-v7"><strong>Notes & resources</strong><span>Add instructions and files for each service.</span></span></div>
-                    <div class="rc-credit-step-v7" :class="{ 'is-active': step === 3 }"><span class="rc-credit-step-number-v7">3</span><span class="rc-credit-step-copy-v7"><strong>Confirm</strong><span>Review the order before credits are deducted.</span></span></div>
+                    <div class="rc-credit-step-v7" :class="{ 'is-active': step === 3 }"><span class="rc-credit-step-number-v7">3</span><span class="rc-credit-step-copy-v7"><strong>Confirm</strong><span>Review the order before points are deducted.</span></span></div>
                 </div>
                 <section class="rc-credit-section-v5" x-show="step === 1">
                     <div class="rc-credit-section-head-v5"><div><h3>1. Select services</h3><p>Choose one or more services. Quantity and Rush are controlled separately for every item.</p></div><div class="rc-subtle"><span x-text="selectedCount"></span> selected</div></div>
@@ -11432,24 +11490,24 @@ CSS;
                             <article class="rc-credit-service-row-v5" :class="{ 'is-selected': selections['{{ $creditKey }}'].selected }">
                                 <div class="rc-credit-service-main-v5">
                                     <div><input type="hidden" name="items[{{ $loop->index }}][selected]" value="0"><input type="hidden" name="items[{{ $loop->index }}][item_key]" value="{{ $creditKey }}"><input class="rc-credit-service-check-v5" type="checkbox" name="items[{{ $loop->index }}][selected]" value="1" x-model="selections['{{ $creditKey }}'].selected" aria-label="Select {{ $creditItem['name'] }}"></div>
-                                    <div class="rc-credit-service-copy-v5"><div class="rc-credit-service-name-v5"><span>{{ $creditItem['name'] }}</span><span class="rc-credit-service-base-v5">{{ number_format((int) $creditItem['points']) }} credits each</span></div><div class="rc-credit-service-desc-v5">{{ $creditItem['description'] ?? '' }}</div></div>
+                                    <div class="rc-credit-service-copy-v5"><div class="rc-credit-service-name-v5"><span>{{ $creditItem['name'] }}</span><span class="rc-credit-service-base-v5">{{ number_format((int) $creditItem['points']) }} points each</span></div><div class="rc-credit-service-desc-v5">{{ $creditItem['description'] ?? '' }}</div></div>
                                 </div>
                                 <div class="rc-credit-service-controls-v5">
                                     <label class="rc-credit-mini-field-v5"><span>Quantity</span><input type="number" name="items[{{ $loop->index }}][quantity]" min="1" max="20" x-model.number="selections['{{ $creditKey }}'].quantity" :disabled="!selections['{{ $creditKey }}'].selected"></label>
                                     <label class="rc-credit-mini-field-v5"><span>Turnaround</span><span class="rc-credit-rush-v5"><input type="hidden" name="items[{{ $loop->index }}][rush]" value="0"><input type="checkbox" name="items[{{ $loop->index }}][rush]" value="1" x-model="selections['{{ $creditKey }}'].rush" :disabled="!selections['{{ $creditKey }}'].selected">Rush +50%</span></label>
-                                    <label class="rc-credit-mini-field-v5"><span>Subtotal</span><span class="rc-credit-row-total-v5" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></span></label>
+                                    <label class="rc-credit-mini-field-v5"><span>Subtotal</span><span class="rc-credit-row-total-v5" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' points'"></span></label>
                                 </div>
                             </article>
                         @endforeach
                     </div>
-                    <div class="rc-credit-wizard-actions-v7"><div><span class="rc-subtle" x-show="selectedCount === 0">Select at least one service.</span><span class="rc-subtle is-error" x-show="selectedCount > 0 && !enough">This selection exceeds your available credits.</span><span class="rc-subtle" x-show="enough"><span x-text="selectedCount"></span> service(s) · <span x-text="quotedPoints.toLocaleString()"></span> credits</span></div><button type="button" class="rc-btn rc-btn-primary" :disabled="!enough" x-on:click="nextSelection()">Continue to Notes</button></div>
+                    <div class="rc-credit-wizard-actions-v7"><div><span class="rc-subtle" x-show="selectedCount === 0">Select at least one service.</span><span class="rc-subtle is-error" x-show="selectedCount > 0 && !enough">This selection exceeds your available points.</span><span class="rc-subtle" x-show="enough"><span x-text="selectedCount"></span> service(s) · <span x-text="quotedPoints.toLocaleString()"></span> points</span></div><button type="button" class="rc-btn rc-btn-primary" :disabled="!enough" x-on:click="nextSelection()">Continue to Notes</button></div>
                 </section>
                 <section class="rc-credit-section-v5" x-show="step === 2" x-cloak>
                     <div class="rc-credit-section-head-v5"><div><h3>2. Notes & resources</h3><p>Add instructions and optional reference files separately for each selected service.</p></div></div>
                     <div class="rc-credit-detail-list-v7">
                         @foreach($rcCreditCatalog as $creditKey => $creditItem)
                             <article class="rc-credit-detail-card-v7" x-show="selections['{{ $creditKey }}'].selected" x-cloak>
-                                <div class="rc-credit-detail-head-v7"><div><strong>{{ $creditItem['name'] }}</strong><span>Qty <span x-text="selections['{{ $creditKey }}'].quantity"></span><span x-show="selections['{{ $creditKey }}'].rush"> · Rush</span></span></div><strong style="color:var(--rc-accent)" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></strong></div>
+                                <div class="rc-credit-detail-head-v7"><div><strong>{{ $creditItem['name'] }}</strong><span>Qty <span x-text="selections['{{ $creditKey }}'].quantity"></span><span x-show="selections['{{ $creditKey }}'].rush"> · Rush</span></span></div><strong style="color:var(--rc-accent)" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' points'"></strong></div>
                                 <div class="rc-credit-detail-grid-v7">
                                     <label class="rc-credit-detail-field-v7">Instructions / notes<textarea name="items[{{ $loop->index }}][notes]" maxlength="2000" x-model="selections['{{ $creditKey }}'].notes" :disabled="!selections['{{ $creditKey }}'].selected" placeholder="Add links, footage notes, design direction, deadlines, or anything specific to this service."></textarea></label>
                                     <label class="rc-credit-detail-field-v7">Reference resources<input class="rc-credit-native-file-v8" type="file" name="items[{{ $loop->index }}][resources][]" multiple :disabled="!selections['{{ $creditKey }}'].selected" x-on:change="rememberResources('{{ $creditKey }}', $event)"><small class="rc-credit-native-help-v8">Optional. Up to 5 files, 50 MB each. Images, video, audio, PDF, Office files, ZIP, or TXT.</small><div class="rc-credit-file-list-v7" x-show="(resourceNames['{{ $creditKey }}'] || []).length"><template x-for="name in (resourceNames['{{ $creditKey }}'] || [])" :key="name"><span class="rc-credit-file-chip-v7" x-text="name"></span></template></div></label>
@@ -11460,21 +11518,26 @@ CSS;
                     <div class="rc-credit-wizard-actions-v7"><button type="button" class="rc-btn" x-on:click="backTo(1)">Back</button><button type="button" class="rc-btn rc-btn-primary" x-on:click="nextDetails()">Review Request</button></div>
                 </section>
                 <section class="rc-credit-section-v5" x-show="step === 3" x-cloak>
-                    <div class="rc-credit-section-head-v5"><div><h3>3. Confirm request</h3><p>Review the services and attached information before the credits are permanently deducted.</p></div></div>
+                    <div class="rc-credit-section-head-v5"><div><h3>3. Confirm request</h3><p>Review the services and attached information before the points are permanently deducted.</p></div></div>
                     <div class="rc-credit-review-list-v7">
                         @foreach($rcCreditCatalog as $creditKey => $creditItem)
                             <article class="rc-credit-review-row-v7" x-show="selections['{{ $creditKey }}'].selected" x-cloak>
-                                <div><strong>{{ $creditItem['name'] }} × <span x-text="selections['{{ $creditKey }}'].quantity"></span></strong><small><span x-text="selections['{{ $creditKey }}'].rush ? 'Rush turnaround · ' : 'Standard turnaround · '"></span><span x-text="selections['{{ $creditKey }}'].notes?.trim() ? selections['{{ $creditKey }}'].notes : 'No extra instructions.'"></span></small><small x-show="(resourceNames['{{ $creditKey }}'] || []).length"><span x-text="(resourceNames['{{ $creditKey }}'] || []).length"></span> resource file(s) attached.</small></div><div class="rc-credit-review-points-v7" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' credits'"></div>
+                                <div><strong>{{ $creditItem['name'] }} × <span x-text="selections['{{ $creditKey }}'].quantity"></span></strong><small><span x-text="selections['{{ $creditKey }}'].rush ? 'Rush turnaround · ' : 'Standard turnaround · '"></span><span x-text="selections['{{ $creditKey }}'].notes?.trim() ? selections['{{ $creditKey }}'].notes : 'No extra instructions.'"></span></small><small x-show="(resourceNames['{{ $creditKey }}'] || []).length"><span x-text="(resourceNames['{{ $creditKey }}'] || []).length"></span> resource file(s) attached.</small></div><div class="rc-credit-review-points-v7" x-text="pointsFor('{{ $creditKey }}').toLocaleString() + ' points'"></div>
                             </article>
                         @endforeach
                     </div>
-                    <div class="rc-credit-shared-fields-v5"><div class="rc-credit-warning-v5">Credit use is final when submitted. There is no self-service cancellation or automatic credit return. If credits need to be restored, an administrator must apply them manually to your account.</div><label class="rc-credit-confirm-v5"><input type="checkbox" name="confirm_spend" value="1" required><span>I understand that the total credits for all selected services will be deducted immediately and will not be automatically returned.</span></label></div>
+                    <div class="rc-credit-shared-fields-v5"><div class="rc-credit-warning-v5">Point use is final when submitted. There is no self-service cancellation or automatic point return. If points need to be restored, an administrator must apply them manually to your account.</div><label class="rc-credit-confirm-v5"><input type="checkbox" name="confirm_spend" value="1" required><span>I understand that the total points for all selected services will be deducted immediately and will not be automatically returned.</span></label></div>
                     <div class="rc-credit-order-summary-v5">
-                        <div class="rc-credit-order-line-v5"><span>Selected services</span><strong><span x-text="selectedCount"></span></strong></div><div class="rc-credit-order-line-v5"><span>Current balance</span><strong>{{ number_format($rcCreditBalance) }} credits</strong></div><div class="rc-credit-order-line-v5"><span>Balance after request</span><strong><span x-text="remaining.toLocaleString()"></span> credits</strong></div><div class="rc-credit-order-line-v5 is-total"><span>Total to deduct</span><strong><span x-text="quotedPoints.toLocaleString()"></span> credits</strong></div>
-                        <div class="rc-credit-form-actions-v5"><button type="button" class="rc-btn" :disabled="submitting" x-on:click="backTo(2)">Back</button><button type="submit" class="rc-btn rc-btn-primary rc-credit-submit-v6" :class="{ 'is-submitting': submitting }" :disabled="!enough || submitting" :aria-busy="submitting ? 'true' : 'false'"><span class="rc-credit-submit-spinner-v6" x-show="submitting" x-cloak aria-hidden="true"></span><span x-show="!submitting">Submit Credit Request</span><span x-show="submitting" x-cloak>Submitting Request...</span></button></div>
+                        <div class="rc-credit-order-line-v5"><span>Selected services</span><strong><span x-text="selectedCount"></span></strong></div><div class="rc-credit-order-line-v5"><span>Current balance</span><strong>{{ number_format($rcCreditBalance) }} points</strong></div><div class="rc-credit-order-line-v5"><span>Balance after request</span><strong><span x-text="remaining.toLocaleString()"></span> points</strong></div><div class="rc-credit-order-line-v5 is-total"><span>Total to deduct</span><strong><span x-text="quotedPoints.toLocaleString()"></span> points</strong></div>
+                        <div class="rc-credit-form-actions-v5"><button type="button" class="rc-btn" :disabled="submitting" x-on:click="backTo(2)">Back</button><button type="submit" class="rc-btn rc-btn-primary rc-credit-submit-v6" :class="{ 'is-submitting': submitting }" :disabled="!enough || submitting" :aria-busy="submitting ? 'true' : 'false'"><span class="rc-credit-submit-spinner-v6" x-show="submitting" x-cloak aria-hidden="true"></span><span x-show="!submitting">Submit Point Request</span><span x-show="submitting" x-cloak>Submitting Request...</span></button></div>
                     </div>
                 </section>
             </form>
+        </div>
+
+        <div class="rc-support-tab-panel-v4" x-show="serviceTab === 'credits'" x-cloak>
+            <section class="rc-points-buy-v12" id="buy-points"><div class="rc-points-section-head-v12"><div><h2>Buy points</h2><p>Point packs are added after Stripe confirms payment.</p></div></div>@if($rcHasJourney)<div class="rc-points-pack-grid-v12">@forelse($rcPointPacks as $pack)<article class="rc-points-pack-v12"><span class="eyebrow">Point pack</span><span class="pts">{{ number_format((int)$pack['points']) }} PTS</span><span class="price">${{ number_format(((int)$pack['price_cents']) / 100, ((int)$pack['price_cents']) % 100 === 0 ? 0 : 2) }}</span><span class="note">{{ $pack['note'] ?? 'Add points to your PLYRCARD balance.' }}</span><button type="button" class="rc-btn" data-plyrcard-point-pack-open="{{ $pack['key'] }}">Buy Points</button></article>@empty<div class="rc-empty">No point packs are enabled right now.</div>@endforelse</div>@else<div class="rc-empty">Point packs are available with My Journey. <a href="{{ url('/admin/my-journey') }}">View My Journey options</a>.</div>@endif</section>
+            <section class="rc-points-history-v12"><div class="rc-points-section-head-v12"><div><h2>Points history</h2><p>Most recent first. Service activity keeps the request status attached.</p></div></div><div class="rc-points-history-table-v12"><div class="rc-points-history-row-v12 is-head"><div>Date</div><div>Item</div><div>Points</div><div>Status</div></div>@forelse($rcPointHistory as $entry)<div class="rc-points-history-row-v12"><div style="color:var(--rc-muted)">{{ $entry['date'] }}</div><div><strong>{{ $entry['item'] }}</strong></div><div class="amt {{ $entry['positive'] ? 'is-add' : '' }}">{{ $entry['amount'] }}</div><div><span class="rc-points-history-status-v12" data-status="{{ $entry['status'] }}">{{ $entry['status'] }}</span></div></div>@empty<div class="rc-empty">No points activity yet.</div>@endforelse</div></section>
         </div>
 
         @php
@@ -11495,7 +11558,7 @@ CSS;
             <div class="rc-request-history-head-v9">
                 <div>
                     <div class="rc-title">Request History</div>
-                    <div class="rc-subtle">Track every credit request, follow its status, and access files delivered by the PLYRCARD team.</div>
+                    <div class="rc-subtle">Track every point request, follow its status, and access files delivered by the PLYRCARD team.</div>
                 </div>
                 <button type="button" class="rc-btn rc-btn-primary" @click="serviceTab = 'credits'">New Request</button>
             </div>
@@ -11506,14 +11569,14 @@ CSS;
                 <div><span>Files Ready</span><strong>{{ $rcDeliveredCreditRequests->count() }}</strong></div>
             </div>
 
-            <div class="rc-credit-history-tabs-v8" role="tablist" aria-label="Filter credit requests">
+            <div class="rc-credit-history-tabs-v8" role="tablist" aria-label="Filter point requests">
                 <button type="button" class="rc-credit-history-tab-v8" :class="historyFilter === 'active' ? 'is-active' : ''" @click="historyFilter = 'active'; selectedRequest = {{ $rcActiveFirstRequestId }}">Active <span class="rc-credit-history-count-v8">{{ $rcActiveCreditRequests->count() }}</span></button>
                 <button type="button" class="rc-credit-history-tab-v8" :class="historyFilter === 'completed' ? 'is-active' : ''" @click="historyFilter = 'completed'; selectedRequest = {{ $rcCompletedFirstRequestId }}">Completed <span class="rc-credit-history-count-v8">{{ $rcCompletedCreditRequests->count() }}</span></button>
                 <button type="button" class="rc-credit-history-tab-v8" :class="historyFilter === 'all' ? 'is-active' : ''" @click="historyFilter = 'all'; selectedRequest = {{ $rcAllFirstRequestId }}">All <span class="rc-credit-history-count-v8">{{ $rcSupportCreditRequests->count() }}</span></button>
             </div>
 
             @if($rcSupportCreditRequests->isEmpty())
-                <div class="rc-empty">You have not submitted a credit service request yet.</div>
+                <div class="rc-empty">You have not submitted a service request yet.</div>
             @else
                 <div class="rc-request-history-layout-v9">
                     <div class="rc-request-history-list-v9">
@@ -11569,7 +11632,7 @@ CSS;
                                 </div>
 
                                 @if($creditRequest->status === 'declined')
-                                    <div class="rc-request-declined-v9"><strong>Request declined</strong><span>This request is closed. Any credit return, if applicable, must be handled manually by the PLYRCARD team.</span></div>
+                                    <div class="rc-request-declined-v9"><strong>Request declined</strong><span>This request is closed. Any point return, if applicable, must be handled manually by the PLYRCARD team.</span></div>
                                 @else
                                     <div class="rc-request-progress-v9" aria-label="Request progress">
                                         @foreach([1 => 'Submitted', 2 => 'Reviewed', 3 => 'In Progress', 4 => 'Completed'] as $stepNumber => $stepLabel)
@@ -11581,7 +11644,7 @@ CSS;
                                 <div class="rc-request-detail-grid-v9">
                                     <div><span>Quantity</span><strong>{{ (int) $creditRequest->quantity }}</strong></div>
                                     <div><span>Turnaround</span><strong>{{ $creditRequest->modifier === 'rush' ? 'Rush +50%' : 'Standard' }}</strong></div>
-                                    <div><span>Credits used</span><strong>{{ number_format((int) $creditRequest->points_spent) }}</strong></div>
+                                    <div><span>Points used</span><strong>{{ number_format((int) $creditRequest->points_spent) }}</strong></div>
                                     <div><span>Last updated</span><strong>{{ optional($creditRequest->updated_at)->format('M j, Y g:i A') }}</strong></div>
                                 </div>
 
@@ -11625,6 +11688,7 @@ CSS;
                     </div>
                 </div>
             @endif
+    @include('partials.stripe-upgrade-modal')
     </div>
 </section>
 <section class="rc-client-panel-v1033" data-rc-client-section="schedule" x-show="activeSection === 'schedule'" style="{{ ($section === 'schedule') ? '' : 'display:none;' }}">
@@ -17414,7 +17478,7 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
             const head = rcCreditElement('div', 'rc-sidebar-credit-head-v3');
             const title = rcCreditElement('div', 'rc-sidebar-credit-title-v3');
-            title.appendChild(rcCreditElement('span', '', 'Credits'));
+            title.appendChild(rcCreditElement('span', '', 'Points'));
 
             const action = rcCreditElement('button', 'rc-sidebar-credit-action-v3', 'Get More');
             action.type = 'button';
@@ -17430,7 +17494,7 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
 
             const availableRow = rcCreditElement('div', 'rc-sidebar-credit-row-v3');
             availableRow.appendChild(rcCreditElement('span', '', 'Available'));
-            availableRow.appendChild(rcCreditElement('strong', '', `${Number(rcCreditBalance || 0).toLocaleString()} credits`));
+            availableRow.appendChild(rcCreditElement('strong', '', `${Number(rcCreditBalance || 0).toLocaleString()} points`));
             card.appendChild(availableRow);
 
             const recentRow = rcCreditElement('div', 'rc-sidebar-credit-row-v3');
@@ -17448,7 +17512,7 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
             const existing = sidebar.querySelector('[data-rc-sidebar-credit-card="1"]');
             if (existing) {
                 const rows = existing.querySelectorAll('.rc-sidebar-credit-row-v3 strong');
-                if (rows[0]) rows[0].textContent = `${Number(rcCreditBalance || 0).toLocaleString()} credits`;
+                if (rows[0]) rows[0].textContent = `${Number(rcCreditBalance || 0).toLocaleString()} points`;
                 return;
             }
 

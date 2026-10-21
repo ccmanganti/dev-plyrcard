@@ -1289,65 +1289,53 @@ class AdminPanelProvider extends PanelProvider
                         .plyr-sidebar-footer > .plyr-sidebar-account,
                         .plyr-sidebar-footer > .plyr-sidebar-plan,
                         .fi-sidebar [data-rc-sidebar-credit-card="1"] { display:none !important; }
-                        .plyr-top-account-dock-host { width:100%; display:flex; justify-content:flex-end; margin:0 0 1rem; position:relative; z-index:65; }
+                        .plyr-top-account-dock-host { display:inline-flex; align-items:center; position:relative; z-index:40; margin-left:.35rem; }
                         body > .plyr-top-account-dock { display:none; }
                         .plyr-top-account-dock-host > .plyr-top-account-dock { display:flex; }
-                        .plyr-top-account-dock { align-items:flex-start; justify-content:flex-end; gap:.6rem; max-width:100%; }
-                        .plyr-top-account-card { border:1px solid rgba(226,232,240,.96); border-radius:.9rem; background:rgba(255,255,255,.96); box-shadow:0 8px 24px rgba(15,23,42,.06); color:#0f172a; }
-                        .dark .plyr-top-account-card { border-color:rgba(148,163,184,.17); background:rgba(15,23,42,.9); color:#f8fafc; box-shadow:none; }
-                        .plyr-top-profile-wrap { position:relative; }
-                        .plyr-top-profile-trigger { min-width:14rem; display:flex; align-items:center; gap:.68rem; padding:.72rem .82rem; border:1px solid rgba(255,99,56,.32); cursor:pointer; text-align:left; transition:border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
-                        .plyr-top-profile-wrap:hover .plyr-top-profile-trigger,
-                        .plyr-top-profile-wrap:focus-within .plyr-top-profile-trigger,
-                        .plyr-top-profile-trigger:hover { border-color:rgba(255,99,56,.46); transform:translateY(-1px); box-shadow:0 12px 26px rgba(15,23,42,.08); }
-                        .plyr-top-profile-avatar { width:2.35rem; height:2.35rem; border-radius:999px; padding:2px; background:linear-gradient(135deg,#ff6338,#ff8a70); flex:0 0 auto; }
-                        .plyr-top-profile-avatar img { width:100%; height:100%; border-radius:inherit; object-fit:cover; border:2px solid #fff; }
-                        .dark .plyr-top-profile-avatar img { border-color:#0f172a; }
-                        .plyr-top-profile-copy { min-width:0; flex:1; display:grid; gap:.14rem; }
-                        .plyr-top-profile-copy strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.82rem; color:inherit; }
-                        .plyr-top-profile-copy span { font-size:.69rem; color:#ff6338; font-weight:700; }
-                        .plyr-top-profile-chevron { width:.95rem; height:.95rem; flex:0 0 auto; transition:transform .16s ease; }
-                        .plyr-top-profile-menu { position:absolute; top:calc(100% + .48rem); right:0; z-index:120; width:18.5rem; padding:.5rem; border:1px solid rgba(226,232,240,.96); border-radius:1rem; background:#fff; box-shadow:0 18px 42px rgba(15,23,42,.16); }
-                        .dark .plyr-top-profile-menu { border-color:rgba(148,163,184,.18); background:#0f172a; box-shadow:0 18px 42px rgba(0,0,0,.32); }
-                        .plyr-top-profile-section { padding:.3rem; }
+                        .plyr-top-account-dock { align-items:center; justify-content:center; }
+                        .plyr-top-profile-wrap { position:relative; display:inline-flex; }
+                        .plyr-top-profile-trigger { width:2.85rem; height:2.85rem; min-width:2.85rem; padding:0; display:grid; place-items:center; border:1px solid rgba(226,232,240,.96); border-radius:.82rem; background:#fff; box-shadow:0 6px 18px rgba(15,23,42,.06); cursor:pointer; transition:border-color .16s ease,transform .16s ease,box-shadow .16s ease; }
+                        .dark .plyr-top-profile-trigger { border-color:rgba(148,163,184,.2); background:#18181b; }
+                        .plyr-top-profile-trigger:hover,.plyr-top-profile-wrap:focus-within .plyr-top-profile-trigger { border-color:rgba(255,99,56,.42); transform:translateY(-1px); box-shadow:0 10px 22px rgba(15,23,42,.09); }
+                        .plyr-top-profile-avatar { width:2.08rem; height:2.08rem; border-radius:999px; padding:2px; background:linear-gradient(135deg,#ff6338,#ff8a70); display:block; }
+                        .plyr-top-profile-avatar img { width:100%; height:100%; border-radius:inherit; object-fit:cover; border:2px solid #fff; display:block; }
+                        .dark .plyr-top-profile-avatar img { border-color:#18181b; }
+                        .plyr-top-profile-menu { position:absolute; top:calc(100% + .5rem); right:0; z-index:90; width:19rem; padding:.5rem; border:1px solid rgba(226,232,240,.96); border-radius:1rem; background:#fff; color:#0f172a; box-shadow:0 18px 42px rgba(15,23,42,.16); }
+                        .dark .plyr-top-profile-menu { border-color:rgba(148,163,184,.18); background:#0f172a; color:#f8fafc; box-shadow:0 18px 42px rgba(0,0,0,.32); }
+                        .plyr-top-profile-user { display:flex; align-items:center; gap:.65rem; padding:.55rem .55rem .7rem; }
+                        .plyr-top-profile-user-copy { min-width:0; display:grid; gap:.12rem; }
+                        .plyr-top-profile-user-copy strong { font-size:.8rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+                        .plyr-top-profile-user-copy span { font-size:.68rem; color:#ff6338; font-weight:750; }
+                        .plyr-top-profile-section { padding:.35rem; }
                         .plyr-top-profile-section + .plyr-top-profile-section { border-top:1px solid #e5e7eb; }
                         .dark .plyr-top-profile-section + .plyr-top-profile-section { border-top-color:rgba(148,163,184,.16); }
-                        .plyr-top-profile-section-label { display:block; margin:0 0 .35rem; padding:0 .18rem; font-size:.66rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:#94a3b8; }
-                        .plyr-top-profile-action { width:100%; min-height:2.25rem; display:flex; align-items:center; gap:.55rem; padding:.56rem .6rem; border:0; border-radius:.72rem; background:transparent; color:#334155; font-size:.75rem; font-weight:650; text-decoration:none; cursor:pointer; }
+                        .plyr-top-profile-section-label { display:block; margin:0 0 .35rem; padding:0 .2rem; font-size:.64rem; font-weight:850; letter-spacing:.06em; text-transform:uppercase; color:#94a3b8; }
+                        .plyr-top-profile-action { width:100%; min-height:2.25rem; display:flex; align-items:center; gap:.55rem; padding:.54rem .6rem; border:0; border-radius:.7rem; background:transparent; color:#334155; font-size:.74rem; font-weight:700; text-decoration:none; cursor:pointer; }
                         .plyr-top-profile-action:hover { background:rgba(255,99,56,.08); color:#ff6338; }
                         .dark .plyr-top-profile-action { color:#e2e8f0; }
                         .plyr-top-profile-action svg { width:.95rem; height:.95rem; }
                         .plyr-top-profile-action.is-danger { color:#ef5d3c; }
                         .plyr-top-profile-dual-actions { display:grid; grid-template-columns:1fr 1fr; gap:.45rem; }
-                        .plyr-top-profile-pill { display:inline-flex; align-items:center; justify-content:center; min-height:2.1rem; padding:0 .85rem; border-radius:999px; font-size:.72rem; font-weight:800; text-decoration:none; transition:transform .16s ease, border-color .16s ease, background .16s ease; }
-                        .plyr-top-profile-pill:hover { transform:translateY(-1px); }
+                        .plyr-top-profile-pill { display:inline-flex; align-items:center; justify-content:center; min-height:2.1rem; padding:0 .75rem; border-radius:999px; font-size:.7rem; font-weight:800; text-decoration:none; }
                         .plyr-top-profile-pill.is-solid { background:#ff6338; color:#fff; }
                         .plyr-top-profile-pill.is-ghost { border:1px solid rgba(255,99,56,.22); background:rgba(255,99,56,.08); color:#ff6338; }
-                        .plyr-top-profile-summary { display:grid; gap:.48rem; }
-                        .plyr-top-profile-summary-card { border:1px solid rgba(226,232,240,.96); border-radius:.8rem; background:#f8fafc; padding:.68rem .75rem; }
+                        .plyr-top-profile-summary-card { border:1px solid rgba(226,232,240,.96); border-radius:.78rem; background:#f8fafc; padding:.68rem .72rem; }
                         .dark .plyr-top-profile-summary-card { border-color:rgba(148,163,184,.16); background:rgba(255,255,255,.03); }
-                        .plyr-top-profile-summary-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:.48rem; }
-                        .plyr-top-profile-summary-head strong { font-size:.74rem; font-weight:800; color:inherit; }
-                        .plyr-top-profile-badge { display:inline-flex; align-items:center; min-height:1.5rem; padding:0 .6rem; border-radius:999px; background:rgba(255,99,56,.1); color:#ff6338; font-size:.67rem; font-weight:800; }
-                        .plyr-top-profile-stat { display:flex; align-items:center; justify-content:space-between; gap:1rem; font-size:.71rem; color:#64748b; padding:.14rem 0; }
+                        .plyr-top-profile-summary-head { display:flex; align-items:center; justify-content:space-between; gap:.7rem; margin-bottom:.4rem; }
+                        .plyr-top-profile-summary-head strong { font-size:.73rem; }
+                        .plyr-top-profile-stat { display:flex; align-items:center; justify-content:space-between; gap:.8rem; padding:.14rem 0; color:#64748b; font-size:.7rem; }
                         .dark .plyr-top-profile-stat { color:#94a3b8; }
-                        .plyr-top-profile-stat strong { color:#0f172a; font-size:.73rem; white-space:nowrap; }
+                        .plyr-top-profile-stat strong { color:#0f172a; font-size:.72rem; text-align:right; }
                         .dark .plyr-top-profile-stat strong { color:#f8fafc; }
-                        .plyr-top-profile-plan-icon { width:1.9rem; height:1.9rem; display:grid; place-items:center; border-radius:.68rem; background:rgba(255,99,56,.1); color:#ff6338; flex:0 0 auto; }
-                        .plyr-top-profile-plan-icon svg { width:.95rem; height:.95rem; }
-                        .plyr-top-profile-plan-row { display:flex; align-items:center; gap:.65rem; }
-                        .plyr-top-profile-plan-copy { min-width:0; display:grid; gap:.12rem; }
-                        .plyr-top-profile-plan-copy strong { font-size:.76rem; line-height:1.1; color:inherit; }
-                        .plyr-top-profile-plan-copy span { font-size:.68rem; color:#64748b; }
+                        .plyr-top-profile-plan-icon { width:1.8rem; height:1.8rem; display:grid; place-items:center; border-radius:.65rem; background:rgba(255,99,56,.1); color:#ff6338; flex:0 0 auto; }
+                        .plyr-top-profile-plan-icon svg { width:.9rem; height:.9rem; }
+                        .plyr-top-profile-plan-copy { display:grid; gap:.1rem; }
+                        .plyr-top-profile-plan-copy strong { font-size:.75rem; }
+                        .plyr-top-profile-plan-copy span { font-size:.67rem; color:#64748b; }
                         .dark .plyr-top-profile-plan-copy span { color:#94a3b8; }
-                        @media(max-width:900px) {
-                            .plyr-top-account-dock-host { justify-content:stretch; }
-                            .plyr-top-account-dock { width:100%; justify-content:flex-end; }
-                            .plyr-top-profile-wrap { width:100%; }
-                            .plyr-top-profile-trigger { width:100%; min-width:0; }
-                            .plyr-top-profile-menu { width:min(100%, 22rem); }
-                            .plyr-top-profile-dual-actions { grid-template-columns:1fr; }
-                        }
+                        .rc-account-impersonation-bar { position:relative !important; z-index:1000 !important; }
+                        .rc-account-impersonation-bar * { pointer-events:auto !important; }
+                        @media(max-width:640px){.plyr-top-profile-menu{position:fixed;top:4.5rem;right:.75rem;width:min(19rem,calc(100vw - 1.5rem))}}
                     </style>
                 HTML,
             )
@@ -2038,47 +2026,23 @@ class AdminPanelProvider extends PanelProvider
                             $recentPurchase = \App\Models\CreditPointTransaction::query()->where('user_id', $user->getKey())->where('type', 'grant')->whereIn('source_type', ['package_purchase', 'top_up_purchase'])->latest('id')->first();
                             if ($recentPurchase) {
                                 $package = trim((string) data_get($recentPurchase->meta ?? [], 'package', ''));
-                                $purchaseName = $package !== '' ? str($package)->replace('-', ' ')->title()->toString() : trim((string) ($recentPurchase->reason ?: 'Credit purchase'));
+                                $purchaseName = $package !== '' ? str($package)->replace('-', ' ')->title()->toString() : trim((string) ($recentPurchase->reason ?: 'Point purchase'));
                                 $purchaseDate = optional($recentPurchase->created_at)->format('M j');
                                 $recentCreditPurchaseLabel = $purchaseName . ($purchaseDate ? ' · ' . $purchaseDate : '');
                             }
                         }
                         $html .= Blade::render(<<<'BLADE'
-                            <div id="plyr-top-account-dock" class="plyr-top-account-dock" x-data="{ profileOpen: false, closeTimer: null, show() { clearTimeout(this.closeTimer); this.profileOpen = true }, hide() { clearTimeout(this.closeTimer); this.closeTimer = setTimeout(() => this.profileOpen = false, 180) } }" x-on:keydown.escape.window="profileOpen = false">
+                            <div id="plyr-top-account-dock" class="plyr-top-account-dock" x-data="{ profileOpen:false, closeTimer:null, show(){clearTimeout(this.closeTimer);this.profileOpen=true}, hide(){clearTimeout(this.closeTimer);this.closeTimer=setTimeout(()=>this.profileOpen=false,180)} }" x-on:keydown.escape.window="profileOpen=false">
                                 <div class="plyr-top-profile-wrap" x-on:mouseenter="show()" x-on:mouseleave="hide()">
-                                    <button type="button" class="plyr-top-account-card plyr-top-profile-trigger" @click="profileOpen = ! profileOpen" aria-label="Open account menu" x-bind:aria-expanded="profileOpen ? 'true' : 'false'">
+                                    <button type="button" class="plyr-top-profile-trigger" @click="profileOpen=!profileOpen" aria-label="Open profile menu" x-bind:aria-expanded="profileOpen?'true':'false'">
                                         <span class="plyr-top-profile-avatar"><img src="{{ $avatarUrl }}" alt="{{ $name }}"></span>
-                                        <span class="plyr-top-profile-copy"><strong>{{ $name }}</strong><span>Profile</span></span>
-                                        <svg class="plyr-top-profile-chevron" :style="profileOpen ? 'transform:rotate(180deg)' : ''" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M6.5 8L10 11.5L13.5 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                     </button>
-                                    <div class="plyr-top-profile-menu" x-show="profileOpen" x-cloak x-transition.opacity.scale.origin.top.right @click.outside="profileOpen = false" x-on:mouseenter="show()" x-on:mouseleave="hide()">
-                                        <div class="plyr-top-profile-section">
-                                            <div class="plyr-top-profile-dual-actions">
-                                                <a href="{{ $editProfileUrl }}" class="plyr-top-profile-pill is-ghost">Edit Profile</a>
-                                                <a href="{{ $settingsUrl }}" class="plyr-top-profile-pill is-ghost">Settings</a>
-                                            </div>
-                                        </div>
-                                        <div class="plyr-top-profile-section">
-                                            <span class="plyr-top-profile-section-label">Credits</span>
-                                            <div class="plyr-top-profile-summary-card">
-                                                <div class="plyr-top-profile-summary-head">
-                                                    <strong>Credit Usage</strong>
-                                                    <a href="{{ $managePlanUrl }}" class="plyr-top-profile-pill is-solid">Get More</a>
-                                                </div>
-                                                <div class="plyr-top-profile-stat"><span>Available</span><strong>{{ number_format($creditBalance) }} credits</strong></div>
-                                                <div class="plyr-top-profile-stat"><span>Recently Purchased</span><strong>{{ $recentCreditPurchaseLabel }}</strong></div>
-                                            </div>
-                                        </div>
-                                        <div class="plyr-top-profile-section">
-                                            <span class="plyr-top-profile-section-label">Plan</span>
-                                            <a href="{{ $managePlanUrl }}" class="plyr-top-profile-action">
-                                                <span class="plyr-top-profile-plan-icon"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M13 2L5 13h6l-1 9l9-12h-6V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span>
-                                                <span class="plyr-top-profile-plan-copy"><strong>{{ $planLabel }}</strong><span>Manage Plan</span></span>
-                                            </a>
-                                        </div>
-                                        <div class="plyr-top-profile-section">
-                                            <form method="POST" action="{{ $logoutUrl }}" style="margin:0;">@csrf<button type="submit" class="plyr-top-profile-action is-danger"><svg viewBox="0 0 24 24" fill="none"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign Out</span></button></form>
-                                        </div>
+                                    <div class="plyr-top-profile-menu" x-show="profileOpen" x-cloak x-transition.opacity.scale.origin.top.right @click.outside="profileOpen=false" x-on:mouseenter="show()" x-on:mouseleave="hide()">
+                                        <div class="plyr-top-profile-user"><span class="plyr-top-profile-avatar"><img src="{{ $avatarUrl }}" alt="{{ $name }}"></span><span class="plyr-top-profile-user-copy"><strong>{{ $name }}</strong><span>{{ $planLabel }}</span></span></div>
+                                        <div class="plyr-top-profile-section"><div class="plyr-top-profile-dual-actions"><a href="{{ $editProfileUrl }}" class="plyr-top-profile-pill is-ghost">Edit Profile</a><a href="{{ $settingsUrl }}" class="plyr-top-profile-pill is-ghost">Settings</a></div></div>
+                                        <div class="plyr-top-profile-section"><span class="plyr-top-profile-section-label">Points</span><div class="plyr-top-profile-summary-card"><div class="plyr-top-profile-summary-head"><strong>PLYRCARD Points</strong><a href="{{ url('/admin/coach-database/services') }}" class="plyr-top-profile-pill is-solid">Use Points</a></div><div class="plyr-top-profile-stat"><span>Available</span><strong>{{ number_format($creditBalance) }} points</strong></div><div class="plyr-top-profile-stat"><span>Recently Purchased</span><strong>{{ $recentCreditPurchaseLabel }}</strong></div></div></div>
+                                        <div class="plyr-top-profile-section"><span class="plyr-top-profile-section-label">Plan</span><a href="{{ $managePlanUrl }}" class="plyr-top-profile-action"><span class="plyr-top-profile-plan-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L5 13h6l-1 9l9-12h-6V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="plyr-top-profile-plan-copy"><strong>{{ $planLabel }}</strong><span>Manage Plan</span></span></a></div>
+                                        <div class="plyr-top-profile-section"><form method="POST" action="{{ $logoutUrl }}" style="margin:0;">@csrf<button type="submit" class="plyr-top-profile-action is-danger"><svg viewBox="0 0 24 24" fill="none"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign Out</span></button></form></div>
                                     </div>
                                 </div>
                             </div>
@@ -2090,8 +2054,21 @@ class AdminPanelProvider extends PanelProvider
                             document.addEventListener('DOMContentLoaded', function () {
                                 const mountPlyrTopAccountDock = () => {
                                     const dock = document.getElementById('plyr-top-account-dock');
+                                    if (!dock) return;
+                                    const darkButtons = Array.from(document.querySelectorAll('[data-plyr-dark-toggle]'));
+                                    const darkButton = darkButtons.find(el => el.getClientRects().length && getComputedStyle(el).display !== 'none');
+                                    if (darkButton && darkButton.parentElement) {
+                                        let host = darkButton.parentElement.querySelector(':scope > .plyr-top-account-dock-host');
+                                        if (!host) {
+                                            host = document.createElement('span');
+                                            host.className = 'plyr-top-account-dock-host';
+                                            darkButton.insertAdjacentElement('afterend', host);
+                                        }
+                                        if (dock.parentElement !== host) host.appendChild(dock);
+                                        return;
+                                    }
                                     const main = document.querySelector('.fi-main');
-                                    if (!dock || !main) return;
+                                    if (!main) return;
                                     let host = main.querySelector(':scope > .plyr-top-account-dock-host');
                                     if (!host) {
                                         host = document.createElement('div');
@@ -2102,6 +2079,8 @@ class AdminPanelProvider extends PanelProvider
                                 };
                                 mountPlyrTopAccountDock();
                                 document.addEventListener('livewire:navigated', mountPlyrTopAccountDock);
+                                window.addEventListener('rc-client-section', () => setTimeout(mountPlyrTopAccountDock, 30));
+                                window.addEventListener('rc-fast-section', () => setTimeout(mountPlyrTopAccountDock, 30));
                                 window.setTimeout(mountPlyrTopAccountDock, 150);
                                 window.setTimeout(mountPlyrTopAccountDock, 700);
                                 const ORANGE = '#ff6338';

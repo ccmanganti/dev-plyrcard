@@ -2,6 +2,12 @@
     @php
         $plans = $this->getPlans();
         $addons = $this->getAddons();
+        $pointPacks = collect($this->getPointPacks());
+        $pointBalance = $this->getPointBalance();
+        $hasJourney = $this->getCurrentPlanKey() === 'my_journey';
+        $serviceCatalog = collect(app(\App\Services\CreditPointService::class)->catalog())->values();
+        $pointWorth = $serviceCatalog->map(fn (array $service): array => array_merge($service, ['count_for_balance' => intdiv(max(0, $pointBalance), max(1, (int) ($service['points'] ?? 0)))]));
+        $money = fn (int $cents) => '$' . number_format($cents / 100, $cents % 100 === 0 ? 0 : 2);
         function mjIcon($name) {
             return match ($name) {
                 'user' => '<svg xmlns="http://www\.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.118a7.5 7.5 0 0 1 15 0A17.933 17.933 0 0 1 12 21.75a17.933 17.933 0 0 1-7.5-1.632Z" /></svg>',
@@ -586,6 +592,34 @@
                 text-align: left;
             }
         }
+        .mj-points-overview { margin-top: 1.25rem; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 1rem; }
+        .mj-points-panel { border: 1px solid var(--mj-border); border-radius: 20px; background: var(--mj-panel); box-shadow: var(--mj-shadow-soft); padding: 1.25rem; }
+        .dark .mj-points-panel { background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%); box-shadow: var(--mj-shadow); }
+        .mj-points-kicker { color: var(--mj-muted); font-size: .7rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
+        .mj-points-balance { display: flex; align-items: flex-end; gap: .55rem; margin-top: .55rem; }
+        .mj-points-balance strong { color: var(--mj-orange); font-size: clamp(3rem, 6vw, 4.7rem); line-height: .9; font-weight: 900; letter-spacing: -.055em; }
+        .mj-points-balance span { padding-bottom: .42rem; color: var(--mj-muted); font-size: .88rem; font-weight: 700; }
+        .mj-points-copy { margin-top: .8rem; padding: .8rem .9rem; border-radius: 12px; background: var(--mj-panel-2); color: var(--mj-muted); font-size: .86rem; line-height: 1.5; }
+        .mj-points-actions { display: flex; gap: .55rem; flex-wrap: wrap; margin-top: .85rem; }
+        .mj-points-actions .mj-btn { width: auto; min-width: 150px; margin-top: 0; }
+        .mj-worth-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+        .mj-worth-head h2, .mj-point-packs h2 { margin: 0; color: var(--mj-heading); font-size: 1.15rem; font-weight: 850; }
+        .mj-worth-head p, .mj-point-packs p { margin: .3rem 0 0; color: var(--mj-muted); font-size: .84rem; line-height: 1.5; }
+        .mj-worth-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin-top: .9rem; }
+        .mj-worth-item { padding: .8rem .85rem; border: 1px solid var(--mj-border); border-radius: 12px; background: var(--mj-panel-2); }
+        .mj-worth-item strong { display: block; color: var(--mj-heading); font-size: .83rem; }
+        .mj-worth-item span { display: block; margin-top: .22rem; color: var(--mj-muted); font-size: .73rem; line-height: 1.4; }
+        .mj-point-packs { margin-top: 1.25rem; border: 1px solid var(--mj-border); border-radius: 20px; background: var(--mj-panel); box-shadow: var(--mj-shadow-soft); padding: 1.25rem; }
+        .dark .mj-point-packs { background: linear-gradient(180deg, #0a0c10 0%, #0a0b0f 100%); box-shadow: var(--mj-shadow); }
+        .mj-pack-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-top: .9rem; }
+        .mj-pack { display: grid; gap: .45rem; min-width: 0; padding: 1rem; border: 1px solid var(--mj-border); border-radius: 14px; background: var(--mj-panel-2); }
+        .mj-pack strong { color: var(--mj-orange); font-size: 1.8rem; line-height: 1; }
+        .mj-pack-price { color: var(--mj-heading); font-size: .92rem; font-weight: 800; }
+        .mj-pack-note { color: var(--mj-muted); font-size: .74rem; line-height: 1.42; min-height: 2.1em; }
+        .mj-pack .mj-btn { margin-top: .35rem; }
+        .mj-point-gate { margin-top: .9rem; padding: .9rem 1rem; border-radius: 12px; border: 1px solid rgba(255, 99, 56, .18); background: var(--mj-orange-soft); color: var(--mj-muted); font-size: .82rem; line-height: 1.5; }
+        @media (max-width: 980px) { .mj-points-overview { grid-template-columns: 1fr; } .mj-pack-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 640px) { .mj-worth-grid { grid-template-columns: 1fr; } .mj-points-actions .mj-btn { width: 100%; } }
     </style>
     <div class="mj-wrap">
         <section class="mj-hero">
@@ -601,7 +635,7 @@
             </p>
             <div style="display:inline-flex;align-items:center;gap:.5rem;margin-top:1rem;padding:.58rem .78rem;border-radius:999px;background:var(--mj-panel);border:1px solid var(--mj-border);font-size:.78rem;font-weight:750;">
                 <span style="color:var(--mj-orange);">●</span>
-                <span>{{ number_format($this->getCreditBalance()) }} credits available</span>
+                <span>{{ number_format($pointBalance) }} points available</span>
                 <span style="color:var(--mj-muted);font-weight:600;">· never expire</span>
             </div>
             <div class="mj-hero-badge">
@@ -610,6 +644,25 @@
                 </div>
                 <div>
                     <div style="font-weight: 800;">{{ $this->getHeroBadgeLabel() }}</div>
+                </div>
+            </div>
+        </section>
+        <section class="mj-points-overview">
+            <div class="mj-points-panel">
+                <div class="mj-points-kicker">Your points</div>
+                <div class="mj-points-balance"><strong>{{ number_format($pointBalance) }}</strong><span>points available</span></div>
+                <div class="mj-points-copy">Mix and match PLYRCARD services with your points. Your unused balance does not expire.</div>
+                <div class="mj-points-actions">
+                    <a href="{{ url('/admin/coach-database/services') }}" class="mj-btn orange">Use Points</a>
+                    <a href="#buy-points" class="mj-btn ghost">Buy Points</a>
+                </div>
+            </div>
+            <div class="mj-points-panel">
+                <div class="mj-worth-head"><div><h2>What your points can get you</h2><p>Live values from the full PLYRCARD service catalog.</p></div></div>
+                <div class="mj-worth-grid">
+                    @foreach ($pointWorth as $service)
+                        <div class="mj-worth-item"><strong>{{ $service['name'] }}</strong><span>{{ number_format((int) $service['points']) }} points each · current balance covers {{ number_format((int) $service['count_for_balance']) }}</span></div>
+                    @endforeach
                 </div>
             </div>
         </section>
@@ -682,6 +735,24 @@
                     </a>
                 </article>
             @endforeach
+        </section>
+        <section class="mj-point-packs" id="buy-points">
+            <div class="mj-worth-head"><div><h2>Buy points</h2><p>Point packs are added after Stripe confirms payment. Jumpstart and Amplify keep their existing package behavior.</p></div></div>
+            @if ($hasJourney)
+                <div class="mj-pack-grid">
+                    @foreach ($pointPacks as $pack)
+                        <article class="mj-pack">
+                            <div class="mj-points-kicker">Point Pack</div>
+                            <strong>{{ number_format((int) $pack['points']) }} PTS</strong>
+                            <div class="mj-pack-price">{{ $money((int) $pack['price_cents']) }}</div>
+                            <div class="mj-pack-note">{{ $pack['note'] ?? 'Add points to your PLYRCARD balance.' }}</div>
+                            <button type="button" class="mj-btn ghost" data-plyrcard-point-pack-open="{{ $pack['key'] }}">Buy Points</button>
+                        </article>
+                    @endforeach
+                </div>
+            @else
+                <div class="mj-point-gate">Point packs become available once My Journey is active. You can still choose Jumpstart or Amplify above, including their existing point allocations.</div>
+            @endif
         </section>
         @if ($this->shouldShowAddons())
             <section class="mj-addon-wrap">
@@ -764,6 +835,6 @@
             });
         })();
     </script>
-    {{-- Native Stripe checkout for My Journey + credit packages. --}}
+    {{-- Native Stripe checkout for My Journey + point packages. --}}
     @include('partials.stripe-upgrade-modal')
 </x-filament-panels::page>

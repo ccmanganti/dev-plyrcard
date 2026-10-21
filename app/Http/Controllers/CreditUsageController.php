@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CreditServiceRequest;
 use App\Models\User;
 use App\Services\CreditPointService;
+use App\Services\PlyrcardSystemEmailService;
 use App\Services\SupportAlertService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,6 +24,7 @@ class CreditUsageController extends Controller
         Request $request,
         CreditPointService $credits,
         SupportAlertService $alerts,
+        PlyrcardSystemEmailService $systemEmail,
     ): RedirectResponse {
         $catalog = $credits->catalog();
 
@@ -46,7 +48,7 @@ class CreditUsageController extends Controller
 
         if ($selected->isEmpty()) {
             throw ValidationException::withMessages([
-                'items' => 'Select at least one service to use your credits.',
+                'items' => 'Select at least one service to use your points.',
             ]);
         }
 
@@ -90,7 +92,7 @@ class CreditUsageController extends Controller
                 if ((int) $lockedUser->points_available < $totalPoints) {
                     throw ValidationException::withMessages([
                         'credits' => sprintf(
-                            'This request needs %s credits, but you currently have %s available.',
+                            'This request needs %s points, but you currently have %s available.',
                             number_format($totalPoints),
                             number_format((int) $lockedUser->points_available),
                         ),
@@ -178,12 +180,28 @@ class CreditUsageController extends Controller
             }
         }
 
+        if ($result['created_new']) {
+            try {
+                $systemEmail->sendServiceRequestSubmitted(
+                    $user->fresh() ?? $user,
+                    $result['requests']->pluck('item_name')->filter()->values()->all(),
+                    (int) $result['points'],
+                );
+            } catch (\Throwable $exception) {
+                Log::warning('PLYRCARD service request player notification failed.', [
+                    'user_id' => $user->getKey(),
+                    'request_ids' => $result['requests']->pluck('id')->all(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         $count = $result['requests']->count();
 
         return back()->with(
             'credit_success',
             sprintf(
-                '%s submitted. %s credits were deducted from your balance.',
+                '%s submitted. %s points were deducted from your balance.',
                 $count === 1 ? '1 service request' : number_format($count) . ' service requests',
                 number_format((int) $result['points']),
             ),
