@@ -50,7 +50,7 @@
         allSchools: @js($gridSchools),
         viewMode: @js($gridViewMode),
         selectedSchoolIds: @js($gridSelectedSchoolIds),
-        search: '', division: '', conference: '', displayLimit: 24,
+        search: '', division: '', state: '', conference: '', displayLimit: 24,
         norm(value) { return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' '); },
         divisionKey(value) {
             return this.norm(value).replace(/ncaa\s*/g,'ncaa ').replace(/division\s*iii/g,'d-iii').replace(/division\s*ii/g,'d-ii').replace(/division\s*i/g,'d-i').replace(/\bd\s*-?\s*iii\b/g,'d-iii').replace(/\bd\s*-?\s*ii\b/g,'d-ii').replace(/\bd\s*-?\s*i\b/g,'d-i');
@@ -58,9 +58,11 @@
         get matchingSchools() {
             const q = this.norm(this.search);
             const div = this.divisionKey(this.division);
+            const state = this.norm(this.state);
             const conf = this.norm(this.conference);
             return this.allSchools.filter(school => {
                 if (div && this.divisionKey(school.division) !== div) return false;
+                if (state && this.norm(school.state) !== state) return false;
                 if (conf && this.norm(school.conference) !== conf) return false;
                 if (!q) return true;
                 const coaches = Array.isArray(school.coaches) ? school.coaches : [];
@@ -71,9 +73,20 @@
                 return haystack.includes(q);
             });
         },
-        get availableConferences() {
+        get availableStates() {
             const div = this.divisionKey(this.division);
             const rows = this.allSchools.filter(school => !div || this.divisionKey(school.division) === div);
+            return Array.from(new Set(rows.map(school => String(school.state || '').trim()).filter(Boolean)))
+                .sort((a, b) => a.localeCompare(b));
+        },
+        get availableConferences() {
+            const div = this.divisionKey(this.division);
+            const state = this.norm(this.state);
+            const rows = this.allSchools.filter(school => {
+                if (div && this.divisionKey(school.division) !== div) return false;
+                if (state && this.norm(school.state) !== state) return false;
+                return true;
+            });
             return Array.from(new Set(rows.map(school => String(school.conference || '').trim()).filter(Boolean)))
                 .sort((a, b) => a.localeCompare(b));
         },
@@ -97,14 +110,19 @@
         initialsFor(name) { const words=String(name ?? '').trim().split(/\s+/).filter(Boolean); return words.slice(0,2).map(word=>word.charAt(0)).join('').toUpperCase() || 'S'; },
         shortDivision(value) { return String(value ?? '').trim() || '—'; },
         publishCount() { this.$dispatch('rc-discover-count', { total: this.matchingSchools.length, shown: this.visibleSchools.length }); },
+        publishStates() {
+            const options = this.availableStates;
+            if (this.state && !options.includes(this.state)) this.state = '';
+            this.$dispatch('rc-discover-states', { states: options, selected: this.state });
+        },
         publishConferences() {
             const options = this.availableConferences;
             if (this.conference && !options.includes(this.conference)) this.conference = '';
             this.$dispatch('rc-discover-conferences', { conferences: options, selected: this.conference });
         }
     }"
-    x-init="$nextTick(() => { publishCount(); publishConferences(); }); $watch('search', () => { displayLimit=24; $nextTick(() => publishCount()) }); $watch('division', () => { displayLimit=24; $nextTick(() => { publishConferences(); publishCount(); }) }); $watch('conference', () => { displayLimit=24; $nextTick(() => publishCount()) })"
-    x-on:rc-discover-filter.window="search=String($event.detail?.search ?? ''); division=String($event.detail?.division ?? ''); conference=String($event.detail?.conference ?? ''); $nextTick(() => { publishConferences(); publishCount(); })"
+    x-init="$nextTick(() => { publishCount(); publishStates(); publishConferences(); }); $watch('search', () => { displayLimit=24; $nextTick(() => publishCount()) }); $watch('division', () => { displayLimit=24; $nextTick(() => { publishStates(); publishConferences(); publishCount(); }) }); $watch('state', () => { displayLimit=24; $nextTick(() => { publishConferences(); publishCount(); }) }); $watch('conference', () => { displayLimit=24; $nextTick(() => publishCount()) })"
+    x-on:rc-discover-filter.window="search=String($event.detail?.search ?? ''); division=String($event.detail?.division ?? ''); state=String($event.detail?.state ?? ''); conference=String($event.detail?.conference ?? ''); $nextTick(() => { publishStates(); publishConferences(); publishCount(); })"
     x-on:rc-discover-view.window="viewMode = $event.detail?.mode === 'list' ? 'list' : 'grid'"
     x-on:rc-discover-load-more.window="displayLimit += 24; $nextTick(() => publishCount())"
     x-on:rc-discover-toggle-visible.window="const visible = visibleSchools.map(item => String(item.id)); const all = visible.length > 0 && visible.every(id => isSelected(id)); selectedSchoolIds = all ? selectedSchoolIds.filter(id => !visible.includes(String(id))) : Array.from(new Set([...selectedSchoolIds.map(String), ...visible])); $dispatch('rc-discover-selection', { ids: [...selectedSchoolIds] })"

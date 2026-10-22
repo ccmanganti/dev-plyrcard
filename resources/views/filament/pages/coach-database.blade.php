@@ -217,7 +217,9 @@
 discoverSelectedIds: [],
             discoverSearch: '',
             discoverDivision: '',
+            discoverState: '',
             discoverConference: '',
+            discoverAvailableStates: [],
             discoverAvailableConferences: [],
             discoverViewMode: 'grid',
             discoverClientCount: 0,
@@ -6549,7 +6551,8 @@ discoverSelectedIds: [],
         x-on:rc-discover-school-state.window="applyGlobalSchoolState($event.detail)"
         x-on:rc-list-membership-changed.window="applyGlobalListMembership($event.detail)"
         x-on:rc-discover-count.window="discoverClientCount = Number($event.detail?.total || 0); discoverClientShown = Number($event.detail?.shown || 0)"
-        x-on:rc-discover-conferences.window="discoverAvailableConferences = Array.isArray($event.detail?.conferences) ? $event.detail.conferences : []; if (discoverConference && !discoverAvailableConferences.includes(discoverConference)) discoverConference = ''"
+        x-on:rc-discover-states.window="discoverAvailableStates = Array.isArray($event.detail?.states) ? $event.detail.states : []; discoverState = String($event.detail?.selected ?? discoverState); if (discoverState && !discoverAvailableStates.includes(discoverState)) discoverState = ''"
+        x-on:rc-discover-conferences.window="discoverAvailableConferences = Array.isArray($event.detail?.conferences) ? $event.detail.conferences : []; discoverConference = String($event.detail?.selected ?? discoverConference); if (discoverConference && !discoverAvailableConferences.includes(discoverConference)) discoverConference = ''"
     >
         {{-- v10.113.9: removed hidden dashboard pollRealtime. This was another
              invisible Livewire request source that could keep the whole component busy. --}}
@@ -8306,7 +8309,7 @@ discoverSelectedIds: [],
                 }
                 .rc-discover-filter-v27 {
                     display: grid;
-                    grid-template-columns: minmax(0, 34rem) minmax(15rem, 20rem) 1fr;
+                    grid-template-columns: minmax(0, 34rem) minmax(10rem, 14rem) minmax(15rem, 20rem);
                     gap: .6rem;
                     align-items: center;
                 }
@@ -8644,7 +8647,7 @@ discoverSelectedIds: [],
                 .rc-discover-v29 .rc-head-coach-chip { display:inline-flex; margin-left:.28rem; border-radius:.35rem; padding:.12rem .28rem; background:rgba(255,99,56,.13); color:var(--rc-accent); font-size:.62rem; font-weight:950; vertical-align:middle; }
                 @media (max-width: 1320px) {
                     .rc-discover-v29 .rc-school-grid.rc-discover-school-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-                    .rc-discover-filter-v27 { grid-template-columns: minmax(0, 1fr) minmax(16rem, 21rem); }
+                    .rc-discover-filter-v27 { grid-template-columns: minmax(0, 1fr) minmax(10rem, 14rem) minmax(15rem, 21rem); }
                 }
                 .rc-discover-bulk-v36 {
                     display:flex;
@@ -9047,15 +9050,21 @@ discoverSelectedIds: [],
                 ])
                 <div class="rc-discover-program-search-v27" role="search" aria-label="Search schools and coaches">
                     <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m21 21-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" /></svg>
-                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." x-model="discoverSearch" x-on:input.debounce.40ms="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })" autocomplete="off" />
+                    <input placeholder="Search {{ number_format($discoverSearchTotal) }} women's soccer programs & coaches..." x-model="discoverSearch" x-on:input.debounce.40ms="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, state: discoverState, conference: discoverConference })" autocomplete="off" />
                 </div>
                 <div class="rc-discover-filter-v27">
                     <div class="rc-discover-tabs-v27" aria-label="Division filter">
                         @foreach($discoverDivisionTabs as $divisionValue => $divisionLabel)
-                            <button type="button" class="rc-discover-tab-v27" x-bind:class="discoverDivision === @js($divisionValue) ? 'is-active' : ''" x-on:click="discoverDivision = (discoverDivision === @js($divisionValue) ? '' : @js($divisionValue)); discoverConference=''; $dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })">{{ $divisionLabel }}</button>
+                            <button type="button" class="rc-discover-tab-v27" x-bind:class="discoverDivision === @js($divisionValue) ? 'is-active' : ''" x-on:click="discoverDivision = (discoverDivision === @js($divisionValue) ? '' : @js($divisionValue)); $dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, state: discoverState, conference: discoverConference })">{{ $divisionLabel }}</button>
                         @endforeach
                     </div>
-                    <select class="rc-discover-select-v27" x-model="discoverConference" x-on:change="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, conference: discoverConference })" aria-label="Conference filter">
+                    <select class="rc-discover-select-v27" x-model="discoverState" x-on:change="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, state: discoverState, conference: discoverConference })" aria-label="State filter">
+                        <option value="" x-text="`All States (${Number(discoverAvailableStates.length || 0).toLocaleString()})`"></option>
+                        <template x-for="stateOption in discoverAvailableStates" :key="`discover-state-${stateOption}`">
+                            <option x-bind:value="stateOption" x-text="stateOption"></option>
+                        </template>
+                    </select>
+                    <select class="rc-discover-select-v27" x-model="discoverConference" x-on:change="$dispatch('rc-discover-filter', { search: discoverSearch, division: discoverDivision, state: discoverState, conference: discoverConference })" aria-label="Conference filter">
                         <option value="" x-text="`All Conferences (${Number(discoverAvailableConferences.length || 0).toLocaleString()})`"></option>
                         <template x-for="conferenceOption in discoverAvailableConferences" :key="`discover-conf-${conferenceOption}`">
                             <option x-bind:value="conferenceOption" x-text="conferenceOption"></option>
