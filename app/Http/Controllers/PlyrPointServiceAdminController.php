@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -19,6 +20,7 @@ class PlyrPointServiceAdminController extends Controller
     {
         $this->authorizeAdmin();
         $data = $this->serviceData($request);
+        $samples = $this->newServiceSamples($request);
 
         $base = Str::slug($data['name'], '_') ?: 'service';
         $key = $base;
@@ -28,14 +30,42 @@ class PlyrPointServiceAdminController extends Controller
             $suffix++;
         }
 
-        $service = PlyrPointService::query()->create([
-            ...$data,
-            'key' => $key,
-            'is_system' => false,
-            'sort_order' => ((int) PlyrPointService::query()->max('sort_order')) + 10,
-        ]);
+        $storedPaths = [];
+        try {
+            $service = DB::transaction(function () use ($data, $key, $samples, &$storedPaths): PlyrPointService {
+                $service = PlyrPointService::query()->create([
+                    ...$data,
+                    'key' => $key,
+                    'is_system' => false,
+                    'sort_order' => ((int) PlyrPointService::query()->max('sort_order')) + 10,
+                ]);
 
-        return $this->respond($request, $service, 'Service added.');
+                $sort = 10;
+                foreach ($samples['urls'] as $sample) {
+                    $this->createUrlSampleRecord(
+                        $service,
+                        (string) $sample['url'],
+                        trim((string) ($sample['title'] ?? '')),
+                        $sort,
+                    );
+                    $sort += 10;
+                }
+
+                foreach ($samples['files'] as $file) {
+                    $this->createUploadedSampleRecord($service, $file, $sort, $storedPaths);
+                    $sort += 10;
+                }
+
+                return $service;
+            });
+        } catch (\Throwable $exception) {
+            foreach ($storedPaths as $path) {
+                Storage::disk('public')->delete($path);
+            }
+            throw $exception;
+        }
+
+        return $this->respond($request, $service->fresh(), 'Service added.');
     }
 
     public function update(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
@@ -110,18 +140,12 @@ class PlyrPointServiceAdminController extends Controller
             'sample_title' => ['nullable', 'string', 'max:180'],
         ]);
 
-        $url = trim((string) $data['sample_url']);
-        $youtubeId = $this->youtubeId($url);
-        $type = $youtubeId ? 'youtube' : $this->urlMediaType($url);
-
-        $service->samples()->create([
-            'uuid' => (string) Str::uuid(),
-            'type' => $type,
-            'title' => trim((string) ($data['sample_title'] ?? '')) ?: ($type === 'youtube' ? 'YouTube sample' : 'Sample link'),
-            'source_url' => $url,
-            'youtube_id' => $youtubeId,
-            'sort_order' => ((int) $service->samples()->max('sort_order')) + 10,
-        ]);
+        $this->createUrlSampleRecord(
+            $service,
+            trim((string) $data['sample_url']),
+            trim((string) ($data['sample_title'] ?? '')),
+            ((int) $service->samples()->max('sort_order')) + 10,
+        );
 
         return $this->respond($request, $service->fresh(), 'Sample added.');
     }
@@ -139,24 +163,17 @@ class PlyrPointServiceAdminController extends Controller
         ]);
 
         $sort = ((int) $service->samples()->max('sort_order')) + 10;
-        foreach ((array) $request->file('sample_files', []) as $file) {
-            if (! $file instanceof UploadedFile || ! $file->isValid()) {
-                continue;
+        $storedPaths = [];
+        try {
+            foreach ((array) $request->file('sample_files', []) as $file) {
+                $this->createUploadedSampleRecord($service, $file, $sort, $storedPaths);
+                $sort += 10;
             }
-
-            $mime = strtolower((string) ($file->getMimeType() ?: $file->getClientMimeType()));
-            $type = str_starts_with($mime, 'image/') ? 'image' : 'video';
-            $path = $file->store('plyr-points/samples/' . $service->key, 'public');
-
-            $service->samples()->create([
-                'uuid' => (string) Str::uuid(),
-                'type' => $type,
-                'title' => trim((string) $file->getClientOriginalName()) ?: ucfirst($type) . ' sample',
-                'path' => $path,
-                'mime' => $mime,
-                'sort_order' => $sort,
-            ]);
-            $sort += 10;
+        } catch (\Throwable $exception) {
+            foreach ($storedPaths as $path) {
+                Storage::disk('public')->delete($path);
+            }
+            throw $exception;
         }
 
         return $this->respond($request, $service->fresh(), 'Sample media uploaded.');
@@ -200,6 +217,65 @@ class PlyrPointServiceAdminController extends Controller
                 ->all(),
             'is_enabled' => $request->boolean('is_enabled'),
         ];
+    }
+
+    private function newServiceSamples(Request $request): array
+    {
+        $data = $request->validate([
+            'sample_urls' => ['nullable', 'array', 'max:20'],
+            'sample_urls.*.url' => ['required', 'url', 'max:2000'],
+            'sample_urls.*.title' => ['nullable', 'string', 'max:180'],
+            'sample_files' => ['nullable', 'array', 'max:12'],
+            'sample_files.*' => ['file', 'max:51200', 'mimes:jpg,jpeg,png,webp,gif,mp4,mov,m4v,webm'],
+        ], [
+            'sample_files.*.max' => 'Each sample must be 50 MB or smaller. Use a YouTube link for larger video files.',
+            'sample_files.*.mimes' => 'Samples must be an image or video file.',
+        ]);
+
+        return [
+            'urls' => array_values((array) ($data['sample_urls'] ?? [])),
+            'files' => array_values(array_filter((array) $request->file('sample_files', []))),
+        ];
+    }
+
+    private function createUrlSampleRecord(PlyrPointService $service, string $url, string $title, int $sortOrder): PlyrPointServiceSample
+    {
+        $youtubeId = $this->youtubeId($url);
+        $type = $youtubeId ? 'youtube' : $this->urlMediaType($url);
+
+        return $service->samples()->create([
+            'uuid' => (string) Str::uuid(),
+            'type' => $type,
+            'title' => $title !== '' ? $title : ($type === 'youtube' ? 'YouTube sample' : 'Sample link'),
+            'source_url' => $url,
+            'youtube_id' => $youtubeId,
+            'sort_order' => $sortOrder,
+        ]);
+    }
+
+    private function createUploadedSampleRecord(
+        PlyrPointService $service,
+        mixed $file,
+        int $sortOrder,
+        array &$storedPaths,
+    ): ?PlyrPointServiceSample {
+        if (! $file instanceof UploadedFile || ! $file->isValid()) {
+            return null;
+        }
+
+        $mime = strtolower((string) ($file->getMimeType() ?: $file->getClientMimeType()));
+        $type = str_starts_with($mime, 'image/') ? 'image' : 'video';
+        $path = $file->store('plyr-points/samples/' . $service->key, 'public');
+        $storedPaths[] = $path;
+
+        return $service->samples()->create([
+            'uuid' => (string) Str::uuid(),
+            'type' => $type,
+            'title' => trim((string) $file->getClientOriginalName()) ?: ucfirst($type) . ' sample',
+            'path' => $path,
+            'mime' => $mime,
+            'sort_order' => $sortOrder,
+        ]);
     }
 
     private function authorizeAdmin(): void

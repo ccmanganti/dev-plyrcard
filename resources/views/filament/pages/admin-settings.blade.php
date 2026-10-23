@@ -68,8 +68,9 @@
                                 class="pc-service-toggle-v7 {{ ($service['enabled'] ?? true) ? 'is-on' : '' }}"
                                 data-plyr-toggle="{{ $service['id'] }}"
                                 aria-pressed="{{ ($service['enabled'] ?? true) ? 'true' : 'false' }}"
+                                aria-label="Turn {{ $service['name'] }} {{ ($service['enabled'] ?? true) ? 'off' : 'on' }}"
                             >
-                                <i></i><span>{{ ($service['enabled'] ?? true) ? 'On' : 'Off' }}</span>
+                                <i class="pc-switch-v7" aria-hidden="true"><b></b></i>
                             </button>
                             <button type="button" class="pc-service-edit-v7" data-plyr-service-edit="{{ $service['id'] }}">Edit</button>
                         @else
@@ -105,6 +106,7 @@
                     </div>
                     <label class="pc-editor-enabled-v7">
                         <input type="checkbox" name="is_enabled" value="1" data-plyr-service-enabled checked>
+                        <i class="pc-switch-v7" aria-hidden="true"><b></b></i>
                         <span>Available</span>
                     </label>
                 </div>
@@ -142,9 +144,9 @@
                 </div>
             </form>
 
-            <section class="pc-editor-card-v7" data-plyr-samples-section hidden>
+            <section class="pc-editor-card-v7" data-plyr-samples-section>
                 <div class="pc-subhead-v7">
-                    <div><strong>Samples</strong><span>Images, videos, YouTube embeds, or external links.</span></div>
+                    <div><strong>Samples</strong><span data-plyr-samples-help>Images, videos, YouTube embeds, or external links.</span></div>
                     <span class="pc-sample-count-v7" data-plyr-sample-count>0</span>
                 </div>
 
@@ -184,15 +186,15 @@
         .pc-settings-card-v7{border:1px solid #e4e7ec;border-radius:1rem;background:#fff;overflow:hidden;box-shadow:0 8px 28px rgba(15,23,42,.04)}.dark .pc-settings-card-v7{background:#111318;border-color:#2c313b;box-shadow:none}
         .pc-settings-head-v7,.pc-points-head-v7{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.1rem;border-bottom:1px solid #eaecf0}.dark .pc-settings-head-v7{border-color:#252a31}.pc-settings-head-v7 h2,.pc-points-head-v7 h2{margin:0;font-size:1rem;font-weight:850}.pc-settings-head-v7 p,.pc-points-head-v7 p{margin:.22rem 0 0;color:#667085;font-size:.75rem;line-height:1.4}.dark .pc-settings-head-v7 p{color:#98a2b3}
         .pc-settings-actions-v7{display:flex;gap:.4rem}.pc-btn-v7{height:2.2rem;border-radius:.62rem;padding:0 .78rem;font-size:.72rem;font-weight:850;cursor:pointer;transition:transform .14s ease,opacity .14s ease,background .14s ease,border-color .14s ease}.pc-btn-v7:active{transform:translateY(1px)}.pc-btn-v7:disabled{opacity:.58;cursor:wait}.pc-btn-v7.primary{border:1px solid #ff6338;background:#ff6338;color:#fff}.pc-btn-v7.primary:hover{background:#f4552d;border-color:#f4552d}.pc-btn-v7.ghost{border:1px solid #d0d5dd;background:#fff;color:#344054}.dark .pc-btn-v7.ghost{background:#17191f;border-color:#343943;color:#e5e7eb}.pc-btn-v7.danger{border:1px solid #fda29b;background:#fff;color:#b42318}.dark .pc-btn-v7.danger{background:#2a1717;border-color:#7a271a;color:#fda29b}
-        .pc-sport-grid-v7{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.pc-sport-row-v7{position:relative;display:flex;align-items:center;justify-content:space-between;gap:.65rem;min-height:3.1rem;padding:.58rem .8rem;border-right:1px solid #f0f1f3;border-bottom:1px solid #f0f1f3;background:#fff;cursor:pointer}.pc-sport-row-v7:nth-child(4n){border-right:0}.dark .pc-sport-row-v7{background:#111318;border-color:#252a31}.pc-sport-row-v7>span{min-width:0;display:flex;gap:.35rem;align-items:center}.pc-sport-row-v7 strong{font-size:.75rem}.pc-sport-row-v7 small{padding:.1rem .3rem;border-radius:.3rem;background:#f2f4f7;color:#98a2b3;font-size:.55rem;font-weight:800;text-transform:uppercase}.pc-sport-row-v7 input{position:absolute;opacity:0;pointer-events:none}.pc-switch-v7{width:1.8rem;height:1.02rem;padding:.11rem;display:flex;align-items:center;border-radius:999px;background:#d0d5dd}.pc-switch-v7 b{width:.8rem;height:.8rem;border-radius:50%;background:#fff;transition:.15s}.pc-sport-row-v7.is-enabled .pc-switch-v7{background:#ff6338}.pc-sport-row-v7.is-enabled .pc-switch-v7 b{transform:translateX(.77rem)}
+        .pc-sport-grid-v7{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.pc-sport-row-v7{position:relative;display:flex;align-items:center;justify-content:space-between;gap:.65rem;min-height:3.1rem;padding:.58rem .8rem;border-right:1px solid #f0f1f3;border-bottom:1px solid #f0f1f3;background:#fff;cursor:pointer}.pc-sport-row-v7:nth-child(4n){border-right:0}.dark .pc-sport-row-v7{background:#111318;border-color:#252a31}.pc-sport-row-v7>span{min-width:0;display:flex;gap:.35rem;align-items:center}.pc-sport-row-v7 strong{font-size:.75rem}.pc-sport-row-v7 small{padding:.1rem .3rem;border-radius:.3rem;background:#f2f4f7;color:#98a2b3;font-size:.55rem;font-weight:800;text-transform:uppercase}.pc-sport-row-v7 input{position:absolute;opacity:0;pointer-events:none}.pc-switch-v7{width:1.8rem;height:1.02rem;padding:.11rem;display:flex;align-items:center;border-radius:999px;background:#d0d5dd;transition:background .15s ease}.pc-switch-v7 b{width:.8rem;height:.8rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.16);transition:transform .15s ease}.pc-sport-row-v7.is-enabled .pc-switch-v7{background:#ff6338}.pc-sport-row-v7.is-enabled .pc-switch-v7 b{transform:translateX(.77rem)}
         .pc-points-head-v7{background:#17191f;color:#fff;border-bottom-color:#242933}.pc-points-head-v7 p{color:#a8b2c1}.pc-points-alert-v7{margin:.8rem 1rem 0;padding:.7rem .8rem;border-radius:.7rem;background:#fff4e5;color:#92400e;font-size:.72rem;font-weight:750}
         .pc-inline-notice-v7,.pc-drawer-notice-v7{border-radius:.7rem;padding:.65rem .75rem;font-size:.7rem;font-weight:800;line-height:1.35}.pc-inline-notice-v7{margin:.7rem 1rem 0}.pc-inline-notice-v7.is-success,.pc-drawer-notice-v7.is-success{background:#ecfdf3;color:#027a48}.pc-inline-notice-v7.is-error,.pc-drawer-notice-v7.is-error{background:#fef3f2;color:#b42318}
         .pc-service-list-v7{display:grid}.pc-service-row-v7{display:grid;grid-template-columns:2.5rem minmax(0,1fr) auto auto;align-items:center;gap:.8rem;padding:.78rem 1rem;border-bottom:1px solid #eef0f3;transition:background .15s ease}.pc-service-row-v7:last-child{border-bottom:0}.pc-service-row-v7.is-updating{background:#fff8f5}.dark .pc-service-row-v7{border-color:#252a31}.dark .pc-service-row-v7.is-updating{background:rgba(255,99,56,.06)}.pc-service-icon-v7{width:2.4rem;height:2.4rem;border-radius:.72rem;display:grid;place-items:center;background:#fff0eb;color:#c2410c;font-size:.8rem;font-weight:950}.dark .pc-service-icon-v7{background:rgba(255,99,56,.14);color:#ff8f73}.pc-service-copy-v7{min-width:0}.pc-service-copy-v7 strong{display:block;font-size:.82rem;font-weight:850}.pc-service-copy-v7 span{display:block;margin-top:.18rem;color:#667085;font-size:.67rem}.dark .pc-service-copy-v7 span{color:#98a2b3}
-        .pc-service-toggle-v7{min-width:4.25rem;height:2rem;border:1px solid #d0d5dd;border-radius:999px;background:#f2f4f7;color:#667085;padding:.18rem .42rem .18rem .2rem;display:flex;align-items:center;gap:.35rem;font-size:.64rem;font-weight:900;cursor:pointer;transition:all .18s ease}.pc-service-toggle-v7 i{width:1.3rem;height:1.3rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15);transition:transform .18s ease}.pc-service-toggle-v7.is-on{background:#ff6338;border-color:#ff6338;color:#fff}.pc-service-toggle-v7.is-on i{transform:translateX(.04rem)}.pc-service-toggle-v7:disabled{opacity:.58;cursor:wait}.pc-service-edit-v7{height:2rem;border:1px solid #d0d5dd;border-radius:.58rem;background:#fff;color:#344054;padding:0 .7rem;font-size:.68rem;font-weight:850;cursor:pointer}.dark .pc-service-edit-v7{background:#17191f;border-color:#343943;color:#e5e7eb}.pc-service-migrate-v7{color:#b54708;font-size:.67rem;font-weight:800}.pc-service-empty-v7{padding:2rem;text-align:center;color:#98a2b3;font-size:.75rem}
+        .pc-service-toggle-v7{border:0;background:transparent;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:999px;line-height:0}.pc-service-toggle-v7:focus-visible{outline:2px solid rgba(255,99,56,.38);outline-offset:3px}.pc-service-toggle-v7 .pc-switch-v7{pointer-events:none}.pc-service-toggle-v7.is-on .pc-switch-v7{background:#ff6338}.pc-service-toggle-v7.is-on .pc-switch-v7 b{transform:translateX(.77rem)}.pc-service-edit-v7{height:2rem;border:1px solid #d0d5dd;border-radius:.58rem;background:#fff;color:#344054;padding:0 .7rem;font-size:.68rem;font-weight:850;cursor:pointer}.dark .pc-service-edit-v7{background:#17191f;border-color:#343943;color:#e5e7eb}.pc-service-migrate-v7{color:#b54708;font-size:.67rem;font-weight:800}.pc-service-empty-v7{padding:2rem;text-align:center;color:#98a2b3;font-size:.75rem}
         .pc-points-overlay-v7{position:fixed;inset:0;z-index:10050;border:0;background:rgba(15,23,42,.34);backdrop-filter:blur(2px);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .22s ease,visibility 0s linear .22s}.pc-points-overlay-v7.is-open{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease,visibility 0s}
         .pc-points-drawer-v7{position:fixed;z-index:10051;top:0;right:0;width:min(560px,100vw);height:100vh;display:grid;grid-template-rows:auto 1fr;background:#fff;color:#101828;border-left:1px solid #e4e7ec;box-shadow:-24px 0 70px rgba(15,23,42,.22);transform:translate3d(100%,0,0);visibility:hidden;pointer-events:none;will-change:transform;transition:transform .26s cubic-bezier(.22,.8,.22,1),visibility 0s linear .26s}.pc-points-drawer-v7.is-open{transform:translate3d(0,0,0);visibility:visible;pointer-events:auto;transition:transform .26s cubic-bezier(.22,.8,.22,1),visibility 0s}.dark .pc-points-drawer-v7{background:#111318;color:#f8fafc;border-color:#2c313b}
         .pc-points-drawer-head-v7{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:1rem;min-height:5rem;padding:1rem 1.1rem;background:#fff;border-bottom:1px solid #e4e7ec}.dark .pc-points-drawer-head-v7{background:#111318;border-color:#2c313b}.pc-points-drawer-head-v7 span{display:block;color:#ff6338;font-size:.62rem;font-weight:900;text-transform:uppercase;letter-spacing:.09em}.pc-points-drawer-head-v7 h2{margin:.2rem 0 0;font-size:1.15rem;font-weight:900;letter-spacing:-.02em}.pc-drawer-close-v7{width:2.35rem;height:2.35rem;border:1px solid #e4e7ec;border-radius:.8rem;background:#fff;color:#667085;font-size:1.45rem;line-height:1;cursor:pointer;transition:.15s}.pc-drawer-close-v7:hover{border-color:#ffb8a5;color:#ff6338;background:#fff7f4}.dark .pc-drawer-close-v7{background:#17191f;border-color:#343943;color:#d0d5dd}
-        .pc-points-drawer-body-v7{overflow:auto;padding:1rem;display:grid;gap:.85rem;align-content:start;background:#f8fafc}.dark .pc-points-drawer-body-v7{background:#0f1217}.pc-editor-card-v7,.pc-delete-service-v7{border:1px solid #e4e7ec;border-radius:.9rem;background:#fff;padding:1rem}.dark .pc-editor-card-v7,.dark .pc-delete-service-v7{background:#17191f;border-color:#303641}.pc-editor-topline-v7,.pc-subhead-v7{display:flex;align-items:center;justify-content:space-between;gap:1rem}.pc-editor-topline-v7 strong,.pc-subhead-v7 strong{display:block;font-size:.8rem;font-weight:900}.pc-editor-topline-v7 span,.pc-subhead-v7 span{display:block;margin-top:.12rem;color:#667085;font-size:.63rem}.dark .pc-editor-topline-v7 span,.dark .pc-subhead-v7 span{color:#98a2b3}.pc-editor-enabled-v7{display:flex;align-items:center;gap:.4rem;font-size:.68rem;font-weight:850}.pc-editor-enabled-v7 input{accent-color:#ff6338}.pc-editor-grid-v7{display:grid;grid-template-columns:minmax(0,1fr) 7rem;gap:.7rem;margin-top:.9rem}.pc-editor-grid-v7 label{display:grid;gap:.35rem}.pc-editor-grid-v7 label.wide{grid-column:1/-1}.pc-editor-grid-v7 label>span{font-size:.65rem;font-weight:850;color:#475467}.dark .pc-editor-grid-v7 label>span{color:#cbd5e1}.pc-editor-grid-v7 input,.pc-editor-grid-v7 textarea,.pc-sample-add-v7 input{width:100%;border:1px solid #d0d5dd;border-radius:.62rem;background:#fff;color:#101828;padding:.58rem .65rem;font:inherit;font-size:.72rem;outline:none;transition:border-color .15s ease,box-shadow .15s ease}.pc-editor-grid-v7 input:focus,.pc-editor-grid-v7 textarea:focus,.pc-sample-add-v7 input:focus{border-color:#ff6338;box-shadow:0 0 0 3px rgba(255,99,56,.11)}.dark .pc-editor-grid-v7 input,.dark .pc-editor-grid-v7 textarea,.dark .pc-sample-add-v7 input{background:#111318;color:#f8fafc;border-color:#343943}
+        .pc-points-drawer-body-v7{overflow:auto;padding:1rem;display:grid;gap:.85rem;align-content:start;background:#f8fafc}.dark .pc-points-drawer-body-v7{background:#0f1217}.pc-editor-card-v7,.pc-delete-service-v7{border:1px solid #e4e7ec;border-radius:.9rem;background:#fff;padding:1rem}.dark .pc-editor-card-v7,.dark .pc-delete-service-v7{background:#17191f;border-color:#303641}.pc-editor-topline-v7,.pc-subhead-v7{display:flex;align-items:center;justify-content:space-between;gap:1rem}.pc-editor-topline-v7 strong,.pc-subhead-v7 strong{display:block;font-size:.8rem;font-weight:900}.pc-editor-topline-v7 span,.pc-subhead-v7 span{display:block;margin-top:.12rem;color:#667085;font-size:.63rem}.dark .pc-editor-topline-v7 span,.dark .pc-subhead-v7 span{color:#98a2b3}.pc-editor-enabled-v7{display:flex;align-items:center;gap:.45rem;font-size:.68rem;font-weight:850;cursor:pointer}.pc-editor-enabled-v7 input{position:absolute;opacity:0;pointer-events:none}.pc-editor-enabled-v7 input:checked + .pc-switch-v7{background:#ff6338}.pc-editor-enabled-v7 input:checked + .pc-switch-v7 b{transform:translateX(.77rem)}.pc-editor-grid-v7{display:grid;grid-template-columns:minmax(0,1fr) 7rem;gap:.7rem;margin-top:.9rem}.pc-editor-grid-v7 label{display:grid;gap:.35rem}.pc-editor-grid-v7 label.wide{grid-column:1/-1}.pc-editor-grid-v7 label>span{font-size:.65rem;font-weight:850;color:#475467}.dark .pc-editor-grid-v7 label>span{color:#cbd5e1}.pc-editor-grid-v7 input,.pc-editor-grid-v7 textarea,.pc-sample-add-v7 input{width:100%;border:1px solid #d0d5dd;border-radius:.62rem;background:#fff;color:#101828;padding:.58rem .65rem;font:inherit;font-size:.72rem;outline:none;transition:border-color .15s ease,box-shadow .15s ease}.pc-editor-grid-v7 input:focus,.pc-editor-grid-v7 textarea:focus,.pc-sample-add-v7 input:focus{border-color:#ff6338;box-shadow:0 0 0 3px rgba(255,99,56,.11)}.dark .pc-editor-grid-v7 input,.dark .pc-editor-grid-v7 textarea,.dark .pc-sample-add-v7 input{background:#111318;color:#f8fafc;border-color:#343943}
         .pc-inclusions-v7{margin-top:1rem;padding-top:1rem;border-top:1px solid #eaecf0}.dark .pc-inclusions-v7{border-color:#303641}.pc-text-button-v7{border:0;background:transparent;color:#ff6338;font-size:.68rem;font-weight:900;cursor:pointer}.pc-inclusion-list-v7{display:grid;gap:.45rem;margin-top:.65rem}.pc-inclusion-row-v7{display:grid;grid-template-columns:minmax(0,1fr) 2rem;gap:.4rem}.pc-inclusion-row-v7 input{width:100%;border:1px solid #d0d5dd;border-radius:.58rem;padding:.55rem .62rem;font-size:.7rem;background:#fff;color:#101828}.dark .pc-inclusion-row-v7 input{background:#111318;color:#f8fafc;border-color:#343943}.pc-inclusion-row-v7 button{border:1px solid #e4e7ec;border-radius:.55rem;background:#fff;color:#b42318;cursor:pointer}.dark .pc-inclusion-row-v7 button{background:#111318;border-color:#343943}.pc-editor-actions-v7{display:flex;justify-content:flex-end;gap:.45rem;margin-top:1rem}
         .pc-sample-list-v7{display:grid;margin-top:.7rem;border:1px solid #eaecf0;border-radius:.72rem;overflow:hidden}.dark .pc-sample-list-v7{border-color:#303641}.pc-sample-row-v7{display:grid;grid-template-columns:4rem minmax(0,1fr) auto auto;gap:.55rem;align-items:center;padding:.58rem .65rem;border-bottom:1px solid #eef0f3}.pc-sample-row-v7:last-child{border-bottom:0}.dark .pc-sample-row-v7{border-color:#252a31}.pc-sample-type-v7{color:#c2410c;font-size:.56rem;font-weight:950;text-transform:uppercase}.pc-sample-row-v7 strong{display:block;font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-sample-row-v7 a{font-size:.62rem;font-weight:850;color:#2563eb;text-decoration:none}.pc-sample-row-v7 button{border:0;background:transparent;color:#b42318;font-size:.62rem;font-weight:850;cursor:pointer}.pc-sample-empty-v7{padding:.8rem;text-align:center;color:#98a2b3;font-size:.68rem}.pc-sample-count-v7{margin:0!important;padding:.16rem .4rem;border-radius:999px;background:#f2f4f7;font-weight:850}.pc-sample-add-v7{display:grid;grid-template-columns:minmax(7rem,.8fr) minmax(0,.9fr) minmax(0,1.2fr) auto;gap:.5rem;align-items:end;margin-top:.65rem;padding:.65rem;border:1px solid #eaecf0;border-radius:.72rem;background:#f9fafb}.dark .pc-sample-add-v7{background:#111318;border-color:#303641}.pc-sample-add-copy-v7 strong{display:block;font-size:.67rem}.pc-sample-add-copy-v7 span{display:block;margin-top:.12rem;color:#98a2b3;font-size:.58rem;line-height:1.3}.pc-delete-service-v7{display:flex;align-items:center;justify-content:space-between;gap:1rem}.pc-delete-service-v7 strong{display:block;font-size:.72rem}.pc-delete-service-v7 span{display:block;margin-top:.12rem;color:#98a2b3;font-size:.62rem}
         [hidden]{display:none!important}
@@ -223,6 +225,8 @@
             const drawerNotice = drawer?.querySelector('[data-plyr-drawer-notice]');
             let activeServiceId = null;
             let noticeTimer = null;
+            let pendingUrlSamples = [];
+            let pendingFiles = [];
 
             const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[char]));
             const safeUrl = value => { try { const url = new URL(String(value || ''), window.location.origin); return ['http:','https:'].includes(url.protocol) ? url.href : ''; } catch (_) { return ''; } };
@@ -265,7 +269,7 @@
             const rowHtml = service => `<article class="pc-service-row-v7" data-service-row="${escapeHtml(service.id)}">
                 <div class="pc-service-icon-v7">${escapeHtml(String(service.name || 'P').slice(0,1).toUpperCase())}</div>
                 <div class="pc-service-copy-v7"><strong data-service-name>${escapeHtml(service.name)}</strong><span data-service-meta>${escapeHtml(serviceMeta(service))}</span></div>
-                <button type="button" class="pc-service-toggle-v7 ${service.enabled ? 'is-on' : ''}" data-plyr-toggle="${escapeHtml(service.id)}" aria-pressed="${service.enabled ? 'true' : 'false'}"><i></i><span>${service.enabled ? 'On' : 'Off'}</span></button>
+                <button type="button" class="pc-service-toggle-v7 ${service.enabled ? 'is-on' : ''}" data-plyr-toggle="${escapeHtml(service.id)}" aria-pressed="${service.enabled ? 'true' : 'false'}" aria-label="Turn ${escapeHtml(service.name)} ${service.enabled ? 'off' : 'on'}"><i class="pc-switch-v7" aria-hidden="true"><b></b></i></button>
                 <button type="button" class="pc-service-edit-v7" data-plyr-service-edit="${escapeHtml(service.id)}">Edit</button>
             </article>`;
 
@@ -300,6 +304,27 @@
 
             const renderSamples = service => {
                 if (!sampleList || !sampleCount) return;
+
+                if (!activeServiceId) {
+                    const total = pendingUrlSamples.length + pendingFiles.length;
+                    sampleCount.textContent = String(total);
+                    if (!total) {
+                        sampleList.innerHTML = '<div class="pc-sample-empty-v7">No samples added yet. Add links or files below; they will save with the new service.</div>';
+                        return;
+                    }
+
+                    const urlRows = pendingUrlSamples.map((sample, index) => {
+                        const type = /(?:youtube\.com|youtu\.be)/i.test(sample.url) ? 'youtube' : 'link';
+                        return `<div class="pc-sample-row-v7"><span class="pc-sample-type-v7">${type}</span><strong>${escapeHtml(sample.title || sample.url)}</strong><a href="${escapeHtml(sample.url)}" target="_blank" rel="noopener">Open</a><button type="button" data-plyr-remove-pending-url="${index}">Remove</button></div>`;
+                    });
+                    const fileRows = pendingFiles.map((file, index) => {
+                        const type = String(file.type || '').startsWith('image/') ? 'image' : 'video';
+                        return `<div class="pc-sample-row-v7"><span class="pc-sample-type-v7">${type}</span><strong>${escapeHtml(file.name || 'Media file')}</strong><span></span><button type="button" data-plyr-remove-pending-file="${index}">Remove</button></div>`;
+                    });
+                    sampleList.innerHTML = [...urlRows, ...fileRows].join('');
+                    return;
+                }
+
                 const samples = Array.isArray(service?.samples) ? service.samples : [];
                 sampleCount.textContent = String(samples.length);
                 if (!samples.length) {
@@ -316,6 +341,10 @@
                 if (!drawer || !form) return;
                 const creating = !service;
                 activeServiceId = service?.id ? String(service.id) : null;
+                if (creating) {
+                    pendingUrlSamples = [];
+                    pendingFiles = [];
+                }
                 drawer.querySelector('[data-plyr-editor-kicker]').textContent = creating ? 'New service' : 'Edit service';
                 drawer.querySelector('[data-plyr-editor-title]').textContent = creating ? 'Add PLYR Points service' : service.name;
                 form.querySelector('[data-plyr-service-name]').value = service?.name || '';
@@ -326,9 +355,21 @@
                 inclusionList.innerHTML = '';
                 const inclusions = Array.isArray(service?.inclusions) ? service.inclusions : [];
                 (inclusions.length ? inclusions : ['']).forEach(addInclusion);
-                samplesSection.hidden = creating;
+                samplesSection.hidden = false;
                 deleteSection.hidden = creating || !!service?.is_system;
-                if (!creating) renderSamples(service);
+                const samplesHelp = drawer.querySelector('[data-plyr-samples-help]');
+                if (samplesHelp) samplesHelp.textContent = creating
+                    ? 'Add links or files now. They will be saved together with the new service.'
+                    : 'Images, videos, YouTube embeds, or external links.';
+                const saveButton = form.querySelector('[data-plyr-save-service]');
+                if (saveButton) saveButton.textContent = creating ? 'Add service' : 'Save service';
+                const urlButton = urlForm?.querySelector('[data-plyr-add-url]');
+                if (urlButton) urlButton.textContent = creating ? 'Add link' : 'Add';
+                const uploadButton = uploadForm?.querySelector('[data-plyr-upload]');
+                if (uploadButton) uploadButton.textContent = creating ? 'Add files' : 'Upload';
+                urlForm?.reset();
+                uploadForm?.reset();
+                renderSamples(service);
                 if (drawerNotice) drawerNotice.hidden = true;
             };
 
@@ -346,8 +387,8 @@
                 if (!toggle) return;
                 toggle.classList.toggle('is-on', !!enabled);
                 toggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-                const label = toggle.querySelector('span');
-                if (label) label.textContent = enabled ? 'On' : 'Off';
+                const service = byId.get(String(toggle.dataset.plyrToggle || ''));
+                if (service?.name) toggle.setAttribute('aria-label', `Turn ${service.name} ${enabled ? 'off' : 'on'}`);
             };
 
             const updateServiceMemory = service => {
@@ -457,7 +498,15 @@
                 const creating = !activeServiceId;
                 const body = new FormData(form);
                 if (!form.querySelector('[data-plyr-service-enabled]').checked) body.set('is_enabled', '0');
-                if (!creating) body.set('_method', 'PUT');
+                if (creating) {
+                    pendingUrlSamples.forEach((sample, index) => {
+                        body.append(`sample_urls[${index}][url]`, sample.url);
+                        body.append(`sample_urls[${index}][title]`, sample.title || '');
+                    });
+                    pendingFiles.forEach(file => body.append('sample_files[]', file, file.name));
+                } else {
+                    body.set('_method', 'PUT');
+                }
                 button.disabled = true;
                 const label = button.textContent;
                 button.textContent = creating ? 'Adding...' : 'Saving...';
@@ -476,11 +525,26 @@
 
             urlForm?.addEventListener('submit', async event => {
                 event.preventDefault();
-                if (!activeServiceId) return;
+                const body = new FormData(urlForm);
+                const rawUrl = String(body.get('sample_url') || '').trim();
+                const url = safeUrl(rawUrl);
+                const title = String(body.get('sample_title') || '').trim();
+                if (!url) {
+                    showNotice('Enter a valid http or https sample URL.', 'error', true);
+                    return;
+                }
+
+                if (!activeServiceId) {
+                    pendingUrlSamples.push({ url, title });
+                    urlForm.reset();
+                    renderSamples(null);
+                    return;
+                }
+
                 const button = urlForm.querySelector('[data-plyr-add-url]');
                 button.disabled = true;
                 try {
-                    const data = await requestJson(`${baseUrl}/${encodeURIComponent(activeServiceId)}/samples/url`, { method: 'POST', body: new FormData(urlForm) });
+                    const data = await requestJson(`${baseUrl}/${encodeURIComponent(activeServiceId)}/samples/url`, { method: 'POST', body });
                     upsertService(data.service);
                     syncEditor(data.service);
                     urlForm.reset();
@@ -492,7 +556,20 @@
 
             uploadForm?.addEventListener('submit', async event => {
                 event.preventDefault();
-                if (!activeServiceId) return;
+                const input = uploadForm.querySelector('input[type="file"]');
+                const selected = Array.from(input?.files || []);
+                if (!selected.length) {
+                    showNotice('Choose at least one image or video.', 'error', true);
+                    return;
+                }
+
+                if (!activeServiceId) {
+                    pendingFiles.push(...selected);
+                    uploadForm.reset();
+                    renderSamples(null);
+                    return;
+                }
+
                 const button = uploadForm.querySelector('[data-plyr-upload]');
                 button.disabled = true;
                 const label = button.textContent;
@@ -509,6 +586,19 @@
             });
 
             sampleList?.addEventListener('click', async event => {
+                const pendingUrlButton = event.target.closest('[data-plyr-remove-pending-url]');
+                if (pendingUrlButton && !activeServiceId) {
+                    pendingUrlSamples.splice(Number(pendingUrlButton.dataset.plyrRemovePendingUrl), 1);
+                    renderSamples(null);
+                    return;
+                }
+                const pendingFileButton = event.target.closest('[data-plyr-remove-pending-file]');
+                if (pendingFileButton && !activeServiceId) {
+                    pendingFiles.splice(Number(pendingFileButton.dataset.plyrRemovePendingFile), 1);
+                    renderSamples(null);
+                    return;
+                }
+
                 const button = event.target.closest('[data-plyr-remove-sample]');
                 if (!button || !activeServiceId) return;
                 if (!window.confirm('Remove this sample?')) return;
