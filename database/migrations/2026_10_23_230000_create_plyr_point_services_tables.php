@@ -10,35 +10,47 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('plyr_point_services', function (Blueprint $table) {
-            $table->id();
-            $table->string('key', 120)->unique();
-            $table->string('name', 120);
-            $table->unsignedInteger('points');
-            $table->text('description')->nullable();
-            $table->string('cta', 120)->default('Request service');
-            $table->json('inclusions')->nullable();
-            $table->boolean('is_enabled')->default(true)->index();
-            $table->boolean('is_system')->default(false);
-            $table->unsignedInteger('sort_order')->default(0)->index();
-            $table->timestamps();
-        });
+        // This migration is intentionally re-runnable. A previous deployment may have
+        // created one or both tables before MySQL rejected Laravel's auto-generated
+        // composite index name for exceeding MySQL's 64-character identifier limit.
+        if (! Schema::hasTable('plyr_point_services')) {
+            Schema::create('plyr_point_services', function (Blueprint $table) {
+                $table->id();
+                $table->string('key', 120)->unique();
+                $table->string('name', 120);
+                $table->unsignedInteger('points');
+                $table->text('description')->nullable();
+                $table->string('cta', 120)->default('Request service');
+                $table->json('inclusions')->nullable();
+                $table->boolean('is_enabled')->default(true)->index();
+                $table->boolean('is_system')->default(false);
+                $table->unsignedInteger('sort_order')->default(0)->index();
+                $table->timestamps();
+            });
+        }
 
-        Schema::create('plyr_point_service_samples', function (Blueprint $table) {
-            $table->id();
-            $table->uuid('uuid')->unique();
-            $table->foreignId('plyr_point_service_id')->constrained('plyr_point_services')->cascadeOnDelete();
-            $table->string('type', 24);
-            $table->string('title', 180)->nullable();
-            $table->string('path', 500)->nullable();
-            $table->text('source_url')->nullable();
-            $table->string('youtube_id', 80)->nullable();
-            $table->string('mime', 120)->nullable();
-            $table->unsignedInteger('sort_order')->default(0);
-            $table->timestamps();
+        if (! Schema::hasTable('plyr_point_service_samples')) {
+            Schema::create('plyr_point_service_samples', function (Blueprint $table) {
+                $table->id();
+                $table->uuid('uuid')->unique();
+                $table->foreignId('plyr_point_service_id')
+                    ->constrained('plyr_point_services')
+                    ->cascadeOnDelete();
+                $table->string('type', 24);
+                $table->string('title', 180)->nullable();
+                $table->string('path', 500)->nullable();
+                $table->text('source_url')->nullable();
+                $table->string('youtube_id', 80)->nullable();
+                $table->string('mime', 120)->nullable();
+                $table->unsignedInteger('sort_order')->default(0);
+                $table->timestamps();
 
-            $table->index(['plyr_point_service_id', 'sort_order']);
-        });
+                // Keep the index name short enough for MySQL's 64-character limit.
+                $table->index(['plyr_point_service_id', 'sort_order'], 'pps_service_sort_idx');
+            });
+        } else {
+            $this->ensureShortSampleIndex();
+        }
 
         $defaults = [
             'outreach' => [
@@ -76,22 +88,18 @@ return new class extends Migration
         $sort = 10;
         foreach ($defaults as $key => $default) {
             $saved = (array) ($legacyByKey[$key] ?? []);
-
-            $serviceId = DB::table('plyr_point_services')->insertGetId([
-                'key' => $key,
+            $serviceId = $this->firstOrCreateService($key, [
                 'name' => trim((string) ($saved['name'] ?? $default['name'])) ?: $default['name'],
                 'points' => max(1, (int) ($saved['points'] ?? $default['points'])),
                 'description' => trim((string) ($saved['description'] ?? $default['description'])),
                 'cta' => trim((string) ($saved['cta'] ?? $default['cta'])) ?: $default['cta'],
-                'inclusions' => json_encode($this->cleanInclusions($saved['inclusions'] ?? [])),
+                'inclusions' => $this->cleanInclusions($saved['inclusions'] ?? []),
                 'is_enabled' => array_key_exists('enabled', $saved) ? (bool) $saved['enabled'] : true,
                 'is_system' => true,
                 'sort_order' => $sort,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
-            $this->importLegacySamples($serviceId, (array) ($saved['samples'] ?? []));
+            $this->importLegacySamplesOnce($serviceId, (array) ($saved['samples'] ?? []));
             unset($legacyByKey[$key]);
             $sort += 10;
         }
@@ -102,21 +110,19 @@ return new class extends Migration
                 continue;
             }
 
-            $serviceId = DB::table('plyr_point_services')->insertGetId([
-                'key' => $this->uniqueKey($key),
+            $serviceKey = $this->existingOrUniqueKey((string) $key, $name);
+            $serviceId = $this->firstOrCreateService($serviceKey, [
                 'name' => $name,
                 'points' => max(1, (int) ($saved['points'] ?? 1)),
                 'description' => trim((string) ($saved['description'] ?? '')),
                 'cta' => trim((string) ($saved['cta'] ?? '')) ?: 'Request service',
-                'inclusions' => json_encode($this->cleanInclusions($saved['inclusions'] ?? [])),
+                'inclusions' => $this->cleanInclusions($saved['inclusions'] ?? []),
                 'is_enabled' => array_key_exists('enabled', $saved) ? (bool) $saved['enabled'] : true,
                 'is_system' => false,
                 'sort_order' => $sort,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
-            $this->importLegacySamples($serviceId, (array) ($saved['samples'] ?? []));
+            $this->importLegacySamplesOnce($serviceId, (array) ($saved['samples'] ?? []));
             $sort += 10;
         }
     }
@@ -125,6 +131,49 @@ return new class extends Migration
     {
         Schema::dropIfExists('plyr_point_service_samples');
         Schema::dropIfExists('plyr_point_services');
+    }
+
+    private function ensureShortSampleIndex(): void
+    {
+        try {
+            $database = DB::connection()->getDatabaseName();
+            $exists = DB::table('information_schema.statistics')
+                ->where('table_schema', $database)
+                ->where('table_name', 'plyr_point_service_samples')
+                ->where('index_name', 'pps_service_sort_idx')
+                ->exists();
+
+            if (! $exists) {
+                Schema::table('plyr_point_service_samples', function (Blueprint $table) {
+                    $table->index(['plyr_point_service_id', 'sort_order'], 'pps_service_sort_idx');
+                });
+            }
+        } catch (\Throwable) {
+            // The composite index is a performance optimization, not a functional
+            // requirement. Never block the migration if a host restricts metadata access.
+        }
+    }
+
+    private function firstOrCreateService(string $key, array $attributes): int
+    {
+        $existingId = DB::table('plyr_point_services')->where('key', $key)->value('id');
+        if ($existingId) {
+            return (int) $existingId;
+        }
+
+        return (int) DB::table('plyr_point_services')->insertGetId([
+            'key' => $key,
+            'name' => $attributes['name'],
+            'points' => $attributes['points'],
+            'description' => $attributes['description'],
+            'cta' => $attributes['cta'],
+            'inclusions' => json_encode($attributes['inclusions']),
+            'is_enabled' => $attributes['is_enabled'],
+            'is_system' => $attributes['is_system'],
+            'sort_order' => $attributes['sort_order'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     private function legacyRows(): array
@@ -156,10 +205,13 @@ return new class extends Migration
             ->all();
     }
 
-    private function importLegacySamples(int $serviceId, array $samples): void
+    private function importLegacySamplesOnce(int $serviceId, array $samples): void
     {
-        $sort = 10;
+        if ($samples === [] || DB::table('plyr_point_service_samples')->where('plyr_point_service_id', $serviceId)->exists()) {
+            return;
+        }
 
+        $sort = 10;
         foreach ($samples as $sample) {
             if (! is_array($sample)) {
                 continue;
@@ -188,9 +240,14 @@ return new class extends Migration
         }
     }
 
-    private function uniqueKey(string $candidate): string
+    private function existingOrUniqueKey(string $candidate, string $name): string
     {
-        $base = Str::slug($candidate, '_') ?: 'service';
+        $candidate = Str::slug($candidate, '_');
+        if ($candidate !== '' && DB::table('plyr_point_services')->where('key', $candidate)->exists()) {
+            return $candidate;
+        }
+
+        $base = $candidate !== '' ? $candidate : (Str::slug($name, '_') ?: 'service');
         $key = $base;
         $suffix = 2;
 
