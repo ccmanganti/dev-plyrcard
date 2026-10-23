@@ -667,9 +667,39 @@ HTML;
     | The right-side website panel shows the next three upcoming schedule items.
     | The full Schedule tab remains unchanged.
     */
+    $watchScheduleNow = now();
+
     $watchSchedulePayload = collect($schedulePayload)
-        ->filter(fn (array $item) => filled($item['date'] ?? null) && (string) $item['date'] >= now()->toDateString())
-        ->sortBy(fn (array $item) => (string) ($item['date'] ?? '') . ' ' . (string) ($item['time_sortable'] ?? '23:59:59'))
+        ->filter(function (array $item) use ($watchScheduleNow): bool {
+            $date = trim((string) ($item['date'] ?? ''));
+            if ($date === '') {
+                return false;
+            }
+
+            try {
+                $time = trim((string) ($item['time_sortable'] ?? ''));
+                $eventAt = $time !== ''
+                    ? \Carbon\Carbon::parse($date . ' ' . $time, config('app.timezone'))
+                    : \Carbon\Carbon::parse($date, config('app.timezone'))->endOfDay();
+
+                return $eventAt->greaterThanOrEqualTo($watchScheduleNow);
+            } catch (\Throwable $exception) {
+                return false;
+            }
+        })
+        ->sortBy(function (array $item): int {
+            try {
+                $date = trim((string) ($item['date'] ?? ''));
+                $time = trim((string) ($item['time_sortable'] ?? ''));
+
+                return ($time !== ''
+                    ? \Carbon\Carbon::parse($date . ' ' . $time, config('app.timezone'))
+                    : \Carbon\Carbon::parse($date, config('app.timezone'))->endOfDay()
+                )->getTimestamp();
+            } catch (\Throwable $exception) {
+                return PHP_INT_MAX;
+            }
+        })
         ->take(3)
         ->values()
         ->all();
@@ -1656,6 +1686,143 @@ HTML;
             line-height: 1.45;
         }
 
+
+        .watch-me-follow{
+            margin-top: 2rem;
+            padding-top: 1.55rem;
+            border-top: 1px solid color-mix(in srgb, var(--on-primary) 34%, transparent 66%);
+        }
+
+        .watch-me-follow-title{
+            margin: 0 0 .4rem;
+            color: var(--on-primary);
+            font-family: "Bebas Neue", "Antonio", ui-sans-serif, system-ui;
+            font-size: clamp(2rem, 3.5vw, 2.65rem);
+            font-weight: 400;
+            line-height: 1;
+            letter-spacing: .015em;
+        }
+
+        .watch-me-follow-copy{
+            margin: 0 0 1rem;
+            color: color-mix(in srgb, var(--on-primary) 86%, transparent 14%);
+            font-size: .9rem;
+            font-weight: 500;
+            line-height: 1.45;
+        }
+
+        .watch-me-follow-form{
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: .75rem;
+            align-items: end;
+        }
+
+        .watch-me-follow-field{
+            min-width: 0;
+        }
+
+        .watch-me-follow-label{
+            display: block;
+            margin-bottom: .32rem;
+            color: color-mix(in srgb, var(--on-primary) 78%, transparent 22%);
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: .74rem;
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+        }
+
+        .watch-me-follow-input{
+            width: 100%;
+            min-height: 48px;
+            border: 0;
+            border-bottom: 2px solid color-mix(in srgb, var(--on-primary) 74%, transparent 26%);
+            border-radius: 0;
+            outline: 0;
+            padding: .55rem .05rem .48rem;
+            background: transparent;
+            color: var(--on-primary);
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .watch-me-follow-input::placeholder{
+            color: color-mix(in srgb, var(--on-primary) 54%, transparent 46%);
+        }
+
+        .watch-me-follow-input:focus{
+            border-bottom-color: var(--on-primary);
+        }
+
+        .watch-me-follow-btn{
+            min-height: 48px;
+            border: 0;
+            border-radius: 999px;
+            padding: 0 1.35rem;
+            background: var(--on-primary);
+            color: var(--primary);
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: .88rem;
+            font-weight: 800;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: transform .16s ease, opacity .16s ease;
+        }
+
+        .watch-me-follow-btn:hover{
+            transform: translateY(-1px);
+        }
+
+        .watch-me-follow-btn:disabled{
+            opacity: .68;
+            cursor: wait;
+            transform: none;
+        }
+
+        .watch-me-follow-error{
+            display: none;
+            margin-top: .42rem;
+            color: var(--on-primary);
+            font-size: .78rem;
+            font-weight: 700;
+        }
+
+        .watch-me-follow-field.has-error .watch-me-follow-error{
+            display: block;
+        }
+
+        .watch-me-follow-status{
+            display: none;
+            grid-column: 1 / -1;
+            margin-top: .1rem;
+            padding: .7rem .85rem;
+            border-radius: 10px;
+            background: color-mix(in srgb, var(--on-primary) 14%, transparent 86%);
+            color: var(--on-primary);
+            font-size: .82rem;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        .watch-me-follow-status.is-visible{
+            display: block;
+        }
+
+        @media (max-width: 480px){
+            .watch-me-follow-form{
+                grid-template-columns: 1fr;
+            }
+
+            .watch-me-follow-btn{
+                width: 100%;
+            }
+        }
+
         @media (max-width: 1023px){
             .watch-me-title{
                 font-size: clamp(3rem, 8vw, 4.8rem);
@@ -2582,6 +2749,54 @@ HTML;
                                     </div>
                                 </div>
                             @endforelse
+                        </div>
+
+                        @php
+                            $watchFollowAction = \Illuminate\Support\Facades\Route::has('public.follow-me.store')
+                                ? route('public.follow-me.store', $website)
+                                : null;
+                        @endphp
+
+                        <div class="watch-me-follow">
+                            <h3 class="watch-me-follow-title">Get my schedule updates</h3>
+                            <p class="watch-me-follow-copy">
+                                Follow my upcoming games, showcases, and schedule changes.
+                            </p>
+
+                            <form
+                                class="watch-me-follow-form"
+                                method="POST"
+                                action="{{ $watchFollowAction ?: '#' }}"
+                                data-follow-me-form
+                                data-follow-compact="1"
+                                data-player-email="{{ $playerEmail }}"
+                                novalidate
+                            >
+                                @csrf
+                                <input type="hidden" name="website_id" value="{{ $website->id }}">
+                                <input type="hidden" name="player_id" value="{{ $user?->id }}">
+                                <input type="hidden" name="player_name" value="{{ $playerDisplayName }}">
+
+                                <div class="watch-me-follow-field" data-field-wrap>
+                                    <label class="watch-me-follow-label" for="watch_follow_email_{{ $website->id }}">Coach email</label>
+                                    <input
+                                        id="watch_follow_email_{{ $website->id }}"
+                                        class="watch-me-follow-input"
+                                        type="email"
+                                        name="email"
+                                        placeholder="coach@email.com"
+                                        autocomplete="email"
+                                        required
+                                    >
+                                    <span class="watch-me-follow-error">Enter a valid email address.</span>
+                                </div>
+
+                                <button class="watch-me-follow-btn follow-me-submit" type="submit" data-default-text="Follow">
+                                    Follow
+                                </button>
+
+                                <div class="watch-me-follow-status follow-me-status" data-follow-me-status aria-live="polite"></div>
+                            </form>
                         </div>
                     </div>
                 @endif
@@ -3544,7 +3759,7 @@ HTML;
                     const playerEmail = form.dataset.playerEmail || '';
 
                     if (!playerEmail) {
-                        setStatus('Thanks — your follow request has been recorded on this page.');
+                        setStatus('We could not submit this follow request right now. Please contact the player directly.');
                         return;
                     }
 
@@ -3556,17 +3771,18 @@ HTML;
                     const message = formData.get('message') || '';
                     const playerName = formData.get('player_name') || 'this player';
 
-                    const subject = encodeURIComponent('Follow Me Request for ' + playerName);
-                    const body = encodeURIComponent([
-                        'New Follow Me request:',
+                    const subject = encodeURIComponent('Schedule Follow Request for ' + playerName);
+                    const bodyLines = [
+                        'New schedule follow request:',
                         '',
-                        'Name: ' + [firstName, lastName].filter(Boolean).join(' '),
-                        'Email: ' + email,
-                        'School / Organization: ' + school,
-                        '',
-                        'Message:',
-                        message || 'No message added.',
-                    ].join('\n'));
+                        email ? 'Coach email: ' + email : '',
+                        [firstName, lastName].filter(Boolean).length ? 'Name: ' + [firstName, lastName].filter(Boolean).join(' ') : '',
+                        school ? 'School / Organization: ' + school : '',
+                        message ? '' : '',
+                        message ? 'Message:' : '',
+                        message || '',
+                    ].filter(Boolean);
+                    const body = encodeURIComponent(bodyLines.join('\n'));
 
                     window.location.href = 'mailto:' + encodeURIComponent(playerEmail) + '?subject=' + subject + '&body=' + body;
                     setStatus('Opening your email app so you can send the follow request.');
@@ -3617,7 +3833,11 @@ HTML;
                         form.reset();
                         setStatus(payload.message || 'Thanks — your follow request has been sent.');
                     } catch (error) {
-                        setStatus(error.message || 'Something went wrong. Please try again.');
+                        if (form.dataset.followCompact === '1') {
+                            fallbackMailTo();
+                        } else {
+                            setStatus(error.message || 'Something went wrong. Please try again.');
+                        }
                     } finally {
                         if (submitButton) {
                             submitButton.disabled = false;
