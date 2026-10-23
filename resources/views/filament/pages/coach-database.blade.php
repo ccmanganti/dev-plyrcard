@@ -18090,7 +18090,6 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             section.querySelector('[data-plyr-points-history-search-v15]')?.addEventListener('input',event=>{state.search=event.target.value||'';window.clearTimeout(event.target.__plyrPointsSearchTimer);event.target.__plyrPointsSearchTimer=window.setTimeout(renderHistory,100);});
             section.querySelector('[data-plyr-points-history-filter-v15]')?.addEventListener('change',event=>{state.filter=event.target.value||'all';renderHistory();});
             section.querySelectorAll('[data-plyr-points-sort-v15]').forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.plyrPointsSortV15;if(!key)return;if(state.sortKey===key)state.sortDirection=state.sortDirection==='asc'?'desc':'asc';else{state.sortKey=key;state.sortDirection=key==='item'||key==='status'?'asc':'desc';}renderHistory();}));
-            section.querySelectorAll('[data-plyr-points-history-entry-v15]').forEach(button=>button.addEventListener('click',()=>openHistoryDetail(button.dataset.plyrPointsHistoryEntryV15)));
         };
 
         const ensureHistoryDrawer = () => {
@@ -18102,7 +18101,31 @@ if (window.__plyrPointsEnhancerInstalledV15) {
         const detailMarkup=(entry)=>{const request=entry.request;if(request)return`<div class="plyr-points-detail-v15"><div class="plyr-points-detail-hero-v15"><div><span class="plyr-points-detail-kicker-v15">Request #${escapeHtml(request.id)}</span><h3>${escapeHtml(request.item_name||entry.item)}</h3><p>Submitted ${escapeHtml(request.created_at||entry.date_time)}</p></div><span class="plyr-points-status-v15 ${statusClass(request.status)}">${escapeHtml(request.status)}</span></div>${requestProgressMarkup(request)}<div class="plyr-points-detail-grid-v15"><div><span>Quantity</span><strong>${escapeHtml(request.quantity)}</strong></div><div><span>Turnaround</span><strong>${escapeHtml(request.turnaround)}</strong></div><div><span>Points used</span><strong>${Number(request.points_spent||0).toLocaleString()}</strong></div><div><span>Last updated</span><strong>${escapeHtml(request.updated_at)}</strong></div></div><div class="plyr-points-detail-section-v15"><h4>Your instructions</h4><p>${escapeHtml(request.notes||'No additional instructions were submitted for this service.')}</p></div><div class="plyr-points-detail-section-v15"><h4>Your submitted resources</h4>${resourcesMarkup(request.resources)}</div>${deliveryMarkup(request)}<div class="plyr-points-detail-section-v15"><h4>Points transaction</h4><p>${entry.transaction_id?`Transaction #${escapeHtml(entry.transaction_id)} · `:''}${escapeHtml(entry.amount)} points · ${escapeHtml(entry.type||'Service request')}</p></div></div>`;return`<div class="plyr-points-detail-v15"><div class="plyr-points-detail-hero-v15"><div><span class="plyr-points-detail-kicker-v15">${escapeHtml(entry.kind==='purchase'?'Point purchase':'Points activity')}</span><h3>${escapeHtml(entry.item)}</h3><p>${escapeHtml(entry.date_time)}</p></div><span class="plyr-points-status-v15 ${statusClass(entry.status)}">${escapeHtml(entry.status)}</span></div><div class="plyr-points-detail-grid-v15"><div><span>Points</span><strong>${escapeHtml(entry.amount)}</strong></div><div><span>Transaction ID</span><strong>${entry.transaction_id?'#'+escapeHtml(entry.transaction_id):'—'}</strong></div><div><span>Type</span><strong>${escapeHtml(entry.type||'Activity')}</strong></div><div><span>Source</span><strong>${escapeHtml(entry.source||'Account activity')}</strong></div></div><div class="plyr-points-detail-section-v15"><h4>About this activity</h4><p>This entry records a PLYR Points balance change. Service delivery details appear on service-request entries.</p></div></div>`};
         function openHistoryDetail(entryId){const entry=state.entries.find(row=>String(row.id)===String(entryId));if(!entry)return;closeRequestDrawer();closeSampleDrawer();const drawer=ensureHistoryDrawer(),subtitle=drawer.querySelector('[data-plyr-points-detail-subtitle-v15]'),body=drawer.querySelector('[data-plyr-points-detail-body-v15]');if(subtitle)subtitle.textContent=entry.kind==='request'&&entry.request_id?`Request #${entry.request_id}`:`Transaction #${entry.transaction_id||'—'}`;if(body)body.innerHTML=detailMarkup(entry);drawer.classList.add('is-open');drawer.scrollTop=0;showOverlay();}
 
-        const installHistory = () => { if(!state.root)return;const section=state.root.querySelector('.rc-points-history-v12');if(!section)return;state.historySection=section;section.dataset.plyrPointsUnifiedHistoryV15='1';renderHistory(); };
+        const installHistory = () => {
+            if(!state.root)return;
+            const section=state.root.querySelector('.rc-points-history-v12');
+            if(!section)return;
+            state.historySection=section;
+
+            // v17: one delegated click handler survives history re-renders and makes the
+            // entire activity row clickable, including the item text/status/points cells.
+            if(section.dataset.plyrPointsHistoryClickBoundV17!=='1'){
+                section.dataset.plyrPointsHistoryClickBoundV17='1';
+                section.addEventListener('click',event=>{
+                    const row=event.target.closest('[data-plyr-points-history-entry-v15]');
+                    if(!row||!section.contains(row))return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    openHistoryDetail(row.getAttribute('data-plyr-points-history-entry-v15'));
+                });
+            }
+
+            // Do not redraw the table every time the page MutationObserver notices a
+            // DOM change. Replacing the rows repeatedly was also replacing click listeners.
+            if(section.dataset.plyrPointsUnifiedHistoryV15==='1')return;
+            section.dataset.plyrPointsUnifiedHistoryV15='1';
+            renderHistory();
+        };
 
         const sampleMediaMarkup = (sample,service) => {
             if(!sample)return`<div class="plyr-points-sample-empty-v15"><strong>No sample added yet</strong><span>An admin can add an image, video, or YouTube sample from Admin Settings.</span></div>`;

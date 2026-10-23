@@ -1,3 +1,4 @@
+<div class="pc-admin-settings-livewire-root-v6" style="display: contents;">
 <x-filament-panels::page>
     @php
         $pointServices = $this->plyrPointServices;
@@ -302,3 +303,4 @@
         })();
     </script>
 </x-filament-panels::page>
+</div>
