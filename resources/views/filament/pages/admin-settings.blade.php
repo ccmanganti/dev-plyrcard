@@ -340,7 +340,78 @@
             const closeEditor = () => setDrawerOpen(false);
 
             document.querySelector('[data-plyr-service-new]')?.addEventListener('click', () => openEditor(null));
-            list?.addEventListener('click', async event => {
+            const toggleState = new Map();
+
+            const setToggleVisual = (toggle, enabled) => {
+                if (!toggle) return;
+                toggle.classList.toggle('is-on', !!enabled);
+                toggle.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+                const label = toggle.querySelector('span');
+                if (label) label.textContent = enabled ? 'On' : 'Off';
+            };
+
+            const updateServiceMemory = service => {
+                if (!service?.id) return;
+                const id = String(service.id);
+                byId.set(id, service);
+                const index = services.findIndex(row => String(row?.id || '') === id);
+                if (index >= 0) services[index] = service;
+                else services.push(service);
+            };
+
+            const flushToggle = async id => {
+                const state = toggleState.get(id);
+                if (!state || state.running) return;
+                state.running = true;
+
+                try {
+                    while (state.committed !== state.desired) {
+                        const target = !!state.desired;
+                        const body = new FormData();
+                        body.set('enabled', target ? '1' : '0');
+
+                        try {
+                            const data = await requestJson(`${baseUrl}/${encodeURIComponent(id)}/toggle`, {
+                                method: 'POST',
+                                body,
+                            });
+                            state.committed = !!(data?.service?.enabled ?? target);
+                            if (data?.service) updateServiceMemory(data.service);
+
+                            if (activeServiceId === id) {
+                                const editorToggle = form?.querySelector('[data-plyr-service-enabled]');
+                                if (editorToggle) editorToggle.checked = !!state.desired;
+                            }
+                        } catch (error) {
+                            // Only roll the UI back when there was not another click while
+                            // this request was in flight. A newer click stays authoritative.
+                            if (state.desired === target) {
+                                state.desired = state.committed;
+                                const currentToggle = list?.querySelector(`[data-plyr-toggle="${CSS.escape(id)}"]`);
+                                setToggleVisual(currentToggle, state.committed);
+                                const remembered = byId.get(id);
+                                if (remembered) {
+                                    remembered.enabled = state.committed;
+                                    updateServiceMemory(remembered);
+                                }
+                                if (activeServiceId === id) {
+                                    const editorToggle = form?.querySelector('[data-plyr-service-enabled]');
+                                    if (editorToggle) editorToggle.checked = state.committed;
+                                }
+                                showNotice(error.message, 'error');
+                            }
+                            break;
+                        }
+                    }
+                } finally {
+                    state.running = false;
+                    // A click can land between the final comparison and this finally block.
+                    // If so, immediately continue syncing the newest desired state.
+                    if (state.committed !== state.desired) flushToggle(id);
+                }
+            };
+
+            list?.addEventListener('click', event => {
                 const edit = event.target.closest('[data-plyr-service-edit]');
                 if (edit) {
                     openEditor(byId.get(String(edit.dataset.plyrServiceEdit)) || null);
@@ -348,21 +419,36 @@
                 }
 
                 const toggle = event.target.closest('[data-plyr-toggle]');
-                if (!toggle || toggle.disabled) return;
+                if (!toggle) return;
+
                 const id = String(toggle.dataset.plyrToggle || '');
-                const row = toggle.closest('[data-service-row]');
-                toggle.disabled = true;
-                row?.classList.add('is-updating');
-                try {
-                    const data = await requestJson(`${baseUrl}/${encodeURIComponent(id)}/toggle`, { method: 'POST' });
-                    upsertService(data.service);
-                    if (activeServiceId === id) syncEditor(data.service);
-                    showNotice(data.message || 'Service updated.');
-                } catch (error) {
-                    showNotice(error.message, 'error');
-                } finally {
-                    row?.classList.remove('is-updating');
+                if (!id) return;
+
+                const current = toggle.getAttribute('aria-pressed') === 'true';
+                const desired = !current;
+
+                // Optimistic UI: the switch moves now, before any network request.
+                setToggleVisual(toggle, desired);
+
+                const remembered = byId.get(id);
+                if (remembered) {
+                    remembered.enabled = desired;
+                    updateServiceMemory(remembered);
                 }
+                if (activeServiceId === id) {
+                    const editorToggle = form?.querySelector('[data-plyr-service-enabled]');
+                    if (editorToggle) editorToggle.checked = desired;
+                }
+
+                let state = toggleState.get(id);
+                if (!state) {
+                    state = { committed: current, desired, running: false };
+                    toggleState.set(id, state);
+                } else {
+                    state.desired = desired;
+                }
+
+                flushToggle(id);
             });
 
             form?.addEventListener('submit', async event => {

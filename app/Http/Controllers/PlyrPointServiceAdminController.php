@@ -49,9 +49,26 @@ class PlyrPointServiceAdminController extends Controller
     public function toggle(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
-        $service->update(['is_enabled' => ! $service->is_enabled]);
 
-        return $this->respond($request, $service->fresh(), $service->is_enabled ? 'Service turned on.' : 'Service turned off.');
+        $data = $request->validate([
+            'enabled' => ['nullable', 'boolean'],
+        ]);
+
+        // Prefer the explicit target state from the instant admin switch. Falling
+        // back to inversion keeps this endpoint compatible with older clients.
+        $enabled = array_key_exists('enabled', $data)
+            ? (bool) $data['enabled']
+            : ! (bool) $service->is_enabled;
+
+        if ((bool) $service->is_enabled !== $enabled) {
+            $service->update(['is_enabled' => $enabled]);
+        }
+
+        return $this->respond(
+            $request,
+            $service->fresh(),
+            $enabled ? 'Service turned on.' : 'Service turned off.',
+        );
     }
 
     public function destroy(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
