@@ -57,8 +57,8 @@ class CreditUsageController extends Controller
         }
 
         $quotes = $selected
-            ->map(function (array $item) use ($credits): array {
-                $quote = $credits->quoteService(
+            ->map(function (array $item) use ($pointCatalog): array {
+                $quote = $pointCatalog->quoteService(
                     (string) $item['item_key'],
                     max(1, (int) ($item['quantity'] ?? 1)),
                     (bool) ($item['rush'] ?? false),
@@ -124,16 +124,27 @@ class CreditUsageController extends Controller
                         'request_resources' => $resources,
                         'status' => 'submitted',
                     ]);
-                    $transaction = $credits->spendForServiceRequest(
+                    $transaction = $credits->debit(
                         $lockedUser,
-                        $quote['item_key'],
-                        $quote['quantity'],
-                        $quote['modifier'] === 'rush',
-                        (string) $serviceRequest->getKey(),
+                        (int) $quote['points'],
+                        'service-request:' . $serviceRequest->getKey(),
                         [
-                            'batch_request_token' => $batchToken,
-                            'request_token' => $itemRequestToken,
-                            'notes' => $serviceRequest->notes,
+                            'item_key' => $quote['item_key'],
+                            'qty' => $quote['quantity'],
+                            'catalog_version' => $quote['catalog_version'],
+                            'unit_price' => $quote['unit_price'],
+                            'modifier' => $quote['modifier'],
+                            'source_type' => 'service_request',
+                            'source_id' => (string) $serviceRequest->getKey(),
+                            'reason' => $quote['item_name'] . ' request',
+                            'actor' => 'athlete',
+                            'meta' => [
+                                'item_name' => $quote['item_name'],
+                                'irreversible_user_redemption' => true,
+                                'batch_request_token' => $batchToken,
+                                'request_token' => $itemRequestToken,
+                                'notes' => $serviceRequest->notes,
+                            ],
                         ],
                     );
                     $serviceRequest->forceFill(['credit_point_transaction_id' => $transaction->getKey()])->save();

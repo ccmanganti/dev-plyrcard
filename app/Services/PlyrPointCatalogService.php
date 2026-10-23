@@ -7,6 +7,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class PlyrPointCatalogService
@@ -77,17 +78,103 @@ class PlyrPointCatalogService
         return array_keys($this->catalog());
     }
 
-    public function saveEnabledKeys(array $enabledKeys): void
+    public function find(string $serviceKey): ?array
     {
-        $enabled = array_flip(array_values(array_intersect(array_map('strval', $enabledKeys), array_keys(self::DEFAULTS))));
-        $rows = $this->rawRows();
+        $serviceKey = strtolower(trim($serviceKey));
+        return $this->adminRows()[$serviceKey] ?? null;
+    }
 
-        foreach ($rows as $key => &$row) {
-            $row['enabled'] = isset($enabled[$key]);
+    public function setEnabled(string $serviceKey, bool $enabled): void
+    {
+        $rows = $this->rawRows();
+        $this->assertServiceExists($serviceKey, $rows);
+        $rows[$serviceKey]['enabled'] = $enabled;
+        $this->persist($rows);
+    }
+
+    public function saveService(array $data, ?string $existingKey = null): string
+    {
+        $rows = $this->rawRows();
+        $existingKey = $existingKey !== null ? strtolower(trim($existingKey)) : null;
+
+        if ($existingKey !== null && $existingKey !== '') {
+            $this->assertServiceExists($existingKey, $rows);
+            $key = $existingKey;
+        } else {
+            $base = Str::slug((string) ($data['name'] ?? ''), '_') ?: 'service';
+            $key = $base;
+            $suffix = 2;
+            while (array_key_exists($key, $rows)) {
+                $key = $base . '_' . $suffix;
+                $suffix++;
+            }
         }
-        unset($row);
+
+        $current = (array) ($rows[$key] ?? []);
+        $rows[$key] = [
+            'key' => $key,
+            'name' => trim((string) ($data['name'] ?? '')),
+            'points' => max(1, (int) ($data['points'] ?? 1)),
+            'description' => trim((string) ($data['description'] ?? '')),
+            'cta' => trim((string) ($data['cta'] ?? '')) ?: 'Request service',
+            'enabled' => (bool) ($data['enabled'] ?? true),
+            'custom' => ! array_key_exists($key, self::DEFAULTS),
+            'samples' => collect((array) ($current['samples'] ?? []))
+                ->filter(fn ($sample): bool => is_array($sample))
+                ->values()
+                ->all(),
+        ];
 
         $this->persist($rows);
+
+        return $key;
+    }
+
+    public function deleteService(string $serviceKey): void
+    {
+        $serviceKey = strtolower(trim($serviceKey));
+        if (array_key_exists($serviceKey, self::DEFAULTS)) {
+            throw new InvalidArgumentException('Built-in PLYR Points services can be turned off, but not deleted.');
+        }
+
+        $rows = $this->rawRows();
+        $this->assertServiceExists($serviceKey, $rows);
+
+        foreach ((array) ($rows[$serviceKey]['samples'] ?? []) as $sample) {
+            if (is_array($sample) && filled($sample['path'] ?? null)) {
+                Storage::disk('public')->delete((string) $sample['path']);
+            }
+        }
+
+        unset($rows[$serviceKey]);
+        $this->persist($rows);
+    }
+
+    public function quoteService(string $itemKey, int $quantity = 1, bool $rush = false): array
+    {
+        $itemKey = strtolower(trim($itemKey));
+        $catalog = $this->catalog();
+        $item = $catalog[$itemKey] ?? null;
+
+        if (! $item) {
+            throw ValidationException::withMessages(['item_key' => 'That PLYR Points service is not available.']);
+        }
+
+        $quantity = max(1, min(20, $quantity));
+        $unitPrice = max(1, (int) ($item['points'] ?? 1));
+        $basePoints = $unitPrice * $quantity;
+        $totalPoints = $rush ? (int) ceil($basePoints * 1.5) : $basePoints;
+
+        return [
+            'item_key' => $itemKey,
+            'item_name' => (string) $item['name'],
+            'description' => (string) ($item['description'] ?? ''),
+            'quantity' => $quantity,
+            'unit_price' => $unitPrice,
+            'modifier' => $rush ? 'rush' : null,
+            'points' => $totalPoints,
+            'catalog_version' => (int) config('plyrcard-points.catalog_version', 1),
+        ];
     }
 
     public function addYoutubeSample(string $serviceKey, string $url): void
@@ -173,7 +260,7 @@ class PlyrPointCatalogService
                     }
 
                     $key = strtolower(trim((string) ($row['key'] ?? '')));
-                    if (array_key_exists($key, self::DEFAULTS)) {
+                    if ($key !== '') {
                         $savedByKey[$key] = $row;
                     }
                 }
@@ -191,11 +278,35 @@ class PlyrPointCatalogService
 
             $rows[$key] = [
                 'key' => $key,
-                'name' => trim((string) ($config['name'] ?? $default['name'])) ?: $default['name'],
-                'points' => max(1, (int) ($config['points'] ?? $default['points'])),
-                'description' => trim((string) ($config['description'] ?? $default['description'])),
-                'cta' => trim((string) ($config['cta'] ?? $default['cta'])) ?: $default['cta'],
+                'name' => trim((string) ($saved['name'] ?? $config['name'] ?? $default['name'])) ?: $default['name'],
+                'points' => max(1, (int) ($saved['points'] ?? $config['points'] ?? $default['points'])),
+                'description' => trim((string) ($saved['description'] ?? $config['description'] ?? $default['description'])),
+                'cta' => trim((string) ($saved['cta'] ?? $config['cta'] ?? $default['cta'])) ?: $default['cta'],
                 'enabled' => array_key_exists('enabled', $saved) ? (bool) $saved['enabled'] : true,
+                'custom' => false,
+                'samples' => collect((array) ($saved['samples'] ?? []))
+                    ->filter(fn ($sample): bool => is_array($sample))
+                    ->values()
+                    ->all(),
+            ];
+
+            unset($savedByKey[$key]);
+        }
+
+        foreach ($savedByKey as $key => $saved) {
+            $name = trim((string) ($saved['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $rows[$key] = [
+                'key' => $key,
+                'name' => $name,
+                'points' => max(1, (int) ($saved['points'] ?? 1)),
+                'description' => trim((string) ($saved['description'] ?? '')),
+                'cta' => trim((string) ($saved['cta'] ?? '')) ?: 'Request service',
+                'enabled' => array_key_exists('enabled', $saved) ? (bool) $saved['enabled'] : true,
+                'custom' => true,
                 'samples' => collect((array) ($saved['samples'] ?? []))
                     ->filter(fn ($sample): bool => is_array($sample))
                     ->values()
@@ -215,7 +326,12 @@ class PlyrPointCatalogService
         $payload = collect($rows)
             ->map(fn (array $row, string $key): array => [
                 'key' => $key,
+                'name' => trim((string) ($row['name'] ?? '')),
+                'points' => max(1, (int) ($row['points'] ?? 1)),
+                'description' => trim((string) ($row['description'] ?? '')),
+                'cta' => trim((string) ($row['cta'] ?? '')) ?: 'Request service',
                 'enabled' => (bool) ($row['enabled'] ?? true),
+                'custom' => (bool) ($row['custom'] ?? ! array_key_exists($key, self::DEFAULTS)),
                 'samples' => collect((array) ($row['samples'] ?? []))
                     ->filter(fn ($sample): bool => is_array($sample))
                     ->map(fn (array $sample): array => collect($sample)
@@ -289,22 +405,26 @@ class PlyrPointCatalogService
             return null;
         }
 
-        $host = strtolower(preg_replace('/^www\./', '', (string) ($parts['host'] ?? '')));
+        $host = strtolower(preg_replace('/^www\./', '', (string) ($parts['host'] ?? '')) ?? '');
         $path = trim((string) ($parts['path'] ?? ''), '/');
-        $candidate = null;
 
-        if ($host === 'youtu.be') {
-            $candidate = explode('/', $path)[0] ?? null;
-        } elseif (in_array($host, ['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'], true)) {
-            if ($path === 'watch') {
-                parse_str((string) ($parts['query'] ?? ''), $query);
-                $candidate = $query['v'] ?? null;
-            } elseif (preg_match('#^(?:embed|shorts|live)/([^/]+)#', $path, $match)) {
-                $candidate = $match[1] ?? null;
+        if ($host === 'youtu.be' && $path !== '') {
+            return explode('/', $path)[0] ?: null;
+        }
+
+        if (in_array($host, ['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'], true)) {
+            parse_str((string) ($parts['query'] ?? ''), $query);
+            if (filled($query['v'] ?? null)) {
+                return trim((string) $query['v']);
+            }
+
+            foreach (['shorts/', 'embed/', 'live/'] as $prefix) {
+                if (str_starts_with($path, $prefix)) {
+                    return trim((string) explode('/', substr($path, strlen($prefix)))[0]) ?: null;
+                }
             }
         }
 
-        $candidate = trim((string) $candidate);
-        return preg_match('/^[A-Za-z0-9_-]{6,20}$/', $candidate) ? $candidate : null;
+        return null;
     }
 }

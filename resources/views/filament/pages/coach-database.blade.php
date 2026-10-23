@@ -256,9 +256,11 @@
     $rcPointSettledPct = round(($rcPointSettledUsedTotal / $rcPointDisplayTotal) * 100, 2);
     $rcPointProductionPct = round(($rcPointInProductionTotal / $rcPointDisplayTotal) * 100, 2);
     $rcPointAvailablePct = max(0, 100 - $rcPointSettledPct - $rcPointProductionPct);
-    $rcFeaturedWorth = collect(['outreach' => 'campaigns', 'reel' => 'reels', 'graphic' => 'graphics'])->map(function (string $label, string $key) use ($rcCreditCatalog, $rcCreditBalance) {
-        $cost = max(1, (int) data_get($rcCreditCatalog, $key . '.points', 1));
-        return number_format(intdiv(max(0, $rcCreditBalance), $cost)) . ' ' . $label;
+    $rcFeaturedWorth = collect($rcCreditCatalog)->take(3)->map(function (array $item) use ($rcCreditBalance) {
+        $cost = max(1, (int) ($item['points'] ?? 1));
+        $count = intdiv(max(0, $rcCreditBalance), $cost);
+        $name = trim((string) ($item['name'] ?? 'service')) ?: 'service';
+        return number_format($count) . ' ' . \Illuminate\Support\Str::plural($name, $count);
     })->values();
     $rcFeaturedWorthText = $rcFeaturedWorth->count() > 1
         ? $rcFeaturedWorth->slice(0, -1)->implode(', ') . ' or ' . $rcFeaturedWorth->last() . '.'
@@ -18133,6 +18135,185 @@ if (window.__plyrPointsEnhancerInstalledV15) {
         const observer=new MutationObserver(queueEnhance);const start=()=>{injectStyles();enhance();observer.observe(document.body,{childList:true,subtree:true});};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
     })();
 }
+</script>
+<script id="rc-plyr-points-clean-ui-v16">
+(() => {
+    const install = () => {
+        let style = document.getElementById('plyr-points-clean-ui-v16');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'plyr-points-clean-ui-v16';
+            style.textContent = `
+                /* v16: simplified solid-color PLYR Points checkout drawer. */
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 {
+                    width:min(780px,100vw) !important;
+                    padding:0 1rem 1rem !important;
+                    border-radius:0 !important;
+                    background:#f4f6f8 !important;
+                    border-left:1px solid #d9dee7 !important;
+                    box-shadow:-20px 0 55px rgba(15,23,42,.22) !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 {
+                    background:#101319 !important;
+                    border-left-color:#303641 !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .plyr-points-drawer-head-v15 {
+                    margin:0 -1rem !important;
+                    padding:1rem 1.1rem !important;
+                    background:#17191f !important;
+                    border-bottom:0 !important;
+                    backdrop-filter:none !important;
+                    color:#fff !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .plyr-points-drawer-head-v15 h2 { color:#fff !important;font-size:1rem !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .plyr-points-drawer-head-v15 p { color:#aeb7c5 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .plyr-points-drawer-close-v15 { background:#242831 !important;border-color:#343943 !important;color:#fff !important; }
+
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-steps-v7 {
+                    top:70px !important;
+                    gap:.45rem !important;
+                    margin:0 -1rem 1rem !important;
+                    padding:.75rem 1rem !important;
+                    border:0 !important;
+                    border-bottom:1px solid #e1e5eb !important;
+                    border-radius:0 !important;
+                    background:#fff !important;
+                    box-shadow:none !important;
+                    backdrop-filter:none !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-steps-v7 { background:#17191f !important;border-color:#303641 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7 {
+                    min-height:4.2rem !important;
+                    grid-template-columns:1.9rem minmax(0,1fr) !important;
+                    gap:.55rem !important;
+                    padding:.7rem !important;
+                    border:0 !important;
+                    border-radius:.75rem !important;
+                    background:#eef1f5 !important;
+                    box-shadow:none !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-active {
+                    background:#ff6338 !important;
+                    color:#fff !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-done {
+                    background:#20242c !important;
+                    color:#fff !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-number-v7 {
+                    width:1.9rem !important;height:1.9rem !important;
+                    border:0 !important;background:#fff !important;color:#475467 !important;
+                    font-size:.72rem !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-active .rc-credit-step-number-v7 { background:#fff !important;color:#ff6338 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-done .rc-credit-step-number-v7 { background:#fff !important;color:#20242c !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-copy-v7 strong { margin-bottom:.12rem !important;font-size:.76rem !important;color:#101828 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-copy-v7 span { font-size:.61rem !important;line-height:1.3 !important;color:#667085 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-active .rc-credit-step-copy-v7 strong,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-active .rc-credit-step-copy-v7 span,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-done .rc-credit-step-copy-v7 strong,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-done .rc-credit-step-copy-v7 span { color:#fff !important; }
+
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-v5 {
+                    margin:0 !important;
+                    border:1px solid #dfe3e8 !important;
+                    border-radius:.9rem !important;
+                    background:#fff !important;
+                    overflow:hidden !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-v5 { background:#17191f !important;border-color:#303641 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 {
+                    min-height:4.2rem !important;
+                    padding:.9rem 1rem !important;
+                    border-bottom:1px solid #eaecf0 !important;
+                    background:#fff !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 { background:#17191f !important;border-color:#303641 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 h3 { margin:0 !important;font-size:.82rem !important;font-weight:850 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 p { margin:.18rem 0 0 !important;font-size:.65rem !important;color:#667085 !important; }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 p { color:#98a2b3 !important; }
+
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-list-v5 {
+                    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+                    gap:.65rem !important;
+                    padding:.8rem !important;
+                    background:#f7f8fa !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-list-v5 { background:#101319 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-row-v5 {
+                    min-height:9.25rem !important;
+                    padding:.85rem !important;
+                    border:1px solid #dfe3e8 !important;
+                    border-radius:.8rem !important;
+                    background:#fff !important;
+                    box-shadow:none !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-row-v5 { background:#17191f !important;border-color:#303641 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-row-v5.is-selected {
+                    border-color:#ff6338 !important;
+                    background:#fff1ec !important;
+                    box-shadow:inset 4px 0 0 #ff6338 !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-row-v5.is-selected { background:#2b1b17 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-name-v5 { align-items:center !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-name-v5 > span:first-child { font-size:.78rem !important;font-weight:850 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-base-v5 { padding:.16rem .38rem !important;border-radius:999px !important;background:#ffe5dc !important;color:#c2410c !important;font-size:.58rem !important;font-weight:850 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-desc-v5 { margin-top:.25rem !important;min-height:2.2rem !important;color:#667085 !important;font-size:.65rem !important;line-height:1.35 !important; }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-desc-v5 { color:#98a2b3 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-controls-v5 { margin-top:.7rem !important;padding-top:.65rem !important;border-top:1px solid #eef0f3 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-mini-field-v5 > span { font-size:.58rem !important;text-transform:uppercase !important;letter-spacing:.04em !important;color:#667085 !important;font-weight:800 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-mini-field-v5 input[type="number"],
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-rush-v5 { min-height:2rem !important;border-radius:.55rem !important;background:#f8fafc !important; }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-mini-field-v5 input[type="number"],
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-rush-v5 { background:#111318 !important; }
+
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-detail-list-v7,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-review-list-v7 { padding:.8rem !important;background:#f7f8fa !important; }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-detail-list-v7,
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-review-list-v7 { background:#101319 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-detail-card-v7,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-review-row-v7,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-order-summary-v5,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-shared-fields-v5 {
+                    border-color:#dfe3e8 !important;
+                    background:#fff !important;
+                    box-shadow:none !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-detail-card-v7,
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-review-row-v7,
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-order-summary-v5,
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-shared-fields-v5 { background:#17191f !important;border-color:#303641 !important; }
+
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-wizard-actions-v7 {
+                    margin-top:0 !important;
+                    padding:.75rem .85rem !important;
+                    border-top:1px solid #e1e5eb !important;
+                    background:#fff !important;
+                    box-shadow:0 -8px 20px rgba(15,23,42,.05) !important;
+                }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-wizard-actions-v7 { background:#17191f !important;border-color:#303641 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-wizard-actions-v7 .rc-btn-primary,
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-submit-v6 { min-width:10rem !important;background:#ff6338 !important;border-color:#ff6338 !important; }
+
+                @media(max-width:720px){
+                    [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-steps-v7 { grid-template-columns:1fr !important;position:relative !important;top:auto !important; }
+                    [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7 { min-height:3.7rem !important; }
+                    [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-list-v5 { grid-template-columns:1fr !important; }
+                }
+            `;
+        }
+        document.head.appendChild(style);
+
+        document.querySelectorAll('[data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 h3').forEach((heading) => {
+            heading.textContent = String(heading.textContent || '').replace(/^\s*[123]\.\s*/, '');
+        });
+    };
+
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, { once:true });
+    else install();
+    document.addEventListener('livewire:navigated', () => window.requestAnimationFrame(install));
+    window.setTimeout(install, 50);
+})();
 </script>
 </x-filament-panels::page>
 </div>
