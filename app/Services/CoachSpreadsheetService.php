@@ -23,6 +23,7 @@ class CoachSpreadsheetService
     public const IMPORT_FIELDS = [
         'school_name' => 'School',
         'school_logo_url' => 'School Logo URL',
+        'school_state' => 'School State',
         'first_name' => 'First Name',
         'last_name' => 'Last Name',
         'email' => 'Email',
@@ -100,6 +101,7 @@ class CoachSpreadsheetService
         $aliases = [
             'school_name' => ['school', 'school name', 'college', 'university'],
             'school_logo_url' => ['school logo', 'school logo url', 'logo', 'logo url', 'college logo', 'university logo'],
+            'school_state' => ['school state', 'school_state', 'state'],
             'first_name' => ['first name', 'firstname', 'coach first name'],
             'last_name' => ['last name', 'lastname', 'coach last name'],
             'email' => ['email', 'coach email', 'email address'],
@@ -112,7 +114,7 @@ class CoachSpreadsheetService
             'confidence_level' => ['confidence level', 'confidence'],
             'audit_notes' => ['audit notes'],
             'city' => ['coach city', 'city'],
-            'state' => ['coach state', 'state'],
+            'state' => ['coach state'],
             'country' => ['country'],
             'website_url' => ['website url', 'website'],
             'is_active' => ['active', 'is active'],
@@ -203,6 +205,7 @@ class CoachSpreadsheetService
                 'source_row' => $row,
                 'school_name' => trim($data['school_name']),
                 'school_logo_url' => $this->nullable($data['school_logo_url']),
+                'school_state' => $this->normalizeSchoolState($data['school_state']),
                 'first_name' => $firstName,
                 'last_name' => $lastName,
                 'display_name' => trim($firstName . ' ' . $lastName),
@@ -275,16 +278,21 @@ class CoachSpreadsheetService
                 $name = trim((string) ($row['school_name'] ?? ''));
                 $key = $this->normalizeSchoolName($name);
                 $logoUrl = trim((string) ($row['school_logo_url'] ?? ''));
+                $state = $this->normalizeSchoolState((string) ($row['school_state'] ?? ''));
 
                 if (! isset($schools[$key])) {
                     $schools[$key] = [
                         'name' => $name,
                         'logo_url' => null,
+                        'state' => null,
                     ];
                 }
 
                 if ($this->isHttpUrl($logoUrl)) {
                     $schools[$key]['logo_url'] = $logoUrl;
+                }
+                if ($state !== null) {
+                    $schools[$key]['state'] = $state;
                 }
 
                 return $schools;
@@ -305,11 +313,19 @@ class CoachSpreadsheetService
                         $schoolKey = $this->normalizeSchoolName($school->name);
                         $schoolData = $schoolRows[$schoolKey] ?? [];
                         $logoUrl = trim((string) ($schoolData['logo_url'] ?? ''));
+                        $state = $this->normalizeSchoolState((string) ($schoolData['state'] ?? ''));
+                        $updates = [];
 
                         // Store the actual remote image URL directly. Do not
                         // download the image and do not write logo_path.
                         if ($this->isHttpUrl($logoUrl) && $school->logo_url !== $logoUrl) {
-                            $school->forceFill(['logo_url' => $logoUrl])->save();
+                            $updates['logo_url'] = $logoUrl;
+                        }
+                        if ($state !== null && $school->state !== $state) {
+                            $updates['state'] = $state;
+                        }
+                        if ($updates !== []) {
+                            $school->forceFill($updates)->save();
                         }
 
                         $schoolMap[$schoolKey] = $school->getKey();
@@ -325,6 +341,7 @@ class CoachSpreadsheetService
                     $school = School::create([
                         'name' => trim((string) $schoolData['name']),
                         'logo_url' => $this->isHttpUrl($logoUrl) ? $logoUrl : null,
+                        'state' => $this->normalizeSchoolState((string) ($schoolData['state'] ?? '')),
                     ]);
 
                     $schoolMap[$schoolKey] = $school->getKey();
@@ -345,7 +362,7 @@ class CoachSpreadsheetService
                 try {
                     $sourceRow = $row['source_row'] ?? '?';
                     $schoolName = trim((string) ($row['school_name'] ?? ''));
-                    unset($row['source_row'], $row['school_name'], $row['school_logo_url']);
+                    unset($row['source_row'], $row['school_name'], $row['school_logo_url'], $row['school_state']);
 
                     $row['school_id'] = $schoolName !== ''
                         ? ($schoolMap[$this->normalizeSchoolName($schoolName)] ?? null)
@@ -515,6 +532,43 @@ class CoachSpreadsheetService
     private function normalizeHeader(string $value): string
     {
         return Str::of($value)->lower()->replace(['_', '-'], ' ')->squish()->toString();
+    }
+
+
+    private function normalizeSchoolState(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        $upper = strtoupper($value);
+        if (preg_match('/^[A-Z]{2}$/', $upper) === 1) {
+            return $upper;
+        }
+
+        $key = Str::of($value)->lower()->replace(['.', '_', '-'], ' ')->squish()->toString();
+        $states = [
+            'alabama' => 'AL', 'alaska' => 'AK', 'arizona' => 'AZ', 'arkansas' => 'AR',
+            'california' => 'CA', 'colorado' => 'CO', 'connecticut' => 'CT', 'delaware' => 'DE',
+            'florida' => 'FL', 'georgia' => 'GA', 'hawaii' => 'HI', 'idaho' => 'ID',
+            'illinois' => 'IL', 'indiana' => 'IN', 'iowa' => 'IA', 'kansas' => 'KS',
+            'kentucky' => 'KY', 'louisiana' => 'LA', 'maine' => 'ME', 'maryland' => 'MD',
+            'massachusetts' => 'MA', 'michigan' => 'MI', 'minnesota' => 'MN', 'mississippi' => 'MS',
+            'missouri' => 'MO', 'montana' => 'MT', 'nebraska' => 'NE', 'nevada' => 'NV',
+            'new hampshire' => 'NH', 'new jersey' => 'NJ', 'new mexico' => 'NM', 'new york' => 'NY',
+            'north carolina' => 'NC', 'north dakota' => 'ND', 'ohio' => 'OH', 'oklahoma' => 'OK',
+            'oregon' => 'OR', 'pennsylvania' => 'PA', 'rhode island' => 'RI', 'south carolina' => 'SC',
+            'south dakota' => 'SD', 'tennessee' => 'TN', 'texas' => 'TX', 'utah' => 'UT',
+            'vermont' => 'VT', 'virginia' => 'VA', 'washington' => 'WA', 'west virginia' => 'WV',
+            'wisconsin' => 'WI', 'wyoming' => 'WY', 'district of columbia' => 'DC', 'washington dc' => 'DC',
+            'british columbia' => 'BC', 'alberta' => 'AB', 'manitoba' => 'MB', 'new brunswick' => 'NB',
+            'newfoundland and labrador' => 'NL', 'nova scotia' => 'NS', 'ontario' => 'ON',
+            'prince edward island' => 'PE', 'quebec' => 'QC', 'saskatchewan' => 'SK',
+            'northwest territories' => 'NT', 'nunavut' => 'NU', 'yukon' => 'YT',
+        ];
+
+        return $states[$key] ?? $value;
     }
 
     private function normalizeSchoolName(string $value): string
