@@ -662,6 +662,26 @@ HTML;
 
     /*
     |--------------------------------------------------------------------------
+    | Where to Watch Me
+    |--------------------------------------------------------------------------
+    | The right-side website panel shows the next three upcoming schedule items.
+    | The full Schedule tab remains unchanged.
+    */
+    $watchSchedulePayload = collect($schedulePayload)
+        ->filter(fn (array $item) => filled($item['date'] ?? null) && (string) $item['date'] >= now()->toDateString())
+        ->sortBy(fn (array $item) => (string) ($item['date'] ?? '') . ' ' . (string) ($item['time_sortable'] ?? '23:59:59'))
+        ->take(3)
+        ->values()
+        ->all();
+
+    $watchSeasonMeta = collect([
+        $club?->name,
+        $club?->league?->name,
+        $gradYearText,
+    ])->filter(fn ($value) => filled($value))->implode(' · ');
+
+    /*
+    |--------------------------------------------------------------------------
     | Contrast Helpers
     |--------------------------------------------------------------------------
     */
@@ -1457,6 +1477,212 @@ HTML;
 
             .follow-me-copy{
                 font-size: .95rem;
+            }
+        }
+
+        /* Where to Watch Me sidebar */
+        .watch-me-panel{
+            width: 100%;
+            color: var(--on-primary);
+            font-family: "Antonio", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        .watch-me-title{
+            margin: 0;
+            color: var(--on-primary);
+            font-family: "Bebas Neue", "Antonio", ui-sans-serif, system-ui;
+            font-size: clamp(3.4rem, 5.7vw, 5.35rem);
+            font-weight: 400;
+            line-height: .86;
+            letter-spacing: -.025em;
+            text-transform: none;
+        }
+
+        .watch-me-copy{
+            margin: .7rem 0 1.7rem;
+            color: var(--on-primary);
+            font-size: clamp(.95rem, 1.15vw, 1.08rem);
+            font-weight: 600;
+            line-height: 1.45;
+            opacity: .96;
+        }
+
+        .watch-me-stack{
+            display: grid;
+            gap: .85rem;
+        }
+
+        .watch-me-card{
+            display: grid;
+            grid-template-columns: 92px minmax(0, 1fr);
+            min-height: 154px;
+            overflow: hidden;
+            border-radius: 13px;
+            background: #ffffff;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .13);
+        }
+
+        .watch-me-date{
+            display: flex;
+            min-width: 0;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem .5rem;
+            background: var(--secondary);
+            color: var(--on-secondary);
+            text-align: center;
+        }
+
+        .watch-me-month,
+        .watch-me-day-name{
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: .78rem;
+            font-weight: 800;
+            letter-spacing: .12em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .watch-me-day-number{
+            display: block;
+            margin: .32rem 0 .22rem;
+            font-family: "Bebas Neue", "Antonio", ui-sans-serif, system-ui;
+            font-size: 3.1rem;
+            font-weight: 400;
+            letter-spacing: .02em;
+            line-height: .85;
+        }
+
+        .watch-me-body{
+            min-width: 0;
+            padding: .95rem 1rem .9rem;
+            color: var(--text1);
+        }
+
+        .watch-me-badge{
+            display: inline-flex;
+            align-items: center;
+            min-height: 21px;
+            margin-bottom: .42rem;
+            border-radius: 3px;
+            padding: .18rem .48rem .16rem;
+            background: var(--primary);
+            color: var(--on-primary);
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: .65rem;
+            font-weight: 800;
+            letter-spacing: .12em;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .watch-me-badge.is-showcase{
+            background: var(--secondary);
+            color: var(--on-secondary);
+        }
+
+        .watch-me-event-title{
+            margin: 0;
+            color: var(--text1);
+            font-family: "Bebas Neue", "Antonio", ui-sans-serif, system-ui;
+            font-size: clamp(1.45rem, 2vw, 2rem);
+            font-weight: 400;
+            letter-spacing: .01em;
+            line-height: .96;
+            text-transform: uppercase;
+        }
+
+        .watch-me-event-meta{
+            margin-top: .25rem;
+            color: var(--text1);
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: .88rem;
+            font-weight: 700;
+            line-height: 1.35;
+        }
+
+        .watch-me-event-location{
+            margin-top: .22rem;
+            color: var(--text2);
+            font-size: .78rem;
+            font-weight: 500;
+            line-height: 1.35;
+        }
+
+        .watch-me-calendar-btn{
+            display: inline-flex;
+            align-items: center;
+            gap: .35rem;
+            margin-top: .65rem;
+            border: 0;
+            border-bottom: 1.5px solid currentColor;
+            border-radius: 0;
+            padding: 0 0 .08rem;
+            background: transparent;
+            color: var(--text1);
+            font-family: "Antonio", ui-sans-serif, system-ui;
+            font-size: .78rem;
+            font-weight: 800;
+            line-height: 1.15;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color .16s ease, opacity .16s ease;
+        }
+
+        .watch-me-calendar-btn:hover{
+            color: var(--primary);
+        }
+
+        .watch-me-empty{
+            border-radius: 13px;
+            padding: 1.2rem;
+            background: color-mix(in srgb, #ffffff 94%, var(--primary) 6%);
+            color: var(--text1);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, .11);
+        }
+
+        .watch-me-empty-title{
+            font-family: "Bebas Neue", "Antonio", ui-sans-serif, system-ui;
+            font-size: 1.7rem;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .watch-me-empty-copy{
+            margin-top: .35rem;
+            color: var(--text2);
+            font-size: .85rem;
+            line-height: 1.45;
+        }
+
+        @media (max-width: 1023px){
+            .watch-me-title{
+                font-size: clamp(3rem, 8vw, 4.8rem);
+            }
+
+            .watch-me-card{
+                grid-template-columns: 86px minmax(0, 1fr);
+            }
+        }
+
+        @media (max-width: 767px){
+            .watch-me-panel{
+                max-width: 560px;
+                margin: 0 auto;
+            }
+
+            .watch-me-card{
+                grid-template-columns: 88px minmax(0, 1fr);
+                min-height: 146px;
+            }
+
+            .watch-me-body{
+                padding: .9rem .9rem .85rem;
+            }
+
+            .watch-me-day-number{
+                font-size: 2.85rem;
             }
         }
 
@@ -2275,105 +2501,88 @@ HTML;
                         <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
                     @endif
                 @else
-                    <div class="follow-me-card">
-                        <h2 class="follow-me-title">Follow Me</h2>
-                        <p class="follow-me-copy">
-                            If you’d like to stay updated on my {{ filled($sportText) ? strtolower($sportText) : 'athlete' }} journey,
-                            upcoming games, and development, please fill out the form below. I’ll only send updates related
-                            to my progress and achievements.
+                    <div class="watch-me-panel">
+                        <h2 class="watch-me-title">Where to<br>Watch Me</h2>
+
+                        <p class="watch-me-copy">
+                            Catch me live this season.@if(filled($watchSeasonMeta)) {{ $watchSeasonMeta }}@endif
                         </p>
 
-                        @php
-                            $followMeFormAction = \Illuminate\Support\Facades\Route::has('public.follow-me.store')
-                                ? route('public.follow-me.store', $website)
-                                : null;
-                        @endphp
+                        <div class="watch-me-stack">
+                            @forelse($watchSchedulePayload as $watchIndex => $watchSchedule)
+                                @php
+                                    $watchSearchText = strtolower(trim(implode(' ', [
+                                        (string) ($watchSchedule['title'] ?? ''),
+                                        (string) ($watchSchedule['notes'] ?? ''),
+                                        (string) ($watchSchedule['status'] ?? ''),
+                                        (string) ($watchSchedule['location'] ?? ''),
+                                        (string) ($watchSchedule['venue'] ?? ''),
+                                    ])));
 
-                        <form
-                            class="follow-me-form"
-                            method="POST"
-                            action="{{ $followMeFormAction ?: '#' }}"
-                            data-follow-me-form
-                            data-player-email="{{ $playerEmail }}"
-                            novalidate
-                        >
-                            @csrf
-                            <input type="hidden" name="website_id" value="{{ $website->id }}">
-                            <input type="hidden" name="player_id" value="{{ $user?->id }}">
-                            <input type="hidden" name="player_name" value="{{ $playerDisplayName }}">
+                                    $watchIsShowcase = str_contains($watchSearchText, 'showcase');
+                                    $watchBadge = $watchIndex === 0
+                                        ? 'NEXT UP'
+                                        : ($watchIsShowcase ? 'SHOWCASE' : null);
 
-                            <div class="follow-me-field" data-field-wrap>
-                                <label class="follow-me-label" for="follow_me_first_name_{{ $website->id }}">First Name</label>
-                                <input
-                                    id="follow_me_first_name_{{ $website->id }}"
-                                    class="follow-me-control"
-                                    type="text"
-                                    name="first_name"
-                                    placeholder="Coach First Name"
-                                    autocomplete="given-name"
-                                    required
-                                >
-                                <span class="follow-me-error">First name is required.</span>
-                            </div>
+                                    $watchCompetitionLine = collect([
+                                        $club?->name,
+                                        $club?->league?->name,
+                                        $watchSchedule['time'] ?? null,
+                                    ])->filter(fn ($value) => filled($value))->implode(' · ');
 
-                            <div class="follow-me-field" data-field-wrap>
-                                <label class="follow-me-label" for="follow_me_last_name_{{ $website->id }}">Last Name</label>
-                                <input
-                                    id="follow_me_last_name_{{ $website->id }}"
-                                    class="follow-me-control"
-                                    type="text"
-                                    name="last_name"
-                                    placeholder="Coach Last Name"
-                                    autocomplete="family-name"
-                                    required
-                                >
-                                <span class="follow-me-error">Last name is required.</span>
-                            </div>
+                                    $watchLocationLine = trim((string) ($watchSchedule['location_line'] ?? ''));
+                                @endphp
 
-                            <div class="follow-me-field" data-field-wrap>
-                                <label class="follow-me-label" for="follow_me_email_{{ $website->id }}">Email *</label>
-                                <input
-                                    id="follow_me_email_{{ $website->id }}"
-                                    class="follow-me-control"
-                                    type="email"
-                                    name="email"
-                                    placeholder="Email"
-                                    autocomplete="email"
-                                    required
-                                >
-                                <span class="follow-me-error">Enter a valid email address.</span>
-                            </div>
+                                <article class="watch-me-card">
+                                    <div class="watch-me-date">
+                                        <span class="watch-me-month">{{ strtoupper((string) ($watchSchedule['month_short'] ?? '')) }}</span>
+                                        <span class="watch-me-day-number">{{ $watchSchedule['day_number'] ?? '--' }}</span>
+                                        <span class="watch-me-day-name">{{ strtoupper((string) ($watchSchedule['day_name'] ?? '')) }}</span>
+                                    </div>
 
-                            <div class="follow-me-field" data-field-wrap>
-                                <label class="follow-me-label" for="follow_me_school_{{ $website->id }}">School</label>
-                                <input
-                                    id="follow_me_school_{{ $website->id }}"
-                                    class="follow-me-control"
-                                    type="text"
-                                    name="school"
-                                    placeholder="School or organization"
-                                    autocomplete="organization"
-                                >
-                                <span class="follow-me-error">Please enter a valid school or organization.</span>
-                            </div>
+                                    <div class="watch-me-body">
+                                        @if($watchBadge)
+                                            <span class="watch-me-badge {{ $watchBadge === 'SHOWCASE' ? 'is-showcase' : '' }}">
+                                                {{ $watchBadge }}
+                                            </span>
+                                        @endif
 
-                            <div class="follow-me-field" data-field-wrap>
-                                <label class="follow-me-label" for="follow_me_message_{{ $website->id }}">Message</label>
-                                <textarea
-                                    id="follow_me_message_{{ $website->id }}"
-                                    class="follow-me-control"
-                                    name="message"
-                                    placeholder="Optional note..."
-                                ></textarea>
-                                <span class="follow-me-error">Please enter a valid message.</span>
-                            </div>
+                                        <h3 class="watch-me-event-title">
+                                            {{ $watchSchedule['title'] ?? 'Game Day' }}
+                                        </h3>
 
-                            <button class="follow-me-submit" type="submit" data-default-text="Follow Me">
-                                Follow Me
-                            </button>
+                                        @if(filled($watchCompetitionLine))
+                                            <div class="watch-me-event-meta">{{ $watchCompetitionLine }}</div>
+                                        @endif
 
-                            <div class="follow-me-status" data-follow-me-status aria-live="polite"></div>
-                        </form>
+                                        @if(filled($watchLocationLine))
+                                            <div class="watch-me-event-location">{{ $watchLocationLine }}</div>
+                                        @endif
+
+                                        <button
+                                            type="button"
+                                            class="watch-me-calendar-btn"
+                                            data-watch-calendar
+                                            data-event-id="{{ $watchSchedule['id'] ?? $watchIndex }}"
+                                            data-event-title="{{ $watchSchedule['title'] ?? 'Game Day' }}"
+                                            data-event-date="{{ $watchSchedule['date'] ?? '' }}"
+                                            data-event-time="{{ $watchSchedule['time_sortable'] ?? '' }}"
+                                            data-event-location="{{ $watchLocationLine }}"
+                                            data-event-notes="{{ $watchSchedule['notes'] ?? '' }}"
+                                        >
+                                            Add to Calendar
+                                        </button>
+                                    </div>
+                                </article>
+                            @empty
+                                <div class="watch-me-empty">
+                                    <div class="watch-me-empty-title">Schedule coming soon</div>
+                                    <div class="watch-me-empty-copy">
+                                        Upcoming games and showcases will appear here as soon as they are added.
+                                    </div>
+                                </div>
+                            @endforelse
+                        </div>
                     </div>
                 @endif
             </div>
@@ -3172,6 +3381,118 @@ HTML;
     </script>
 
     
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const calendarButtons = document.querySelectorAll('[data-watch-calendar]');
+
+            if (!calendarButtons.length) {
+                return;
+            }
+
+            const pad = value => String(value).padStart(2, '0');
+
+            const formatLocalIcsDateTime = date => [
+                date.getFullYear(),
+                pad(date.getMonth() + 1),
+                pad(date.getDate()),
+                'T',
+                pad(date.getHours()),
+                pad(date.getMinutes()),
+                pad(date.getSeconds()),
+            ].join('');
+
+            const formatUtcStamp = date => [
+                date.getUTCFullYear(),
+                pad(date.getUTCMonth() + 1),
+                pad(date.getUTCDate()),
+                'T',
+                pad(date.getUTCHours()),
+                pad(date.getUTCMinutes()),
+                pad(date.getUTCSeconds()),
+                'Z',
+            ].join('');
+
+            const escapeIcs = value => String(value || '')
+                .replace(/\\/g, '\\\\')
+                .replace(/\r?\n/g, '\\n')
+                .replace(/,/g, '\\,')
+                .replace(/;/g, '\\;');
+
+            const addOneDay = dateString => {
+                const [year, month, day] = String(dateString).split('-').map(Number);
+                const date = new Date(year, month - 1, day);
+                date.setDate(date.getDate() + 1);
+                return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+            };
+
+            calendarButtons.forEach(button => {
+                button.addEventListener('click', function () {
+                    const title = this.dataset.eventTitle || 'Game Day';
+                    const dateString = this.dataset.eventDate || '';
+                    const timeString = this.dataset.eventTime || '';
+                    const location = this.dataset.eventLocation || '';
+                    const notes = this.dataset.eventNotes || '';
+                    const eventId = this.dataset.eventId || 'event';
+
+                    if (!dateString) {
+                        return;
+                    }
+
+                    const [year, month, day] = dateString.split('-').map(Number);
+                    const hasTime = /^\d{2}:\d{2}/.test(timeString);
+
+                    let dtStart;
+                    let dtEnd;
+
+                    if (hasTime) {
+                        const [hours, minutes, seconds = 0] = timeString.split(':').map(Number);
+                        const start = new Date(year, month - 1, day, hours, minutes, seconds);
+                        const end = new Date(start.getTime() + (2 * 60 * 60 * 1000));
+                        dtStart = `DTSTART:${formatLocalIcsDateTime(start)}`;
+                        dtEnd = `DTEND:${formatLocalIcsDateTime(end)}`;
+                    } else {
+                        const compactDate = `${year}${pad(month)}${pad(day)}`;
+                        dtStart = `DTSTART;VALUE=DATE:${compactDate}`;
+                        dtEnd = `DTEND;VALUE=DATE:${addOneDay(dateString)}`;
+                    }
+
+                    const ics = [
+                        'BEGIN:VCALENDAR',
+                        'VERSION:2.0',
+                        'PRODID:-//PLYRCard//Where to Watch Me//EN',
+                        'CALSCALE:GREGORIAN',
+                        'METHOD:PUBLISH',
+                        'BEGIN:VEVENT',
+                        `UID:plyrcard-${eventId}-${dateString}@plyrcard.com`,
+                        `DTSTAMP:${formatUtcStamp(new Date())}`,
+                        dtStart,
+                        dtEnd,
+                        `SUMMARY:${escapeIcs(title)}`,
+                        location ? `LOCATION:${escapeIcs(location)}` : '',
+                        notes ? `DESCRIPTION:${escapeIcs(notes)}` : '',
+                        'END:VEVENT',
+                        'END:VCALENDAR',
+                    ].filter(Boolean).join('\r\n');
+
+                    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const safeName = title.toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-+|-+$/g, '') || 'plyrcard-event';
+
+                    link.href = url;
+                    link.download = `${safeName}.ics`;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+
+                    setTimeout(() => URL.revokeObjectURL(url), 1000);
+                });
+            });
+        });
+    </script>
 
     <script>
         document.addEventListener('DOMContentLoaded', function () {
