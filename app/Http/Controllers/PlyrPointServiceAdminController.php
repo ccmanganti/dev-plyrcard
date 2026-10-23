@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Filament\Pages\AdminSettings;
 use App\Models\PlyrPointService;
 use App\Models\PlyrPointServiceSample;
+use App\Services\PlyrPointCatalogService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -13,7 +15,7 @@ use Illuminate\Support\Str;
 
 class PlyrPointServiceAdminController extends Controller
 {
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
         $data = $this->serviceData($request);
@@ -33,31 +35,31 @@ class PlyrPointServiceAdminController extends Controller
             'sort_order' => ((int) PlyrPointService::query()->max('sort_order')) + 10,
         ]);
 
-        return $this->editorRedirect($service, 'Service added.');
+        return $this->respond($request, $service, 'Service added.');
     }
 
-    public function update(Request $request, PlyrPointService $service): RedirectResponse
+    public function update(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
         $service->update($this->serviceData($request));
 
-        return $this->editorRedirect($service, 'Service updated.');
+        return $this->respond($request, $service->fresh(), 'Service updated.');
     }
 
-    public function toggle(PlyrPointService $service): RedirectResponse
+    public function toggle(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
         $service->update(['is_enabled' => ! $service->is_enabled]);
 
-        return redirect()->to(AdminSettings::getUrl() . '#plyr-points-services');
+        return $this->respond($request, $service->fresh(), $service->is_enabled ? 'Service turned on.' : 'Service turned off.');
     }
 
-    public function destroy(PlyrPointService $service): RedirectResponse
+    public function destroy(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
 
         if ($service->is_system) {
-            return $this->editorRedirect($service, 'Built-in services can be turned off, but not deleted.', 'error');
+            return $this->respond($request, $service, 'Built-in services can be turned off, but not deleted.', 'error', 422);
         }
 
         $service->load('samples');
@@ -66,13 +68,23 @@ class PlyrPointServiceAdminController extends Controller
                 Storage::disk('public')->delete((string) $sample->path);
             }
         }
+
+        $deletedId = (int) $service->getKey();
         $service->delete();
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Service deleted.',
+                'deleted_id' => $deletedId,
+            ]);
+        }
 
         return redirect()->to(AdminSettings::getUrl() . '#plyr-points-services')
             ->with('plyr_points_success', 'Service deleted.');
     }
 
-    public function addUrlSample(Request $request, PlyrPointService $service): RedirectResponse
+    public function addUrlSample(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
 
@@ -94,10 +106,10 @@ class PlyrPointServiceAdminController extends Controller
             'sort_order' => ((int) $service->samples()->max('sort_order')) + 10,
         ]);
 
-        return $this->editorRedirect($service, 'Sample link added.');
+        return $this->respond($request, $service->fresh(), 'Sample added.');
     }
 
-    public function uploadSamples(Request $request, PlyrPointService $service): RedirectResponse
+    public function uploadSamples(Request $request, PlyrPointService $service): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
 
@@ -130,10 +142,10 @@ class PlyrPointServiceAdminController extends Controller
             $sort += 10;
         }
 
-        return $this->editorRedirect($service, 'Sample media uploaded.');
+        return $this->respond($request, $service->fresh(), 'Sample media uploaded.');
     }
 
-    public function removeSample(PlyrPointService $service, PlyrPointServiceSample $sample): RedirectResponse
+    public function removeSample(Request $request, PlyrPointService $service, PlyrPointServiceSample $sample): JsonResponse|RedirectResponse
     {
         $this->authorizeAdmin();
         abort_unless((int) $sample->plyr_point_service_id === (int) $service->getKey(), 404);
@@ -143,7 +155,7 @@ class PlyrPointServiceAdminController extends Controller
         }
         $sample->delete();
 
-        return $this->editorRedirect($service, 'Sample removed.');
+        return $this->respond($request, $service->fresh(), 'Sample removed.');
     }
 
     private function serviceData(Request $request): array
@@ -176,6 +188,44 @@ class PlyrPointServiceAdminController extends Controller
     private function authorizeAdmin(): void
     {
         abort_unless(AdminSettings::canAccess(), 403);
+    }
+
+    private function respond(
+        Request $request,
+        PlyrPointService $service,
+        string $message,
+        string $type = 'success',
+        int $status = 200,
+    ): JsonResponse|RedirectResponse {
+        if ($request->expectsJson()) {
+            return response()->json([
+                'success' => $type !== 'error',
+                'message' => $message,
+                'service' => $this->servicePayload($service),
+            ], $status);
+        }
+
+        return $this->editorRedirect($service, $message, $type);
+    }
+
+    private function servicePayload(PlyrPointService $service): array
+    {
+        $id = (int) $service->getKey();
+
+        return collect(app(PlyrPointCatalogService::class)->adminRows())
+            ->first(fn (array $row): bool => (int) ($row['id'] ?? 0) === $id)
+            ?? [
+                'id' => $id,
+                'key' => (string) $service->key,
+                'name' => (string) $service->name,
+                'points' => (int) $service->points,
+                'description' => (string) ($service->description ?? ''),
+                'cta' => (string) ($service->cta ?? 'Request service'),
+                'inclusions' => (array) $service->inclusions,
+                'samples' => [],
+                'enabled' => (bool) $service->is_enabled,
+                'is_system' => (bool) $service->is_system,
+            ];
     }
 
     private function editorRedirect(PlyrPointService $service, string $message, string $type = 'success'): RedirectResponse
