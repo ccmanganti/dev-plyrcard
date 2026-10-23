@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\CreditServiceRequest;
 use App\Models\User;
 use App\Services\CreditPointService;
+use App\Services\PlyrPointCatalogService;
 use App\Services\PlyrcardSystemEmailService;
 use App\Services\SupportAlertService;
 use Illuminate\Http\RedirectResponse;
@@ -22,11 +23,14 @@ class CreditUsageController extends Controller
 {
     public function store(
         Request $request,
+        PlyrPointCatalogService $pointCatalog,
         CreditPointService $credits,
         SupportAlertService $alerts,
         PlyrcardSystemEmailService $systemEmail,
     ): RedirectResponse {
-        $catalog = $credits->catalog();
+        // The player-facing catalog is controlled from Admin Settings. Use the same
+        // enabled list here so a hidden service cannot be submitted manually.
+        $catalog = $pointCatalog->catalog();
 
         $data = $request->validate([
             'request_token' => ['required', 'string', 'max:80'],
@@ -60,7 +64,6 @@ class CreditUsageController extends Controller
                     (bool) ($item['rush'] ?? false),
                 );
 
-                // Instructions belong to the individual service, not the whole batch.
                 $quote['notes'] = trim((string) ($item['notes'] ?? '')) ?: null;
                 $quote['input_index'] = (int) $item['_input_index'];
                 return $quote;
@@ -121,7 +124,6 @@ class CreditUsageController extends Controller
                         'request_resources' => $resources,
                         'status' => 'submitted',
                     ]);
-                    // Athlete redemptions are final. Only an explicit admin adjustment can return credits.
                     $transaction = $credits->spendForServiceRequest(
                         $lockedUser,
                         $quote['item_key'],
@@ -155,8 +157,6 @@ class CreditUsageController extends Controller
             }
         }
 
-        // A mail failure must never reverse a valid credit redemption. Notify admins only
-        // for a newly-created batch so browser retries do not send duplicate alerts.
         if ($result['created_new']) {
             try {
                 $alert = $alerts->sendCreditServiceRequestBatch(

@@ -30,7 +30,7 @@
 
     // Credits: keep the cached user balance fast, but read purchase/request history
     // from the append-only ledger when the supporting tables are available.
-    $rcCreditCatalog = app(\App\Services\CreditPointService::class)->catalog();
+    $rcCreditCatalog = app(\App\Services\PlyrPointCatalogService::class)->catalog();
     $rcCreditBalance = (int) ($rcCatalogUser?->points_available ?? 0);
     $rcRecentCreditPurchaseLabel = 'None yet';
     $rcSupportCreditRequests = collect();
@@ -58,7 +58,7 @@
         $rcSupportCreditRequests = \App\Models\CreditServiceRequest::query()
             ->where('user_id', $rcCatalogUser->getKey())
             ->latest('id')
-            ->limit(50)
+            ->limit(200)
             ->get();
     }
 
@@ -70,11 +70,12 @@
     $rcPointGrantedTotal = 0;
     $rcPointUsedTotal = 0;
     $rcPointHistory = collect();
+    $rcPointLedger = collect();
     if ($rcCatalogUser && \Illuminate\Support\Facades\Schema::hasTable('credit_point_transactions')) {
         $rcPointLedger = \App\Models\CreditPointTransaction::query()
             ->where('user_id', $rcCatalogUser->getKey())
             ->latest('id')
-            ->limit(40)
+            ->limit(200)
             ->get();
         $rcPointGrantedTotal = (int) \App\Models\CreditPointTransaction::query()
             ->where('user_id', $rcCatalogUser->getKey())
@@ -107,6 +108,144 @@
             ];
         })->values();
     }
+    // v15: seed the merged activity history during the Blade render so the player
+    // never waits on a second API request just to see their PLYR Points activity.
+    $rcPointActivityEntries = collect();
+    if ($rcCatalogUser) {
+        $requestByIdForActivity = $rcSupportCreditRequests->keyBy(fn ($request) => (string) $request->getKey());
+        $requestByTransactionForActivity = $rcSupportCreditRequests
+            ->filter(fn ($request) => (int) ($request->credit_point_transaction_id ?? 0) > 0)
+            ->keyBy(fn ($request) => (string) $request->credit_point_transaction_id);
+        $seenActivityRequestIds = [];
+
+        $buildRequestDetailForActivity = function ($serviceRequest): array {
+            $resources = collect((array) $serviceRequest->request_resources)
+                ->filter(fn ($resource): bool => is_array($resource) && filled($resource['path'] ?? null))
+                ->map(function (array $resource): array {
+                    $path = (string) $resource['path'];
+                    return [
+                        'name' => trim((string) ($resource['name'] ?? basename($path))) ?: 'Resource file',
+                        'url' => \Illuminate\Support\Facades\Storage::disk('public')->url($path),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $deliveryFilePath = trim((string) ($serviceRequest->delivery_file_path ?? ''));
+
+            return [
+                'id' => (int) $serviceRequest->getKey(),
+                'item_name' => (string) $serviceRequest->item_name,
+                'status_key' => (string) $serviceRequest->status,
+                'status' => $serviceRequest->statusLabel(),
+                'status_rank' => match ((string) $serviceRequest->status) {
+                    'reviewed' => 2,
+                    'in_progress' => 3,
+                    'completed' => 4,
+                    default => 1,
+                },
+                'quantity' => (int) $serviceRequest->quantity,
+                'modifier' => (string) ($serviceRequest->modifier ?: 'standard'),
+                'turnaround' => $serviceRequest->modifier === 'rush' ? 'Rush +50%' : 'Standard',
+                'points_spent' => (int) $serviceRequest->points_spent,
+                'credits_returned' => (int) $serviceRequest->credits_returned,
+                'notes' => trim((string) ($serviceRequest->notes ?? '')),
+                'resources' => $resources,
+                'delivery_file_url' => $deliveryFilePath !== '' ? \Illuminate\Support\Facades\Storage::disk('public')->url($deliveryFilePath) : null,
+                'delivery_file_name' => $deliveryFilePath !== '' ? basename($deliveryFilePath) : null,
+                'delivery_url' => filled($serviceRequest->delivery_url) ? (string) $serviceRequest->delivery_url : null,
+                'delivery_notes' => trim((string) ($serviceRequest->delivery_notes ?? '')),
+                'provided_at' => optional($serviceRequest->provided_at)->format('M j, Y'),
+                'created_at' => optional($serviceRequest->created_at)->format('M j, Y g:i A') ?: '—',
+                'updated_at' => optional($serviceRequest->updated_at)->format('M j, Y g:i A') ?: '—',
+            ];
+        };
+
+        $transactionActivityEntries = $rcPointLedger->map(function ($row) use ($requestByIdForActivity, $requestByTransactionForActivity, &$seenActivityRequestIds, $buildRequestDetailForActivity): array {
+            $meta = (array) ($row->meta ?? []);
+            $request = null;
+            if ((string) $row->source_type === 'service_request' && filled($row->source_id)) {
+                $request = $requestByIdForActivity->get((string) $row->source_id);
+            }
+            if (! $request) {
+                $request = $requestByTransactionForActivity->get((string) $row->getKey());
+            }
+            if ($request) {
+                $seenActivityRequestIds[(string) $request->getKey()] = true;
+            }
+
+            $positive = in_array((string) $row->type, ['grant', 'refund', 'release'], true)
+                ? true
+                : (in_array((string) $row->type, ['debit', 'hold'], true) ? false : ((int) ($meta['adjust_sign'] ?? 1) >= 0));
+            $points = abs((int) $row->points);
+            $status = $request?->statusLabel() ?? match (true) {
+                in_array((string) $row->source_type, ['package_purchase', 'top_up_purchase'], true) => 'Added',
+                in_array((string) $row->type, ['refund', 'release'], true) => 'Returned',
+                (string) $row->type === 'adjust' => 'Adjusted',
+                (string) $row->type === 'hold' => 'Reserved',
+                (string) $row->type === 'debit' => 'Used',
+                default => str((string) $row->type)->headline()->toString(),
+            };
+            $item = trim((string) ($row->reason ?: data_get($meta, 'item_name', 'PLYR Points activity')));
+            if ($item === '' && $request) {
+                $item = (string) $request->item_name;
+            }
+            $kind = $request
+                ? 'request'
+                : (in_array((string) $row->source_type, ['package_purchase', 'top_up_purchase'], true) ? 'purchase' : 'activity');
+
+            return [
+                'id' => 'transaction-' . $row->getKey(),
+                'transaction_id' => (int) $row->getKey(),
+                'request_id' => $request?->getKey(),
+                'kind' => $kind,
+                'date' => optional($row->created_at)->format('M j, Y') ?: '—',
+                'date_time' => optional($row->created_at)->format('M j, Y g:i A') ?: '—',
+                'created_at' => optional($row->created_at)->toIso8601String(),
+                'sort_timestamp' => optional($row->created_at)->timestamp ?? 0,
+                'item' => $item !== '' ? $item : 'PLYR Points activity',
+                'points' => $positive ? $points : -$points,
+                'points_absolute' => $points,
+                'amount' => ($positive ? '+' : '−') . number_format($points),
+                'positive' => $positive,
+                'status' => $status,
+                'type' => str((string) $row->type)->headline()->toString(),
+                'source' => str((string) ($row->source_type ?: 'account activity'))->headline()->toString(),
+                'request' => $request ? $buildRequestDetailForActivity($request) : null,
+            ];
+        });
+
+        $missingActivityRequests = $rcSupportCreditRequests
+            ->reject(fn ($serviceRequest): bool => isset($seenActivityRequestIds[(string) $serviceRequest->getKey()]))
+            ->map(function ($serviceRequest) use ($buildRequestDetailForActivity): array {
+                $points = abs((int) $serviceRequest->points_spent);
+                return [
+                    'id' => 'request-' . $serviceRequest->getKey(),
+                    'transaction_id' => $serviceRequest->credit_point_transaction_id ? (int) $serviceRequest->credit_point_transaction_id : null,
+                    'request_id' => (int) $serviceRequest->getKey(),
+                    'kind' => 'request',
+                    'date' => optional($serviceRequest->created_at)->format('M j, Y') ?: '—',
+                    'date_time' => optional($serviceRequest->created_at)->format('M j, Y g:i A') ?: '—',
+                    'created_at' => optional($serviceRequest->created_at)->toIso8601String(),
+                    'sort_timestamp' => optional($serviceRequest->created_at)->timestamp ?? 0,
+                    'item' => (string) $serviceRequest->item_name,
+                    'points' => -$points,
+                    'points_absolute' => $points,
+                    'amount' => '−' . number_format($points),
+                    'positive' => false,
+                    'status' => $serviceRequest->statusLabel(),
+                    'type' => 'Service Request',
+                    'source' => 'Service Request',
+                    'request' => $buildRequestDetailForActivity($serviceRequest),
+                ];
+            });
+
+        $rcPointActivityEntries = $transactionActivityEntries
+            ->concat($missingActivityRequests)
+            ->sortByDesc(fn (array $entry): int => (int) ($entry['sort_timestamp'] ?? 0))
+            ->values();
+    }
+
     $rcPointWorth = collect($rcCreditCatalog)->map(function (array $item) use ($rcCreditBalance) {
         $cost = max(1, (int) ($item['points'] ?? 0));
         return array_merge($item, ['count_for_balance' => intdiv(max(0, $rcCreditBalance), $cost)]);
@@ -190,7 +329,7 @@
                 compose: 'Compose Email',
                 photos: 'My Photos',
                 support: 'Support',
-                services: 'Services',
+                services: 'PLYR Points',
                 schedule: 'Schedule'
             },
             openFreeGate(section) {
@@ -11478,7 +11617,20 @@ CSS;
                 <div class="rc-points-section-head-v13"><div><h2>Spend your points</h2></div><p>Points are deducted when the request is submitted.</p></div>
                 <div class="rc-points-services-grid-v13">
                     @foreach($rcCreditCatalog as $serviceKey => $serviceItem)
-                        <article class="rc-points-service-v13"><div class="rc-points-service-head-v13"><strong>{{ $serviceItem['name'] }}</strong><span class="rc-points-service-price-v13">{{ number_format((int)$serviceItem['points']) }} <small>pts</small></span></div><p>{{ $serviceItem['description'] ?? '' }}</p><button type="button" class="rc-btn rc-btn-primary" data-service-key="{{ $serviceKey }}" x-data="{ opening:false }" x-bind:disabled="opening" x-on:click.prevent="if(opening)return;opening=true;serviceTab='credits';window.dispatchEvent(new CustomEvent('rc-select-point-service',{detail:{key:$el.dataset.serviceKey}}));window.setTimeout(()=>opening=false,650)"><span x-show="!opening">Request {{ strtolower($serviceItem['name']) }}</span><span x-cloak x-show="opening" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Opening request…</span></button></article>
+                        <article class="rc-points-service-v13">
+                            <div class="rc-points-service-head-v13">
+                                <strong>{{ $serviceItem['name'] }}</strong>
+                                <span class="rc-points-service-price-v13">{{ number_format((int) $serviceItem['points']) }} <small>pts</small></span>
+                            </div>
+                            <p>{{ $serviceItem['description'] ?? '' }}</p>
+                            <div class="rc-points-service-actions-v15">
+                                <button type="button" class="rc-btn rc-btn-primary" data-service-key="{{ $serviceKey }}">{{ $serviceItem['cta'] ?? ('Request ' . strtolower($serviceItem['name'])) }}</button>
+                                <button type="button" class="rc-btn rc-points-sample-btn-v15" data-plyr-points-sample-key="{{ $serviceKey }}">
+                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2.8 12s3.25-5.2 9.2-5.2S21.2 12 21.2 12 17.95 17.2 12 17.2 2.8 12 2.8 12Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="2.35" stroke="currentColor" stroke-width="1.6"/></svg>
+                                    See sample
+                                </button>
+                            </div>
+                        </article>
                     @endforeach
                 </div>
             </section>
@@ -16918,7 +17070,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         photos: 'My Photos',
         schedule: 'My Schedule',
         settings: 'Settings',
-        services: 'Services',
+        services: 'PLYR Points',
         support: 'Support',
     };
     const setPageChrome = (section) => {
@@ -17640,998 +17792,347 @@ body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
         window.setTimeout(rcMountCreditCard, 1200);
     })();
 </script>
-<script data-navigate-once id="rc-plyr-points-inline-v14">
-(() => {
-    'use strict';
-
-    if (window.__plyrPointsEnhancerInstalled) return;
-    window.__plyrPointsEnhancerInstalled = true;
-
-    const HISTORY_URL = '/admin/plyr-points/history';
-    const SERVICES_PATH_RE = /\/admin\/coach-database\/services\/?$/;
-
-    const state = {
-        root: null,
-        requestPanel: null,
-        purchasePanel: null,
-        legacyHistoryPanel: null,
-        historySection: null,
-        historyDrawer: null,
-        overlay: null,
-        entries: [],
-        historyLoaded: false,
-        historyLoading: false,
-        historyError: '',
-        sortKey: 'sort_timestamp',
-        sortDirection: 'desc',
-        filter: 'all',
-        search: '',
-        observerQueued: false,
-    };
-
-    const escapeHtml = (value) => String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
-
-    const safeUrl = (value) => {
-        const raw = String(value ?? '').trim();
-        if (!raw) return '';
-        if (raw.startsWith('/')) return raw;
-
-        try {
-            const parsed = new URL(raw, window.location.origin);
-            return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
-        } catch (_) {
-            return '';
-        }
-    };
-
-    const statusClass = (status) => {
-        const normalized = String(status || '').toLowerCase();
-        if (normalized.includes('completed') || normalized === 'added') return 'is-completed';
-        if (normalized.includes('progress')) return 'is-progress';
-        if (normalized.includes('review')) return 'is-reviewed';
-        if (normalized.includes('declin')) return 'is-declined';
-        if (normalized.includes('return') || normalized.includes('adjust')) return 'is-returned';
-        if (normalized.includes('submitted') || normalized.includes('reserved')) return 'is-submitted';
-        return 'is-neutral';
-    };
-
-    const injectStyles = () => {
-        if (document.getElementById('plyr-points-enhancer-styles')) return;
-
-        const style = document.createElement('style');
-        style.id = 'plyr-points-enhancer-styles';
-        style.textContent = `
-            html.plyr-points-drawer-locked { overflow: hidden !important; }
-
-            [data-rc-client-section="services"] .rc-support-tabs-v5,
-            [data-rc-client-section="services"] .rc-request-history-page-v9 {
-                display: none !important;
-            }
-
-            [data-rc-client-section="services"] .plyr-points-main-purchases-v14 {
-                display: block !important;
-            }
-
-            [data-rc-client-section="services"] .plyr-points-request-drawer-v14 {
-                display: none !important;
-                position: fixed !important;
-                top: 0 !important;
-                right: 0 !important;
-                bottom: 0 !important;
-                left: auto !important;
-                z-index: 10051 !important;
-                width: min(720px, 100vw) !important;
-                height: 100vh !important;
-                max-height: 100vh !important;
-                overflow: auto !important;
-                padding: 0 1.25rem 1.4rem !important;
-                border: 0 !important;
-                border-left: 1px solid var(--rc-border) !important;
-                border-radius: 1.35rem 0 0 1.35rem !important;
-                background: var(--rc-surface) !important;
-                color: var(--rc-text) !important;
-                box-shadow: -28px 0 80px rgba(15, 23, 42, .22) !important;
-                animation: plyrPointsDrawerInV14 .24s cubic-bezier(.2,.8,.2,1) both !important;
-                scrollbar-width: thin;
-                scrollbar-color: rgba(255,99,56,.48) rgba(148,163,184,.14);
-            }
-
-            [data-rc-client-section="services"] .plyr-points-request-drawer-v14.is-open {
-                display: block !important;
-            }
-
-            .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v14,
-            .dark .plyr-points-history-drawer-v14 {
-                background: rgb(18 18 22) !important;
-                border-left-color: rgba(148, 163, 184, .16) !important;
-                box-shadow: -28px 0 80px rgba(0, 0, 0, .48) !important;
-            }
-
-            @keyframes plyrPointsDrawerInV14 {
-                from { transform: translateX(46px); opacity: .15; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-
-            .plyr-points-drawer-overlay-v14 {
-                position: fixed;
-                inset: 0;
-                z-index: 10050;
-                display: none;
-                border: 0;
-                padding: 0;
-                background: rgba(15, 23, 42, .38);
-                backdrop-filter: blur(4px);
-                cursor: default;
-                animation: plyrPointsBackdropInV14 .18s ease-out both;
-            }
-
-            .plyr-points-drawer-overlay-v14.is-open { display: block; }
-
-            @keyframes plyrPointsBackdropInV14 {
-                from { background: rgba(15,23,42,0); backdrop-filter: blur(0); }
-                to { background: rgba(15,23,42,.38); backdrop-filter: blur(4px); }
-            }
-
-            .plyr-points-drawer-head-v14 {
-                position: sticky;
-                top: 0;
-                z-index: 6;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                gap: 1rem;
-                margin: 0 -1.25rem 1rem;
-                padding: 1rem 1.25rem;
-                border-bottom: 1px solid var(--rc-border);
-                background: color-mix(in srgb, var(--rc-surface) 94%, transparent);
-                backdrop-filter: blur(12px);
-            }
-
-            .plyr-points-drawer-head-v14 h2 {
-                margin: 0;
-                font-size: 1.05rem;
-                line-height: 1.2;
-                color: var(--rc-text);
-            }
-
-            .plyr-points-drawer-head-v14 p {
-                margin: .2rem 0 0;
-                color: var(--rc-muted);
-                font-size: .72rem;
-            }
-
-            .plyr-points-drawer-close-v14 {
-                position: relative;
-                width: 2.35rem;
-                height: 2.35rem;
-                flex: 0 0 auto;
-                border: 1px solid var(--rc-border);
-                border-radius: .8rem;
-                background: var(--rc-soft);
-                color: var(--rc-muted);
-                cursor: pointer;
-                font-size: 0;
-            }
-
-            .plyr-points-drawer-close-v14::before,
-            .plyr-points-drawer-close-v14::after {
-                content: '';
-                position: absolute;
-                left: 50%;
-                top: 50%;
-                width: 1rem;
-                height: 2px;
-                border-radius: 999px;
-                background: currentColor;
-            }
-
-            .plyr-points-drawer-close-v14::before { transform: translate(-50%,-50%) rotate(45deg); }
-            .plyr-points-drawer-close-v14::after { transform: translate(-50%,-50%) rotate(-45deg); }
-            .plyr-points-drawer-close-v14:hover { color: var(--rc-accent); border-color: rgba(255,99,56,.36); background: var(--rc-accent-soft); }
-
-            .plyr-points-bulk-action-v14 {
-                display: flex;
-                justify-content: flex-end;
-                margin-top: .75rem;
-            }
-
-            .plyr-points-bulk-action-v14 .rc-btn {
-                display: inline-flex;
-                align-items: center;
-                gap: .42rem;
-            }
-
-            .plyr-points-bulk-action-v14 svg { width: 1rem; height: 1rem; }
-
-            .plyr-points-history-v14 {
-                display: grid;
-                gap: .8rem;
-            }
-
-            .plyr-points-history-head-v14 {
-                display: flex;
-                align-items: flex-end;
-                justify-content: space-between;
-                gap: 1rem;
-                flex-wrap: wrap;
-            }
-
-            .plyr-points-history-head-v14 h2 { margin: 0; font-size: 1.05rem; }
-            .plyr-points-history-head-v14 p { margin: .2rem 0 0; color: var(--rc-muted); font-size: .72rem; }
-
-            .plyr-points-history-tools-v14 {
-                display: flex;
-                align-items: center;
-                gap: .55rem;
-                flex-wrap: wrap;
-            }
-
-            .plyr-points-history-tools-v14 select,
-            .plyr-points-history-tools-v14 input {
-                height: 2.3rem;
-                border: 1px solid var(--rc-border);
-                border-radius: .65rem;
-                background: var(--rc-surface);
-                color: var(--rc-text);
-                padding: 0 .7rem;
-                font: inherit;
-                font-size: .72rem;
-                outline: none;
-            }
-
-            .plyr-points-history-tools-v14 input { width: min(15rem, 60vw); }
-            .plyr-points-history-tools-v14 select:focus,
-            .plyr-points-history-tools-v14 input:focus { border-color: var(--rc-accent); box-shadow: 0 0 0 3px var(--rc-accent-soft); }
-
-            .plyr-points-history-table-v14 { display: grid; }
-
-            .plyr-points-history-row-v14 {
-                width: 100%;
-                display: grid;
-                grid-template-columns: 7.2rem minmax(0,1fr) 7rem 8.5rem 1.35rem;
-                gap: .75rem;
-                align-items: center;
-                padding: .72rem .1rem;
-                border: 0;
-                border-bottom: 1px solid var(--rc-border);
-                background: transparent;
-                color: var(--rc-text);
-                text-align: left;
-                font: inherit;
-            }
-
-            button.plyr-points-history-row-v14 { cursor: pointer; transition: background .15s ease, transform .15s ease; }
-            button.plyr-points-history-row-v14:hover { background: rgba(255,99,56,.045); transform: translateX(2px); }
-            .plyr-points-history-row-v14.is-head { padding-top: .35rem; padding-bottom: .5rem; color: var(--rc-muted); font-size: .62rem; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
-            .plyr-points-history-row-v14.is-head > :last-child { visibility: hidden; }
-
-            .plyr-points-sort-v14 {
-                display: inline-flex;
-                align-items: center;
-                gap: .25rem;
-                border: 0;
-                padding: 0;
-                background: transparent;
-                color: inherit;
-                font: inherit;
-                font-weight: inherit;
-                letter-spacing: inherit;
-                text-transform: inherit;
-                cursor: pointer;
-            }
-
-            .plyr-points-sort-v14.is-active { color: var(--rc-accent); }
-            .plyr-points-history-date-v14 { color: var(--rc-muted); font-size: .72rem; }
-            .plyr-points-history-item-v14 { min-width: 0; }
-            .plyr-points-history-item-v14 strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .76rem; }
-            .plyr-points-history-item-v14 small { display: block; margin-top: .18rem; color: var(--rc-muted); font-size: .64rem; }
-            .plyr-points-history-amount-v14 { font-size: .75rem; font-weight: 900; }
-            .plyr-points-history-amount-v14.is-positive { color: #c2410c; }
-            .plyr-points-history-chevron-v14 { color: var(--rc-muted); font-size: 1rem; }
-
-            .plyr-points-status-v14 {
-                display: inline-flex;
-                width: max-content;
-                max-width: 100%;
-                padding: .24rem .5rem;
-                border-radius: 999px;
-                background: var(--rc-soft);
-                color: var(--rc-muted);
-                font-size: .62rem;
-                font-weight: 850;
-                white-space: nowrap;
-            }
-
-            .plyr-points-status-v14.is-completed { background: rgba(16,185,129,.1); color: #15803d; }
-            .plyr-points-status-v14.is-progress { background: rgba(139,92,246,.1); color: #7c3aed; }
-            .plyr-points-status-v14.is-reviewed { background: rgba(59,130,246,.1); color: #2563eb; }
-            .plyr-points-status-v14.is-submitted { background: rgba(255,99,56,.1); color: #c2410c; }
-            .plyr-points-status-v14.is-declined { background: rgba(239,68,68,.1); color: #b42318; }
-            .plyr-points-status-v14.is-returned { background: rgba(59,130,246,.1); color: #1d4ed8; }
-
-            .plyr-points-history-empty-v14 {
-                padding: 1.4rem;
-                border: 1px dashed var(--rc-border);
-                border-radius: .8rem;
-                color: var(--rc-muted);
-                text-align: center;
-                font-size: .75rem;
-            }
-
-            .plyr-points-history-drawer-v14 {
-                position: fixed;
-                top: 0;
-                right: 0;
-                bottom: 0;
-                z-index: 10051;
-                width: min(640px, 100vw);
-                height: 100vh;
-                overflow: auto;
-                display: none;
-                padding: 0 1.25rem 1.4rem;
-                border-left: 1px solid var(--rc-border);
-                border-radius: 1.35rem 0 0 1.35rem;
-                background: var(--rc-surface);
-                color: var(--rc-text);
-                box-shadow: -28px 0 80px rgba(15,23,42,.22);
-                animation: plyrPointsDrawerInV14 .24s cubic-bezier(.2,.8,.2,1) both;
-                scrollbar-width: thin;
-                scrollbar-color: rgba(255,99,56,.48) rgba(148,163,184,.14);
-            }
-
-            .plyr-points-history-drawer-v14.is-open { display: block; }
-            .plyr-points-detail-v14 { display: grid; gap: 1rem; }
-            .plyr-points-detail-hero-v14 { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .2rem 0 .4rem; }
-            .plyr-points-detail-kicker-v14 { color: var(--rc-muted); font-size: .65rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
-            .plyr-points-detail-hero-v14 h3 { margin: .3rem 0 .2rem; font-size: 1.3rem; line-height: 1.2; }
-            .plyr-points-detail-hero-v14 p { margin: 0; color: var(--rc-muted); font-size: .72rem; }
-
-            .plyr-points-detail-grid-v14 { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .65rem; }
-            .plyr-points-detail-grid-v14 > div { display: grid; gap: .18rem; padding: .72rem .8rem; border: 1px solid var(--rc-border); border-radius: .72rem; background: var(--rc-soft); }
-            .plyr-points-detail-grid-v14 span { color: var(--rc-muted); font-size: .63rem; font-weight: 700; }
-            .plyr-points-detail-grid-v14 strong { color: var(--rc-text); font-size: .78rem; }
-
-            .plyr-points-detail-section-v14 { padding: .9rem; border: 1px solid var(--rc-border); border-radius: .8rem; background: var(--rc-surface); }
-            .plyr-points-detail-section-v14 h4 { margin: 0 0 .42rem; font-size: .78rem; }
-            .plyr-points-detail-section-v14 p { margin: 0; color: var(--rc-muted); font-size: .72rem; line-height: 1.55; white-space: pre-wrap; }
-            .plyr-points-detail-section-v14.is-delivery { border-color: rgba(22,163,74,.26); background: rgba(22,163,74,.045); }
-
-            .plyr-points-progress-v14 { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .35rem; }
-            .plyr-points-progress-v14 > div { display: grid; justify-items: center; gap: .35rem; position: relative; color: var(--rc-muted); text-align: center; }
-            .plyr-points-progress-v14 > div::before { content: ''; position: absolute; top: .8rem; left: -50%; width: 100%; height: 2px; background: var(--rc-border); z-index: 0; }
-            .plyr-points-progress-v14 > div:first-child::before { display: none; }
-            .plyr-points-progress-v14 span { position: relative; z-index: 1; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--rc-border); background: var(--rc-surface); font-size: .66rem; font-weight: 850; }
-            .plyr-points-progress-v14 small { font-size: .61rem; font-weight: 750; }
-            .plyr-points-progress-v14 > div.is-done { color: var(--rc-accent); }
-            .plyr-points-progress-v14 > div.is-done span { border-color: var(--rc-accent); background: var(--rc-accent); color: #fff; }
-
-            .plyr-points-files-v14 { display: grid; gap: .42rem; }
-            .plyr-points-file-v14 { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .55rem .65rem; border: 1px solid var(--rc-border); border-radius: .6rem; background: var(--rc-soft); font-size: .69rem; }
-            .plyr-points-file-actions-v14 { display: inline-flex; gap: .45rem; }
-            .plyr-points-file-actions-v14 a { color: var(--rc-accent); font-weight: 800; text-decoration: none; }
-            .plyr-points-delivery-actions-v14 { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .7rem; }
-
-            @media (max-width: 760px) {
-                [data-rc-client-section="services"] .plyr-points-request-drawer-v14,
-                .plyr-points-history-drawer-v14 { width: 100vw !important; border-radius: 0 !important; }
-                .plyr-points-history-row-v14 { grid-template-columns: 5.8rem minmax(0,1fr) 5.2rem 1.1rem; }
-                .plyr-points-history-row-v14 > :nth-child(4) { grid-column: 2 / 4; }
-                .plyr-points-history-row-v14.is-head > :nth-child(4) { display: none; }
-                .plyr-points-history-row-v14.is-head > :last-child { display: none; }
-                .plyr-points-detail-grid-v14 { grid-template-columns: 1fr; }
-                .plyr-points-progress-v14 { gap: .1rem; }
-            }
-        `;
-        document.head.appendChild(style);
-    };
-
-    const ensureOverlay = () => {
-        if (state.overlay?.isConnected) return state.overlay;
-        const overlay = document.createElement('button');
-        overlay.type = 'button';
-        overlay.className = 'plyr-points-drawer-overlay-v14';
-        overlay.setAttribute('aria-label', 'Close PLYR Points drawer');
-        overlay.addEventListener('click', closeAllDrawers);
-        document.body.appendChild(overlay);
-        state.overlay = overlay;
-        return overlay;
-    };
-
-    const showOverlay = () => {
-        ensureOverlay().classList.add('is-open');
-        document.documentElement.classList.add('plyr-points-drawer-locked');
-    };
-
-    const hideOverlayIfUnused = () => {
-        const requestOpen = state.requestPanel?.classList.contains('is-open');
-        const historyOpen = state.historyDrawer?.classList.contains('is-open');
-        if (requestOpen || historyOpen) return;
-        state.overlay?.classList.remove('is-open');
-        document.documentElement.classList.remove('plyr-points-drawer-locked');
-    };
-
-    const usePointsTab = () => {
-        if (!state.root) return null;
-        return Array.from(state.root.querySelectorAll('.rc-support-tabs-v5 button'))
-            .find((button) => /use points/i.test(button.textContent || '')) || null;
-    };
-
-    const openRequestDrawer = (serviceKey = '') => {
-        if (!state.requestPanel?.isConnected) enhance();
-        if (!state.requestPanel) return;
-
-        // The existing Alpine wizard remains the source of truth. Switch its legacy tab
-        // to credits before exposing it as a drawer, then reuse its existing selection event.
-        usePointsTab()?.click();
-
-        if (serviceKey) {
-            window.dispatchEvent(new CustomEvent('rc-select-point-service', {
-                detail: { key: String(serviceKey) },
-            }));
-        }
-
-        state.historyDrawer?.classList.remove('is-open');
-        state.requestPanel.classList.add('is-open');
-        state.requestPanel.setAttribute('aria-hidden', 'false');
-        showOverlay();
-        window.setTimeout(() => state.requestPanel?.querySelector('.rc-credit-steps-v7')?.scrollIntoView({ block: 'start' }), 40);
-    };
-
-    const closeRequestDrawer = () => {
-        if (!state.requestPanel) return;
-        const submitting = state.requestPanel.querySelector('.rc-credit-submit-v6.is-submitting');
-        if (submitting) return;
-        state.requestPanel.classList.remove('is-open');
-        state.requestPanel.setAttribute('aria-hidden', 'true');
-        hideOverlayIfUnused();
-    };
-
-    const closeHistoryDrawer = () => {
-        state.historyDrawer?.classList.remove('is-open');
-        hideOverlayIfUnused();
-    };
-
-    function closeAllDrawers() {
-        closeRequestDrawer();
-        closeHistoryDrawer();
-    }
-
-    const installRequestDrawer = () => {
-        if (!state.root) return;
-
-        const requestForm = state.root.querySelector('form.rc-credit-request-form-v5');
-        const requestPanel = requestForm?.closest('.rc-support-tab-panel-v4');
-        if (!requestPanel) return;
-
-        state.requestPanel = requestPanel;
-        requestPanel.classList.add('plyr-points-request-drawer-v14');
-        requestPanel.setAttribute('role', 'dialog');
-        requestPanel.setAttribute('aria-modal', 'true');
-        requestPanel.setAttribute('aria-label', 'Request PLYR Points service');
-
-        if (!requestPanel.querySelector('[data-plyr-points-request-head]')) {
-            const balanceText = state.root.querySelector('.rc-points-balance-number-v13 strong')?.textContent?.trim() || '0';
-            const header = document.createElement('div');
-            header.className = 'plyr-points-drawer-head-v14';
-            header.dataset.plyrPointsRequestHead = '1';
-            header.innerHTML = `
-                <div>
-                    <h2>Request with PLYR Points</h2>
-                    <p>${escapeHtml(balanceText)} points available · Single or multi-service request</p>
-                </div>
-                <button type="button" class="plyr-points-drawer-close-v14" data-plyr-points-request-close aria-label="Close request drawer">Close</button>
-            `;
-            requestPanel.prepend(header);
-            header.querySelector('[data-plyr-points-request-close]')?.addEventListener('click', closeRequestDrawer);
-        }
-
-        if (!requestPanel.dataset.plyrPointsCaptureInstalled) {
-            requestPanel.dataset.plyrPointsCaptureInstalled = '1';
-            requestPanel.addEventListener('submit', () => {
-                showOverlay();
-            });
-        }
-
-        const hasValidationError = !!requestPanel.querySelector('.rc-card[style*="239,68,68"]');
-        if (hasValidationError) window.setTimeout(() => openRequestDrawer(), 30);
-    };
-
-    const installServiceButtons = () => {
-        if (!state.root || state.root.dataset.plyrPointsServiceClicksInstalled === '1') return;
-        state.root.dataset.plyrPointsServiceClicksInstalled = '1';
-
-        state.root.addEventListener('click', (event) => {
-            const serviceButton = event.target.closest('[data-service-key]');
-            if (serviceButton && state.root.contains(serviceButton)) {
-                openRequestDrawer(serviceButton.dataset.serviceKey || '');
-                return;
-            }
-
-            const bulkButton = event.target.closest('[data-plyr-points-bulk-request]');
-            if (bulkButton && state.root.contains(bulkButton)) {
-                openRequestDrawer('');
-            }
-        }, true);
-    };
-
-    const installBulkAction = () => {
-        if (!state.root || state.root.querySelector('[data-plyr-points-bulk-request]')) return;
-        const grid = state.root.querySelector('.rc-points-services-grid-v13');
-        if (!grid) return;
-
-        const wrapper = document.createElement('div');
-        wrapper.className = 'plyr-points-bulk-action-v14';
-        wrapper.innerHTML = `
-            <button type="button" class="rc-btn" data-plyr-points-bulk-request>
-                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M4 4h5M15 4h5M4 20h5M15 20h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-                Request multiple services
-            </button>
-        `;
-        grid.insertAdjacentElement('afterend', wrapper);
-    };
-
-    const installLegacyPanelVisibility = () => {
-        if (!state.root) return;
-        const buyPoints = state.root.querySelector('#buy-points');
-        state.purchasePanel = buyPoints?.closest('.rc-support-tab-panel-v4') || null;
-        state.purchasePanel?.classList.add('plyr-points-main-purchases-v14');
-
-        state.legacyHistoryPanel = state.root.querySelector('.rc-request-history-page-v9');
-        state.legacyHistoryPanel?.setAttribute('aria-hidden', 'true');
-    };
-
-    const filteredAndSortedEntries = () => {
-        const query = state.search.trim().toLowerCase();
-        let rows = state.entries.filter((entry) => {
-            if (state.filter === 'requests' && entry.kind !== 'request') return false;
-            if (state.filter === 'purchases' && entry.kind !== 'purchase') return false;
-            if (state.filter === 'activity' && ['request', 'purchase'].includes(entry.kind)) return false;
-            if (!query) return true;
-            return [entry.item, entry.status, entry.type, entry.source]
-                .some((value) => String(value || '').toLowerCase().includes(query));
-        });
-
-        const direction = state.sortDirection === 'asc' ? 1 : -1;
-        rows = [...rows].sort((a, b) => {
-            let left = a[state.sortKey];
-            let right = b[state.sortKey];
-
-            if (['sort_timestamp', 'points'].includes(state.sortKey)) {
-                left = Number(left || 0);
-                right = Number(right || 0);
-                return (left - right) * direction;
-            }
-
-            return String(left || '').localeCompare(String(right || ''), undefined, { sensitivity: 'base' }) * direction;
-        });
-
-        return rows;
-    };
-
-    const sortArrow = (key) => {
-        if (state.sortKey !== key) return '';
-        return state.sortDirection === 'asc' ? ' ↑' : ' ↓';
-    };
-
-    const renderHistory = () => {
-        const section = state.historySection;
-        if (!section?.isConnected) return;
-
-        if (state.historyLoading) {
-            section.innerHTML = `
-                <div class="plyr-points-history-v14">
-                    <div class="plyr-points-history-head-v14"><div><h2>Activity history</h2><p>Requests and point activity in one place.</p></div></div>
-                    <div class="plyr-points-history-empty-v14"><span class="rc-loading-inline"><span class="rc-spinner-mini"></span> Loading PLYR Points activity…</span></div>
-                </div>
-            `;
-            return;
-        }
-
-        if (state.historyError) {
-            section.innerHTML = `
-                <div class="plyr-points-history-v14">
-                    <div class="plyr-points-history-head-v14"><div><h2>Activity history</h2><p>Requests and point activity in one place.</p></div><button type="button" class="rc-btn" data-plyr-points-history-retry>Retry</button></div>
-                    <div class="plyr-points-history-empty-v14">${escapeHtml(state.historyError)}</div>
-                </div>
-            `;
-            section.querySelector('[data-plyr-points-history-retry]')?.addEventListener('click', () => loadHistory(true));
-            return;
-        }
-
-        const rows = filteredAndSortedEntries();
-        const rowMarkup = rows.length
-            ? rows.map((entry) => `
-                <button type="button" class="plyr-points-history-row-v14" data-plyr-points-history-entry="${escapeHtml(entry.id)}">
-                    <div class="plyr-points-history-date-v14">${escapeHtml(entry.date)}</div>
-                    <div class="plyr-points-history-item-v14"><strong>${escapeHtml(entry.item)}</strong><small>${entry.kind === 'request' && entry.request_id ? `Request #${escapeHtml(entry.request_id)}` : escapeHtml(entry.type || 'Points activity')}</small></div>
-                    <div class="plyr-points-history-amount-v14 ${entry.positive ? 'is-positive' : ''}">${escapeHtml(entry.amount)}</div>
-                    <div><span class="plyr-points-status-v14 ${statusClass(entry.status)}">${escapeHtml(entry.status)}</span></div>
-                    <div class="plyr-points-history-chevron-v14" aria-hidden="true">›</div>
-                </button>
-            `).join('')
-            : '<div class="plyr-points-history-empty-v14">No activity matches the current filters.</div>';
-
-        section.innerHTML = `
-            <div class="plyr-points-history-v14">
-                <div class="plyr-points-history-head-v14">
-                    <div><h2>Activity history</h2><p>Requests, purchases, and point spending are merged here. Click any entry for details.</p></div>
-                    <div class="plyr-points-history-tools-v14">
-                        <input type="search" value="${escapeHtml(state.search)}" placeholder="Search activity" data-plyr-points-history-search aria-label="Search PLYR Points activity">
-                        <select data-plyr-points-history-filter aria-label="Filter PLYR Points activity">
-                            <option value="all" ${state.filter === 'all' ? 'selected' : ''}>All activity</option>
-                            <option value="requests" ${state.filter === 'requests' ? 'selected' : ''}>Service requests</option>
-                            <option value="purchases" ${state.filter === 'purchases' ? 'selected' : ''}>Point purchases</option>
-                            <option value="activity" ${state.filter === 'activity' ? 'selected' : ''}>Other activity</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="plyr-points-history-table-v14">
-                    <div class="plyr-points-history-row-v14 is-head">
-                        <div><button type="button" class="plyr-points-sort-v14 ${state.sortKey === 'sort_timestamp' ? 'is-active' : ''}" data-plyr-points-sort="sort_timestamp">Date${sortArrow('sort_timestamp')}</button></div>
-                        <div><button type="button" class="plyr-points-sort-v14 ${state.sortKey === 'item' ? 'is-active' : ''}" data-plyr-points-sort="item">Item${sortArrow('item')}</button></div>
-                        <div><button type="button" class="plyr-points-sort-v14 ${state.sortKey === 'points' ? 'is-active' : ''}" data-plyr-points-sort="points">Points${sortArrow('points')}</button></div>
-                        <div><button type="button" class="plyr-points-sort-v14 ${state.sortKey === 'status' ? 'is-active' : ''}" data-plyr-points-sort="status">Status${sortArrow('status')}</button></div>
-                        <div>Open</div>
-                    </div>
-                    ${rowMarkup}
-                </div>
-            </div>
-        `;
-
-        section.querySelector('[data-plyr-points-history-search]')?.addEventListener('input', (event) => {
-            state.search = event.target.value || '';
-            window.clearTimeout(event.target.__plyrPointsSearchTimer);
-            event.target.__plyrPointsSearchTimer = window.setTimeout(renderHistory, 120);
-        });
-
-        section.querySelector('[data-plyr-points-history-filter]')?.addEventListener('change', (event) => {
-            state.filter = event.target.value || 'all';
-            renderHistory();
-        });
-
-        section.querySelectorAll('[data-plyr-points-sort]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const key = button.dataset.plyrPointsSort;
-                if (!key) return;
-                if (state.sortKey === key) {
-                    state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
-                } else {
-                    state.sortKey = key;
-                    state.sortDirection = key === 'item' || key === 'status' ? 'asc' : 'desc';
-                }
-                renderHistory();
-            });
-        });
-
-        section.querySelectorAll('[data-plyr-points-history-entry]').forEach((button) => {
-            button.addEventListener('click', () => openHistoryDetail(button.dataset.plyrPointsHistoryEntry));
-        });
-    };
-
-    const ensureHistoryDrawer = () => {
-        if (state.historyDrawer?.isConnected) return state.historyDrawer;
-
-        const drawer = document.createElement('aside');
-        drawer.className = 'plyr-points-history-drawer-v14';
-        drawer.id = 'plyr-points-history-drawer-v14';
-        drawer.setAttribute('role', 'dialog');
-        drawer.setAttribute('aria-modal', 'true');
-        drawer.setAttribute('aria-label', 'PLYR Points activity details');
-        drawer.innerHTML = `
-            <div class="plyr-points-drawer-head-v14">
-                <div><h2>Activity details</h2><p data-plyr-points-detail-subtitle>PLYR Points</p></div>
-                <button type="button" class="plyr-points-drawer-close-v14" data-plyr-points-history-close aria-label="Close activity details">Close</button>
-            </div>
-            <div data-plyr-points-detail-body></div>
-        `;
-        drawer.querySelector('[data-plyr-points-history-close]')?.addEventListener('click', closeHistoryDrawer);
-        document.body.appendChild(drawer);
-        state.historyDrawer = drawer;
-        return drawer;
-    };
-
-    const requestProgressMarkup = (request) => {
-        if (!request) return '';
-        if (String(request.status_key) === 'declined') {
-            return '<div class="plyr-points-detail-section-v14"><h4>Request declined</h4><p>This request is closed. Any point return, if applicable, is handled by the PLYRCARD team.</p></div>';
-        }
-
-        const steps = ['Submitted', 'Reviewed', 'In Progress', 'Completed'];
-        const rank = Number(request.status_rank || 1);
-        return `
-            <div class="plyr-points-progress-v14" aria-label="Request progress">
-                ${steps.map((label, index) => {
-                    const step = index + 1;
-                    return `<div class="${rank >= step ? 'is-done' : ''}"><span>${rank > step ? '✓' : step}</span><small>${label}</small></div>`;
-                }).join('')}
-            </div>
-        `;
-    };
-
-    const resourcesMarkup = (resources) => {
-        const rows = Array.isArray(resources) ? resources : [];
-        if (!rows.length) return '<p>No resource files were attached to this request.</p>';
-
-        return `
-            <div class="plyr-points-files-v14">
-                ${rows.map((resource) => {
-                    const url = safeUrl(resource.url);
-                    return `<div class="plyr-points-file-v14"><span>${escapeHtml(resource.name || 'Resource file')}</span>${url ? `<span class="plyr-points-file-actions-v14"><a href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a><a href="${escapeHtml(url)}" download>Download</a></span>` : ''}</div>`;
-                }).join('')}
-            </div>
-        `;
-    };
-
-    const deliveryMarkup = (request) => {
-        const fileUrl = safeUrl(request?.delivery_file_url);
-        const linkUrl = safeUrl(request?.delivery_url);
-        const hasDelivery = !!(fileUrl || linkUrl);
-
-        return `
-            <div class="plyr-points-detail-section-v14 is-delivery">
-                <h4>PLYRCARD delivery</h4>
-                <p>${hasDelivery ? 'Your completed file or delivery link is ready.' : 'Completed files or links will appear here when the PLYRCARD team provides them.'}</p>
-                ${hasDelivery ? `<div class="plyr-points-delivery-actions-v14">
-                    ${fileUrl ? `<a class="rc-btn rc-btn-primary" href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">Open File</a><a class="rc-btn" href="${escapeHtml(fileUrl)}" download="${escapeHtml(request.delivery_file_name || '')}">Download File</a>` : ''}
-                    ${linkUrl ? `<a class="rc-btn" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">Open Delivery Link</a>` : ''}
-                </div>` : ''}
-                ${request?.delivery_notes ? `<p style="margin-top:.7rem">${escapeHtml(request.delivery_notes)}</p>` : ''}
-                ${request?.provided_at ? `<p style="margin-top:.45rem">Provided ${escapeHtml(request.provided_at)}</p>` : ''}
-            </div>
-        `;
-    };
-
-    const detailMarkup = (entry) => {
-        const request = entry.request;
-
-        if (request) {
-            return `
-                <div class="plyr-points-detail-v14">
-                    <div class="plyr-points-detail-hero-v14">
-                        <div>
-                            <span class="plyr-points-detail-kicker-v14">Request #${escapeHtml(request.id)}</span>
-                            <h3>${escapeHtml(request.item_name || entry.item)}</h3>
-                            <p>Submitted ${escapeHtml(request.created_at || entry.date_time)}</p>
-                        </div>
-                        <span class="plyr-points-status-v14 ${statusClass(request.status)}">${escapeHtml(request.status)}</span>
-                    </div>
-                    ${requestProgressMarkup(request)}
-                    <div class="plyr-points-detail-grid-v14">
-                        <div><span>Quantity</span><strong>${escapeHtml(request.quantity)}</strong></div>
-                        <div><span>Turnaround</span><strong>${escapeHtml(request.turnaround)}</strong></div>
-                        <div><span>Points used</span><strong>${Number(request.points_spent || 0).toLocaleString()}</strong></div>
-                        <div><span>Last updated</span><strong>${escapeHtml(request.updated_at)}</strong></div>
-                    </div>
-                    <div class="plyr-points-detail-section-v14"><h4>Your instructions</h4><p>${escapeHtml(request.notes || 'No additional instructions were submitted for this service.')}</p></div>
-                    <div class="plyr-points-detail-section-v14"><h4>Your submitted resources</h4>${resourcesMarkup(request.resources)}</div>
-                    ${deliveryMarkup(request)}
-                    <div class="plyr-points-detail-section-v14"><h4>Points transaction</h4><p>${entry.transaction_id ? `Transaction #${escapeHtml(entry.transaction_id)} · ` : ''}${escapeHtml(entry.amount)} points · ${escapeHtml(entry.type || 'Service request')}</p></div>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="plyr-points-detail-v14">
-                <div class="plyr-points-detail-hero-v14">
-                    <div>
-                        <span class="plyr-points-detail-kicker-v14">${escapeHtml(entry.kind === 'purchase' ? 'Point purchase' : 'Points activity')}</span>
-                        <h3>${escapeHtml(entry.item)}</h3>
-                        <p>${escapeHtml(entry.date_time)}</p>
-                    </div>
-                    <span class="plyr-points-status-v14 ${statusClass(entry.status)}">${escapeHtml(entry.status)}</span>
-                </div>
-                <div class="plyr-points-detail-grid-v14">
-                    <div><span>Points</span><strong>${escapeHtml(entry.amount)}</strong></div>
-                    <div><span>Transaction ID</span><strong>${entry.transaction_id ? '#' + escapeHtml(entry.transaction_id) : '—'}</strong></div>
-                    <div><span>Type</span><strong>${escapeHtml(entry.type || 'Activity')}</strong></div>
-                    <div><span>Source</span><strong>${escapeHtml(entry.source || 'Account activity')}</strong></div>
-                </div>
-                <div class="plyr-points-detail-section-v14"><h4>About this activity</h4><p>This entry records a PLYR Points balance change. Service delivery details are shown only on service-request entries.</p></div>
-            </div>
-        `;
-    };
-
-    function openHistoryDetail(entryId) {
-        const entry = state.entries.find((row) => String(row.id) === String(entryId));
-        if (!entry) return;
-
-        closeRequestDrawer();
-        const drawer = ensureHistoryDrawer();
-        const subtitle = drawer.querySelector('[data-plyr-points-detail-subtitle]');
-        const body = drawer.querySelector('[data-plyr-points-detail-body]');
-        if (subtitle) subtitle.textContent = entry.kind === 'request' && entry.request_id ? `Request #${entry.request_id}` : `Transaction #${entry.transaction_id || '—'}`;
-        if (body) body.innerHTML = detailMarkup(entry);
-        drawer.classList.add('is-open');
-        drawer.scrollTop = 0;
-        showOverlay();
-    }
-
-    const loadHistory = async (force = false) => {
-        if (state.historyLoading || (state.historyLoaded && !force)) return;
-        state.historyLoading = true;
-        state.historyError = '';
-        renderHistory();
-
-        try {
-            const response = await fetch(HISTORY_URL, {
-                method: 'GET',
-                credentials: 'same-origin',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                },
-            });
-
-            if (!response.ok) throw new Error(`Unable to load activity (${response.status}).`);
-            const payload = await response.json();
-            if (!payload?.success) throw new Error(payload?.message || 'Unable to load PLYR Points activity.');
-
-            state.entries = Array.isArray(payload.entries) ? payload.entries : [];
-            state.historyLoaded = true;
-
-            const badgeValue = Number(payload.balance);
-            if (Number.isFinite(badgeValue)) updateSidebarBadge(badgeValue);
-        } catch (error) {
-            state.historyError = error?.message || 'Unable to load PLYR Points activity.';
-        } finally {
-            state.historyLoading = false;
-            renderHistory();
-        }
-    };
-
-    const installHistory = () => {
-        if (!state.root) return;
-        const section = state.root.querySelector('.rc-points-history-v12');
-        if (!section) return;
-
-        const sectionChanged = state.historySection !== section;
-        state.historySection = section;
-        section.dataset.plyrPointsUnifiedHistory = '1';
-
-        // Avoid a MutationObserver render loop. Livewire may replace this section, in
-        // which case the marker disappears and we rebuild it from the cached history.
-        if (sectionChanged || !section.querySelector('.plyr-points-history-v14')) {
-            renderHistory();
-        }
-    };
-
-    const updateSidebarBadge = (balance) => {
-        const anchors = Array.from(document.querySelectorAll('.fi-sidebar a[href]'));
-        const anchor = anchors.find((item) => {
+<script id="rc-plyr-points-inline-v15">
+window.__plyrPointsServerPayloadV15 = {
+    balance: @js((int) $rcCreditBalance),
+    entries: @js($rcPointActivityEntries->all()),
+    services: @js($rcCreditCatalog),
+};
+
+if (window.__plyrPointsEnhancerInstalledV15) {
+    window.dispatchEvent(new CustomEvent('plyr-points-server-sync-v15'));
+} else {
+    window.__plyrPointsEnhancerInstalledV15 = true;
+
+    (() => {
+        'use strict';
+
+        const SERVICES_PATH_RE = /\/admin\/coach-database\/services\/?$/;
+        const payload = () => window.__plyrPointsServerPayloadV15 || { balance: 0, entries: [], services: {} };
+
+        const state = {
+            root: null,
+            requestPanel: null,
+            purchasePanel: null,
+            legacyHistoryPanel: null,
+            historySection: null,
+            historyDrawer: null,
+            sampleDrawer: null,
+            overlay: null,
+            entries: Array.isArray(payload().entries) ? payload().entries : [],
+            services: payload().services || {},
+            sortKey: 'sort_timestamp',
+            sortDirection: 'desc',
+            filter: 'all',
+            search: '',
+            sampleServiceKey: '',
+            sampleIndex: 0,
+            observerQueued: false,
+        };
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
+
+        const safeUrl = (value) => {
+            const raw = String(value ?? '').trim();
+            if (!raw) return '';
+            if (raw.startsWith('/')) return raw;
             try {
-                return SERVICES_PATH_RE.test(new URL(item.href, window.location.href).pathname);
+                const parsed = new URL(raw, window.location.origin);
+                return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
             } catch (_) {
-                return false;
+                return '';
             }
-        });
-        if (!anchor) return;
+        };
 
-        // Filament owns the actual badge markup. Only update a badge that already exists;
-        // never guess at a sibling element and risk changing another navigation count.
-        const item = anchor.closest('.fi-sidebar-item');
-        const badge = item?.querySelector('.fi-badge, [class*="badge"]');
-        if (badge) badge.textContent = `${Number(balance || 0).toLocaleString()} pts`;
-    };
+        const statusClass = (status) => {
+            const normalized = String(status || '').toLowerCase();
+            if (normalized.includes('completed') || normalized === 'added') return 'is-completed';
+            if (normalized.includes('progress')) return 'is-progress';
+            if (normalized.includes('review')) return 'is-reviewed';
+            if (normalized.includes('declin')) return 'is-declined';
+            if (normalized.includes('return') || normalized.includes('adjust')) return 'is-returned';
+            if (normalized.includes('submitted') || normalized.includes('reserved')) return 'is-submitted';
+            return 'is-neutral';
+        };
 
-    const isPointsActive = () => {
-        if (SERVICES_PATH_RE.test(window.location.pathname)) return true;
-        const root = state.root || document.querySelector('[data-rc-client-section="services"]');
-        return !!root && root.getClientRects().length > 0 && getComputedStyle(root).display !== 'none';
-    };
+        const injectStyles = () => {
+            if (document.getElementById('plyr-points-enhancer-styles-v15')) return;
+            const style = document.createElement('style');
+            style.id = 'plyr-points-enhancer-styles-v15';
+            style.textContent = `
+                html.plyr-points-drawer-locked-v15 { overflow: hidden !important; }
 
-    const syncChrome = () => {
-        if (!isPointsActive()) return;
-        if (document.title !== 'PLYR Points - PlyrCard') document.title = 'PLYR Points - PlyrCard';
-        if (!state.historyLoaded && !state.historyLoading) loadHistory();
-    };
+                [data-rc-client-section="services"] .rc-support-tabs-v5,
+                [data-rc-client-section="services"] .rc-request-history-page-v9 { display:none !important; }
+                [data-rc-client-section="services"] .plyr-points-main-purchases-v15 { display:block !important; }
 
-    const installThankYouBehavior = () => {
-        if (!state.root) return;
+                [data-rc-client-section="services"] .rc-points-service-actions-v15 { display:grid;gap:.42rem;margin-top:auto; }
+                [data-rc-client-section="services"] .rc-points-service-actions-v15 .rc-btn { width:100%; }
+                [data-rc-client-section="services"] .rc-points-sample-btn-v15 { border-color:transparent;background:transparent;color:#c2410c;min-height:1.8rem;padding:.25rem .4rem; }
+                [data-rc-client-section="services"] .rc-points-sample-btn-v15:hover { background:rgba(255,99,56,.07);border-color:rgba(255,99,56,.16); }
+                [data-rc-client-section="services"] .rc-points-sample-btn-v15 svg { width:.9rem;height:.9rem; }
 
-        const overlay = state.root.querySelector('[data-credit-thank-you-overlay]');
-        if (overlay) {
-            const copy = overlay.querySelector('p');
-            const button = overlay.querySelector('button');
-            if (copy) copy.textContent = 'Your point request was submitted. Track the request, status, and delivered files from Activity History.';
-            if (button) button.textContent = 'View Activity History';
-        }
+                .plyr-points-drawer-overlay-v15 { position:fixed;inset:0;z-index:10050;display:none;border:0;padding:0;background:rgba(15,23,42,.42);backdrop-filter:blur(4px);cursor:default; }
+                .plyr-points-drawer-overlay-v15.is-open { display:block; }
 
-        if (state.root.dataset.plyrPointsThankYouInstalled === '1') return;
-        state.root.dataset.plyrPointsThankYouInstalled = '1';
-        state.root.addEventListener('click', (event) => {
-            const button = event.target.closest('[data-credit-thank-you-overlay] button');
-            if (!button) return;
-            window.setTimeout(() => {
-                usePointsTab()?.click();
-                state.historySection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                loadHistory(true);
-            }, 20);
-        });
-    };
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15,
+                .plyr-points-history-drawer-v15,
+                .plyr-points-sample-drawer-v15 {
+                    position:fixed !important;top:0 !important;right:0 !important;bottom:0 !important;left:auto !important;z-index:10051 !important;
+                    width:min(860px,100vw) !important;height:100vh !important;max-height:100vh !important;overflow:auto !important;
+                    display:none !important;padding:0 1.35rem 1.5rem !important;border:0 !important;border-left:1px solid var(--rc-border) !important;
+                    border-radius:1.35rem 0 0 1.35rem !important;background:var(--rc-surface) !important;color:var(--rc-text) !important;
+                    box-shadow:-28px 0 80px rgba(15,23,42,.24) !important;animation:plyrPointsDrawerInV15 .22s cubic-bezier(.2,.8,.2,1) both !important;
+                    scrollbar-width:thin;scrollbar-color:rgba(255,99,56,.48) rgba(148,163,184,.14);
+                }
+                .plyr-points-history-drawer-v15,.plyr-points-sample-drawer-v15 { width:min(680px,100vw) !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15.is-open,
+                .plyr-points-history-drawer-v15.is-open,
+                .plyr-points-sample-drawer-v15.is-open { display:block !important; }
+                .dark [data-rc-client-section="services"] .plyr-points-request-drawer-v15,
+                .dark .plyr-points-history-drawer-v15,.dark .plyr-points-sample-drawer-v15 { background:rgb(18 18 22) !important;border-left-color:rgba(148,163,184,.16) !important;box-shadow:-28px 0 80px rgba(0,0,0,.48) !important; }
+                @keyframes plyrPointsDrawerInV15 { from{transform:translateX(48px);opacity:.2} to{transform:translateX(0);opacity:1} }
 
-    const enhance = () => {
-        injectStyles();
-        ensureOverlay();
+                .plyr-points-drawer-head-v15 { position:sticky;top:0;z-index:8;display:flex;align-items:center;justify-content:space-between;gap:1rem;margin:0 -1.35rem 0;padding:1rem 1.35rem;border-bottom:1px solid var(--rc-border);background:color-mix(in srgb,var(--rc-surface) 94%,transparent);backdrop-filter:blur(14px); }
+                .plyr-points-drawer-head-v15 h2 { margin:0;font-size:1.08rem;line-height:1.2;color:var(--rc-text); }
+                .plyr-points-drawer-head-v15 p { margin:.22rem 0 0;color:var(--rc-muted);font-size:.72rem; }
+                .plyr-points-drawer-close-v15 { position:relative;width:2.4rem;height:2.4rem;flex:0 0 auto;border:1px solid var(--rc-border);border-radius:.82rem;background:var(--rc-soft);color:var(--rc-muted);cursor:pointer;font-size:0; }
+                .plyr-points-drawer-close-v15::before,.plyr-points-drawer-close-v15::after { content:'';position:absolute;left:50%;top:50%;width:1rem;height:2px;border-radius:999px;background:currentColor; }
+                .plyr-points-drawer-close-v15::before { transform:translate(-50%,-50%) rotate(45deg); }
+                .plyr-points-drawer-close-v15::after { transform:translate(-50%,-50%) rotate(-45deg); }
+                .plyr-points-drawer-close-v15:hover { color:var(--rc-accent);border-color:rgba(255,99,56,.36);background:var(--rc-accent-soft); }
 
-        const root = document.querySelector('[data-rc-client-section="services"]');
-        if (!root) return;
+                /* Request wizard: make the three steps unmistakable and keep them visible while scrolling. */
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-steps-v7 {
+                    position:sticky !important;top:73px !important;z-index:7 !important;display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+                    gap:.55rem !important;margin:0 -1px 1.05rem !important;padding:.72rem !important;border:1px solid var(--rc-border) !important;border-top:0 !important;
+                    border-radius:0 0 1rem 1rem !important;background:color-mix(in srgb,var(--rc-surface) 96%,transparent) !important;backdrop-filter:blur(12px) !important;box-shadow:0 8px 22px rgba(15,23,42,.06) !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7 {
+                    min-height:4.8rem !important;display:grid !important;grid-template-columns:2.15rem minmax(0,1fr) !important;gap:.7rem !important;align-items:center !important;
+                    padding:.78rem .82rem !important;border:1px solid var(--rc-border) !important;border-radius:.82rem !important;background:var(--rc-soft) !important;transition:.16s ease !important;
+                }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-active { border-color:rgba(255,99,56,.58) !important;background:linear-gradient(135deg,rgba(255,99,56,.13),rgba(255,99,56,.045)) !important;box-shadow:0 0 0 3px rgba(255,99,56,.07) !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-done { border-color:rgba(22,163,74,.28) !important;background:rgba(22,163,74,.055) !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-number-v7 { width:2.15rem !important;height:2.15rem !important;display:grid !important;place-items:center !important;border:2px solid var(--rc-border) !important;border-radius:999px !important;background:var(--rc-surface) !important;color:var(--rc-muted) !important;font-size:.78rem !important;font-weight:900 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-active .rc-credit-step-number-v7 { border-color:var(--rc-accent) !important;background:var(--rc-accent) !important;color:#fff !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-v7.is-done .rc-credit-step-number-v7 { border-color:#16a34a !important;background:#16a34a !important;color:#fff !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-copy-v7 strong { display:block !important;margin-bottom:.25rem !important;color:var(--rc-text) !important;font-size:.8rem !important;font-weight:900 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-step-copy-v7 span { display:block !important;color:var(--rc-muted) !important;font-size:.66rem !important;line-height:1.4 !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-v5 { border-radius:1rem !important;box-shadow:none !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-section-head-v5 { padding:1rem 1.05rem !important;background:var(--rc-soft) !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-list-v5 { padding:.8rem !important;gap:.75rem !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-service-row-v5 { padding:.9rem !important;border:1px solid var(--rc-border) !important;background:var(--rc-surface) !important; }
+                [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-wizard-actions-v7 { position:sticky !important;bottom:0 !important;z-index:6 !important;padding:.85rem 0 !important;background:linear-gradient(180deg,transparent,var(--rc-surface) 28%) !important; }
 
-        if (state.root !== root) {
-            state.root = root;
-            state.requestPanel = null;
-            state.purchasePanel = null;
-            state.legacyHistoryPanel = null;
-            state.historySection = null;
-        }
+                .plyr-points-bulk-action-v15 { display:flex;justify-content:flex-end;margin-top:.75rem; }
+                .plyr-points-bulk-action-v15 .rc-btn { display:inline-flex;align-items:center;gap:.42rem; }
+                .plyr-points-bulk-action-v15 svg { width:1rem;height:1rem; }
 
-        installLegacyPanelVisibility();
-        installRequestDrawer();
-        installServiceButtons();
-        installBulkAction();
-        installHistory();
-        installThankYouBehavior();
-        syncChrome();
-    };
+                .plyr-points-history-v15 { display:grid;gap:.8rem; }
+                .plyr-points-history-head-v15 { display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;flex-wrap:wrap; }
+                .plyr-points-history-head-v15 h2 { margin:0;font-size:1.05rem; }
+                .plyr-points-history-head-v15 p { margin:.2rem 0 0;color:var(--rc-muted);font-size:.72rem; }
+                .plyr-points-history-tools-v15 { display:flex;align-items:center;gap:.55rem;flex-wrap:wrap; }
+                .plyr-points-history-tools-v15 select,.plyr-points-history-tools-v15 input { height:2.3rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);padding:0 .7rem;font:inherit;font-size:.72rem;outline:none; }
+                .plyr-points-history-tools-v15 input { width:min(15rem,60vw); }
+                .plyr-points-history-tools-v15 select:focus,.plyr-points-history-tools-v15 input:focus { border-color:var(--rc-accent);box-shadow:0 0 0 3px var(--rc-accent-soft); }
+                .plyr-points-history-table-v15 { display:grid; }
+                .plyr-points-history-row-v15 { width:100%;display:grid;grid-template-columns:7.2rem minmax(0,1fr) 7rem 8.5rem 1.35rem;gap:.75rem;align-items:center;padding:.72rem .1rem;border:0;border-bottom:1px solid var(--rc-border);background:transparent;color:var(--rc-text);text-align:left;font:inherit; }
+                button.plyr-points-history-row-v15 { cursor:pointer;transition:background .15s ease,transform .15s ease; }
+                button.plyr-points-history-row-v15:hover { background:rgba(255,99,56,.045);transform:translateX(2px); }
+                .plyr-points-history-row-v15.is-head { padding-top:.35rem;padding-bottom:.5rem;color:var(--rc-muted);font-size:.62rem;font-weight:850;letter-spacing:.07em;text-transform:uppercase; }
+                .plyr-points-history-row-v15.is-head>:last-child { visibility:hidden; }
+                .plyr-points-sort-v15 { display:inline-flex;align-items:center;gap:.25rem;border:0;padding:0;background:transparent;color:inherit;font:inherit;font-weight:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer; }
+                .plyr-points-sort-v15.is-active { color:var(--rc-accent); }
+                .plyr-points-history-date-v15 { color:var(--rc-muted);font-size:.72rem; }
+                .plyr-points-history-item-v15 { min-width:0; }.plyr-points-history-item-v15 strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.76rem}.plyr-points-history-item-v15 small{display:block;margin-top:.18rem;color:var(--rc-muted);font-size:.64rem}
+                .plyr-points-history-amount-v15 { font-size:.75rem;font-weight:900; }.plyr-points-history-amount-v15.is-positive{color:#c2410c}.plyr-points-history-chevron-v15{color:var(--rc-muted);font-size:1rem}
+                .plyr-points-status-v15 { display:inline-flex;width:max-content;max-width:100%;padding:.24rem .5rem;border-radius:999px;background:var(--rc-soft);color:var(--rc-muted);font-size:.62rem;font-weight:850;white-space:nowrap; }
+                .plyr-points-status-v15.is-completed{background:rgba(16,185,129,.1);color:#15803d}.plyr-points-status-v15.is-progress{background:rgba(139,92,246,.1);color:#7c3aed}.plyr-points-status-v15.is-reviewed{background:rgba(59,130,246,.1);color:#2563eb}.plyr-points-status-v15.is-submitted{background:rgba(255,99,56,.1);color:#c2410c}.plyr-points-status-v15.is-declined{background:rgba(239,68,68,.1);color:#b42318}.plyr-points-status-v15.is-returned{background:rgba(59,130,246,.1);color:#1d4ed8}
+                .plyr-points-history-empty-v15 { padding:1.4rem;border:1px dashed var(--rc-border);border-radius:.8rem;color:var(--rc-muted);text-align:center;font-size:.75rem; }
 
-    const queueEnhance = () => {
-        if (state.observerQueued) return;
-        state.observerQueued = true;
-        requestAnimationFrame(() => {
-            state.observerQueued = false;
-            enhance();
-        });
-    };
+                .plyr-points-detail-v15 { display:grid;gap:1rem;padding-top:1rem; }
+                .plyr-points-detail-hero-v15 { display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding:.2rem 0 .4rem; }.plyr-points-detail-kicker-v15{color:var(--rc-muted);font-size:.65rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.plyr-points-detail-hero-v15 h3{margin:.3rem 0 .2rem;font-size:1.3rem;line-height:1.2}.plyr-points-detail-hero-v15 p{margin:0;color:var(--rc-muted);font-size:.72rem}
+                .plyr-points-detail-grid-v15{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}.plyr-points-detail-grid-v15>div{display:grid;gap:.18rem;padding:.72rem .8rem;border:1px solid var(--rc-border);border-radius:.72rem;background:var(--rc-soft)}.plyr-points-detail-grid-v15 span{color:var(--rc-muted);font-size:.63rem;font-weight:700}.plyr-points-detail-grid-v15 strong{color:var(--rc-text);font-size:.78rem}
+                .plyr-points-detail-section-v15{padding:.9rem;border:1px solid var(--rc-border);border-radius:.8rem;background:var(--rc-surface)}.plyr-points-detail-section-v15 h4{margin:0 0 .42rem;font-size:.78rem}.plyr-points-detail-section-v15 p{margin:0;color:var(--rc-muted);font-size:.72rem;line-height:1.55;white-space:pre-wrap}.plyr-points-detail-section-v15.is-delivery{border-color:rgba(22,163,74,.26);background:rgba(22,163,74,.045)}
+                .plyr-points-progress-v15{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.35rem}.plyr-points-progress-v15>div{display:grid;justify-items:center;gap:.35rem;position:relative;color:var(--rc-muted);text-align:center}.plyr-points-progress-v15>div::before{content:'';position:absolute;top:.8rem;left:-50%;width:100%;height:2px;background:var(--rc-border);z-index:0}.plyr-points-progress-v15>div:first-child::before{display:none}.plyr-points-progress-v15 span{position:relative;z-index:1;width:1.6rem;height:1.6rem;display:grid;place-items:center;border-radius:999px;border:1px solid var(--rc-border);background:var(--rc-surface);font-size:.66rem;font-weight:850}.plyr-points-progress-v15 small{font-size:.61rem;font-weight:750}.plyr-points-progress-v15>div.is-done{color:var(--rc-accent)}.plyr-points-progress-v15>div.is-done span{border-color:var(--rc-accent);background:var(--rc-accent);color:#fff}
+                .plyr-points-files-v15{display:grid;gap:.42rem}.plyr-points-file-v15{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.55rem .65rem;border:1px solid var(--rc-border);border-radius:.6rem;background:var(--rc-soft);font-size:.69rem}.plyr-points-file-actions-v15{display:inline-flex;gap:.45rem}.plyr-points-file-actions-v15 a{color:var(--rc-accent);font-weight:800;text-decoration:none}.plyr-points-delivery-actions-v15{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.7rem}
 
-    document.addEventListener('keydown', (event) => {
-        if (event.key !== 'Escape') return;
-        if (state.requestPanel?.classList.contains('is-open') || state.historyDrawer?.classList.contains('is-open')) {
-            event.preventDefault();
-            closeAllDrawers();
-        }
-    });
+                .plyr-points-sample-body-v15 { display:grid;gap:1rem;padding-top:1rem; }
+                .plyr-points-sample-kicker-v15 { color:var(--rc-accent);font-size:.64rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase; }
+                .plyr-points-sample-title-v15 h3 { margin:.32rem 0 .22rem;font-size:1.35rem;line-height:1.1;color:var(--rc-text); }.plyr-points-sample-title-v15 p{margin:0;color:var(--rc-muted);font-size:.76rem;line-height:1.5}
+                .plyr-points-sample-stage-v15 { position:relative;aspect-ratio:16/9;overflow:hidden;border-radius:1rem;background:#0d1117;display:grid;place-items:center;border:1px solid rgba(148,163,184,.18); }
+                .plyr-points-sample-stage-v15 img,.plyr-points-sample-stage-v15 video,.plyr-points-sample-stage-v15 iframe{width:100%;height:100%;border:0;object-fit:contain;background:#0d1117}.plyr-points-sample-empty-v15{display:grid;gap:.35rem;place-items:center;color:#cbd5e1;text-align:center;padding:2rem}.plyr-points-sample-empty-v15 strong{color:#fff;font-size:1rem}.plyr-points-sample-empty-v15 span{font-size:.75rem;color:#94a3b8}
+                .plyr-points-sample-nav-v15 { display:flex;align-items:center;justify-content:space-between;gap:.75rem; }.plyr-points-sample-nav-v15>span{color:var(--rc-muted);font-size:.7rem}.plyr-points-sample-nav-actions-v15{display:flex;gap:.45rem}.plyr-points-sample-nav-actions-v15 button{min-width:2.3rem;height:2.2rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);cursor:pointer}.plyr-points-sample-nav-actions-v15 button:disabled{opacity:.35;cursor:not-allowed}
+                .plyr-points-sample-dots-v15{display:flex;justify-content:center;gap:.35rem;flex-wrap:wrap}.plyr-points-sample-dots-v15 button{width:.45rem;height:.45rem;padding:0;border:0;border-radius:999px;background:#d0d5dd;cursor:pointer}.plyr-points-sample-dots-v15 button.is-active{width:1.1rem;background:var(--rc-accent)}
+                .plyr-points-sample-footer-v15 { position:sticky;bottom:0;display:grid;grid-template-columns:1fr auto;gap:.65rem;padding:1rem 0 .2rem;background:linear-gradient(180deg,transparent,var(--rc-surface) 25%); }.plyr-points-sample-footer-v15 .rc-btn-primary{min-width:12rem}
 
-    document.addEventListener('click', (event) => {
-        const anchor = event.target.closest('a[href]');
-        if (!anchor) return;
-        try {
-            const pathname = new URL(anchor.href, window.location.href).pathname;
-            if (SERVICES_PATH_RE.test(pathname)) {
-                window.setTimeout(() => {
-                    enhance();
-                    syncChrome();
-                    loadHistory();
-                }, 30);
+                @media(max-width:900px){
+                    [data-rc-client-section="services"] .plyr-points-request-drawer-v15{width:100vw !important;border-radius:0 !important}.plyr-points-history-drawer-v15,.plyr-points-sample-drawer-v15{width:100vw !important;border-radius:0 !important}
+                }
+                @media(max-width:760px){
+                    [data-rc-client-section="services"] .plyr-points-request-drawer-v15 .rc-credit-steps-v7{grid-template-columns:1fr !important;position:relative !important;top:auto !important}.plyr-points-history-row-v15{grid-template-columns:5.8rem minmax(0,1fr) 5.2rem 1.1rem}.plyr-points-history-row-v15>:nth-child(4){grid-column:2/4}.plyr-points-history-row-v15.is-head>:nth-child(4),.plyr-points-history-row-v15.is-head>:last-child{display:none}.plyr-points-detail-grid-v15{grid-template-columns:1fr}.plyr-points-progress-v15{gap:.1rem}.plyr-points-sample-footer-v15{grid-template-columns:1fr}.plyr-points-sample-footer-v15 .rc-btn-primary{min-width:0}
+                }
+            `;
+            document.head.appendChild(style);
+        };
+
+        const ensureOverlay = () => {
+            if (state.overlay?.isConnected) return state.overlay;
+            const overlay = document.createElement('button');
+            overlay.type = 'button';
+            overlay.className = 'plyr-points-drawer-overlay-v15';
+            overlay.setAttribute('aria-label', 'Close PLYR Points drawer');
+            overlay.addEventListener('click', closeAllDrawers);
+            document.body.appendChild(overlay);
+            state.overlay = overlay;
+            return overlay;
+        };
+
+        const anyDrawerOpen = () => !!(
+            state.requestPanel?.classList.contains('is-open') ||
+            state.historyDrawer?.classList.contains('is-open') ||
+            state.sampleDrawer?.classList.contains('is-open')
+        );
+        const showOverlay = () => { ensureOverlay().classList.add('is-open');document.documentElement.classList.add('plyr-points-drawer-locked-v15'); };
+        const hideOverlayIfUnused = () => { if(anyDrawerOpen()) return;state.overlay?.classList.remove('is-open');document.documentElement.classList.remove('plyr-points-drawer-locked-v15'); };
+
+        const usePointsTab = () => state.root ? Array.from(state.root.querySelectorAll('.rc-support-tabs-v5 button')).find(button => /use points/i.test(button.textContent || '')) || null : null;
+
+        const openRequestDrawer = (serviceKey = '') => {
+            if (!state.requestPanel?.isConnected) enhance();
+            if (!state.requestPanel) return;
+            usePointsTab()?.click();
+            if (serviceKey) window.dispatchEvent(new CustomEvent('rc-select-point-service',{detail:{key:String(serviceKey)}}));
+            state.historyDrawer?.classList.remove('is-open');
+            state.sampleDrawer?.classList.remove('is-open');
+            state.requestPanel.classList.add('is-open');
+            state.requestPanel.setAttribute('aria-hidden','false');
+            showOverlay();
+            window.setTimeout(()=>state.requestPanel?.querySelector('.rc-credit-steps-v7')?.scrollIntoView({block:'start'}),30);
+        };
+        const closeRequestDrawer = () => { if(!state.requestPanel)return;if(state.requestPanel.querySelector('.rc-credit-submit-v6.is-submitting'))return;state.requestPanel.classList.remove('is-open');state.requestPanel.setAttribute('aria-hidden','true');hideOverlayIfUnused(); };
+        const closeHistoryDrawer = () => { state.historyDrawer?.classList.remove('is-open');hideOverlayIfUnused(); };
+        const closeSampleDrawer = () => { state.sampleDrawer?.classList.remove('is-open');hideOverlayIfUnused(); };
+        function closeAllDrawers(){closeRequestDrawer();closeHistoryDrawer();closeSampleDrawer();}
+
+        const installRequestDrawer = () => {
+            if(!state.root)return;
+            const requestForm=state.root.querySelector('form.rc-credit-request-form-v5');
+            const requestPanel=requestForm?.closest('.rc-support-tab-panel-v4');
+            if(!requestPanel)return;
+            state.requestPanel=requestPanel;
+            requestPanel.classList.remove('plyr-points-request-drawer-v14');
+            requestPanel.classList.add('plyr-points-request-drawer-v15');
+            requestPanel.setAttribute('role','dialog');requestPanel.setAttribute('aria-modal','true');requestPanel.setAttribute('aria-label','Request PLYR Points service');
+            requestPanel.querySelector('[data-plyr-points-request-head]')?.remove();
+            if(!requestPanel.querySelector('[data-plyr-points-request-head-v15]')){
+                const balanceText=Number(payload().balance||0).toLocaleString();
+                const header=document.createElement('div');header.className='plyr-points-drawer-head-v15';header.dataset.plyrPointsRequestHeadV15='1';header.innerHTML=`<div><h2>Request with PLYR Points</h2><p>${escapeHtml(balanceText)} points available · Choose one service or build a multi-service request</p></div><button type="button" class="plyr-points-drawer-close-v15" data-plyr-points-request-close-v15 aria-label="Close request drawer">Close</button>`;
+                requestPanel.prepend(header);header.querySelector('[data-plyr-points-request-close-v15]')?.addEventListener('click',closeRequestDrawer);
             }
-        } catch (_) {}
-    }, true);
+            const hasValidationError=!!requestPanel.querySelector('.rc-card[style*="239,68,68"]');if(hasValidationError)window.setTimeout(()=>openRequestDrawer(),20);
+        };
 
-    document.addEventListener('livewire:navigated', () => {
-        window.setTimeout(() => {
-            enhance();
-            syncChrome();
-        }, 0);
-    });
+        const installServiceButtons = () => {
+            if(!state.root||state.root.dataset.plyrPointsServiceClicksV15==='1')return;
+            state.root.dataset.plyrPointsServiceClicksV15='1';
+            state.root.addEventListener('click',(event)=>{
+                const sampleButton=event.target.closest('[data-plyr-points-sample-key]');
+                if(sampleButton&&state.root.contains(sampleButton)){event.preventDefault();event.stopPropagation();openSampleDrawer(sampleButton.dataset.plyrPointsSampleKey||'');return;}
+                const serviceButton=event.target.closest('[data-service-key]');
+                if(serviceButton&&state.root.contains(serviceButton)){event.preventDefault();event.stopPropagation();openRequestDrawer(serviceButton.dataset.serviceKey||'');return;}
+                const bulkButton=event.target.closest('[data-plyr-points-bulk-request-v15]');if(bulkButton&&state.root.contains(bulkButton)){event.preventDefault();openRequestDrawer('');}
+            },true);
+        };
 
-    window.addEventListener('popstate', () => window.setTimeout(syncChrome, 0));
+        const installBulkAction = () => {
+            if(!state.root||state.root.querySelector('[data-plyr-points-bulk-request-v15]'))return;
+            const grid=state.root.querySelector('.rc-points-services-grid-v13');if(!grid)return;
+            const wrapper=document.createElement('div');wrapper.className='plyr-points-bulk-action-v15';wrapper.innerHTML=`<button type="button" class="rc-btn" data-plyr-points-bulk-request-v15><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><path d="M4 4h5M15 4h5M4 20h5M15 20h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>Request multiple services</button>`;grid.insertAdjacentElement('afterend',wrapper);
+        };
 
-    const observer = new MutationObserver(queueEnhance);
-    const start = () => {
-        injectStyles();
-        enhance();
-        observer.observe(document.body, { childList: true, subtree: true });
-    };
+        const installLegacyPanelVisibility = () => {
+            if(!state.root)return;const buyPoints=state.root.querySelector('#buy-points');state.purchasePanel=buyPoints?.closest('.rc-support-tab-panel-v4')||null;state.purchasePanel?.classList.add('plyr-points-main-purchases-v15');state.legacyHistoryPanel=state.root.querySelector('.rc-request-history-page-v9');state.legacyHistoryPanel?.setAttribute('aria-hidden','true');
+        };
 
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', start, { once: true });
-    } else {
-        start();
-    }
-})();
+        const filteredAndSortedEntries = () => {
+            const query=state.search.trim().toLowerCase();let rows=state.entries.filter(entry=>{if(state.filter==='requests'&&entry.kind!=='request')return false;if(state.filter==='purchases'&&entry.kind!=='purchase')return false;if(state.filter==='activity'&&['request','purchase'].includes(entry.kind))return false;if(!query)return true;return[entry.item,entry.status,entry.type,entry.source].some(value=>String(value||'').toLowerCase().includes(query));});
+            const direction=state.sortDirection==='asc'?1:-1;return[...rows].sort((a,b)=>{let left=a[state.sortKey],right=b[state.sortKey];if(['sort_timestamp','points'].includes(state.sortKey)){left=Number(left||0);right=Number(right||0);return(left-right)*direction;}return String(left||'').localeCompare(String(right||''),undefined,{sensitivity:'base'})*direction;});
+        };
+        const sortArrow=(key)=>state.sortKey!==key?'':(state.sortDirection==='asc'?' ↑':' ↓');
+
+        const renderHistory = () => {
+            const section=state.historySection;if(!section?.isConnected)return;
+            const rows=filteredAndSortedEntries();
+            const rowMarkup=rows.length?rows.map(entry=>`<button type="button" class="plyr-points-history-row-v15" data-plyr-points-history-entry-v15="${escapeHtml(entry.id)}"><div class="plyr-points-history-date-v15">${escapeHtml(entry.date)}</div><div class="plyr-points-history-item-v15"><strong>${escapeHtml(entry.item)}</strong><small>${entry.kind==='request'&&entry.request_id?`Request #${escapeHtml(entry.request_id)}`:escapeHtml(entry.type||'Points activity')}</small></div><div class="plyr-points-history-amount-v15 ${entry.positive?'is-positive':''}">${escapeHtml(entry.amount)}</div><div><span class="plyr-points-status-v15 ${statusClass(entry.status)}">${escapeHtml(entry.status)}</span></div><div class="plyr-points-history-chevron-v15" aria-hidden="true">›</div></button>`).join(''):'<div class="plyr-points-history-empty-v15">No activity matches the current filters.</div>';
+            section.innerHTML=`<div class="plyr-points-history-v15"><div class="plyr-points-history-head-v15"><div><h2>Activity history</h2><p>Requests, purchases, and point spending are together here. Click any entry for details.</p></div><div class="plyr-points-history-tools-v15"><input type="search" value="${escapeHtml(state.search)}" placeholder="Search activity" data-plyr-points-history-search-v15><select data-plyr-points-history-filter-v15><option value="all" ${state.filter==='all'?'selected':''}>All activity</option><option value="requests" ${state.filter==='requests'?'selected':''}>Service requests</option><option value="purchases" ${state.filter==='purchases'?'selected':''}>Point purchases</option><option value="activity" ${state.filter==='activity'?'selected':''}>Other activity</option></select></div></div><div class="plyr-points-history-table-v15"><div class="plyr-points-history-row-v15 is-head"><div><button type="button" class="plyr-points-sort-v15 ${state.sortKey==='sort_timestamp'?'is-active':''}" data-plyr-points-sort-v15="sort_timestamp">Date${sortArrow('sort_timestamp')}</button></div><div><button type="button" class="plyr-points-sort-v15 ${state.sortKey==='item'?'is-active':''}" data-plyr-points-sort-v15="item">Item${sortArrow('item')}</button></div><div><button type="button" class="plyr-points-sort-v15 ${state.sortKey==='points'?'is-active':''}" data-plyr-points-sort-v15="points">Points${sortArrow('points')}</button></div><div><button type="button" class="plyr-points-sort-v15 ${state.sortKey==='status'?'is-active':''}" data-plyr-points-sort-v15="status">Status${sortArrow('status')}</button></div><div>Open</div></div>${rowMarkup}</div></div>`;
+            section.querySelector('[data-plyr-points-history-search-v15]')?.addEventListener('input',event=>{state.search=event.target.value||'';window.clearTimeout(event.target.__plyrPointsSearchTimer);event.target.__plyrPointsSearchTimer=window.setTimeout(renderHistory,100);});
+            section.querySelector('[data-plyr-points-history-filter-v15]')?.addEventListener('change',event=>{state.filter=event.target.value||'all';renderHistory();});
+            section.querySelectorAll('[data-plyr-points-sort-v15]').forEach(button=>button.addEventListener('click',()=>{const key=button.dataset.plyrPointsSortV15;if(!key)return;if(state.sortKey===key)state.sortDirection=state.sortDirection==='asc'?'desc':'asc';else{state.sortKey=key;state.sortDirection=key==='item'||key==='status'?'asc':'desc';}renderHistory();}));
+            section.querySelectorAll('[data-plyr-points-history-entry-v15]').forEach(button=>button.addEventListener('click',()=>openHistoryDetail(button.dataset.plyrPointsHistoryEntryV15)));
+        };
+
+        const ensureHistoryDrawer = () => {
+            if(state.historyDrawer?.isConnected)return state.historyDrawer;const drawer=document.createElement('aside');drawer.className='plyr-points-history-drawer-v15';drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','PLYR Points activity details');drawer.innerHTML=`<div class="plyr-points-drawer-head-v15"><div><h2>Activity details</h2><p data-plyr-points-detail-subtitle-v15>PLYR Points</p></div><button type="button" class="plyr-points-drawer-close-v15" data-plyr-points-history-close-v15 aria-label="Close activity details">Close</button></div><div data-plyr-points-detail-body-v15></div>`;drawer.querySelector('[data-plyr-points-history-close-v15]')?.addEventListener('click',closeHistoryDrawer);document.body.appendChild(drawer);state.historyDrawer=drawer;return drawer;
+        };
+        const requestProgressMarkup=(request)=>{if(!request)return'';if(String(request.status_key)==='declined')return'<div class="plyr-points-detail-section-v15"><h4>Request declined</h4><p>This request is closed. Any point return, if applicable, is handled by the PLYRCARD team.</p></div>';const steps=['Submitted','Reviewed','In Progress','Completed'],rank=Number(request.status_rank||1);return`<div class="plyr-points-progress-v15">${steps.map((label,index)=>{const step=index+1;return`<div class="${rank>=step?'is-done':''}"><span>${rank>step?'✓':step}</span><small>${label}</small></div>`}).join('')}</div>`};
+        const resourcesMarkup=(resources)=>{const rows=Array.isArray(resources)?resources:[];if(!rows.length)return'<p>No resource files were attached to this request.</p>';return`<div class="plyr-points-files-v15">${rows.map(resource=>{const url=safeUrl(resource.url);return`<div class="plyr-points-file-v15"><span>${escapeHtml(resource.name||'Resource file')}</span>${url?`<span class="plyr-points-file-actions-v15"><a href="${escapeHtml(url)}" target="_blank" rel="noopener">Open</a><a href="${escapeHtml(url)}" download>Download</a></span>`:''}</div>`}).join('')}</div>`};
+        const deliveryMarkup=(request)=>{const fileUrl=safeUrl(request?.delivery_file_url),linkUrl=safeUrl(request?.delivery_url),hasDelivery=!!(fileUrl||linkUrl);return`<div class="plyr-points-detail-section-v15 is-delivery"><h4>PLYRCARD delivery</h4><p>${hasDelivery?'Your completed file or delivery link is ready.':'Completed files or links will appear here when the PLYRCARD team provides them.'}</p>${hasDelivery?`<div class="plyr-points-delivery-actions-v15">${fileUrl?`<a class="rc-btn rc-btn-primary" href="${escapeHtml(fileUrl)}" target="_blank" rel="noopener">Open File</a><a class="rc-btn" href="${escapeHtml(fileUrl)}" download="${escapeHtml(request.delivery_file_name||'')}">Download File</a>`:''}${linkUrl?`<a class="rc-btn" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">Open Delivery Link</a>`:''}</div>`:''}${request?.delivery_notes?`<p style="margin-top:.7rem">${escapeHtml(request.delivery_notes)}</p>`:''}${request?.provided_at?`<p style="margin-top:.45rem">Provided ${escapeHtml(request.provided_at)}</p>`:''}</div>`};
+        const detailMarkup=(entry)=>{const request=entry.request;if(request)return`<div class="plyr-points-detail-v15"><div class="plyr-points-detail-hero-v15"><div><span class="plyr-points-detail-kicker-v15">Request #${escapeHtml(request.id)}</span><h3>${escapeHtml(request.item_name||entry.item)}</h3><p>Submitted ${escapeHtml(request.created_at||entry.date_time)}</p></div><span class="plyr-points-status-v15 ${statusClass(request.status)}">${escapeHtml(request.status)}</span></div>${requestProgressMarkup(request)}<div class="plyr-points-detail-grid-v15"><div><span>Quantity</span><strong>${escapeHtml(request.quantity)}</strong></div><div><span>Turnaround</span><strong>${escapeHtml(request.turnaround)}</strong></div><div><span>Points used</span><strong>${Number(request.points_spent||0).toLocaleString()}</strong></div><div><span>Last updated</span><strong>${escapeHtml(request.updated_at)}</strong></div></div><div class="plyr-points-detail-section-v15"><h4>Your instructions</h4><p>${escapeHtml(request.notes||'No additional instructions were submitted for this service.')}</p></div><div class="plyr-points-detail-section-v15"><h4>Your submitted resources</h4>${resourcesMarkup(request.resources)}</div>${deliveryMarkup(request)}<div class="plyr-points-detail-section-v15"><h4>Points transaction</h4><p>${entry.transaction_id?`Transaction #${escapeHtml(entry.transaction_id)} · `:''}${escapeHtml(entry.amount)} points · ${escapeHtml(entry.type||'Service request')}</p></div></div>`;return`<div class="plyr-points-detail-v15"><div class="plyr-points-detail-hero-v15"><div><span class="plyr-points-detail-kicker-v15">${escapeHtml(entry.kind==='purchase'?'Point purchase':'Points activity')}</span><h3>${escapeHtml(entry.item)}</h3><p>${escapeHtml(entry.date_time)}</p></div><span class="plyr-points-status-v15 ${statusClass(entry.status)}">${escapeHtml(entry.status)}</span></div><div class="plyr-points-detail-grid-v15"><div><span>Points</span><strong>${escapeHtml(entry.amount)}</strong></div><div><span>Transaction ID</span><strong>${entry.transaction_id?'#'+escapeHtml(entry.transaction_id):'—'}</strong></div><div><span>Type</span><strong>${escapeHtml(entry.type||'Activity')}</strong></div><div><span>Source</span><strong>${escapeHtml(entry.source||'Account activity')}</strong></div></div><div class="plyr-points-detail-section-v15"><h4>About this activity</h4><p>This entry records a PLYR Points balance change. Service delivery details appear on service-request entries.</p></div></div>`};
+        function openHistoryDetail(entryId){const entry=state.entries.find(row=>String(row.id)===String(entryId));if(!entry)return;closeRequestDrawer();closeSampleDrawer();const drawer=ensureHistoryDrawer(),subtitle=drawer.querySelector('[data-plyr-points-detail-subtitle-v15]'),body=drawer.querySelector('[data-plyr-points-detail-body-v15]');if(subtitle)subtitle.textContent=entry.kind==='request'&&entry.request_id?`Request #${entry.request_id}`:`Transaction #${entry.transaction_id||'—'}`;if(body)body.innerHTML=detailMarkup(entry);drawer.classList.add('is-open');drawer.scrollTop=0;showOverlay();}
+
+        const installHistory = () => { if(!state.root)return;const section=state.root.querySelector('.rc-points-history-v12');if(!section)return;state.historySection=section;section.dataset.plyrPointsUnifiedHistoryV15='1';renderHistory(); };
+
+        const sampleMediaMarkup = (sample,service) => {
+            if(!sample)return`<div class="plyr-points-sample-empty-v15"><strong>No sample added yet</strong><span>An admin can add an image, video, or YouTube sample from Admin Settings.</span></div>`;
+            const type=String(sample.type||'').toLowerCase(),url=safeUrl(sample.url),embed=safeUrl(sample.embed_url);
+            if(type==='image'&&url)return`<img src="${escapeHtml(url)}" alt="${escapeHtml(service.name||'PLYR Points')} sample">`;
+            if(type==='video'&&url)return`<video src="${escapeHtml(url)}" controls playsinline preload="metadata"></video>`;
+            if(type==='youtube'&&embed)return`<iframe src="${escapeHtml(embed)}" title="${escapeHtml(service.name||'PLYR Points')} sample" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+            return`<div class="plyr-points-sample-empty-v15"><strong>Sample unavailable</strong><span>This sample could not be displayed.</span></div>`;
+        };
+        const ensureSampleDrawer = () => {
+            if(state.sampleDrawer?.isConnected)return state.sampleDrawer;const drawer=document.createElement('aside');drawer.className='plyr-points-sample-drawer-v15';drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','PLYR Points service sample');drawer.innerHTML=`<div class="plyr-points-drawer-head-v15"><div><h2>Service sample</h2><p>Preview what this PLYR Points service can deliver.</p></div><button type="button" class="plyr-points-drawer-close-v15" data-plyr-points-sample-close-v15 aria-label="Close sample drawer">Close</button></div><div data-plyr-points-sample-body-v15></div>`;drawer.querySelector('[data-plyr-points-sample-close-v15]')?.addEventListener('click',closeSampleDrawer);document.body.appendChild(drawer);state.sampleDrawer=drawer;return drawer;
+        };
+        const renderSampleDrawer = () => {
+            const drawer=ensureSampleDrawer(),body=drawer.querySelector('[data-plyr-points-sample-body-v15]'),service=state.services?.[state.sampleServiceKey]||null;if(!body||!service)return;const samples=Array.isArray(service.samples)?service.samples:[];if(state.sampleIndex<0)state.sampleIndex=Math.max(0,samples.length-1);if(state.sampleIndex>=samples.length)state.sampleIndex=0;const sample=samples[state.sampleIndex]||null;const multiple=samples.length>1;
+            body.innerHTML=`<div class="plyr-points-sample-body-v15"><div class="plyr-points-sample-title-v15"><span class="plyr-points-sample-kicker-v15">Sample</span><h3>${escapeHtml(service.name||'PLYR Points service')}</h3><p>${Number(service.points||0).toLocaleString()} pts · ${escapeHtml(service.description||'')}</p></div><div class="plyr-points-sample-stage-v15">${sampleMediaMarkup(sample,service)}</div>${samples.length?`<div class="plyr-points-sample-nav-v15"><span>${escapeHtml(sample?.name||`Sample ${state.sampleIndex+1}`)} · ${state.sampleIndex+1} of ${samples.length}</span><div class="plyr-points-sample-nav-actions-v15"><button type="button" data-plyr-points-sample-prev-v15 ${multiple?'':'disabled'} aria-label="Previous sample">←</button><button type="button" data-plyr-points-sample-next-v15 ${multiple?'':'disabled'} aria-label="Next sample">→</button></div></div><div class="plyr-points-sample-dots-v15">${samples.map((_,index)=>`<button type="button" class="${index===state.sampleIndex?'is-active':''}" data-plyr-points-sample-dot-v15="${index}" aria-label="View sample ${index+1}"></button>`).join('')}</div>`:''}<div class="plyr-points-sample-footer-v15"><button type="button" class="rc-btn rc-btn-primary" data-plyr-points-sample-request-v15>${escapeHtml(service.cta||('Request '+String(service.name||'this service').toLowerCase()))}</button><button type="button" class="rc-btn" data-plyr-points-sample-footer-close-v15>Close</button></div></div>`;
+            body.querySelector('[data-plyr-points-sample-prev-v15]')?.addEventListener('click',()=>{state.sampleIndex-=1;renderSampleDrawer();});body.querySelector('[data-plyr-points-sample-next-v15]')?.addEventListener('click',()=>{state.sampleIndex+=1;renderSampleDrawer();});body.querySelectorAll('[data-plyr-points-sample-dot-v15]').forEach(button=>button.addEventListener('click',()=>{state.sampleIndex=Number(button.dataset.plyrPointsSampleDotV15||0);renderSampleDrawer();}));body.querySelector('[data-plyr-points-sample-request-v15]')?.addEventListener('click',()=>openRequestDrawer(state.sampleServiceKey));body.querySelector('[data-plyr-points-sample-footer-close-v15]')?.addEventListener('click',closeSampleDrawer);
+        };
+        function openSampleDrawer(serviceKey){state.services=payload().services||state.services||{};const service=state.services?.[serviceKey];if(!service)return;closeRequestDrawer();closeHistoryDrawer();state.sampleServiceKey=String(serviceKey);state.sampleIndex=0;const drawer=ensureSampleDrawer();renderSampleDrawer();drawer.classList.add('is-open');drawer.scrollTop=0;showOverlay();}
+
+        const installThankYouBehavior = () => {
+            if(!state.root)return;const thankYou=state.root.querySelector('[data-credit-thank-you-overlay]');if(thankYou){const copy=thankYou.querySelector('p'),button=thankYou.querySelector('button');if(copy)copy.textContent='Your point request was submitted. Track its status and delivered files from Activity History.';if(button)button.textContent='View Activity History';}
+            if(state.root.dataset.plyrPointsThankYouV15==='1')return;state.root.dataset.plyrPointsThankYouV15='1';state.root.addEventListener('click',event=>{const button=event.target.closest('[data-credit-thank-you-overlay] button');if(!button)return;window.setTimeout(()=>{usePointsTab()?.click();state.historySection?.scrollIntoView({behavior:'smooth',block:'start'});},20);});
+        };
+
+        const syncChrome = () => { if(!isPointsActive())return;if(document.title!=='PLYR Points - PlyrCard')document.title='PLYR Points - PlyrCard'; };
+        const isPointsActive = () => { if(SERVICES_PATH_RE.test(window.location.pathname))return true;const root=state.root||document.querySelector('[data-rc-client-section="services"]');return!!root&&root.getClientRects().length>0&&getComputedStyle(root).display!=='none'; };
+
+        const syncServerPayload = () => {
+            const fresh=payload();state.entries=Array.isArray(fresh.entries)?fresh.entries:[];state.services=fresh.services||{};renderHistory();if(state.sampleDrawer?.classList.contains('is-open'))renderSampleDrawer();
+        };
+
+        const enhance = () => {
+            injectStyles();ensureOverlay();const root=document.querySelector('[data-rc-client-section="services"]');if(!root)return;if(state.root!==root){state.root=root;state.requestPanel=null;state.purchasePanel=null;state.legacyHistoryPanel=null;state.historySection=null;}
+            installLegacyPanelVisibility();installRequestDrawer();installServiceButtons();installBulkAction();installHistory();installThankYouBehavior();syncChrome();
+        };
+        const queueEnhance = () => { if(state.observerQueued)return;state.observerQueued=true;requestAnimationFrame(()=>{state.observerQueued=false;enhance();}); };
+
+        window.addEventListener('plyr-points-server-sync-v15',()=>{syncServerPayload();queueEnhance();});
+        document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(anyDrawerOpen()){event.preventDefault();closeAllDrawers();}});
+        document.addEventListener('click',event=>{const anchor=event.target.closest('a[href]');if(!anchor)return;try{const pathname=new URL(anchor.href,window.location.href).pathname;if(SERVICES_PATH_RE.test(pathname))window.setTimeout(()=>{enhance();syncChrome();},25);}catch(_){}},true);
+        document.addEventListener('livewire:navigated',()=>window.setTimeout(()=>{enhance();syncChrome();},0));window.addEventListener('popstate',()=>window.setTimeout(syncChrome,0));
+        const observer=new MutationObserver(queueEnhance);const start=()=>{injectStyles();enhance();observer.observe(document.body,{childList:true,subtree:true});};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+    })();
+}
 </script>
 </x-filament-panels::page>
 </div>

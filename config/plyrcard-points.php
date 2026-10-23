@@ -1,42 +1,31 @@
 <?php
 
 return [
-    'catalog_version' => (int) env('PLYRCARD_POINTS_CATALOG_VERSION', 2),
+    'catalog_version' => (int) env('PLYRCARD_POINTS_CATALOG_VERSION', 3),
     'catalog' => [
-        'graphic' => [
-            'name' => 'Social graphic',
-            'points' => (int) env('PLYRCARD_POINTS_GRAPHIC', 50),
-            'description' => 'One social graphic.',
+        'outreach' => [
+            'name' => 'Coach Outreach Program',
+            'points' => (int) env('PLYRCARD_POINTS_OUTREACH', 80),
+            'description' => 'Targeted outreach to the coaches on your list, from your own recruiting email.',
+            'cta' => 'Request an outreach program',
         ],
         'reel' => [
-            'name' => 'Highlight reel',
+            'name' => 'Highlight Reel',
             'points' => (int) env('PLYRCARD_POINTS_REEL', 90),
-            'description' => 'One highlight reel, up to 2 minutes.',
+            'description' => 'Your best moments cut from VEO or game film.',
+            'cta' => 'Request a reel',
         ],
-        'outreach' => [
-            'name' => 'Coach outreach campaign',
-            'points' => (int) env('PLYRCARD_POINTS_OUTREACH', 80),
-            'description' => 'One outreach campaign to up to 25 coaches.',
+        'graphic' => [
+            'name' => 'Custom Graphic',
+            'points' => (int) env('PLYRCARD_POINTS_GRAPHIC', 50),
+            'description' => 'Commitment posts, CV graphics, game day and stat cards.',
+            'cta' => 'Request a graphic',
         ],
         'production_hour' => [
-            'name' => 'Production hour',
+            'name' => 'Rep Hour',
             'points' => (int) env('PLYRCARD_POINTS_PRODUCTION_HOUR', 50),
-            'description' => 'One shoot or editing hour.',
-        ],
-        'photo_batch' => [
-            'name' => 'Photo retouch batch',
-            'points' => (int) env('PLYRCARD_POINTS_PHOTO_BATCH', 15),
-            'description' => 'One photo retouch batch.',
-        ],
-        'site_refresh' => [
-            'name' => 'Profile site refresh',
-            'points' => (int) env('PLYRCARD_POINTS_SITE_REFRESH', 15),
-            'description' => 'One profile-site refresh.',
-        ],
-        'film_breakdown' => [
-            'name' => 'Match film breakdown',
-            'points' => (int) env('PLYRCARD_POINTS_FILM_BREAKDOWN', 35),
-            'description' => 'One match-film breakdown.',
+            'description' => 'Have your rep review your profile, or hand off the work when you are short on time.',
+            'cta' => 'Book a rep hour',
         ],
     ],
     'point_packs' => [
