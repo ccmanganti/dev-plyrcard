@@ -45,6 +45,15 @@ class CreditServiceRequest extends Model
         'credit_point_transaction_id',
     ];
 
+    /**
+     * Snapshot of the status before the current update.
+     *
+     * Capture this before Eloquent syncs its original values so every status
+     * transition can be detected reliably from Filament, actions, controllers,
+     * or any other normal model save path.
+     */
+    protected ?string $statusBeforeUpdate = null;
+
     protected function casts(): array
     {
         return [
@@ -63,6 +72,12 @@ class CreditServiceRequest extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (CreditServiceRequest $request): void {
+            if ($request->isDirty('status')) {
+                $request->statusBeforeUpdate = trim((string) $request->getOriginal('status'));
+            }
+        });
+
         static::saving(function (CreditServiceRequest $request): void {
             if ($request->isDirty('status')) {
                 if (
@@ -137,19 +152,24 @@ class CreditServiceRequest extends Model
                 return;
             }
 
-            // Laravel keeps the values from the last save in getPrevious(). Using
-            // that is more reliable here than depending on getOriginal() after a
-            // Filament EditAction has completed its own save lifecycle.
-            $previous = method_exists($request, 'getPrevious')
-                ? (array) $request->getPrevious()
-                : [];
+            // Use the value captured in the updating event. This happens before
+            // Eloquent syncs originals, so it is stable even when Filament/Livewire
+            // has already completed its own save lifecycle by the time updated runs.
+            $previousStatus = trim((string) ($request->statusBeforeUpdate ?? ''));
 
-            $previousStatus = trim((string) (
-                $previous['status']
-                ?? $request->getRawOriginal('status')
-                ?? $request->getOriginal('status')
-                ?? ''
-            ));
+            // Defensive fallback for updates initiated by unusual framework paths.
+            if ($previousStatus === '') {
+                $previous = method_exists($request, 'getPrevious')
+                    ? (array) $request->getPrevious()
+                    : [];
+
+                $previousStatus = trim((string) (
+                    $previous['status']
+                    ?? $request->getRawOriginal('status')
+                    ?? $request->getOriginal('status')
+                    ?? ''
+                ));
+            }
             $currentStatus = trim((string) $request->status);
 
             if ($currentStatus === '' || $previousStatus === $currentStatus) {
