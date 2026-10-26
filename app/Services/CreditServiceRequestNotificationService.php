@@ -7,6 +7,7 @@ use App\Models\CreditServiceRequest;
 use App\Models\User;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class CreditServiceRequestNotificationService
@@ -74,10 +75,12 @@ class CreditServiceRequestNotificationService
             $playerResult = (array) ($result['player'] ?? []);
             $adminResults = (array) ($result['admins'] ?? []);
             $playerSent = (bool) ($playerResult['success'] ?? false);
-            $adminsSent = $adminResults !== []
-                && collect($adminResults)->every(
-                    fn (array $adminResult): bool => (bool) ($adminResult['success'] ?? false),
-                );
+
+            $adminCollection = collect($adminResults);
+            $adminSentCount = $adminCollection
+                ->filter(fn (array $adminResult): bool => (bool) ($adminResult['success'] ?? false))
+                ->count();
+            $adminFailedCount = max(0, $adminCollection->count() - $adminSentCount);
 
             $errors = collect();
 
@@ -90,12 +93,24 @@ class CreditServiceRequestNotificationService
             } else {
                 foreach ($adminResults as $adminResult) {
                     if (! ($adminResult['success'] ?? false)) {
-                        $errors->push('Admin: ' . (string) ($adminResult['error'] ?? 'email was not accepted'));
+                        $recipient = trim((string) ($adminResult['recipient'] ?? ''));
+                        $prefix = $recipient !== '' ? 'Admin ' . $recipient . ': ' : 'Admin: ';
+                        $errors->push($prefix . (string) ($adminResult['error'] ?? 'email was not accepted'));
                     }
                 }
             }
 
-            $success = $playerSent && $adminsSent;
+            // Delivery is intentionally per-recipient. One failed player/admin
+            // address must never make successful recipients look failed.
+            $anySent = $playerSent || $adminSentCount > 0;
+            $allSent = $playerSent
+                && $adminResults !== []
+                && $adminFailedCount === 0;
+
+            $deliveryStatus = $allSent
+                ? 'sent'
+                : ($anySent ? 'partial' : 'failed');
+
             $errorMessage = $errors->isEmpty()
                 ? null
                 : Str::limit($errors->unique()->implode(' | '), 1000, '');
@@ -104,20 +119,23 @@ class CreditServiceRequestNotificationService
                 ->whereKey($requestId)
                 ->update([
                     'email_alerted_at' => now(),
-                    'email_alert_status' => $success ? 'sent' : 'failed',
+                    'email_alert_status' => $deliveryStatus,
                     'email_alert_error' => $errorMessage,
                 ]);
 
             Log::log(
-                $success ? 'info' : 'warning',
-                $success
+                $deliveryStatus === 'sent' ? 'info' : 'warning',
+                $deliveryStatus === 'sent'
                     ? 'PLYRCARD credit-request status emails sent.'
                     : 'PLYRCARD credit-request status email delivery was incomplete.',
                 [
                     'request_id' => $requestId,
                     'previous_status' => $previousStatus,
                     'status' => $currentStatus,
+                    'delivery_status' => $deliveryStatus,
                     'player_sent' => $playerSent,
+                    'admin_sent_count' => $adminSentCount,
+                    'admin_failed_count' => $adminFailedCount,
                     'admin_results' => $adminResults,
                     'errors' => $errors->values()->all(),
                 ],
@@ -125,7 +143,9 @@ class CreditServiceRequestNotificationService
 
             return [
                 ...$result,
-                'success' => $success,
+                'success' => $anySent,
+                'all_success' => $allSent,
+                'delivery_status' => $deliveryStatus,
                 'error' => $errorMessage,
             ];
         } catch (\Throwable $exception) {
@@ -403,21 +423,79 @@ class CreditServiceRequestNotificationService
         string $html,
         string $purpose,
     ): array {
-        if (! function_exists('mail') || ! is_callable('mail')) {
-            $result = ['success' => false, 'error' => 'PHP mail() is not available on this server.'];
-            $this->logAdminFailure($request, $recipient, $subject, $purpose, $result);
+        $recipient = $this->sanitizeEmail($recipient);
+        $configuredFrom = $this->sanitizeEmail((string) config('mail.from.address'));
+        $fromEmail = ($configuredFrom && ! str_ends_with($configuredFrom, '@example.com'))
+            ? $configuredFrom
+            : $this->sanitizeEmail(PlyrcardMailSender::email());
+        $fromName = trim((string) config('mail.from.name')) ?: PlyrcardMailSender::name();
+        $subject = trim(str_replace(["\r", "\n"], ' ', $subject));
+
+        if ($recipient === null || $fromEmail === null || $subject === '') {
+            $result = [
+                'success' => false,
+                'recipient' => $recipient,
+                'error' => 'The recipient, sender, or subject is invalid.',
+            ];
+            $this->logAdminFailure($request, $recipient ?? '', $subject, $purpose, $result);
 
             return $result;
         }
 
-        $recipient = $this->sanitizeEmail($recipient);
-        $fromEmail = $this->sanitizeEmail(PlyrcardMailSender::email());
-        $fromName = trim(str_replace(["\r", "\n"], ' ', PlyrcardMailSender::name()));
-        $subject = trim(str_replace(["\r", "\n"], ' ', $subject));
+        // Prefer Laravel's configured mail transport (SMTP / sendmail / provider)
+        // when one is actually configured. Dev/test/live can therefore use their
+        // own transport settings. Log/array mailers are intentionally skipped
+        // because they do not deliver real email.
+        $mailer = strtolower(trim((string) config('mail.default', '')));
+        $laravelError = null;
 
-        if ($recipient === null || $fromEmail === null || $subject === '') {
-            $result = ['success' => false, 'error' => 'The recipient, sender, or subject is invalid.'];
-            $this->logAdminFailure($request, $recipient ?? '', $subject, $purpose, $result);
+        if ($mailer !== '' && ! in_array($mailer, ['log', 'array'], true)) {
+            try {
+                Mail::html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
+                    $message->to($recipient)
+                        ->from($fromEmail, $fromName)
+                        ->replyTo($fromEmail, $fromName)
+                        ->subject($subject);
+                });
+
+                Log::info('PLYRCARD credit-request admin email sent through Laravel mailer.', [
+                    'purpose' => $purpose,
+                    'request_id' => $request->getKey(),
+                    'user_id' => $request->user_id,
+                    'recipient' => $recipient,
+                    'from_email' => $fromEmail,
+                    'subject' => $subject,
+                    'mailer' => $mailer,
+                    'host' => PlyrcardMailSender::currentHost(),
+                ]);
+
+                return [
+                    'success' => true,
+                    'transport' => 'laravel_' . $mailer,
+                    'recipient' => $recipient,
+                ];
+            } catch (\Throwable $exception) {
+                $laravelError = $exception->getMessage();
+
+                Log::warning('PLYRCARD configured mailer rejected credit-request admin email; trying PHP mail fallback.', [
+                    'purpose' => $purpose,
+                    'request_id' => $request->getKey(),
+                    'recipient' => $recipient,
+                    'mailer' => $mailer,
+                    'error' => $laravelError,
+                ]);
+            }
+        }
+
+        if (! function_exists('mail') || ! is_callable('mail')) {
+            $result = [
+                'success' => false,
+                'recipient' => $recipient,
+                'error' => $laravelError
+                    ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail() is unavailable.'
+                    : 'PHP mail() is not available on this server.',
+            ];
+            $this->logAdminFailure($request, $recipient, $subject, $purpose, $result);
 
             return $result;
         }
@@ -500,10 +578,14 @@ class CreditServiceRequestNotificationService
             ];
         }
 
+        $phpError = $this->mailErrorMessage($firstError, $fallbackError);
         $result = [
             'success' => false,
             'transport' => 'php_mail',
-            'error' => $this->mailErrorMessage($firstError, $fallbackError),
+            'recipient' => $recipient,
+            'error' => $laravelError
+                ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail fallback failed: ' . $phpError
+                : $phpError,
         ];
 
         $this->logAdminFailure($request, $recipient, $subject, $purpose, $result);
