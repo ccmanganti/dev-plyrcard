@@ -12,6 +12,10 @@ final class PlyrcardMailSender
             return 'support@dev.plyrcard.com';
         }
 
+        if (static::isTestHost($host)) {
+            return 'support@test.plyrcard.com';
+        }
+
         return 'support@plyrcard.com';
     }
 
@@ -49,5 +53,10 @@ final class PlyrcardMailSender
         }
 
         return $host === 'dev.plyrcard.com' || str_ends_with($host, '.dev.plyrcard.com');
+    }
+
+    private static function isTestHost(string $host): bool
+    {
+        return $host === 'test.plyrcard.com' || str_ends_with($host, '.test.plyrcard.com');
     }
 }

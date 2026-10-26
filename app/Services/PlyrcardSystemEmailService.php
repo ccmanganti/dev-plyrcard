@@ -7,7 +7,6 @@ use App\Models\User;
 use App\Models\Website;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 
 class PlyrcardSystemEmailService
@@ -345,16 +344,16 @@ class PlyrcardSystemEmailService
         $html = '<!doctype html><html><body style="margin:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,sans-serif">'
             . '<div style="max-width:600px;margin:0 auto;padding:36px">'
             . '<div style="font-size:20px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></div>'
-            . '<h2 style="margin:28px 0 10px">Native mail test</h2>'
-            . '<p style="margin:0;color:#AAB0B7;line-height:1.6">If you received this message, the hosting server accepted a PLYRCARD email through PHP mail().</p>'
+            . '<h2 style="margin:28px 0 10px">PLYRCARD email delivery test</h2>'
+            . '<p style="margin:0;color:#AAB0B7;line-height:1.6">If you received this message, the current PLYRCARD environment successfully delivered email using its configured mail transport.</p>'
             . '</div></body></html>';
 
         return $this->sendHtml(
             user: $user,
             recipient: $recipient,
-            subject: 'PLYRCARD native mail test',
+            subject: 'PLYRCARD email delivery test',
             html: $html,
-            purpose: 'native_mail_test',
+            purpose: 'mail_delivery_test',
         );
     }
 
@@ -654,214 +653,21 @@ class PlyrcardSystemEmailService
 
     protected function sendHtml(User $user, string $recipient, string $subject, string $html, string $purpose): array
     {
-        $recipient = $this->sanitizeEmail($recipient);
-        $configuredFrom = $this->sanitizeEmail((string) config('mail.from.address'));
-        $fromEmail = ($configuredFrom && ! str_ends_with($configuredFrom, '@example.com'))
-            ? $configuredFrom
-            : $this->sanitizeEmail('support@plyrcard.com');
-        $fromName = trim((string) config('mail.from.name')) ?: PlyrcardMailSender::name();
-        $subject = $this->sanitizeHeaderValue($subject);
-
-        if ($recipient === null || $fromEmail === null || $subject === '') {
-            $result = [
-                'success' => false,
-                'recipient' => $recipient,
-                'error' => 'The recipient, sender, or subject is invalid.',
-            ];
-
-            $this->logFailure($user, $recipient ?? '', $subject, $purpose, $result);
-
-            return $result;
-        }
-
-        $mailer = strtolower(trim((string) config('mail.default', '')));
-        $laravelError = null;
-
-        if ($mailer !== '' && ! in_array($mailer, ['log', 'array'], true)) {
-            try {
-                Mail::html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
-                    $message->to($recipient)
-                        ->from($fromEmail, $fromName)
-                        ->replyTo($fromEmail, $fromName)
-                        ->subject($subject);
-                });
-
-                Log::info('PLYRCARD system email sent through Laravel mailer.', [
-                    'purpose' => $purpose,
-                    'user_id' => $user->getKey(),
-                    'recipient' => $recipient,
-                    'from_email' => $fromEmail,
-                    'subject' => $subject,
-                    'mailer' => $mailer,
-                    'host' => PlyrcardMailSender::currentHost(),
-                ]);
-
-                return [
-                    'success' => true,
-                    'transport' => 'laravel_' . $mailer,
-                    'recipient' => $recipient,
-                    'from_email' => $fromEmail,
-                ];
-            } catch (\Throwable $exception) {
-                $laravelError = $exception->getMessage();
-
-                Log::warning('PLYRCARD configured mailer rejected system email; trying PHP mail fallback.', [
-                    'purpose' => $purpose,
-                    'user_id' => $user->getKey(),
-                    'recipient' => $recipient,
-                    'mailer' => $mailer,
-                    'error' => $laravelError,
-                ]);
-            }
-        }
-
-        // Shared hosting may expose sendmail even when PHP mail() itself
-        // returns false. Try it before falling back to native mail().
-        if ($mailer !== 'sendmail') {
-            try {
-                Mail::mailer('sendmail')->html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
-                    $message->to($recipient)
-                        ->from($fromEmail, $fromName)
-                        ->replyTo($fromEmail, $fromName)
-                        ->subject($subject);
-                });
-
-                Log::info('PLYRCARD system email sent through sendmail fallback.', [
-                    'purpose' => $purpose,
-                    'user_id' => $user->getKey(),
-                    'recipient' => $recipient,
-                    'from_email' => $fromEmail,
-                    'subject' => $subject,
-                    'host' => PlyrcardMailSender::currentHost(),
-                ]);
-
-                return [
-                    'success' => true,
-                    'transport' => 'laravel_sendmail',
-                    'recipient' => $recipient,
-                    'from_email' => $fromEmail,
-                ];
-            } catch (\Throwable $exception) {
-                $sendmailError = $exception->getMessage();
-
-                Log::warning('PLYRCARD sendmail fallback rejected system email.', [
-                    'purpose' => $purpose,
-                    'user_id' => $user->getKey(),
-                    'recipient' => $recipient,
-                    'error' => $sendmailError,
-                ]);
-
-                $laravelError = collect([$laravelError, $sendmailError])
-                    ->filter()
-                    ->implode(' | ');
-            }
-        }
-
-        if (! function_exists('mail') || ! is_callable('mail')) {
-            $result = [
-                'success' => false,
-                'recipient' => $recipient,
-                'error' => $laravelError
-                    ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail() is unavailable.'
-                    : 'PHP mail() is not available on this server.',
-            ];
-
-            $this->logFailure($user, $recipient, $subject, $purpose, $result);
-
-            return $result;
-        }
-
-        $plainText = $this->plainTextFromHtml($html);
-        $boundary = 'plyrcard_' . bin2hex(random_bytes(16));
-
-        $headers = [
-            'MIME-Version: 1.0',
-            'From: ' . $fromName . ' <' . $fromEmail . '>',
-            'Reply-To: ' . $fromEmail,
-            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-            'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
-        ];
-
-        $message = '--' . $boundary . "\r\n"
-            . "Content-Type: text/plain; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-            . $plainText . "\r\n"
-            . '--' . $boundary . "\r\n"
-            . "Content-Type: text/html; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-            . $html . "\r\n"
-            . '--' . $boundary . '--';
-
-        $headerString = implode("\r\n", $headers);
-        $envelopeParameter = '-f' . $fromEmail;
-
-        $sentWithEnvelope = false;
-        $sentWithoutEnvelope = false;
-        $firstError = null;
-        $fallbackError = null;
-
-        try {
-            $sentWithEnvelope = @mail(
-                $recipient,
-                $subject,
-                $message,
-                $headerString,
-                $envelopeParameter,
-            );
-
-            $firstError = error_get_last();
-        } catch (\Throwable $exception) {
-            $firstError = ['message' => $exception->getMessage()];
-        }
-
-        if (! $sentWithEnvelope) {
-            try {
-                $sentWithoutEnvelope = @mail(
-                    $recipient,
-                    $subject,
-                    $message,
-                    $headerString,
-                );
-
-                $fallbackError = error_get_last();
-            } catch (\Throwable $exception) {
-                $fallbackError = ['message' => $exception->getMessage()];
-            }
-        }
-
-        $sent = $sentWithEnvelope || $sentWithoutEnvelope;
-
-        if ($sent) {
-            Log::info('PLYRCARD system email handed to native PHP mail().', [
+        $result = app(PlyrcardMailTransport::class)->sendHtml(
+            recipient: $recipient,
+            subject: $subject,
+            html: $html,
+            replyTo: PlyrcardMailSender::email(),
+            context: [
                 'purpose' => $purpose,
                 'user_id' => $user->getKey(),
-                'recipient' => $recipient,
-                'from_email' => $fromEmail,
-                'subject' => $subject,
-                'host' => PlyrcardMailSender::currentHost(),
-                'used_envelope_sender' => $sentWithEnvelope,
-            ]);
+                'notification_audience' => 'player',
+            ],
+        );
 
-            return [
-                'success' => true,
-                'transport' => 'php_mail',
-                'recipient' => $recipient,
-                'from_email' => $fromEmail,
-                'used_envelope_sender' => $sentWithEnvelope,
-            ];
+        if (! ($result['success'] ?? false)) {
+            $this->logFailure($user, $recipient, $subject, $purpose, $result);
         }
-
-        $phpError = $this->mailErrorMessage($firstError, $fallbackError);
-        $result = [
-            'success' => false,
-            'transport' => 'php_mail',
-            'recipient' => $recipient,
-            'error' => $laravelError
-                ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail fallback failed: ' . $phpError
-                : $phpError,
-        ];
-
-        $this->logFailure($user, $recipient, $subject, $purpose, $result);
 
         return $result;
     }

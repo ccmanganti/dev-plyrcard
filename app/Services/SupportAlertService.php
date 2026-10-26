@@ -267,7 +267,7 @@ class SupportAlertService
         );
     }
 
-    public function sendPointPurchase(User $user, int $points, string $label, int $amountCents, array $context = []): array
+    public function sendPointPurchase(User $user, int $points, string $label, int $amountCents, array $context = [], ?array $recipients = null): array
     {
         $user->loadMissing('roles');
         $name = trim(collect([$user->first_name, $user->last_name])->filter()->implode(' ')) ?: ($user->email ?: 'PLYRCARD player');
@@ -296,6 +296,7 @@ class SupportAlertService
             $email,
             'points_purchase',
             array_merge(['user_id' => $user->getKey(), 'points' => $points, 'label' => $label], $context),
+            $recipients,
         );
     }
 
@@ -307,13 +308,16 @@ class SupportAlertService
             $ticket->user?->email,
             $ticket->user?->personal_email,
         ])->map(fn ($email) => $this->sanitizeEmail((string) $email))->filter()->unique()->values()->all();
-        $sender = $this->sanitizeEmail(PlyrcardMailSender::email());
+
         if ($recipients === []) {
-            return ['success' => false, 'sent_recipients' => [], 'failed_recipients' => [], 'error' => 'The ticket does not have a deliverable player email address.'];
+            return [
+                'success' => false,
+                'sent_recipients' => [],
+                'failed_recipients' => [],
+                'error' => 'The ticket does not have a deliverable player email address.',
+            ];
         }
-        if (! $sender || ! function_exists('mail') || ! is_callable('mail')) {
-            return ['success' => false, 'sent_recipients' => [], 'failed_recipients' => $recipients, 'error' => 'The server mail transport is unavailable.'];
-        }
+
         $html = $this->layout(
             heading: 'PLYRCARD Support replied',
             intro: 'Our support team replied to your request. The same reply is also available in your Support ticket history.',
@@ -327,52 +331,41 @@ class SupportAlertService
             actionLabel: 'View Support Ticket',
             actionUrl: rtrim((string) config('app.url'), '/') . '/admin/coach-database/support',
         );
+
         $subject = $this->sanitizeHeader('[PLYRCARD Support ' . $ticket->ticket_number . '] Reply from support');
-        $plain = $this->plainText($html);
         $sent = [];
         $failed = [];
+        $errors = [];
+
         foreach ($recipients as $recipient) {
-            $boundary = 'plyrcard_reply_' . bin2hex(random_bytes(12));
-            $headers = [
-                'MIME-Version: 1.0',
-                'From: ' . PlyrcardMailSender::name() . ' <' . $sender . '>',
-                'Reply-To: ' . $sender,
-                'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-                'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
-            ];
-            $message = '--' . $boundary . "\r\n"
-                . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
-                . $plain . "\r\n"
-                . '--' . $boundary . "\r\n"
-                . "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
-                . $html . "\r\n"
-                . '--' . $boundary . '--';
-            $ok = false;
-            try {
-                $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers), '-f' . $sender);
-                if (! $ok) $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers));
-            } catch (\Throwable $exception) {
-                Log::warning('PLYRCARD support reply email threw an exception.', [
+            $result = app(PlyrcardMailTransport::class)->sendHtml(
+                recipient: $recipient,
+                subject: $subject,
+                html: $html,
+                replyTo: PlyrcardMailSender::email(),
+                context: [
+                    'purpose' => 'support_reply',
                     'ticket_id' => $ticket->getKey(),
-                    'recipient' => $recipient,
-                    'error' => $exception->getMessage(),
-                ]);
+                    'notification_audience' => 'player',
+                ],
+            );
+
+            if ($result['success'] ?? false) {
+                $sent[] = $recipient;
+            } else {
+                $failed[] = $recipient;
+                $errors[$recipient] = $result['error'] ?? 'Email delivery failed.';
             }
-            if ($ok) $sent[] = $recipient; else $failed[] = $recipient;
         }
-        if ($failed !== []) {
-            Log::warning('PLYRCARD support reply notification was not accepted for all player recipients.', [
-                'ticket_id' => $ticket->getKey(),
-                'failed_recipients' => $failed,
-                'sent_recipients' => $sent,
-            ]);
-        }
+
         return [
             'success' => $sent !== [],
+            'all_success' => $failed === [],
             'sent' => count($sent),
             'sent_recipients' => $sent,
             'failed_recipients' => $failed,
-            'error' => $sent === [] ? 'The hosting mail server did not accept the player notification email.' : null,
+            'errors' => $errors,
+            'error' => $sent === [] ? implode(' | ', array_values($errors)) : null,
         ];
     }
 
@@ -388,60 +381,80 @@ class SupportAlertService
         return collect($configured)->map(fn ($email) => $this->sanitizeEmail((string) $email))->filter()->unique()->values()->all();
     }
 
-    protected function sendToAdmins(string $subject, string $html, ?string $replyTo, string $purpose, array $context = []): array
-    {
-        $recipients = $this->adminRecipients();
-        $sender = $this->sanitizeEmail(PlyrcardMailSender::email());
-        $replyTo = $this->sanitizeEmail((string) $replyTo) ?: $sender;
-        if ($recipients === []) return ['success' => false, 'sent' => 0, 'recipients' => [], 'error' => 'No admin alert recipients are configured.'];
-        if (! $sender || ! function_exists('mail') || ! is_callable('mail')) return ['success' => false, 'sent' => 0, 'recipients' => $recipients, 'error' => 'The server mail transport is unavailable.'];
+    protected function sendToAdmins(
+        string $subject,
+        string $html,
+        ?string $replyTo,
+        string $purpose,
+        array $context = [],
+        ?array $recipientOverride = null,
+    ): array {
+        $recipients = $recipientOverride === null
+            ? $this->adminRecipients()
+            : collect($recipientOverride)
+                ->map(fn ($email) => $this->sanitizeEmail((string) $email))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+        $replyTo = $this->sanitizeEmail((string) $replyTo) ?: PlyrcardMailSender::email();
+
+        if ($recipients === []) {
+            return [
+                'success' => false,
+                'all_success' => false,
+                'sent' => 0,
+                'recipients' => [],
+                'sent_recipients' => [],
+                'failed_recipients' => [],
+                'error' => 'No admin alert recipients are configured.',
+            ];
+        }
+
         $subject = $this->sanitizeHeader($subject);
-        $plain = $this->plainText($html);
         $sent = [];
         $failed = [];
+        $errors = [];
+
         foreach ($recipients as $recipient) {
-            $boundary = 'plyrcard_alert_' . bin2hex(random_bytes(12));
-            $headers = [
-                'MIME-Version: 1.0',
-                'From: ' . PlyrcardMailSender::name() . ' <' . $sender . '>',
-                'Reply-To: ' . $replyTo,
-                'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-                'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
-            ];
-            $message = '--' . $boundary . "\r\n"
-                . "Content-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
-                . $plain . "\r\n"
-                . '--' . $boundary . "\r\n"
-                . "Content-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"
-                . $html . "\r\n"
-                . '--' . $boundary . '--';
-            $ok = false;
-            try {
-                $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers), '-f' . $sender);
-                if (! $ok) $ok = @mail($recipient, $subject, $message, implode("\r\n", $headers));
-            } catch (\Throwable $exception) {
-                Log::warning('PLYRCARD internal alert email threw an exception.', array_merge($context, [
+            $result = app(PlyrcardMailTransport::class)->sendHtml(
+                recipient: $recipient,
+                subject: $subject,
+                html: $html,
+                replyTo: $replyTo,
+                context: array_merge($context, [
                     'purpose' => $purpose,
-                    'recipient' => $recipient,
-                    'error' => $exception->getMessage(),
-                ]));
+                    'notification_audience' => 'admin',
+                ]),
+            );
+
+            if ($result['success'] ?? false) {
+                $sent[] = $recipient;
+            } else {
+                $failed[] = $recipient;
+                $errors[$recipient] = $result['error'] ?? 'Email delivery failed.';
             }
-            if ($ok) $sent[] = $recipient; else $failed[] = $recipient;
         }
+
         if ($failed !== []) {
             Log::warning('PLYRCARD internal alert email was not accepted for all recipients.', array_merge($context, [
                 'purpose' => $purpose,
                 'failed_recipients' => $failed,
                 'sent_recipients' => $sent,
+                'errors' => $errors,
             ]));
         }
+
         return [
             'success' => $sent !== [],
+            'all_success' => $failed === [],
             'sent' => count($sent),
             'recipients' => $recipients,
             'sent_recipients' => $sent,
             'failed_recipients' => $failed,
-            'error' => $sent === [] ? 'The hosting mail server did not accept the alert email.' : null,
+            'errors' => $errors,
+            'error' => $sent === [] ? implode(' | ', array_values($errors)) : null,
         ];
     }
 

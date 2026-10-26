@@ -828,22 +828,18 @@ class StripeBillingService
             }
             return $transaction;
         });
-        if (! $transaction->wasRecentlyCreated) {
-            return;
-        }
         $points = (int) $transaction->points;
         $label = $plan === 'jumpstart' ? 'Jumpstart' : 'Amplify';
         $amount = (int) $billing->amount_paid_cents;
-        try {
-            app(PlyrcardSystemEmailService::class)->sendPointsPurchased($user->fresh() ?? $user, $points, $label, $amount);
-        } catch (\Throwable $exception) {
-            Log::warning('PLYRCARD point purchase player email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
-        }
-        try {
-            app(SupportAlertService::class)->sendPointPurchase($user->fresh() ?? $user, $points, $label, $amount, ['stripe_payment_intent_id' => $sourceId]);
-        } catch (\Throwable $exception) {
-            Log::warning('PLYRCARD point purchase admin email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
-        }
+
+        $this->notifyPointPurchaseIfNeeded(
+            $transaction,
+            $user,
+            $points,
+            $label,
+            $amount,
+            ['stripe_payment_intent_id' => $sourceId, 'package' => $plan],
+        );
     }
     protected function activatePointPackPurchase(BillingInformation $billing, array $intent): void
     {
@@ -862,24 +858,112 @@ class StripeBillingService
             'stripe_billing_id' => $billing->getKey(),
             'amount_cents' => $amount,
         ]);
-        if (! $transaction->wasRecentlyCreated) {
-            return;
-        }
         $label = number_format($points) . ' Point Pack';
-        try {
-            app(PlyrcardSystemEmailService::class)->sendPointsPurchased($user->fresh() ?? $user, $points, $label, $amount);
-        } catch (\Throwable $exception) {
-            Log::warning('PLYRCARD point-pack player email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
-        }
-        try {
-            app(SupportAlertService::class)->sendPointPurchase($user->fresh() ?? $user, $points, $label, $amount, [
+
+        $this->notifyPointPurchaseIfNeeded(
+            $transaction,
+            $user,
+            $points,
+            $label,
+            $amount,
+            [
                 'stripe_payment_intent_id' => $sourceId,
                 'point_pack' => $packKey,
-            ]);
-        } catch (\Throwable $exception) {
-            Log::warning('PLYRCARD point-pack admin email failed.', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
-        }
+            ],
+        );
     }
+    protected function notifyPointPurchaseIfNeeded(
+        CreditPointTransaction $transaction,
+        User $user,
+        int $points,
+        string $label,
+        int $amountCents,
+        array $context = [],
+    ): void {
+        $transaction->refresh();
+        $meta = is_array($transaction->meta) ? $transaction->meta : [];
+        $notification = (array) data_get($meta, 'notifications.points_purchase', []);
+        $now = now()->toIso8601String();
+
+        if (blank($notification['player_sent_at'] ?? null)) {
+            try {
+                $playerResult = app(PlyrcardSystemEmailService::class)
+                    ->sendPointsPurchased($user->fresh() ?? $user, $points, $label, $amountCents);
+
+                $notification['player_last_attempt_at'] = $now;
+                $notification['player_last_error'] = $playerResult['success'] ?? false
+                    ? null
+                    : ($playerResult['error'] ?? 'Player purchase email failed.');
+
+                if ($playerResult['success'] ?? false) {
+                    $notification['player_sent_at'] = $now;
+                    $notification['player_transport'] = $playerResult['transport'] ?? null;
+                }
+            } catch (\Throwable $exception) {
+                $notification['player_last_attempt_at'] = $now;
+                $notification['player_last_error'] = $exception->getMessage();
+
+                Log::warning('PLYRCARD point purchase player email failed.', [
+                    'user_id' => $user->getKey(),
+                    'credit_transaction_id' => $transaction->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $alerts = app(SupportAlertService::class);
+        $configuredAdmins = $alerts->adminRecipients();
+        $alreadySentAdmins = collect((array) ($notification['admin_sent_recipients'] ?? []))
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $remainingAdmins = array_values(array_diff($configuredAdmins, $alreadySentAdmins));
+
+        if ($remainingAdmins !== []) {
+            try {
+                $adminResult = $alerts->sendPointPurchase(
+                    $user->fresh() ?? $user,
+                    $points,
+                    $label,
+                    $amountCents,
+                    array_merge($context, ['credit_transaction_id' => $transaction->getKey()]),
+                    $remainingAdmins,
+                );
+
+                $sentNow = collect((array) ($adminResult['sent_recipients'] ?? []))
+                    ->map(fn ($email) => strtolower(trim((string) $email)))
+                    ->filter()
+                    ->all();
+
+                $notification['admin_sent_recipients'] = collect(array_merge($alreadySentAdmins, $sentNow))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+                $notification['admin_last_attempt_at'] = $now;
+                $notification['admin_failed_recipients'] = $adminResult['failed_recipients'] ?? [];
+                $notification['admin_last_error'] = ($adminResult['failed_recipients'] ?? []) === []
+                    ? null
+                    : ($adminResult['error'] ?? 'One or more admin purchase emails failed.');
+            } catch (\Throwable $exception) {
+                $notification['admin_last_attempt_at'] = $now;
+                $notification['admin_last_error'] = $exception->getMessage();
+
+                Log::warning('PLYRCARD point purchase admin email failed.', [
+                    'user_id' => $user->getKey(),
+                    'credit_transaction_id' => $transaction->getKey(),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $notification['configured_admin_recipients'] = $configuredAdmins;
+        data_set($meta, 'notifications.points_purchase', $notification);
+        $transaction->forceFill(['meta' => $meta])->save();
+    }
+
     protected function downgradeAfterSubscriptionEnd(BillingInformation $billing): void
     {
         $user = $billing->user;
