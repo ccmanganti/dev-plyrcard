@@ -344,16 +344,16 @@ class PlyrcardSystemEmailService
         $html = '<!doctype html><html><body style="margin:0;background:#0C0E11;color:#F2F0ED;font-family:Arial,sans-serif">'
             . '<div style="max-width:600px;margin:0 auto;padding:36px">'
             . '<div style="font-size:20px;font-weight:800">PLYR<span style="color:#FF5A3C">CARD</span></div>'
-            . '<h2 style="margin:28px 0 10px">Native mail test</h2>'
-            . '<p style="margin:0;color:#AAB0B7;line-height:1.6">If you received this message, the hosting server accepted a PLYRCARD email through PHP mail().</p>'
+            . '<h2 style="margin:28px 0 10px">PLYRCARD email delivery test</h2>'
+            . '<p style="margin:0;color:#AAB0B7;line-height:1.6">If you received this message, the current PLYRCARD environment successfully delivered email using its configured mail transport.</p>'
             . '</div></body></html>';
 
         return $this->sendHtml(
             user: $user,
             recipient: $recipient,
-            subject: 'PLYRCARD native mail test',
+            subject: 'PLYRCARD email delivery test',
             html: $html,
-            purpose: 'native_mail_test',
+            purpose: 'mail_delivery_test',
         );
     }
 
