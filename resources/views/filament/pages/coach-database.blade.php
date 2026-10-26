@@ -10854,7 +10854,24 @@ CSS;
                                                     x-bind:class="{ 'rc-message-collapsible-v11321': collapsible, 'is-expanded': expanded }"
                                                 >
                                                     <div class="rc-email-direct-v11320" aria-label="Email message">
-                                                        <div class="rc-email-direct-body-v11320" x-ref="body">{!! $emailBodyForInline !!}</div>
+                                                        <div
+                                                            class="rc-email-direct-body-v11320"
+                                                            x-ref="body"
+                                                            data-email-body-b64="{{ base64_encode($emailBodyForInline) }}"
+                                                            x-init="
+                                                                (() => {
+                                                                    const encoded = String($el.dataset.emailBodyB64 || '');
+                                                                    if (!encoded) return;
+                                                                    try {
+                                                                        $el.innerHTML = decodeURIComponent(escape(window.atob(encoded)));
+                                                                    } catch (error) {
+                                                                        try { $el.innerHTML = window.atob(encoded); }
+                                                                        catch (_) { $el.textContent = 'Unable to display this email.'; }
+                                                                    }
+                                                                    $nextTick(() => measure());
+                                                                })()
+                                                            "
+                                                        ></div>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -13812,7 +13829,7 @@ CSS;
                                              x-on:click="captureSelection()"
                                              x-on:focus="captureSelection()"
                                              x-on:paste="queueSync(); setTimeout(() => captureSelection(), 0)"
-                                             x-on:blur="syncNow()">{!! $templateBody ?? '' !!}</div>
+                                             x-on:blur="syncNow()"></div>
                                         <textarea x-ref="hidden" data-plyr-native-editor-hidden="template-body" style="display:none !important;">{!! e($templateBody ?? '') !!}</textarea>
                                         <div class="rc-template-editor-footer-v11331">
                                             <span>Use short paragraphs and one clear call-to-action.</span>
