@@ -137,7 +137,19 @@ class CreditServiceRequest extends Model
                 return;
             }
 
-            $previousStatus = trim((string) ($request->getOriginal('status') ?? ''));
+            // Laravel keeps the values from the last save in getPrevious(). Using
+            // that is more reliable here than depending on getOriginal() after a
+            // Filament EditAction has completed its own save lifecycle.
+            $previous = method_exists($request, 'getPrevious')
+                ? (array) $request->getPrevious()
+                : [];
+
+            $previousStatus = trim((string) (
+                $previous['status']
+                ?? $request->getRawOriginal('status')
+                ?? $request->getOriginal('status')
+                ?? ''
+            ));
             $currentStatus = trim((string) $request->status);
 
             if ($currentStatus === '' || $previousStatus === $currentStatus) {
@@ -146,31 +158,86 @@ class CreditServiceRequest extends Model
 
             $requestId = (int) $request->getKey();
 
-            $notifyEveryone = function () use ($requestId, $previousStatus): void {
-                try {
-                    $fresh = CreditServiceRequest::query()
-                        ->with(['user', 'managedBy'])
-                        ->find($requestId);
+            // Send synchronously from the actual model update. The previous
+            // implementation deferred this through DB::afterCommit(), which can be
+            // unreliable inside nested Filament/Livewire transactions and gave the
+            // admin no indication that the email callback never ran.
+            try {
+                $fresh = CreditServiceRequest::query()
+                    ->with(['user', 'managedBy'])
+                    ->find($requestId);
 
-                    if (! $fresh?->user) {
-                        return;
+                if (! $fresh?->user) {
+                    throw new \RuntimeException('The credit request is not attached to a player account.');
+                }
+
+                $result = app(CreditServiceRequestNotificationService::class)
+                    ->notifyStatusChanged($fresh, $previousStatus);
+
+                $playerResult = (array) ($result['player'] ?? []);
+                $adminResults = (array) ($result['admins'] ?? []);
+                $playerSent = (bool) ($playerResult['success'] ?? false);
+                $adminsSent = $adminResults !== []
+                    && collect($adminResults)->every(
+                        fn (array $adminResult): bool => (bool) ($adminResult['success'] ?? false),
+                    );
+
+                $errors = collect();
+                if (! $playerSent) {
+                    $errors->push('Player: ' . (string) ($playerResult['error'] ?? 'email was not accepted'));
+                }
+                if ($adminResults === []) {
+                    $errors->push('Admin: no Superadmin email recipient was found');
+                } else {
+                    foreach ($adminResults as $adminResult) {
+                        if (! ($adminResult['success'] ?? false)) {
+                            $errors->push('Admin: ' . (string) ($adminResult['error'] ?? 'email was not accepted'));
+                        }
                     }
+                }
 
-                    app(CreditServiceRequestNotificationService::class)
-                        ->notifyStatusChanged($fresh, $previousStatus);
-                } catch (\Throwable $exception) {
-                    Log::warning('PLYRCARD service-request status notification failed.', [
+                CreditServiceRequest::query()
+                    ->whereKey($requestId)
+                    ->update([
+                        'email_alerted_at' => now(),
+                        'email_alert_status' => ($playerSent && $adminsSent) ? 'sent' : 'failed',
+                        'email_alert_error' => $errors->isEmpty()
+                            ? null
+                            : \Illuminate\Support\Str::limit($errors->unique()->implode(' | '), 1000, ''),
+                    ]);
+
+                if ($playerSent && $adminsSent) {
+                    Log::info('PLYRCARD credit-request status emails sent.', [
                         'request_id' => $requestId,
                         'previous_status' => $previousStatus,
-                        'error' => $exception->getMessage(),
+                        'status' => $currentStatus,
+                        'admin_recipients' => count($adminResults),
+                    ]);
+                } else {
+                    Log::warning('PLYRCARD credit-request status email delivery was incomplete.', [
+                        'request_id' => $requestId,
+                        'previous_status' => $previousStatus,
+                        'status' => $currentStatus,
+                        'player_sent' => $playerSent,
+                        'admin_results' => $adminResults,
+                        'errors' => $errors->values()->all(),
                     ]);
                 }
-            };
+            } catch (\Throwable $exception) {
+                CreditServiceRequest::query()
+                    ->whereKey($requestId)
+                    ->update([
+                        'email_alerted_at' => now(),
+                        'email_alert_status' => 'failed',
+                        'email_alert_error' => \Illuminate\Support\Str::limit($exception->getMessage(), 1000, ''),
+                    ]);
 
-            if (DB::transactionLevel() > 0) {
-                DB::afterCommit($notifyEveryone);
-            } else {
-                $notifyEveryone();
+                Log::warning('PLYRCARD service-request status notification failed.', [
+                    'request_id' => $requestId,
+                    'previous_status' => $previousStatus,
+                    'status' => $currentStatus,
+                    'error' => $exception->getMessage(),
+                ]);
             }
         });
     }

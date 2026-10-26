@@ -47,6 +47,7 @@ class CreditServiceRequestNotificationService
 
         return [
             'success' => ($playerResult['success'] ?? false)
+                && $adminResults !== []
                 && collect($adminResults)->every(fn (array $result): bool => (bool) ($result['success'] ?? false)),
             'player' => $playerResult,
             'admins' => $adminResults,
@@ -133,14 +134,6 @@ class CreditServiceRequestNotificationService
             ]))
             ->get();
 
-        $playerEmails = collect([
-            $player?->email,
-            $player?->personal_email,
-        ])
-            ->map(fn ($email): string => strtolower(trim((string) $email)))
-            ->filter()
-            ->flip();
-
         $recipients = [];
         $seen = [];
 
@@ -150,7 +143,11 @@ class CreditServiceRequestNotificationService
                 $admin->personal_email,
             ]);
 
-            if ($recipient === null || isset($seen[$recipient]) || $playerEmails->has($recipient)) {
+            // Do not exclude the player address here. A Superadmin can also own a
+            // test/player request (as in dev), and the requirement is that both the
+            // player notification and the admin notification are sent. In that case
+            // the same mailbox intentionally receives the two role-specific emails.
+            if ($recipient === null || isset($seen[$recipient])) {
                 continue;
             }
 
