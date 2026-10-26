@@ -167,7 +167,7 @@ class PlyrPointsHistoryController extends Controller
             'status_key' => (string) $serviceRequest->status,
             'status' => $serviceRequest->statusLabel(),
             'status_rank' => match ((string) $serviceRequest->status) {
-                'reviewed' => 2,
+                'reviewed', 'pending_information' => 2,
                 'in_progress' => 3,
                 'completed' => 4,
                 default => 1,
@@ -184,6 +184,8 @@ class PlyrPointsHistoryController extends Controller
             'delivery_url' => filled($serviceRequest->delivery_url) ? (string) $serviceRequest->delivery_url : null,
             'delivery_notes' => trim((string) ($serviceRequest->delivery_notes ?? '')),
             'provided_at' => optional($serviceRequest->provided_at)->format('M j, Y'),
+            'reviewed_at' => optional($serviceRequest->reviewed_at)->format('M j, Y'),
+            'completed_at' => optional($serviceRequest->completed_at)->format('M j, Y'),
             'created_at' => optional($serviceRequest->created_at)->format('M j, Y g:i A') ?: '—',
             'updated_at' => optional($serviceRequest->updated_at)->format('M j, Y g:i A') ?: '—',
         ];

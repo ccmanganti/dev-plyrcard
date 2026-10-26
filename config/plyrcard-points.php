@@ -29,6 +29,14 @@ return [
         ],
     ],
     'point_packs' => [
+        '50' => [
+            'label' => '50 Point Pack',
+            'points' => (int) env('PLYRCARD_POINT_PACK_50_POINTS', 50),
+            'price_cents' => (int) env('PLYRCARD_POINT_PACK_50_PRICE_CENTS', 5000),
+            'stripe_product_id' => trim((string) env('PLYRCARD_POINT_PACK_50_STRIPE_PRODUCT_ID', env('PLYRCARD_POINT_PACK_100_STRIPE_PRODUCT_ID', ''))),
+            'enabled' => filter_var(env('PLYRCARD_POINT_PACK_50_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'note' => 'Enough for one Custom Graphic or Rep Hour.',
+        ],
         '100' => [
             'label' => '100 Point Pack',
             'points' => (int) env('PLYRCARD_POINT_PACK_100_POINTS', 100),
@@ -53,6 +61,15 @@ return [
             'enabled' => filter_var(env('PLYRCARD_POINT_PACK_500_ENABLED', true), FILTER_VALIDATE_BOOL),
             'note' => 'Best point-pack value for larger service needs.',
         ],
+    ],
+    'custom_point_purchase' => [
+        'enabled' => filter_var(env('PLYRCARD_CUSTOM_POINT_PURCHASE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'min_points' => max(1, (int) env('PLYRCARD_CUSTOM_POINT_MIN', 1)),
+        'max_points' => max(1, (int) env('PLYRCARD_CUSTOM_POINT_MAX', 1000)),
+        'price_per_point_cents' => max(1, (int) env('PLYRCARD_CUSTOM_POINT_PRICE_CENTS', 100)),
+        // Prefer a generic Stripe product named something like "PLYR Points".
+        // The controller can fall back to the 50-point product during rollout.
+        'stripe_product_id' => trim((string) env('PLYRCARD_POINT_CUSTOM_STRIPE_PRODUCT_ID', '')),
     ],
     'packages' => [
         'jumpstart' => (int) env('PLYRCARD_POINTS_JUMPSTART', 320),

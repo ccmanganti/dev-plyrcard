@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\PlyrcardSystemEmailService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class CreditServiceRequest extends Model
@@ -63,7 +66,7 @@ class CreditServiceRequest extends Model
         static::saving(function (CreditServiceRequest $request): void {
             if ($request->isDirty('status')) {
                 if (
-                    in_array($request->status, ['reviewed', 'in_progress', 'completed', 'declined'], true)
+                    in_array($request->status, ['reviewed', 'pending_information', 'in_progress', 'completed'], true)
                     && ! $request->reviewed_at
                 ) {
                     $request->reviewed_at = now();
@@ -71,7 +74,7 @@ class CreditServiceRequest extends Model
 
                 if ($request->status === 'completed') {
                     $request->completed_at ??= now();
-                } elseif ($request->isDirty('status')) {
+                } else {
                     $request->completed_at = null;
                 }
             }
@@ -81,6 +84,48 @@ class CreditServiceRequest extends Model
                 && ($request->isDirty('status') || $request->isDirty('admin_notes'))
             ) {
                 $request->managed_by_user_id = auth()->id();
+            }
+        });
+
+        static::updated(function (CreditServiceRequest $request): void {
+            if (! $request->wasChanged('status')) {
+                return;
+            }
+
+            $status = (string) $request->status;
+            if ($status === 'submitted') {
+                // Submission already sends its own request-created notification.
+                return;
+            }
+
+            $previousStatus = (string) ($request->getOriginal('status') ?? '');
+            $requestId = (int) $request->getKey();
+
+            $notifyPlayer = function () use ($requestId, $previousStatus): void {
+                try {
+                    $fresh = CreditServiceRequest::query()
+                        ->with('user')
+                        ->find($requestId);
+
+                    if (! $fresh?->user) {
+                        return;
+                    }
+
+                    app(PlyrcardSystemEmailService::class)
+                        ->sendServiceRequestStatusUpdated($fresh, $previousStatus);
+                } catch (\Throwable $exception) {
+                    Log::warning('PLYRCARD service-request status notification failed.', [
+                        'request_id' => $requestId,
+                        'previous_status' => $previousStatus,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            };
+
+            if (DB::transactionLevel() > 0) {
+                DB::afterCommit($notifyPlayer);
+            } else {
+                $notifyPlayer();
             }
         });
     }
@@ -110,9 +155,9 @@ class CreditServiceRequest extends Model
         return [
             'submitted' => 'Submitted',
             'reviewed' => 'Reviewed',
+            'pending_information' => 'Pending Information',
             'in_progress' => 'In Progress',
             'completed' => 'Completed',
-            'declined' => 'Declined',
         ];
     }
 
