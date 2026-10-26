@@ -11807,7 +11807,9 @@ CSS;
                 <div class="rc-points-section-head-v13"><div><h2>Spend your points</h2></div><p>Points are deducted when the request is submitted.</p></div>
                 <div class="rc-points-services-grid-v13">
                     @foreach($rcCreditCatalog as $serviceKey => $serviceItem)
-                        @php($serviceBasePoints = max(1, (int) ($serviceItem['points'] ?? 0)))
+                        @php
+                            $serviceBasePoints = max(1, (int) ($serviceItem['points'] ?? 0));
+                        @endphp
                         <article
                             class="rc-points-service-v13"
                             x-data="{ available: {{ (int) $rcCreditBalance }}, required: {{ $serviceBasePoints }} }"
