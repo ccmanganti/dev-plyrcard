@@ -975,7 +975,9 @@ discoverSelectedIds: [],
                 const previous = !!this.optimisticSchool.is_favorite;
                 const next = !previous;
                 this.optimisticSchool.is_favorite = next;
-                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [] } }));
+                window.__plyrRcFavoritesDirty = true;
+                window.dispatchEvent(new CustomEvent('rc-discover-school-state', { detail: { id: String(this.optimisticSchool.id), is_favorite: next, list_keys: this.optimisticSchool.list_keys || [], school: { ...this.optimisticSchool } } }));
+                window.dispatchEvent(new CustomEvent('rc-favorite-school-updated', { detail: { school_id: String(this.optimisticSchool.id), is_favorite: next, school: { ...this.optimisticSchool } } }));
                 Promise.resolve(this.$wire.call('queueSchoolFavoriteState', String(this.optimisticSchool.id), next))
                     .then(result => {
                         if (!result || result.success === false) {
@@ -11314,6 +11316,10 @@ CSS;
                                             const previous = this.favorite;
                                             this.favorite = !previous;
                                             this.favoritePending = true;
+                                            window.__plyrRcFavoritesDirty = true;
+                                            window.dispatchEvent(new CustomEvent('rc-favorite-school-updated', {
+                                                detail: { school_id: this.schoolId, is_favorite: this.favorite }
+                                            }));
                                             try {
                                                 const result = await this.$wire.call('queueSchoolFavoriteState', this.schoolId, this.favorite);
                                                 if (!result || result.success === false) this.favorite = previous;
@@ -17202,6 +17208,26 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
 (() => {
     if (window.__plyrRcPersistentNavInstalled) return;
     window.__plyrRcPersistentNavInstalled = true;
+
+    // v10.114: Favorites is server-rendered while Recruiting Center tabs are
+    // intentionally switched client-side. Mark the panel stale whenever a school
+    // favorite changes, then perform one Livewire refresh only when Favorites is
+    // actually opened. This keeps favorite clicks instant without requiring a full
+    // browser reload or restoring expensive server sync on every tab change.
+    window.__plyrRcFavoritesDirty = !!window.__plyrRcFavoritesDirty;
+    if (!window.__plyrRcFavoritesDirtyListenerInstalled) {
+        window.__plyrRcFavoritesDirtyListenerInstalled = true;
+        window.addEventListener('rc-discover-school-state', (event) => {
+            const detail = event?.detail || {};
+            if (Object.prototype.hasOwnProperty.call(detail, 'is_favorite')) {
+                window.__plyrRcFavoritesDirty = true;
+            }
+        });
+        window.addEventListener('rc-favorite-school-updated', () => {
+            window.__plyrRcFavoritesDirty = true;
+        });
+    }
+
     const pathToSection = (pathname) => {
         const path = String(pathname || '').replace(/\/+$/, '') || '/';
         if (!path.startsWith('/admin/coach-database')) return null;
@@ -17350,6 +17376,29 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         }
         const alreadyActive = root.dataset.rcCurrentSection === section;
         if (!activateSectionClientOnly(section, href, replace)) return false;
+
+        // v10.114: Favorites HTML may be older than the local favorite_schools pivot
+        // because favorite writes from Discover/Inbox intentionally use renderless
+        // Livewire calls. Re-render only this transition when Favorites is dirty.
+        // switchRecruitingSection() updates the server-side section to Favorites and
+        // causes one normal Livewire morph, so the newly favorited school appears
+        // immediately while every clean tab switch remains browser-only.
+        if (section === 'favorites' && window.__plyrRcFavoritesDirty) {
+            const livewireRoot = window.rcFindCoachDatabaseLivewireComponent
+                ? window.rcFindCoachDatabaseLivewireComponent(root)
+                : root.closest?.('[wire\:id]');
+            const wireId = livewireRoot?.getAttribute?.('wire:id');
+            const component = wireId && window.Livewire?.find ? window.Livewire.find(wireId) : null;
+
+            if (component && typeof component.call === 'function') {
+                window.__plyrRcFavoritesDirty = false;
+                Promise.resolve(component.call('switchRecruitingSection', 'favorites'))
+                    .catch(() => {
+                        window.__plyrRcFavoritesDirty = true;
+                    });
+            }
+        }
+
         if (alreadyActive || pendingSection === section) return true;
         // v10.113.20: keep sidebar navigation purely client-side. The old
         // renderless section-sync call still made Livewire morph the whole 16k-line
