@@ -1,3 +1,4 @@
+<x-filament-panels::page>
 @php
     // v10.113.14: keep the giant school catalog out of Inbox/template Livewire morphs.
     // The catalog is only seeded on sections that can actually open/search schools.
@@ -300,8 +301,6 @@
     $rcServicesUrl = \App\Filament\Pages\CoachDatabaseServices::getUrl();
     $rcReferralPoints = max(1, (int) config('plyrcard-referrals.inviter_points', 50));
 @endphp
-<div class="pc-coach-database-component-root-v1031" style="display: contents;">
-<x-filament-panels::page>
     <script data-navigate-once>
         (() => {
             const isRecruitingCenter = () => String(window.location.pathname || '').startsWith('/admin/coach-database');
@@ -18630,4 +18629,3 @@ if (window.__plyrPointsEnhancerInstalledV15) {
 })();
 </script>
 </x-filament-panels::page>
-</div>
