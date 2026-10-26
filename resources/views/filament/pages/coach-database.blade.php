@@ -17377,12 +17377,12 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         const alreadyActive = root.dataset.rcCurrentSection === section;
         if (!activateSectionClientOnly(section, href, replace)) return false;
 
-        // v10.114: Favorites HTML may be older than the local favorite_schools pivot
-        // because favorite writes from Discover/Inbox intentionally use renderless
-        // Livewire calls. Re-render only this transition when Favorites is dirty.
-        // switchRecruitingSection() updates the server-side section to Favorites and
-        // causes one normal Livewire morph, so the newly favorited school appears
-        // immediately while every clean tab switch remains browser-only.
+        // v10.115: Favorite writes are renderless, so Favorites can contain stale
+        // server-rendered HTML. Do not call switchRecruitingSection() here: that action
+        // intentionally returns early when PHP already thinks the component section is
+        // `favorites`, which can happen after the browser has switched away client-side.
+        // Instead, stage the public section property without a network request and force
+        // one Livewire refresh. This always re-reads favorite_schools when the panel is dirty.
         if (section === 'favorites' && window.__plyrRcFavoritesDirty) {
             const livewireRoot = window.rcFindCoachDatabaseLivewireComponent
                 ? window.rcFindCoachDatabaseLivewireComponent(root)
@@ -17390,12 +17390,21 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             const wireId = livewireRoot?.getAttribute?.('wire:id');
             const component = wireId && window.Livewire?.find ? window.Livewire.find(wireId) : null;
 
-            if (component && typeof component.call === 'function') {
+            if (component && typeof component.$refresh === 'function') {
                 window.__plyrRcFavoritesDirty = false;
-                Promise.resolve(component.call('switchRecruitingSection', 'favorites'))
-                    .catch(() => {
-                        window.__plyrRcFavoritesDirty = true;
-                    });
+                try {
+                    if (typeof component.$set === 'function') {
+                        component.$set('section', 'favorites', false);
+                    } else {
+                        component.section = 'favorites';
+                    }
+                    Promise.resolve(component.$refresh())
+                        .catch(() => {
+                            window.__plyrRcFavoritesDirty = true;
+                        });
+                } catch (_) {
+                    window.__plyrRcFavoritesDirty = true;
+                }
             }
         }
 
