@@ -34,7 +34,10 @@ class PlyrcardMailTransport
         $mailers = [];
 
         $defaultMailer = strtolower(trim((string) config('mail.default', '')));
-        if ($defaultMailer !== '' && ! in_array($defaultMailer, ['log', 'array'], true)) {
+        // Do not count log/array/failover-to-log as delivery. The default
+        // failover mailer in this repo includes "log", which can otherwise
+        // make an undelivered message look successful.
+        if ($defaultMailer !== '' && ! in_array($defaultMailer, ['log', 'array', 'failover'], true)) {
             $mailers[] = $defaultMailer;
         }
 
