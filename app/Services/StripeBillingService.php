@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use RuntimeException;
 class StripeBillingService
 {
@@ -154,6 +155,10 @@ class StripeBillingService
     }
     public function refreshRegistration(User $user, BillingInformation $billing): array
     {
+        $this->assertConfigured();
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         if ($billing->payment_status === 'paid') {
             return [
                 'paid' => true,
@@ -292,11 +297,16 @@ class StripeBillingService
     }
     public function upgradeStatus(User $user, string $planKey): array
     {
+        $this->assertConfigured();
         $user->refresh()->loadMissing('roles');
         $billing = BillingInformation::query()->where('user_id', $user->getKey())->latest('id')->first();
         if (! $billing) {
             return ['success' => true, 'completed' => false, 'message' => 'Waiting for Stripe payment confirmation…'];
         }
+
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         if (in_array($planKey, ['jumpstart', 'amplify'], true)) {
             $intentId = (string) data_get($billing->registration_meta ?? [], 'stripe_upgrade.' . $planKey . '.payment_intent_id', '');
             if ($intentId !== '') {
