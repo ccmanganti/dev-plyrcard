@@ -60,14 +60,28 @@ class PlayerReferralService
 
         $query = User::query()->whereRaw('UPPER(referral_code) = ?', [$code]);
 
-        // Keep previously shared referral links working after the readable-code
-        // refresh. Only one legacy code is needed because this is the first format
-        // migration for the referral system.
+        // Preserve the original human-readable referral code as an alias.
         if (Schema::hasColumn('users', 'legacy_referral_code')) {
             $query->orWhereRaw('UPPER(legacy_referral_code) = ?', [$code]);
         }
 
-        return $query->first();
+        $resolved = $query->first();
+        if ($resolved) {
+            return $resolved;
+        }
+
+        // The immediately previous format was INITIALS-USERID-LLEAGUEID
+        // (for example SU-1-L0). It can be resolved deterministically from the
+        // embedded user ID, so those already-shared links remain valid without
+        // consuming the single legacy_referral_code column.
+        if (preg_match('/^[A-Z]{1,3}-(\d+)-L\d+$/', $code, $matches)) {
+            $candidate = User::query()->find((int) $matches[1]);
+            if ($candidate && hash_equals($this->previousReadableCode($candidate), $code)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 
     public function registerReferral(?User $inviter, User $invitee, string $planKey): ?PlayerReferral
@@ -370,7 +384,29 @@ class PlayerReferralService
         $userId = max(1, (int) $user->getKey());
         $leagueId = max(0, (int) ($user->league_id ?? 0));
 
-        return $initials . '-' . $userId . '-L' . $leagueId;
+        return 'PLYR-' . $initials . $userId . 'L' . $leagueId;
+    }
+
+    protected function previousReadableCode(User $user): string
+    {
+        $first = Str::of((string) $user->first_name)
+            ->ascii()
+            ->upper()
+            ->replaceMatches('/[^A-Z0-9]/', '')
+            ->toString();
+        $last = Str::of((string) $user->last_name)
+            ->ascii()
+            ->upper()
+            ->replaceMatches('/[^A-Z0-9]/', '')
+            ->toString();
+
+        $initials = mb_substr($first, 0, 1) . mb_substr($last, 0, 1);
+        if (mb_strlen($initials) < 2) {
+            $initials = mb_substr($first . $last . 'PL', 0, 2);
+        }
+        $initials = $initials !== '' ? $initials : 'PL';
+
+        return $initials . '-' . max(1, (int) $user->getKey()) . '-L' . max(0, (int) ($user->league_id ?? 0));
     }
 
     protected function normalizePlanKey(mixed $value): string
