@@ -134,6 +134,28 @@ class CreditServiceRequestNotificationService
             ]))
             ->get();
 
+        // Always include the authenticated Superadmin who made the change.
+        // This is a guarded fallback for environments where the direct roles
+        // relationship query is scoped differently than hasRole().
+        try {
+            $actor = auth()->user();
+
+            if (
+                $actor instanceof User
+                && method_exists($actor, 'hasRole')
+                && (
+                    $actor->hasRole('Superadmin')
+                    || $actor->hasRole('superadmin')
+                    || $actor->hasRole('Super Admin')
+                )
+            ) {
+                $admins->prepend($actor);
+            }
+        } catch (\Throwable) {
+            // The role query above remains the source of truth when no auth
+            // context is available (for example CLI or background execution).
+        }
+
         $recipients = [];
         $seen = [];
 
