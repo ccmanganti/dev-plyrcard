@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 class TestPlyrcardSystemEmail extends Command
 {
     protected $signature = 'plyrcard:test-system-email {email}';
-    protected $description = 'Send a PLYRCARD system email using the hosting server native PHP mail() transport.';
+    protected $description = 'Send a PLYRCARD system email using the environment-aware delivery transport.';
 
     public function handle(PlyrcardSystemEmailService $systemEmail): int
     {
@@ -28,16 +28,16 @@ class TestPlyrcardSystemEmail extends Command
         $result = $systemEmail->sendTest($user);
 
         if ($result['success'] ?? false) {
-            $this->info('PHP mail() accepted the PLYRCARD system email for handoff.');
+            $this->info('PLYRCARD accepted the email through a deliverable transport.');
             $this->line('Recipient: ' . $email);
             $this->line('From: ' . ($result['from_email'] ?? 'n/a'));
-            $this->line('Envelope sender used: ' . (($result['used_envelope_sender'] ?? false) ? 'yes' : 'fallback without -f'));
+            $this->line('Transport: ' . ($result['transport'] ?? 'unknown'));
             $this->newLine();
-            $this->warn('mail() returning true means the local mail system accepted the message; final inbox delivery is still determined by the hosting mail server.');
+            $this->warn('The transport accepted the message; final inbox placement can still depend on the receiving mail provider.');
             return self::SUCCESS;
         }
 
-        $this->error('PHP mail() did not accept the PLYRCARD system email.');
+        $this->error('PLYRCARD could not deliver the system email through any available transport.');
         $this->line('Error: ' . ($result['error'] ?? 'Unknown error'));
         return self::FAILURE;
     }
