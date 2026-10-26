@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Services\PlyrcardSystemEmailService;
+use App\Services\CreditServiceRequestNotificationService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -87,32 +87,77 @@ class CreditServiceRequest extends Model
             }
         });
 
-        static::updated(function (CreditServiceRequest $request): void {
-            if (! $request->wasChanged('status')) {
+        /*
+         * A brand-new request already has its player-facing submission email in the
+         * checkout/submission flow. This hook adds the missing admin email without
+         * sending the player a duplicate message.
+         */
+        static::created(function (CreditServiceRequest $request): void {
+            if ((string) $request->status !== 'submitted') {
                 return;
             }
 
-            $status = (string) $request->status;
-            if ($status === 'submitted') {
-                // Submission already sends its own request-created notification.
-                return;
-            }
-
-            $previousStatus = (string) ($request->getOriginal('status') ?? '');
             $requestId = (int) $request->getKey();
 
-            $notifyPlayer = function () use ($requestId, $previousStatus): void {
+            $notifyAdmins = function () use ($requestId): void {
                 try {
                     $fresh = CreditServiceRequest::query()
-                        ->with('user')
+                        ->with(['user', 'managedBy'])
                         ->find($requestId);
 
                     if (! $fresh?->user) {
                         return;
                     }
 
-                    app(PlyrcardSystemEmailService::class)
-                        ->sendServiceRequestStatusUpdated($fresh, $previousStatus);
+                    app(CreditServiceRequestNotificationService::class)
+                        ->notifyAdminsOfNewSubmission($fresh);
+                } catch (\Throwable $exception) {
+                    Log::warning('PLYRCARD new service-request admin notification failed.', [
+                        'request_id' => $requestId,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            };
+
+            if (DB::transactionLevel() > 0) {
+                DB::afterCommit($notifyAdmins);
+            } else {
+                $notifyAdmins();
+            }
+        });
+
+        /*
+         * Every actual status transition is notification-worthy, regardless of
+         * direction. That includes moving a request backwards, such as:
+         * Completed -> In Progress, In Progress -> Pending Information, or
+         * Reviewed -> Submitted.
+         */
+        static::updated(function (CreditServiceRequest $request): void {
+            if (! $request->wasChanged('status')) {
+                return;
+            }
+
+            $previousStatus = trim((string) ($request->getOriginal('status') ?? ''));
+            $currentStatus = trim((string) $request->status);
+
+            if ($currentStatus === '' || $previousStatus === $currentStatus) {
+                return;
+            }
+
+            $requestId = (int) $request->getKey();
+
+            $notifyEveryone = function () use ($requestId, $previousStatus): void {
+                try {
+                    $fresh = CreditServiceRequest::query()
+                        ->with(['user', 'managedBy'])
+                        ->find($requestId);
+
+                    if (! $fresh?->user) {
+                        return;
+                    }
+
+                    app(CreditServiceRequestNotificationService::class)
+                        ->notifyStatusChanged($fresh, $previousStatus);
                 } catch (\Throwable $exception) {
                     Log::warning('PLYRCARD service-request status notification failed.', [
                         'request_id' => $requestId,
@@ -123,9 +168,9 @@ class CreditServiceRequest extends Model
             };
 
             if (DB::transactionLevel() > 0) {
-                DB::afterCommit($notifyPlayer);
+                DB::afterCommit($notifyEveryone);
             } else {
-                $notifyPlayer();
+                $notifyEveryone();
             }
         });
     }
