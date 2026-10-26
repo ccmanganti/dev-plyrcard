@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Filament\Resources\CreditServiceRequests\CreditServiceRequestResource;
 use App\Models\CreditServiceRequest;
-use App\Models\User;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -196,7 +195,7 @@ class CreditServiceRequestNotificationService
         ?string $previousStatus,
         bool $initialSubmission,
     ): array {
-        $recipients = $this->adminRecipients($request->user);
+        $recipients = $this->adminRecipients();
 
         if ($recipients === []) {
             Log::warning('PLYRCARD credit-request notification has no admin recipients.', [
@@ -241,64 +240,17 @@ class CreditServiceRequestNotificationService
     }
 
     /**
-     * Match the same roles that are currently allowed to manage the Filament
-     * Credit Requests resource. This keeps admin email recipients aligned with
-     * actual administrative access.
+     * Use the exact same global admin-alert recipients configured under
+     * Support Tickets -> System Settings. This is the single source of truth
+     * for internal PLYRCARD alert emails across the admin.
      */
-    protected function adminRecipients(?User $player = null): array
+    protected function adminRecipients(): array
     {
-        $admins = User::query()
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', [
-                'Superadmin',
-                'superadmin',
-                'Super Admin',
-            ]))
-            ->get();
+        $emails = app(SupportAlertService::class)->adminRecipients();
 
-        // Always include the authenticated Superadmin who made the change.
-        // This is a guarded fallback for environments where the direct roles
-        // relationship query is scoped differently than hasRole().
-        try {
-            $actor = auth()->user();
-
-            if (
-                $actor instanceof User
-                && method_exists($actor, 'hasRole')
-                && (
-                    $actor->hasRole('Superadmin')
-                    || $actor->hasRole('superadmin')
-                    || $actor->hasRole('Super Admin')
-                )
-            ) {
-                $admins->prepend($actor);
-            }
-        } catch (\Throwable) {
-            // The role query above remains the source of truth when no auth
-            // context is available (for example CLI or background execution).
-        }
-
-        $recipients = [];
-        $seen = [];
-
-        foreach ($admins as $admin) {
-            $recipient = $this->firstValidEmail([
-                $admin->email,
-                $admin->personal_email,
-            ]);
-
-            // Do not exclude the player address here. A Superadmin can also own a
-            // test/player request (as in dev), and the requirement is that both the
-            // player notification and the admin notification are sent. In that case
-            // the same mailbox intentionally receives the two role-specific emails.
-            if ($recipient === null || isset($seen[$recipient])) {
-                continue;
-            }
-
-            $seen[$recipient] = true;
-            $recipients[(string) $admin->getKey()] = $recipient;
-        }
-
-        return $recipients;
+        return collect($emails)
+            ->mapWithKeys(fn (string $email): array => [$email => $email])
+            ->all();
     }
 
     protected function adminEmailHtml(
