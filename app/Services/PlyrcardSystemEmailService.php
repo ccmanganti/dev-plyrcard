@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\Website;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\View;
 
 class PlyrcardSystemEmailService
@@ -653,29 +654,77 @@ class PlyrcardSystemEmailService
 
     protected function sendHtml(User $user, string $recipient, string $subject, string $html, string $purpose): array
     {
-        if (! function_exists('mail') || ! is_callable('mail')) {
-            $result = [
-                'success' => false,
-                'error' => 'PHP mail() is not available on this server.',
-            ];
-
-            $this->logFailure($user, $recipient, $subject, $purpose, $result);
-
-            return $result;
-        }
-
         $recipient = $this->sanitizeEmail($recipient);
-        $fromEmail = $this->sanitizeEmail(PlyrcardMailSender::email());
-        $fromName = PlyrcardMailSender::name();
+        $configuredFrom = $this->sanitizeEmail((string) config('mail.from.address'));
+        $fromEmail = ($configuredFrom && ! str_ends_with($configuredFrom, '@example.com'))
+            ? $configuredFrom
+            : $this->sanitizeEmail(PlyrcardMailSender::email());
+        $fromName = trim((string) config('mail.from.name')) ?: PlyrcardMailSender::name();
         $subject = $this->sanitizeHeaderValue($subject);
 
         if ($recipient === null || $fromEmail === null || $subject === '') {
             $result = [
                 'success' => false,
+                'recipient' => $recipient,
                 'error' => 'The recipient, sender, or subject is invalid.',
             ];
 
             $this->logFailure($user, $recipient ?? '', $subject, $purpose, $result);
+
+            return $result;
+        }
+
+        $mailer = strtolower(trim((string) config('mail.default', '')));
+        $laravelError = null;
+
+        if ($mailer !== '' && ! in_array($mailer, ['log', 'array'], true)) {
+            try {
+                Mail::html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
+                    $message->to($recipient)
+                        ->from($fromEmail, $fromName)
+                        ->replyTo($fromEmail, $fromName)
+                        ->subject($subject);
+                });
+
+                Log::info('PLYRCARD system email sent through Laravel mailer.', [
+                    'purpose' => $purpose,
+                    'user_id' => $user->getKey(),
+                    'recipient' => $recipient,
+                    'from_email' => $fromEmail,
+                    'subject' => $subject,
+                    'mailer' => $mailer,
+                    'host' => PlyrcardMailSender::currentHost(),
+                ]);
+
+                return [
+                    'success' => true,
+                    'transport' => 'laravel_' . $mailer,
+                    'recipient' => $recipient,
+                    'from_email' => $fromEmail,
+                ];
+            } catch (\Throwable $exception) {
+                $laravelError = $exception->getMessage();
+
+                Log::warning('PLYRCARD configured mailer rejected system email; trying PHP mail fallback.', [
+                    'purpose' => $purpose,
+                    'user_id' => $user->getKey(),
+                    'recipient' => $recipient,
+                    'mailer' => $mailer,
+                    'error' => $laravelError,
+                ]);
+            }
+        }
+
+        if (! function_exists('mail') || ! is_callable('mail')) {
+            $result = [
+                'success' => false,
+                'recipient' => $recipient,
+                'error' => $laravelError
+                    ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail() is unavailable.'
+                    : 'PHP mail() is not available on this server.',
+            ];
+
+            $this->logFailure($user, $recipient, $subject, $purpose, $result);
 
             return $result;
         }
@@ -760,10 +809,14 @@ class PlyrcardSystemEmailService
             ];
         }
 
+        $phpError = $this->mailErrorMessage($firstError, $fallbackError);
         $result = [
             'success' => false,
             'transport' => 'php_mail',
-            'error' => $this->mailErrorMessage($firstError, $fallbackError),
+            'recipient' => $recipient,
+            'error' => $laravelError
+                ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail fallback failed: ' . $phpError
+                : $phpError,
         ];
 
         $this->logFailure($user, $recipient, $subject, $purpose, $result);
