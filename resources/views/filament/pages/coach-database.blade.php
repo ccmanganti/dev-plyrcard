@@ -1,3 +1,4 @@
+<plyr-coach-database-root class="pc-coach-database-livewire-root-v200" style="display: contents;">
 <x-filament-panels::page>
 @php
     // v10.113.14: keep the giant school catalog out of Inbox/template Livewire morphs.
@@ -18646,3 +18647,4 @@ if (window.__plyrPointsEnhancerInstalledV15) {
 })();
 </script>
 </x-filament-panels::page>
+</plyr-coach-database-root>
