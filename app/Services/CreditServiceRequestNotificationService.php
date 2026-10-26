@@ -6,7 +6,6 @@ use App\Filament\Resources\CreditServiceRequests\CreditServiceRequestResource;
 use App\Models\CreditServiceRequest;
 use App\Support\PlyrcardMailSender;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class CreditServiceRequestNotificationService
@@ -375,213 +374,22 @@ class CreditServiceRequestNotificationService
         string $html,
         string $purpose,
     ): array {
-        $recipient = $this->sanitizeEmail($recipient);
-        $configuredFrom = $this->sanitizeEmail((string) config('mail.from.address'));
-        $fromEmail = ($configuredFrom && ! str_ends_with($configuredFrom, '@example.com'))
-            ? $configuredFrom
-            : $this->sanitizeEmail('support@plyrcard.com');
-        $fromName = trim((string) config('mail.from.name')) ?: PlyrcardMailSender::name();
-        $subject = trim(str_replace(["\r", "\n"], ' ', $subject));
-
-        if ($recipient === null || $fromEmail === null || $subject === '') {
-            $result = [
-                'success' => false,
-                'recipient' => $recipient,
-                'error' => 'The recipient, sender, or subject is invalid.',
-            ];
-            $this->logAdminFailure($request, $recipient ?? '', $subject, $purpose, $result);
-
-            return $result;
-        }
-
-        // Prefer Laravel's configured mail transport (SMTP / sendmail / provider)
-        // when one is actually configured. Dev/test/live can therefore use their
-        // own transport settings. Log/array mailers are intentionally skipped
-        // because they do not deliver real email.
-        $mailer = strtolower(trim((string) config('mail.default', '')));
-        $laravelError = null;
-
-        if ($mailer !== '' && ! in_array($mailer, ['log', 'array'], true)) {
-            try {
-                Mail::html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
-                    $message->to($recipient)
-                        ->from($fromEmail, $fromName)
-                        ->replyTo($fromEmail, $fromName)
-                        ->subject($subject);
-                });
-
-                Log::info('PLYRCARD credit-request admin email sent through Laravel mailer.', [
-                    'purpose' => $purpose,
-                    'request_id' => $request->getKey(),
-                    'user_id' => $request->user_id,
-                    'recipient' => $recipient,
-                    'from_email' => $fromEmail,
-                    'subject' => $subject,
-                    'mailer' => $mailer,
-                    'host' => PlyrcardMailSender::currentHost(),
-                ]);
-
-                return [
-                    'success' => true,
-                    'transport' => 'laravel_' . $mailer,
-                    'recipient' => $recipient,
-                ];
-            } catch (\Throwable $exception) {
-                $laravelError = $exception->getMessage();
-
-                Log::warning('PLYRCARD configured mailer rejected credit-request admin email; trying PHP mail fallback.', [
-                    'purpose' => $purpose,
-                    'request_id' => $request->getKey(),
-                    'recipient' => $recipient,
-                    'mailer' => $mailer,
-                    'error' => $laravelError,
-                ]);
-            }
-        }
-
-        // Shared hosting often exposes sendmail even when PHP mail() is
-        // disabled. Try Laravel's sendmail transport before native mail().
-        if ($mailer !== 'sendmail') {
-            try {
-                Mail::mailer('sendmail')->html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
-                    $message->to($recipient)
-                        ->from($fromEmail, $fromName)
-                        ->replyTo($fromEmail, $fromName)
-                        ->subject($subject);
-                });
-
-                Log::info('PLYRCARD credit-request admin email sent through sendmail fallback.', [
-                    'purpose' => $purpose,
-                    'request_id' => $request->getKey(),
-                    'recipient' => $recipient,
-                    'from_email' => $fromEmail,
-                    'subject' => $subject,
-                    'host' => PlyrcardMailSender::currentHost(),
-                ]);
-
-                return [
-                    'success' => true,
-                    'transport' => 'laravel_sendmail',
-                    'recipient' => $recipient,
-                ];
-            } catch (\Throwable $exception) {
-                $sendmailError = $exception->getMessage();
-
-                Log::warning('PLYRCARD sendmail fallback rejected credit-request admin email.', [
-                    'purpose' => $purpose,
-                    'request_id' => $request->getKey(),
-                    'recipient' => $recipient,
-                    'error' => $sendmailError,
-                ]);
-
-                $laravelError = collect([$laravelError, $sendmailError])
-                    ->filter()
-                    ->implode(' | ');
-            }
-        }
-
-        if (! function_exists('mail') || ! is_callable('mail')) {
-            $result = [
-                'success' => false,
-                'recipient' => $recipient,
-                'error' => $laravelError
-                    ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail() is unavailable.'
-                    : 'PHP mail() is not available on this server.',
-            ];
-            $this->logAdminFailure($request, $recipient, $subject, $purpose, $result);
-
-            return $result;
-        }
-
-        $plainText = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8')) ?? '');
-        $boundary = 'plyrcard_credit_' . bin2hex(random_bytes(16));
-
-        $headers = [
-            'MIME-Version: 1.0',
-            'From: ' . $fromName . ' <' . $fromEmail . '>',
-            'Reply-To: ' . $fromEmail,
-            'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
-            'X-Mailer: PLYRCARD PHP/' . PHP_VERSION,
-        ];
-
-        $message = '--' . $boundary . "\r\n"
-            . "Content-Type: text/plain; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-            . $plainText . "\r\n"
-            . '--' . $boundary . "\r\n"
-            . "Content-Type: text/html; charset=UTF-8\r\n"
-            . "Content-Transfer-Encoding: 8bit\r\n\r\n"
-            . $html . "\r\n"
-            . '--' . $boundary . '--';
-
-        $headerString = implode("\r\n", $headers);
-        $envelopeParameter = '-f' . $fromEmail;
-
-        $sentWithEnvelope = false;
-        $sentWithoutEnvelope = false;
-        $firstError = null;
-        $fallbackError = null;
-
-        try {
-            $sentWithEnvelope = @mail(
-                $recipient,
-                $subject,
-                $message,
-                $headerString,
-                $envelopeParameter,
-            );
-            $firstError = error_get_last();
-        } catch (\Throwable $exception) {
-            $firstError = ['message' => $exception->getMessage()];
-        }
-
-        if (! $sentWithEnvelope) {
-            try {
-                $sentWithoutEnvelope = @mail(
-                    $recipient,
-                    $subject,
-                    $message,
-                    $headerString,
-                );
-                $fallbackError = error_get_last();
-            } catch (\Throwable $exception) {
-                $fallbackError = ['message' => $exception->getMessage()];
-            }
-        }
-
-        $sent = $sentWithEnvelope || $sentWithoutEnvelope;
-
-        if ($sent) {
-            Log::info('PLYRCARD credit-request admin email handed to native PHP mail().', [
+        $result = app(PlyrcardMailTransport::class)->sendHtml(
+            recipient: $recipient,
+            subject: $subject,
+            html: $html,
+            replyTo: PlyrcardMailSender::email(),
+            context: [
                 'purpose' => $purpose,
                 'request_id' => $request->getKey(),
                 'user_id' => $request->user_id,
-                'recipient' => $recipient,
-                'from_email' => $fromEmail,
-                'subject' => $subject,
-                'host' => PlyrcardMailSender::currentHost(),
-                'used_envelope_sender' => $sentWithEnvelope,
-            ]);
+                'notification_audience' => 'admin',
+            ],
+        );
 
-            return [
-                'success' => true,
-                'transport' => 'php_mail',
-                'recipient' => $recipient,
-                'used_envelope_sender' => $sentWithEnvelope,
-            ];
+        if (! ($result['success'] ?? false)) {
+            $this->logAdminFailure($request, $recipient, $subject, $purpose, $result);
         }
-
-        $phpError = $this->mailErrorMessage($firstError, $fallbackError);
-        $result = [
-            'success' => false,
-            'transport' => 'php_mail',
-            'recipient' => $recipient,
-            'error' => $laravelError
-                ? 'Configured mailer failed: ' . $laravelError . ' | PHP mail fallback failed: ' . $phpError
-                : $phpError,
-        ];
-
-        $this->logAdminFailure($request, $recipient, $subject, $purpose, $result);
 
         return $result;
     }
