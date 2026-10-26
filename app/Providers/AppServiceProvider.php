@@ -4,13 +4,16 @@ namespace App\Providers;
 
 use App\Http\Controllers\PlyrPointServiceAdminController;
 use App\Http\Controllers\PlyrPointsHistoryController;
+use App\Models\BillingInformation;
 use App\Models\User;
 use App\Models\Website;
 use App\Observers\UserObserver;
 use App\Observers\WebsiteObserver;
 use App\Http\Responses\LoginResponse as PlyrCardLoginResponse;
+use App\Services\PlayerReferralService;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,6 +32,25 @@ class AppServiceProvider extends ServiceProvider
 
         User::observe(UserObserver::class);
         Website::observe(WebsiteObserver::class);
+
+        // Referral rewards are tied to a proven paid My Journey entitlement, not
+        // to merely submitting a referral code. The service is idempotent, so
+        // recurring billing saves/webhook retries cannot issue duplicate points.
+        BillingInformation::saved(function (BillingInformation $billing): void {
+            if (strtolower(trim((string) $billing->payment_status)) !== 'paid') {
+                return;
+            }
+
+            try {
+                app(PlayerReferralService::class)->qualifyBilling($billing);
+            } catch (\Throwable $exception) {
+                Log::warning('PLYRCARD referral qualification failed after billing update.', [
+                    'billing_id' => $billing->getKey(),
+                    'user_id' => $billing->user_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        });
 
         // PLYR Points routes live in the always-loaded AppServiceProvider so the
         // admin settings view can resolve its named routes reliably on every request.

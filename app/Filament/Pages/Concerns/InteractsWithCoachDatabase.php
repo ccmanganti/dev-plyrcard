@@ -8036,13 +8036,6 @@ public function loadTemplateDetail(string $templateId): ?array
                         VIEW MY PLAYER PROFILE
                     </a>
                 </div>
-
-                <div style="font-size:11px;line-height:1.25;font-weight:600;letter-spacing:.9px;text-transform:uppercase;color:#6b7280;">
-                    POWERED BY
-                    <span style="color:#050816;font-weight:600;">PLYR</span><span style="color:#ff4f3f;font-weight:600;">CARD</span>
-                    <span style="color:#9ca3af;padding:0 5px;font-weight:400;">•</span>
-                    DON'T LET COACHES MISS YOU.
-                </div>
             </td>
         </tr>
     </table>

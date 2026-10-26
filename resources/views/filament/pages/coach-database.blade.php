@@ -272,6 +272,31 @@
     $rcAmplifyPoints = app(\App\Services\CreditPointService::class)->packagePoints('amplify');
     $rcJumpstartPriceCents = (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900);
     $rcAmplifyPriceCents = (int) config('plyrcard-registration.plans.amplify.setup_fee_cents', 50000);
+
+    // Dashboard referral + compact PLYR Points cards. Referral qualification is
+    // database-backed and awards points only after paid My Journey activation.
+    $rcReferralData = [
+        'code' => '',
+        'link' => '',
+        'invited' => 0,
+        'qualified' => 0,
+        'points_earned' => 0,
+        'rows' => collect(),
+        'enabled' => false,
+    ];
+    if ($rcCatalogUser) {
+        try {
+            $rcReferralData = app(\App\Services\PlayerReferralService::class)->dashboardData($rcCatalogUser);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+    $rcDashboardPointServices = collect($rcCreditCatalog)->take(4);
+    $rcDashboardActiveRequest = $rcSupportCreditRequests
+        ->whereIn('status', ['submitted', 'reviewed', 'in_progress'])
+        ->first();
+    $rcServicesUrl = \App\Filament\Pages\CoachDatabaseServices::getUrl();
+    $rcReferralPoints = max(1, (int) config('plyrcard-referrals.inviter_points', 50));
 @endphp
 <div class="pc-coach-database-component-root-v1031" style="display: contents;">
 <x-filament-panels::page>
@@ -7605,6 +7630,138 @@ discoverSelectedIds: [],
                         .rc-email-saved-refresh-dot-v148 { animation: none; opacity: .72; }
                     }
                 </style>
+                <style id="rc-dashboard-points-referrals-v150">
+                    .rc-dashboard-feature-stack-v150{display:grid;gap:1.05rem;margin-bottom:1.05rem}
+                    .rc-dashboard-points-v150,.rc-dashboard-referral-v150{background:#fff;border:1px solid #e4e8ee;border-radius:16px;overflow:hidden;box-shadow:0 10px 28px rgba(15,23,42,.035)}
+                    .dark .rc-dashboard-points-v150,.dark .rc-dashboard-referral-v150{background:#171a20;border-color:#2b3039}
+                    .rc-dashboard-points-v150{display:grid;grid-template-columns:minmax(250px,.72fr) minmax(0,1.45fr);padding:1rem}
+                    .rc-dashboard-points-balance-v150{padding:.25rem 1rem .25rem .15rem;border-right:1px solid #edf0f4;display:flex;flex-direction:column;min-width:0}
+                    .dark .rc-dashboard-points-balance-v150{border-right-color:#2b3039}
+                    .rc-dashboard-kicker-v150{display:flex;align-items:center;gap:.48rem;flex-wrap:wrap;margin-bottom:.65rem}
+                    .rc-dashboard-kicker-v150 h2{font-size:1rem;font-weight:800;margin:0;color:#17191f}
+                    .dark .rc-dashboard-kicker-v150 h2{color:#f8fafc}
+                    .rc-dashboard-chip-v150{display:inline-flex;align-items:center;padding:.23rem .48rem;border-radius:999px;background:#eaf7ef;color:#287a48;font-size:.62rem;font-weight:800;line-height:1}
+                    .rc-dashboard-points-number-v150{display:flex;align-items:flex-end;gap:.45rem;margin:.1rem 0 .55rem;color:#c94420}
+                    .rc-dashboard-points-number-v150 strong{font-size:2.7rem;line-height:.92;font-weight:900;letter-spacing:-.055em}
+                    .rc-dashboard-points-number-v150 span{font-size:.66rem;font-weight:700;padding-bottom:.28rem;color:#4b5563}
+                    .dark .rc-dashboard-points-number-v150 span{color:#aeb7c5}
+                    .rc-dashboard-points-meter-v150{display:flex;height:.38rem;border-radius:999px;overflow:hidden;background:#e8ebef;margin:.15rem 0 .42rem}
+                    .rc-dashboard-points-meter-v150 span:nth-child(1){background:#c8ccd2}.rc-dashboard-points-meter-v150 span:nth-child(2){background:#e7a08d}.rc-dashboard-points-meter-v150 span:nth-child(3){background:#ff6338}
+                    .rc-dashboard-points-legend-v150{display:flex;gap:.62rem;flex-wrap:wrap;font-size:.61rem;color:#6b7280}
+                    .rc-dashboard-points-legend-v150 span{display:inline-flex;align-items:center;gap:.27rem}.rc-dashboard-points-legend-v150 i{width:.34rem;height:.34rem;border-radius:1px;background:#c8ccd2}.rc-dashboard-points-legend-v150 span:nth-child(2) i{background:#e7a08d}.rc-dashboard-points-legend-v150 span:nth-child(3) i{background:#ff6338}
+                    .rc-dashboard-points-actions-v150{display:flex;gap:.5rem;margin-top:auto;padding-top:.9rem}
+                    .rc-dashboard-points-actions-v150 a{flex:1;min-height:2.3rem;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;font-size:.7rem;font-weight:800;border:1px solid #dde2e8;color:#17191f;background:#fff}
+                    .rc-dashboard-points-actions-v150 a:first-child{background:#ff6338;border-color:#ff6338;color:#fff}
+                    .dark .rc-dashboard-points-actions-v150 a:not(:first-child){background:#191d24;border-color:#323844;color:#f8fafc}
+                    .rc-dashboard-services-v150{padding:.25rem .15rem .15rem 1rem;min-width:0}
+                    .rc-dashboard-services-head-v150{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.6rem}.rc-dashboard-services-head-v150 strong{font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;color:#5f6773}.rc-dashboard-services-head-v150 span{font-size:.61rem;color:#7b8491}
+                    .rc-dashboard-services-grid-v150{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem}
+                    .rc-dashboard-service-v150{display:flex;flex-direction:column;min-width:0;padding:.75rem;border:1px solid #edf0f4;border-radius:11px;background:#fbfbfc}
+                    .dark .rc-dashboard-service-v150{background:#111419;border-color:#2a3039}
+                    .rc-dashboard-service-v150 strong{font-size:.72rem;line-height:1.15;color:#20242b;min-height:2.1em}.dark .rc-dashboard-service-v150 strong{color:#f5f7fa}
+                    .rc-dashboard-service-v150 .price{font-size:1rem;font-weight:900;color:#17191f;margin:.35rem 0 .48rem}.dark .rc-dashboard-service-v150 .price{color:#fff}.rc-dashboard-service-v150 .price small{font-size:.58rem;font-weight:700;color:#6b7280}
+                    .rc-dashboard-service-v150 .request{display:flex;align-items:center;justify-content:center;min-height:2rem;background:#fff;border:1px solid #dde2e8;border-radius:8px;text-decoration:none;color:#20242b;font-size:.64rem;font-weight:800}.dark .rc-dashboard-service-v150 .request{background:#191d24;border-color:#343a45;color:#fff}
+                    .rc-dashboard-service-v150 .sample{display:flex;align-items:center;justify-content:center;gap:.25rem;margin-top:.42rem;text-decoration:none;color:#b94b2c;font-size:.59rem;font-weight:750}
+                    .rc-dashboard-production-v150{grid-column:1/-1;margin-top:.55rem;padding:.46rem .62rem;border-radius:8px;background:#fff7f4;color:#6f3729;font-size:.61rem}.dark .rc-dashboard-production-v150{background:#251914;color:#f2b3a2}
+                    .rc-dashboard-referral-v150{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,.88fr);padding:1rem}
+                    .rc-referral-left-v150{padding:.1rem 1.3rem .1rem .1rem;border-right:1px solid #edf0f4}.dark .rc-referral-left-v150{border-right-color:#2b3039}
+                    .rc-referral-title-v150{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}.rc-referral-title-v150 h2{font-size:1rem;font-weight:850;margin:0;color:#17191f}.dark .rc-referral-title-v150 h2{color:#fff}.rc-referral-title-v150 span{padding:.25rem .5rem;border-radius:999px;background:#fff0eb;color:#bc4d2d;font-size:.62rem;font-weight:850}
+                    .rc-referral-copy-v150{font-size:.72rem;line-height:1.5;color:#505866;margin:.45rem 0 .7rem}.dark .rc-referral-copy-v150{color:#b5bdc9}
+                    .rc-referral-label-v150{display:block;margin:0 0 .27rem;font-size:.59rem;font-weight:850;letter-spacing:.1em;text-transform:uppercase;color:#727986}
+                    .rc-referral-codebox-v150{display:flex;align-items:center;justify-content:space-between;gap:.7rem;border:1px dashed #ff9d82;border-radius:10px;padding:.62rem .7rem;background:#fffaf8;margin-bottom:.62rem}.dark .rc-referral-codebox-v150{background:#211815}.rc-referral-codebox-v150 code{font-size:1.05rem;font-weight:900;letter-spacing:.08em;color:#b84727}.rc-referral-codebox-v150 button,.rc-referral-linkrow-v150 button{border:1px solid #dce1e8;border-radius:8px;background:#fff;min-height:2rem;padding:0 .72rem;font-size:.64rem;font-weight:800;cursor:pointer;color:#20242b}.dark .rc-referral-codebox-v150 button,.dark .rc-referral-linkrow-v150 button{background:#1a1e25;border-color:#373e49;color:#fff}
+                    .rc-referral-linkrow-v150{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.45rem}.rc-referral-linkrow-v150 input{min-width:0;border:1px solid #dde2e8;border-radius:8px;background:#f9fafb;padding:.55rem .66rem;font-size:.64rem;color:#333b46}.dark .rc-referral-linkrow-v150 input{background:#111419;border-color:#343a45;color:#e9edf3}.rc-referral-linkrow-v150 button{background:#e96a49;border-color:#e96a49;color:#fff}
+                    .rc-referral-share-v150{display:flex;gap:.5rem;margin:.62rem 0}.rc-referral-share-v150 a{display:inline-flex;align-items:center;justify-content:center;min-height:2rem;padding:0 .7rem;border:1px solid #dde2e8;border-radius:8px;text-decoration:none;color:#252b34;font-size:.62rem;font-weight:750}.dark .rc-referral-share-v150 a{border-color:#343a45;color:#eef2f7}
+                    .rc-referral-rules-v150{display:flex;gap:.9rem;flex-wrap:wrap;border-top:1px solid #edf0f4;padding-top:.58rem;font-size:.59rem;color:#505866}.dark .rc-referral-rules-v150{border-top-color:#2b3039;color:#aeb7c5}.rc-referral-rules-v150 span{display:inline-flex;align-items:center;gap:.32rem}.rc-referral-rules-v150 b{display:inline-flex;width:1.1rem;height:1.1rem;border-radius:50%;align-items:center;justify-content:center;background:#e96948;color:#fff;font-size:.56rem}
+                    .rc-referral-right-v150{padding:.1rem .1rem .1rem 1.3rem}.rc-referral-metrics-v150{display:grid;grid-template-columns:repeat(3,1fr);gap:.45rem;margin-bottom:.65rem}.rc-referral-metric-v150{padding:.62rem;border:1px solid #edf0f4;border-radius:10px;background:#fafbfc}.dark .rc-referral-metric-v150{background:#111419;border-color:#2a3039}.rc-referral-metric-v150 strong{display:block;font-size:1.15rem;line-height:1;color:#17191f}.dark .rc-referral-metric-v150 strong{color:#fff}.rc-referral-metric-v150 span{display:block;margin-top:.2rem;font-size:.57rem;line-height:1.15;color:#6d7580}.rc-referral-metric-v150.is-points{border-color:#ffd6ca;background:#fff8f5}.dark .rc-referral-metric-v150.is-points{background:#231713}.rc-referral-metric-v150.is-points strong{color:#b84727}
+                    .rc-referral-subhead-v150{font-size:.58rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase;color:#727986;margin-bottom:.35rem}.rc-referral-list-v150{display:grid;gap:.34rem}.rc-referral-row-v150{display:grid;grid-template-columns:1.65rem minmax(0,1fr) auto;gap:.5rem;align-items:center;padding:.48rem .55rem;border:1px solid #edf0f4;border-radius:9px;background:#fbfbfc}.dark .rc-referral-row-v150{background:#111419;border-color:#2a3039}.rc-referral-avatar-v150{display:flex;align-items:center;justify-content:center;width:1.65rem;height:1.65rem;border-radius:50%;background:#f0f1f3;color:#5a616b;font-size:.56rem;font-weight:850}.rc-referral-row-v150 strong{display:block;font-size:.64rem;color:#20242b}.dark .rc-referral-row-v150 strong{color:#f5f7fa}.rc-referral-row-v150 small{display:block;margin-top:.06rem;font-size:.54rem;color:#7b8491}.rc-referral-badge-v150{padding:.25rem .45rem;border-radius:999px;font-size:.54rem;font-weight:850;white-space:nowrap}.rc-referral-badge-v150.is-earned{background:#e8f6ed;color:#2c7a47}.rc-referral-badge-v150.is-free{background:#fff3db;color:#9d6514}.rc-referral-badge-v150.is-pending{background:#eef0f3;color:#5d6570}.rc-referral-note-v150{font-size:.56rem;color:#727986;margin-top:.42rem}
+                    .rc-referral-empty-v150{padding:.7rem;border:1px dashed #dfe3e8;border-radius:9px;font-size:.62rem;color:#737b87;text-align:center}
+                    @media(max-width:1000px){.rc-dashboard-points-v150,.rc-dashboard-referral-v150{grid-template-columns:1fr}.rc-dashboard-points-balance-v150,.rc-referral-left-v150{border-right:0;border-bottom:1px solid #edf0f4;padding-right:.1rem;padding-bottom:1rem}.dark .rc-dashboard-points-balance-v150,.dark .rc-referral-left-v150{border-bottom-color:#2b3039}.rc-dashboard-services-v150,.rc-referral-right-v150{padding:1rem .1rem .1rem}.rc-dashboard-services-grid-v150{grid-template-columns:repeat(2,minmax(0,1fr))}}
+                    @media(max-width:600px){.rc-dashboard-services-grid-v150{grid-template-columns:1fr 1fr}.rc-referral-metrics-v150{grid-template-columns:repeat(3,minmax(0,1fr))}.rc-referral-rules-v150{display:grid;gap:.45rem}.rc-dashboard-points-actions-v150{flex-direction:column}}
+                </style>
+                <div class="rc-dashboard-feature-stack-v150">
+                    <section class="rc-dashboard-points-v150" aria-label="PLYR Points">
+                        <div class="rc-dashboard-points-balance-v150">
+                            <div class="rc-dashboard-kicker-v150"><h2>PLYR Points</h2><span class="rc-dashboard-chip-v150">Never expire</span></div>
+                            <div class="rc-dashboard-points-number-v150"><strong>{{ number_format($rcCreditBalance) }}</strong><span>points available</span></div>
+                            <div class="rc-dashboard-points-meter-v150" aria-label="Points balance breakdown"><span style="width:{{ $rcPointSettledPct }}%"></span><span style="width:{{ $rcPointProductionPct }}%"></span><span style="width:{{ $rcPointAvailablePct }}%"></span></div>
+                            <div class="rc-dashboard-points-legend-v150"><span><i></i>{{ number_format($rcPointSettledUsedTotal) }} used</span><span><i></i>{{ number_format($rcPointInProductionTotal) }} in production</span><span><i></i>{{ number_format($rcCreditBalance) }} available</span></div>
+                            <div class="rc-dashboard-points-actions-v150"><a href="{{ $rcServicesUrl }}?buy=1">Buy points</a><a href="{{ $rcServicesUrl }}?history=1">View history</a></div>
+                        </div>
+                        <div class="rc-dashboard-services-v150">
+                            <div class="rc-dashboard-services-head-v150"><strong>Spend your points</strong><span>Use points on the services you need</span></div>
+                            <div class="rc-dashboard-services-grid-v150">
+                                @foreach($rcDashboardPointServices as $serviceKey => $serviceItem)
+                                    <article class="rc-dashboard-service-v150">
+                                        <strong>{{ $serviceItem['name'] ?? 'PLYR service' }}</strong>
+                                        <div class="price">{{ number_format((int) ($serviceItem['points'] ?? 0)) }} <small>pts</small></div>
+                                        <a class="request" href="{{ $rcServicesUrl }}?service={{ urlencode((string) $serviceKey) }}">{{ str_contains(strtolower((string) ($serviceItem['cta'] ?? '')), 'book') ? 'Book' : 'Request' }}</a>
+                                        @if(!empty($serviceItem['samples']))<a class="sample" href="{{ $rcServicesUrl }}?sample={{ urlencode((string) $serviceKey) }}">◎ See sample</a>@endif
+                                    </article>
+                                @endforeach
+                                @if($rcDashboardActiveRequest)
+                                    <div class="rc-dashboard-production-v150"><strong>● In production:</strong> {{ $rcDashboardActiveRequest->item_name }} · {{ number_format((int) $rcDashboardActiveRequest->points_spent) }} pts · {{ $rcDashboardActiveRequest->statusLabel() }}</div>
+                                @endif
+                            </div>
+                        </div>
+                    </section>
+
+                    @if($rcReferralData['enabled'] ?? false)
+                        @php
+                            $rcReferralInviteText = 'Join me on PLYRCARD. Use my referral code ' . ($rcReferralData['code'] ?? '') . '. You can sign up here: ' . ($rcReferralData['link'] ?? '');
+                            $rcReferralEmailSubject = 'Join me on PLYRCARD';
+                        @endphp
+                        <section class="rc-dashboard-referral-v150" aria-label="Refer a friend">
+                            <div class="rc-referral-left-v150">
+                                <div class="rc-referral-title-v150"><h2>Refer a friend</h2><span>+{{ number_format($rcReferralPoints) }} pts per qualified friend</span></div>
+                                <p class="rc-referral-copy-v150">Share your code or link. When a friend activates <strong>My Journey or higher</strong>, you both get <strong>{{ number_format($rcReferralPoints) }} PLYR Points</strong>. No points are awarded just for signing up.</p>
+                                <span class="rc-referral-label-v150">Your code</span>
+                                <div class="rc-referral-codebox-v150"><code>{{ $rcReferralData['code'] }}</code><button type="button" data-referral-copy-value="{{ $rcReferralData['code'] }}">Copy</button></div>
+                                <span class="rc-referral-label-v150">Your link</span>
+                                <div class="rc-referral-linkrow-v150"><input type="text" readonly value="{{ $rcReferralData['link'] }}" aria-label="Referral link"><button type="button" data-referral-copy-value="{{ $rcReferralData['link'] }}">Copy link</button></div>
+                                <div class="rc-referral-share-v150"><a href="sms:?&body={{ rawurlencode($rcReferralInviteText) }}">Text a friend</a><a href="mailto:?subject={{ rawurlencode($rcReferralEmailSubject) }}&body={{ rawurlencode($rcReferralInviteText) }}">Email a friend</a></div>
+                                <div class="rc-referral-rules-v150"><span><b>1</b> Share your code or link</span><span><b>2</b> Friend creates an account</span><span><b>3</b> My Journey activates → {{ number_format($rcReferralPoints) }} pts each</span></div>
+                            </div>
+                            <div class="rc-referral-right-v150">
+                                <div class="rc-referral-metrics-v150"><div class="rc-referral-metric-v150"><strong>{{ number_format((int) $rcReferralData['invited']) }}</strong><span>Friends invited</span></div><div class="rc-referral-metric-v150"><strong>{{ number_format((int) $rcReferralData['qualified']) }}</strong><span>Joined My Journey</span></div><div class="rc-referral-metric-v150 is-points"><strong>{{ number_format((int) $rcReferralData['points_earned']) }}</strong><span>Points earned</span></div></div>
+                                <div class="rc-referral-subhead-v150">Your referrals</div>
+                                <div class="rc-referral-list-v150">
+                                    @forelse(($rcReferralData['rows'] ?? collect()) as $referralRow)
+                                        <div class="rc-referral-row-v150"><span class="rc-referral-avatar-v150">{{ $referralRow['initials'] }}</span><span><strong>{{ $referralRow['name'] }}</strong><small>{{ $referralRow['detail'] }}</small></span><span class="rc-referral-badge-v150 is-{{ $referralRow['tone'] }}">{{ $referralRow['badge'] }}</span></div>
+                                    @empty
+                                        <div class="rc-referral-empty-v150">Share your code to start your referral list.</div>
+                                    @endforelse
+                                </div>
+                                <div class="rc-referral-note-v150">Free signups earn no points until they activate My Journey.</div>
+                            </div>
+                        </section>
+                    @endif
+                </div>
+                <script>
+                    (() => {
+                        if (window.__rcReferralCopyInstalledV150) return;
+                        window.__rcReferralCopyInstalledV150 = true;
+                        document.addEventListener('click', async (event) => {
+                            const button = event.target.closest('[data-referral-copy-value]');
+                            if (!button) return;
+                            event.preventDefault();
+                            const value = String(button.dataset.referralCopyValue || '');
+                            if (!value) return;
+                            const original = button.textContent;
+                            try {
+                                if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+                                else {
+                                    const area = document.createElement('textarea');
+                                    area.value = value;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();document.execCommand('copy');area.remove();
+                                }
+                                button.textContent = 'Copied';
+                                window.setTimeout(() => { if (button.isConnected) button.textContent = original; }, 1200);
+                            } catch (_) {
+                                button.textContent = 'Copy failed';
+                                window.setTimeout(() => { if (button.isConnected) button.textContent = original; }, 1400);
+                            }
+                        });
+                    })();
+                </script>
                 <div class="rc-home-grid-v2">
                     <section class="rc-home-panel-v2 rc-home-progress-panel-v2">
                         <div class="rc-home-panel-head-v2">
@@ -17846,6 +18003,7 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             sampleServiceKey: '',
             sampleIndex: 0,
             observerQueued: false,
+            deepLinkKey: '',
         };
 
         const escapeHtml = (value) => String(value ?? '')
@@ -18193,9 +18351,29 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             const fresh=payload();state.entries=Array.isArray(fresh.entries)?fresh.entries:[];state.services=fresh.services||{};renderHistory();if(state.sampleDrawer?.classList.contains('is-open'))renderSampleDrawer();
         };
 
+        const applyDeepLink = () => {
+            if(!SERVICES_PATH_RE.test(window.location.pathname)){state.deepLinkKey='';return;}
+            const params=new URLSearchParams(window.location.search);
+            const service=String(params.get('service')||'');
+            const sample=String(params.get('sample')||'');
+            const history=params.get('history')==='1';
+            const buy=params.get('buy')==='1';
+            if(!service&&!sample&&!history&&!buy){state.deepLinkKey='';return;}
+            const key=window.location.pathname+'?'+params.toString();
+            if(state.deepLinkKey===key)return;
+            state.deepLinkKey=key;
+            window.setTimeout(()=>{
+                if(service){openRequestDrawer(service);return;}
+                if(sample){openSampleDrawer(sample);return;}
+                usePointsTab()?.click();
+                if(history){state.historySection?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+                if(buy){state.root?.querySelector('#buy-points')?.scrollIntoView({behavior:'smooth',block:'start'});}
+            },80);
+        };
+
         const enhance = () => {
             injectStyles();ensureOverlay();const root=document.querySelector('[data-rc-client-section="services"]');if(!root)return;if(state.root!==root){state.root=root;state.requestPanel=null;state.purchasePanel=null;state.legacyHistoryPanel=null;state.historySection=null;}
-            installLegacyPanelVisibility();installRequestDrawer();installServiceButtons();installBulkAction();installHistory();installThankYouBehavior();syncChrome();
+            installLegacyPanelVisibility();installRequestDrawer();installServiceButtons();installBulkAction();installHistory();installThankYouBehavior();syncChrome();applyDeepLink();
         };
         const queueEnhance = () => { if(state.observerQueued)return;state.observerQueued=true;requestAnimationFrame(()=>{state.observerQueued=false;enhance();}); };
 

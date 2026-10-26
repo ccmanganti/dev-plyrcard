@@ -10,9 +10,11 @@ use App\Models\School;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\GoHighLevelService;
+use App\Services\PlayerReferralService;
 use App\Services\PlyrcardSystemEmailService;
 use App\Services\StripeBillingService;
 use App\Services\SportAvailabilityService;
+use App\Services\SupportAlertService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -36,6 +38,10 @@ class RegistrationController extends PublicPlayerIntakeController
         $programsByLeague = $programs->groupBy('league_id');
         $sportPositions = app(SportAvailabilityService::class)
             ->filterSportPositions($this->sportPositions);
+        $referrals = app(PlayerReferralService::class);
+        $requestedReferralCode = $referrals->normalizeCode($request->query('ref', ''));
+        $referralInviter = $referrals->resolveInviter($requestedReferralCode);
+        $referralCode = $referralInviter ? $referrals->codeFor($referralInviter) : '';
         return view('pages.registration', [
             'planKey' => $planKey,
             'plan' => $this->planConfig($planKey),
@@ -45,17 +51,12 @@ class RegistrationController extends PublicPlayerIntakeController
             'sportPositions' => $sportPositions,
             'states' => $this->states(),
             'ageGroups' => $this->getAgeGroupOptions(),
-            // Registration is intentionally strict here: a league must have
-            // explicit gender support either on the League itself or through one
-            // of its active ClubLeague records. Missing gender metadata is not
-            // treated as "all genders".
+            'referralCode' => $referralCode,
+            'referralInviterName' => $referralInviter
+                ? trim((string) ($referralInviter->first_name . ' ' . $referralInviter->last_name))
+                : null,
             'leagueDirectory' => $leagues->map(function (League $league) use ($programsByLeague) {
                 $leaguePrograms = $programsByLeague->get($league->id, collect());
-                // Registration uses the League row as the source of truth when it
-                // explicitly declares a gender. Only legacy rows with no usable
-                // League gender metadata fall back to active ClubLeague genders.
-                // This prevents a Girls league from becoming visible for Boys just
-                // because one attached program has conflicting metadata.
                 $leagueGenders = $this->registrationGenderValues(
                     ! empty($league->genders) ? $league->genders : [$league->gender]
                 );
@@ -66,8 +67,6 @@ class RegistrationController extends PublicPlayerIntakeController
                         ->filter()
                         ->unique()
                         ->values();
-                // Same precedence for sport: an explicit League sport wins. Only
-                // use ClubLeague sport values when the League itself is unclassified.
                 $leagueSport = filled($league->sport)
                     ? strtolower(trim((string) $league->sport))
                     : null;
@@ -118,18 +117,10 @@ class RegistrationController extends PublicPlayerIntakeController
         $handle = $this->normalizeHandle((string) $request->query('handle', ''));
         $reserved = $this->reservedHandles();
         if (strlen($handle) < 3) {
-            return response()->json([
-                'available' => false,
-                'handle' => $handle,
-                'message' => 'Use at least 3 letters or numbers.',
-            ]);
+            return response()->json(['available' => false, 'handle' => $handle, 'message' => 'Use at least 3 letters or numbers.']);
         }
         if (in_array($handle, $reserved, true)) {
-            return response()->json([
-                'available' => false,
-                'handle' => $handle,
-                'message' => 'That PLYRSITE link is reserved.',
-            ]);
+            return response()->json(['available' => false, 'handle' => $handle, 'message' => 'That PLYRSITE link is reserved.']);
         }
         $exists = Website::query()->whereRaw('LOWER(slug) = ?', [strtolower($handle)])->exists()
             || BillingInformation::query()
@@ -140,9 +131,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'available' => ! $exists,
             'handle' => $handle,
             'url' => url('/' . $handle),
-            'message' => $exists
-                ? 'That PLYRSITE link is already taken.'
-                : 'This PLYRSITE link is available.',
+            'message' => $exists ? 'That PLYRSITE link is already taken.' : 'This PLYRSITE link is available.',
         ]);
     }
 
@@ -159,14 +148,8 @@ class RegistrationController extends PublicPlayerIntakeController
                 'registrar_verified' => false,
             ]);
         }
-        $claimedLocally = Website::query()
-            ->whereNotNull('domain')
-            ->whereRaw('LOWER(domain) = ?', [strtolower($domain)])
-            ->exists();
-        $requestedLocally = BillingInformation::query()
-            ->whereRaw('LOWER(requested_domain) = ?', [strtolower($domain)])
-            ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid'])
-            ->exists();
+        $claimedLocally = Website::query()->whereNotNull('domain')->whereRaw('LOWER(domain) = ?', [strtolower($domain)])->exists();
+        $requestedLocally = BillingInformation::query()->whereRaw('LOWER(requested_domain) = ?', [strtolower($domain)])->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid'])->exists();
         if ($claimedLocally || $requestedLocally) {
             return response()->json([
                 'available' => false,
@@ -177,7 +160,6 @@ class RegistrationController extends PublicPlayerIntakeController
                 'registrar_verified' => false,
             ]);
         }
-        /** @var \App\Services\DomainAvailabilityService $domainAvailability */
         $domainAvailability = app(\App\Services\DomainAvailabilityService::class);
         $lookup = $domainAvailability->lookup($domain);
         return response()->json([
@@ -190,8 +172,6 @@ class RegistrationController extends PublicPlayerIntakeController
                 default => $lookup['message'] ?? 'We could not verify this domain right now. Please try again.',
             },
             'rdap_verified' => (bool) ($lookup['verified'] ?? false),
-            // RDAP verifies whether registration data exists; actual purchasability
-            // is still confirmed by the registrar during provisioning.
             'registrar_verified' => false,
             'lookup_source' => 'rdap',
         ]);
@@ -199,18 +179,11 @@ class RegistrationController extends PublicPlayerIntakeController
 
     public function store(Request $request)
     {
-        // Keep this signature compatible with PublicPlayerIntakeController::store(Request $request).
-        // Resolve the registration-only services through Laravel's container instead of
-        // adding parameters to the overridden parent method.
         $ghl = app(GoHighLevelService::class);
-        $planKey = $this->normalizePlanKey(
-            $request->query('utm_plan', $request->input('plan_key', 'free'))
-        );
+        $referrals = app(PlayerReferralService::class);
+        $planKey = $this->normalizePlanKey($request->query('utm_plan', $request->input('plan_key', 'free')));
         $plan = $this->planConfig($planKey);
         $isPaid = $planKey !== 'free';
-        // My Journey is the subscription layer for My Journey itself and for both
-        // Jumpstart / Amplify service-extension registrations, so all three use
-        // the custom-domain registration flow.
         $requiresDomain = in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true);
         $request->merge([
             'plan_key' => $planKey,
@@ -218,33 +191,16 @@ class RegistrationController extends PublicPlayerIntakeController
             'billing_phone' => $this->normalizePhone($request->input('billing_phone')),
             'requested_handle' => $this->normalizeHandle((string) $request->input('requested_handle')),
             'requested_domain' => $this->normalizeDomain((string) $request->input('requested_domain')),
+            'referral_code' => $referrals->normalizeCode($request->input('referral_code', $request->query('ref', ''))),
         ]);
-        $sportPositions = app(SportAvailabilityService::class)
-            ->filterSportPositions($this->sportPositions);
+        $sportPositions = app(SportAvailabilityService::class)->filterSportPositions($this->sportPositions);
         $rules = [
             'plan_key' => ['required', Rule::in(['free', 'my-journey', 'jumpstart', 'amplify'])],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
-            'email' => [
-                'required',
-                'email:rfc',
-                'max:255',
-                Rule::unique('users', 'email'),
-                Rule::unique('users', 'personal_email'),
-            ],
-            'phone' => [
-                $isPaid ? 'required' : 'nullable',
-                'string',
-                'max:50',
-            ],
-            'password' => [
-                'required',
-                'string',
-                'confirmed',
-                'min:8',
-                'regex:/[A-Z]/',
-                'regex:/[0-9]/',
-            ],
+            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email'), Rule::unique('users', 'personal_email')],
+            'phone' => [$isPaid ? 'required' : 'nullable', 'string', 'max:50'],
+            'password' => ['required', 'string', 'confirmed', 'min:8', 'regex:/[A-Z]/', 'regex:/[0-9]/'],
             'is_minor' => ['nullable', 'boolean'],
             'guardian_name' => [Rule::requiredIf($request->boolean('is_minor')), 'nullable', 'string', 'max:255'],
             'guardian_email' => [Rule::requiredIf($request->boolean('is_minor')), 'nullable', 'email:rfc', 'max:255'],
@@ -272,6 +228,7 @@ class RegistrationController extends PublicPlayerIntakeController
             'utm_club_id' => ['nullable', 'integer'],
             'utm_league_id' => ['nullable', 'integer'],
             'utm_team_name' => ['nullable', 'string', 'max:255'],
+            'referral_code' => ['nullable', 'string', 'max:64'],
         ];
         if ($isPaid) {
             $rules = array_merge($rules, [
@@ -285,69 +242,40 @@ class RegistrationController extends PublicPlayerIntakeController
                 'billing_country' => ['required', 'string', 'max:100'],
             ]);
         }
-        if ($requiresDomain) {
-            $rules['requested_domain'] = ['required', 'string', 'max:255'];
-        }
-        $validated = $request->validate($rules, [
-            'password.regex' => 'Password must include at least one capital letter and one number.',
-        ]);
+        if ($requiresDomain) $rules['requested_domain'] = ['required', 'string', 'max:255'];
+        $validated = $request->validate($rules, ['password.regex' => 'Password must include at least one capital letter and one number.']);
         $gender = $this->normalizeRegistrationGender($validated['gender']);
         $sport = $validated['sport'];
         $positions = array_values(array_unique($validated['position']));
+        $referralCode = $referrals->normalizeCode($validated['referral_code'] ?? '');
+        $referrer = $referrals->resolveInviter($referralCode);
+        if ($referralCode !== '' && ! $referrer) {
+            throw ValidationException::withMessages([
+                'referral_code' => 'That referral code could not be found. Check the code and try again.',
+            ]);
+        }
         $allowedPositions = array_keys($sportPositions[$sport] ?? []);
         foreach ($positions as $position) {
             if (! in_array($position, $allowedPositions, true)) {
-                throw ValidationException::withMessages([
-                    'position' => 'One or more positions do not match the selected sport.',
-                ]);
+                throw ValidationException::withMessages(['position' => 'One or more positions do not match the selected sport.']);
             }
         }
         $domainLookup = null;
         if ($requiresDomain) {
             if (! $this->domainLooksValid($validated['requested_domain'])) {
-                throw ValidationException::withMessages([
-                    'requested_domain' => 'Please enter a valid domain name.',
-                ]);
+                throw ValidationException::withMessages(['requested_domain' => 'Please enter a valid domain name.']);
             }
-            $domainConflict = Website::query()
-                ->whereNotNull('domain')
-                ->whereRaw('LOWER(domain) = ?', [strtolower($validated['requested_domain'])])
-                ->exists()
-                || BillingInformation::query()
-                    ->whereRaw('LOWER(requested_domain) = ?', [strtolower($validated['requested_domain'])])
-                    ->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid'])
-                    ->exists();
+            $domainConflict = Website::query()->whereNotNull('domain')->whereRaw('LOWER(domain) = ?', [strtolower($validated['requested_domain'])])->exists()
+                || BillingInformation::query()->whereRaw('LOWER(requested_domain) = ?', [strtolower($validated['requested_domain'])])->whereIn('payment_status', ['pending', 'payment_form_ready', 'paid'])->exists();
             if ($domainConflict) {
-                throw ValidationException::withMessages([
-                    'requested_domain' => 'That domain is already attached to or requested by another PLYRCARD account.',
-                ]);
+                throw ValidationException::withMessages(['requested_domain' => 'That domain is already attached to or requested by another PLYRCARD account.']);
             }
-            // The athlete already selected an available domain in Step 1.
-            // Do not perform a second external lookup here because a transient
-            // registry/network response must not invalidate a previously selected name.
-            // The final submit only protects against a local PLYRCARD collision.
-            $domainLookup = [
-                'available' => true,
-                'status' => 'selected_available',
-                'verified' => true,
-            ];
+            $domainLookup = ['available' => true, 'status' => 'selected_available', 'verified' => true];
         } else {
-            $validated['requested_handle'] = $this->generateAutomaticHandle(
-                $validated['first_name'],
-                $validated['last_name'],
-            );
+            $validated['requested_handle'] = $this->generateAutomaticHandle($validated['first_name'], $validated['last_name']);
         }
-        [$user, $billing] = DB::transaction(function () use (
-            $validated,
-            $plan,
-            $planKey,
-            $isPaid,
-            $requiresDomain,
-            $gender,
-            $sport,
-            $positions,
-            $domainLookup,
-        ) {
+
+        [$user, $billing, $playerReferral] = DB::transaction(function () use ($validated, $plan, $planKey, $isPaid, $requiresDomain, $gender, $sport, $positions, $domainLookup, $referrals, $referrer, $referralCode) {
             $school = $this->resolveRegistrationSchool($validated['high_school'] ?? null, $validated['state'] ?? null);
             [$league, $club, $clubLeague, $teamName] = $this->resolveRegistrationProgram(
                 (int) $validated['league_id'],
@@ -388,25 +316,13 @@ class RegistrationController extends PublicPlayerIntakeController
                 'must_change_password' => false,
             ]);
             $registrationRole = (string) ($plan['role_after_registration'] ?? 'Free');
-            if (method_exists($user, 'syncRoles')) {
-                $user->syncRoles([$registrationRole]);
-            }
+            if (method_exists($user, 'syncRoles')) $user->syncRoles([$registrationRole]);
             $website = $this->createWebsiteIfSupported($user, ['sport' => $sport], []);
-            if (! $requiresDomain && $website) {
-                $website->forceFill(['slug' => $validated['requested_handle']])->save();
-            }
+            if (! $requiresDomain && $website) $website->forceFill(['slug' => $validated['requested_handle']])->save();
             if ($requiresDomain) {
                 $selectedDomain = $validated['requested_domain'];
-                // Save the selected domain directly on the player's website/profile.
-                if ($website) {
-                    $website->forceFill(['domain' => $selectedDomain])->save();
-                }
-                // Some existing PLYRCARD databases also carry domain on users.
-                // Populate it when that column exists without requiring the User
-                // model's fillable list to change.
-                if (Schema::hasColumn($user->getTable(), 'domain')) {
-                    $user->forceFill(['domain' => $selectedDomain])->saveQuietly();
-                }
+                if ($website) $website->forceFill(['domain' => $selectedDomain])->save();
+                if (Schema::hasColumn($user->getTable(), 'domain')) $user->forceFill(['domain' => $selectedDomain])->saveQuietly();
             }
             $registrationMeta = [
                 'source_utm_plan' => $planKey,
@@ -428,6 +344,11 @@ class RegistrationController extends PublicPlayerIntakeController
                 'domain_rdap_status' => $requiresDomain ? ($domainLookup['status'] ?? null) : null,
                 'domain_lookup_source' => $requiresDomain ? 'selected-domain' : null,
                 'domain_registrar_verified' => false,
+                'player_referral' => $referrer ? [
+                    'code' => $referralCode,
+                    'inviter_user_id' => $referrer->getKey(),
+                    'inviter_name' => trim((string) ($referrer->first_name . ' ' . $referrer->last_name)),
+                ] : null,
             ];
             $recurring = (int) ($plan['recurring_amount_cents'] ?? 0);
             $setup = (int) ($plan['setup_fee_cents'] ?? 0);
@@ -435,9 +356,7 @@ class RegistrationController extends PublicPlayerIntakeController
             $initialAmount = $setup + ($chargeFirstMonthUpfront ? $recurring : 0);
             $billing = BillingInformation::create([
                 'user_id' => $user->id,
-                'billing_name' => $isPaid
-                    ? $validated['billing_name']
-                    : trim($validated['first_name'] . ' ' . $validated['last_name']),
+                'billing_name' => $isPaid ? $validated['billing_name'] : trim($validated['first_name'] . ' ' . $validated['last_name']),
                 'billing_email' => $isPaid ? $validated['billing_email'] : $validated['email'],
                 'billing_phone' => $isPaid ? $validated['billing_phone'] : ($validated['phone'] ?? null),
                 'billing_address_1' => $validated['billing_address_1'] ?? null,
@@ -461,8 +380,13 @@ class RegistrationController extends PublicPlayerIntakeController
                 'ghl_location_id' => config('ghl.location_id'),
                 'ghl_sync_status' => 'pending',
             ]);
-            return [$user, $billing];
+            $playerReferral = $referrals->registerReferral($referrer, $user, $planKey);
+            return [$user, $billing, $playerReferral];
         });
+
+        // Using a referral code records the relationship and notifies the inviter, but awards no points yet.
+        $referrals->notifyReferralUsed($playerReferral);
+
         $ghlContactId = null;
         $stripeCheckout = null;
         $stripeCheckoutError = null;
@@ -475,30 +399,15 @@ class RegistrationController extends PublicPlayerIntakeController
                 'phone' => $user->phone,
                 'state' => $user->state,
                 'country' => 'US',
-                'tags' => [
-                    'player-registration',
-                    'registration-' . $planKey,
-                    $isPaid ? 'payment-pending' : 'free-player',
-                ],
-                // Reuse the custom field already used by the current intake flow.
-                // Payment/domain state remains authoritative in billing_information so
-                // registration does not depend on new GHL custom fields existing first.
-                'customFields' => [
-                    ['key' => 'selected_plan', 'field_value' => $plan['label']],
-                ],
+                'tags' => ['player-registration', 'registration-' . $planKey, $isPaid ? 'payment-pending' : 'free-player'],
+                'customFields' => [['key' => 'selected_plan', 'field_value' => $plan['label']]],
             ]);
         } catch (\Throwable $e) {
-            Log::error('Native registration GHL contact sync threw an exception.', [
-                'user_id' => $user->id,
-                'message' => $e->getMessage(),
-            ]);
+            Log::error('Native registration GHL contact sync threw an exception.', ['user_id' => $user->id, 'message' => $e->getMessage()]);
         }
         if ($ghlContactId) {
             $locationId = config('ghl.location_id');
-            $user->forceFill([
-                'ghl_contact_id' => $ghlContactId,
-                'ghl_location_id' => $locationId,
-            ])->save();
+            $user->forceFill(['ghl_contact_id' => $ghlContactId, 'ghl_location_id' => $locationId])->save();
             $billing->forceFill([
                 'ghl_contact_id' => $ghlContactId,
                 'ghl_location_id' => $locationId,
@@ -518,8 +427,7 @@ class RegistrationController extends PublicPlayerIntakeController
         $request->session()->regenerateToken();
         if ($isPaid) {
             try {
-                $stripeCheckout = app(StripeBillingService::class)
-                    ->startRegistration($user, $billing, $planKey, $plan);
+                $stripeCheckout = app(StripeBillingService::class)->startRegistration($user, $billing, $planKey, $plan);
             } catch (\Throwable $exception) {
                 $stripeCheckoutError = $exception->getMessage();
                 $billing->forceFill([
@@ -539,18 +447,20 @@ class RegistrationController extends PublicPlayerIntakeController
         $welcomeEmailResult = ['success' => false, 'error' => 'Welcome email was not attempted.'];
         try {
             $dashboardUrl = rtrim($request->getSchemeAndHttpHost(), '/') . '/admin';
-            $welcomeEmailResult = app(PlyrcardSystemEmailService::class)
-                ->sendRegistrationWelcome($user, $dashboardUrl, $planKey);
+            $welcomeEmailResult = app(PlyrcardSystemEmailService::class)->sendRegistrationWelcome($user, $dashboardUrl, $planKey);
         } catch (\Throwable $exception) {
-            $welcomeEmailResult = [
-                'success' => false,
-                'error' => $exception->getMessage(),
-            ];
-            Log::error('Registration welcome email could not be sent through native PHP mail().', [
+            $welcomeEmailResult = ['success' => false, 'error' => $exception->getMessage()];
+            Log::error('Registration welcome email could not be sent through native PHP mail().', ['user_id' => $user->getKey(), 'error' => $exception->getMessage()]);
+        }
+        try {
+            app(SupportAlertService::class)->sendNewRegistration($user->fresh() ?? $user, $billing->fresh());
+        } catch (\Throwable $exception) {
+            Log::warning('PLYRCARD new-registration admin notification failed.', [
                 'user_id' => $user->getKey(),
                 'error' => $exception->getMessage(),
             ]);
         }
+
         $billing->refresh();
         return response()->json([
             'success' => true,
@@ -563,12 +473,10 @@ class RegistrationController extends PublicPlayerIntakeController
             'stripe_publishable_key' => $stripeCheckout['publishable_key'] ?? (string) config('services.stripe.key'),
             'stripe_subscription_id' => $stripeCheckout['subscription_id'] ?? $billing->stripe_subscription_id,
             'stripe_error' => $stripeCheckoutError,
-            // Compatibility keys for the older registration JavaScript. Stripe no longer uses a hosted payment URL.
             'payment_form_url' => null,
             'payment_url' => null,
             'csrf_token' => csrf_token(),
             'welcome_email_sent' => (bool) ($welcomeEmailResult['success'] ?? false),
-            // Backwards-compatible response key for older frontends. This is a welcome email, not a verification email.
             'verification_email_sent' => (bool) ($welcomeEmailResult['success'] ?? false),
             'redirect_url' => url('/admin/my-profile'),
             'message' => $isPaid
@@ -584,25 +492,12 @@ class RegistrationController extends PublicPlayerIntakeController
     public function startStripePayment(Request $request, StripeBillingService $stripe): JsonResponse
     {
         $user = $request->user();
-        if (! $user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-        $billing = BillingInformation::query()
-            ->where('user_id', $user->id)
-            ->latest('id')
-            ->first();
-        if (! $billing) {
-            return response()->json(['message' => 'Billing record not found.'], 404);
-        }
+        if (! $user) return response()->json(['message' => 'Unauthenticated.'], 401);
+        $billing = BillingInformation::query()->where('user_id', $user->id)->latest('id')->first();
+        if (! $billing) return response()->json(['message' => 'Billing record not found.'], 404);
         $meta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
-        $planKey = $this->normalizePlanKey(
-            data_get($meta, 'stripe.checkout_plan_key')
-                ?: data_get($meta, 'source_utm_plan')
-                ?: $billing->plan_key
-        );
-        if ($planKey === 'free') {
-            return response()->json(['message' => 'This account does not require Stripe payment.'], 422);
-        }
+        $planKey = $this->normalizePlanKey(data_get($meta, 'stripe.checkout_plan_key') ?: data_get($meta, 'source_utm_plan') ?: $billing->plan_key);
+        if ($planKey === 'free') return response()->json(['message' => 'This account does not require Stripe payment.'], 422);
         try {
             $checkout = $stripe->startRegistration($user, $billing, $planKey, $this->planConfig($planKey));
             $billing->refresh();
@@ -617,48 +512,25 @@ class RegistrationController extends PublicPlayerIntakeController
                 'csrf_token' => csrf_token(),
             ]);
         } catch (\Throwable $exception) {
-            Log::error('Stripe registration payment retry failed.', [
-                'user_id' => $user->getKey(),
-                'billing_id' => $billing->getKey(),
-                'error' => $exception->getMessage(),
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => $exception->getMessage(),
-                'csrf_token' => csrf_token(),
-            ], 422);
+            Log::error('Stripe registration payment retry failed.', ['user_id' => $user->getKey(), 'billing_id' => $billing->getKey(), 'error' => $exception->getMessage()]);
+            return response()->json(['success' => false, 'message' => $exception->getMessage(), 'csrf_token' => csrf_token()], 422);
         }
     }
 
     public function paymentStatus(Request $request, StripeBillingService $stripe): JsonResponse
     {
         $user = $request->user();
-        if (! $user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
-        }
-        $billing = BillingInformation::query()
-            ->where('user_id', $user->id)
-            ->latest('id')
-            ->first();
-        if (! $billing) {
-            return response()->json(['message' => 'Billing record not found.'], 404);
-        }
+        if (! $user) return response()->json(['message' => 'Unauthenticated.'], 401);
+        $billing = BillingInformation::query()->where('user_id', $user->id)->latest('id')->first();
+        if (! $billing) return response()->json(['message' => 'Billing record not found.'], 404);
         $verification = null;
         if ($billing->payment_provider === 'stripe' && $billing->payment_status !== 'paid') {
             try {
                 $verification = $stripe->refreshRegistration($user, $billing);
                 $billing->refresh();
             } catch (\Throwable $exception) {
-                Log::warning('Registration payment status could not refresh Stripe yet.', [
-                    'user_id' => $user->getKey(),
-                    'billing_id' => $billing->getKey(),
-                    'error' => $exception->getMessage(),
-                ]);
-                $verification = [
-                    'paid' => false,
-                    'source' => 'stripe',
-                    'reason' => 'verification_exception',
-                ];
+                Log::warning('Registration payment status could not refresh Stripe yet.', ['user_id' => $user->getKey(), 'billing_id' => $billing->getKey(), 'error' => $exception->getMessage()]);
+                $verification = ['paid' => false, 'source' => 'stripe', 'reason' => 'verification_exception'];
             }
         }
         return response()->json([
@@ -674,12 +546,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
     protected function normalizePlanKey(mixed $value): string
     {
-        $value = Str::of((string) $value)
-            ->lower()
-            ->trim()
-            ->replace(['_', ' '], '-')
-            ->replaceMatches('/-+/', '-')
-            ->toString();
+        $value = Str::of((string) $value)->lower()->trim()->replace(['_', ' '], '-')->replaceMatches('/-+/', '-')->toString();
         return match ($value) {
             'myjourney', 'my-journey', 'journey' => 'my-journey',
             'jumpstart', 'jump-start' => 'jumpstart',
@@ -691,9 +558,7 @@ class RegistrationController extends PublicPlayerIntakeController
     protected function planConfig(string $planKey): array
     {
         $configuredPlan = config('plyrcard-registration.plans.' . $planKey);
-        if (is_array($configuredPlan)) {
-            return $configuredPlan;
-        }
+        if (is_array($configuredPlan)) return $configuredPlan;
         if ($planKey === 'jumpstart') {
             return [
                 'label' => 'Jumpstart',
@@ -706,46 +571,26 @@ class RegistrationController extends PublicPlayerIntakeController
             ];
         }
         $configuredFreePlan = config('plyrcard-registration.plans.free');
-        if (is_array($configuredFreePlan)) {
-            return $configuredFreePlan;
-        }
-        // Defensive fallback so registration can still render even if the
-        // registration config file was not deployed or Laravel has stale config cache.
+        if (is_array($configuredFreePlan)) return $configuredFreePlan;
         return match ($planKey) {
             'my-journey' => [
-                'label' => 'My Journey',
-                'recurring_amount_cents' => 4900,
-                'setup_fee_cents' => 0,
-                'charge_first_month_upfront' => true,
-                'role_after_registration' => 'Free',
-                'role_after_payment' => 'My Journey',
+                'label' => 'My Journey', 'recurring_amount_cents' => 4900, 'setup_fee_cents' => 0,
+                'charge_first_month_upfront' => true, 'role_after_registration' => 'Free', 'role_after_payment' => 'My Journey',
                 'payment_form_url' => 'https\://systems.plyrcard.com/widget/survey/82L4a2pfvspbMYWeD0zo?notrack=true',
             ],
             'jumpstart' => [
-                'label' => 'Jumpstart',
-                'recurring_amount_cents' => 4900,
-                'setup_fee_cents' => 14900,
-                'charge_first_month_upfront' => true,
-                'role_after_registration' => 'Free',
-                'role_after_payment' => 'My Journey',
+                'label' => 'Jumpstart', 'recurring_amount_cents' => 4900, 'setup_fee_cents' => 14900,
+                'charge_first_month_upfront' => true, 'role_after_registration' => 'Free', 'role_after_payment' => 'My Journey',
                 'payment_form_url' => 'https\://systems.plyrcard.com/widget/survey/KmE9cOWtXltjhFEPw27w?notrack=true',
             ],
             'amplify' => [
-                'label' => 'Amplify',
-                'recurring_amount_cents' => 4900,
-                'setup_fee_cents' => 50000,
-                'charge_first_month_upfront' => true,
-                'role_after_registration' => 'Free',
-                'role_after_payment' => 'My Journey',
+                'label' => 'Amplify', 'recurring_amount_cents' => 4900, 'setup_fee_cents' => 50000,
+                'charge_first_month_upfront' => true, 'role_after_registration' => 'Free', 'role_after_payment' => 'My Journey',
                 'payment_form_url' => 'https\://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
             ],
             default => [
-                'label' => 'Free',
-                'recurring_amount_cents' => 0,
-                'setup_fee_cents' => 0,
-                'charge_first_month_upfront' => false,
-                'role_after_registration' => 'Free',
-                'role_after_payment' => 'Free',
+                'label' => 'Free', 'recurring_amount_cents' => 0, 'setup_fee_cents' => 0,
+                'charge_first_month_upfront' => false, 'role_after_registration' => 'Free', 'role_after_payment' => 'Free',
             ],
         };
     }
@@ -761,15 +606,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
     protected function normalizeHandle(string $value): string
     {
-        return Str::of($value)
-            ->lower()
-            ->trim()
-            ->replaceMatches('/[^a-z0-9\s-]/', '')
-            ->replaceMatches('/\s+/', '-')
-            ->replaceMatches('/-+/', '-')
-            ->trim('-')
-            ->limit(80, '')
-            ->toString();
+        return Str::of($value)->lower()->trim()->replaceMatches('/[^a-z0-9\s-]/', '')->replaceMatches('/\s+/', '-')->replaceMatches('/-+/', '-')->trim('-')->limit(80, '')->toString();
     }
 
     protected function normalizeDomain(string $value): string
@@ -783,8 +620,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
     protected function domainLooksValid(string $domain): bool
     {
-        return strlen($domain) <= 253
-            && (bool) preg_match('/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?[.])+[a-z]{2,63}$/i', $domain);
+        return strlen($domain) <= 253 && (bool) preg_match('/^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?[.])+[a-z]{2,63}$/i', $domain);
     }
 
     protected function reservedHandles(): array
@@ -801,32 +637,20 @@ class RegistrationController extends PublicPlayerIntakeController
     protected function resolveRegistrationSchool(?string $name, ?string $state): ?School
     {
         $name = trim((string) $name);
-        if ($name === '') {
-            return null;
-        }
+        if ($name === '') return null;
         return School::query()->whereRaw('LOWER(name) = ?', [strtolower($name)])->first()
             ?: School::create(['name' => $name, 'state' => $state]);
     }
 
-    protected function resolveRegistrationProgram(
-        int $leagueId,
-        string $clubId,
-        ?string $clubOther,
-        string $teamName,
-        string $gender,
-        string $sport,
-    ): array {
+    protected function resolveRegistrationProgram(int $leagueId, string $clubId, ?string $clubOther, string $teamName, string $gender, string $sport): array
+    {
         $league = $this->canonicalLeagueQuery()->findOrFail($leagueId);
         if (! $this->registrationLeagueSupports($league, $gender, $sport)) {
-            throw ValidationException::withMessages([
-                'league_id' => 'The selected league does not match the athlete gender and sport.',
-            ]);
+            throw ValidationException::withMessages(['league_id' => 'The selected league does not match the athlete gender and sport.']);
         }
         if ($clubId === '__other__') {
             $clubName = trim((string) $clubOther);
-            if ($clubName === '') {
-                throw ValidationException::withMessages(['club_other' => 'Enter the club name.']);
-            }
+            if ($clubName === '') throw ValidationException::withMessages(['club_other' => 'Enter the club name.']);
             $club = Club::firstOrCreate(['name' => $clubName]);
             $program = ClubLeague::firstOrCreate(
                 ['club_id' => $club->id, 'league_id' => $league->id],
@@ -837,33 +661,15 @@ class RegistrationController extends PublicPlayerIntakeController
             $program = $club ? $this->activeClubLeagueQuery()
                 ->where('club_id', $club->id)
                 ->where('league_id', $league->id)
-                ->where(function ($query) use ($sport) {
-                    $query->whereNull('sport')->orWhere('sport', $sport);
-                })
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get()
-                ->first(fn (ClubLeague $candidate) => $this->registrationGendersContain(
-                    $candidate->genders ?: $league->genders ?: [$league->gender],
-                    $gender,
-                )) : null;
-            if (! $club || ! $program) {
-                throw ValidationException::withMessages(['club_id' => 'The selected club does not match the selected gender, sport, and league.']);
-            }
+                ->where(function ($query) use ($sport) { $query->whereNull('sport')->orWhere('sport', $sport); })
+                ->orderBy('sort_order')->orderBy('id')->get()
+                ->first(fn (ClubLeague $candidate) => $this->registrationGendersContain($candidate->genders ?: $league->genders ?: [$league->gender], $gender)) : null;
+            if (! $club || ! $program) throw ValidationException::withMessages(['club_id' => 'The selected club does not match the selected gender, sport, and league.']);
         }
         $teamName = strtoupper(trim($teamName));
-        if (! in_array($teamName, $this->getAgeGroupOptions(), true)) {
-            throw ValidationException::withMessages([
-                'team_name' => 'Select a valid team age group.',
-            ]);
-        }
+        if (! in_array($teamName, $this->getAgeGroupOptions(), true)) throw ValidationException::withMessages(['team_name' => 'Select a valid team age group.']);
         return [$league, $club, $program, $teamName];
     }
-    /**
-     * Normalize registration directory genders while preserving coed/mixed
-     * programs. The parent controller's normalizeGender() intentionally returns
-     * only male/female, which is not enough for a cascading registration list.
-     */
 
     protected function normalizeRegistrationDirectoryGender(?string $gender): ?string
     {
@@ -878,12 +684,7 @@ class RegistrationController extends PublicPlayerIntakeController
 
     protected function registrationGenderValues($genders): array
     {
-        return collect(is_array($genders) ? $genders : [$genders])
-            ->map(fn ($value) => $this->normalizeRegistrationDirectoryGender($value))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        return collect(is_array($genders) ? $genders : [$genders])->map(fn ($value) => $this->normalizeRegistrationDirectoryGender($value))->filter()->unique()->values()->all();
     }
 
     protected function registrationGendersContain($genders, string $gender): bool
@@ -895,42 +696,21 @@ class RegistrationController extends PublicPlayerIntakeController
 
     protected function registrationLeagueSupports(League $league, string $gender, string $sport): bool
     {
-        $leagueGenders = $this->registrationGenderValues(
-            ! empty($league->genders) ? $league->genders : [$league->gender]
-        );
-        // If the League explicitly declares gender support, keep it authoritative.
-        // Do not let a conflicting ClubLeague row widen that League to both genders.
+        $leagueGenders = $this->registrationGenderValues(! empty($league->genders) ? $league->genders : [$league->gender]);
         if (! empty($leagueGenders)) {
-            if (! $this->registrationGendersContain($leagueGenders, $gender)) {
-                return false;
-            }
-            if (filled($league->sport)) {
-                return $this->isLeagueSportCompatible($league->sport, $sport);
-            }
-            return $this->activeClubLeagueQuery()
-                ->where('league_id', $league->id)
-                ->get()
-                ->contains(fn (ClubLeague $program) =>
-                    blank($program->sport) || $this->isLeagueSportCompatible($program->sport, $sport)
-                );
+            if (! $this->registrationGendersContain($leagueGenders, $gender)) return false;
+            if (filled($league->sport)) return $this->isLeagueSportCompatible($league->sport, $sport);
+            return $this->activeClubLeagueQuery()->where('league_id', $league->id)->get()->contains(fn (ClubLeague $program) => blank($program->sport) || $this->isLeagueSportCompatible($program->sport, $sport));
         }
-        // Legacy League rows without usable gender metadata inherit support only
-        // from active ClubLeague records that explicitly match gender + sport.
-        return $this->activeClubLeagueQuery()
-            ->where('league_id', $league->id)
-            ->get()
-            ->contains(function (ClubLeague $program) use ($gender, $sport) {
-                return $this->registrationGendersContain($program->genders, $gender)
-                    && (blank($program->sport) || $this->isLeagueSportCompatible($program->sport, $sport));
-            });
+        return $this->activeClubLeagueQuery()->where('league_id', $league->id)->get()->contains(function (ClubLeague $program) use ($gender, $sport) {
+            return $this->registrationGendersContain($program->genders, $gender) && (blank($program->sport) || $this->isLeagueSportCompatible($program->sport, $sport));
+        });
     }
 
     protected function generateAutomaticHandle(string $firstName, string $lastName): string
     {
         $base = Str::slug(trim($firstName . ' ' . $lastName)) ?: 'player';
-        if (in_array($base, $this->reservedHandles(), true)) {
-            $base .= '-player';
-        }
+        if (in_array($base, $this->reservedHandles(), true)) $base .= '-player';
         $slug = $base;
         $counter = 2;
         while (
