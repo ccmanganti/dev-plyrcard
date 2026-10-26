@@ -658,7 +658,7 @@ class PlyrcardSystemEmailService
         $configuredFrom = $this->sanitizeEmail((string) config('mail.from.address'));
         $fromEmail = ($configuredFrom && ! str_ends_with($configuredFrom, '@example.com'))
             ? $configuredFrom
-            : $this->sanitizeEmail(PlyrcardMailSender::email());
+            : $this->sanitizeEmail('support@plyrcard.com');
         $fromName = trim((string) config('mail.from.name')) ?: PlyrcardMailSender::name();
         $subject = $this->sanitizeHeaderValue($subject);
 
@@ -712,6 +712,48 @@ class PlyrcardSystemEmailService
                     'mailer' => $mailer,
                     'error' => $laravelError,
                 ]);
+            }
+        }
+
+        // Shared hosting may expose sendmail even when PHP mail() itself
+        // returns false. Try it before falling back to native mail().
+        if ($mailer !== 'sendmail') {
+            try {
+                Mail::mailer('sendmail')->html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
+                    $message->to($recipient)
+                        ->from($fromEmail, $fromName)
+                        ->replyTo($fromEmail, $fromName)
+                        ->subject($subject);
+                });
+
+                Log::info('PLYRCARD system email sent through sendmail fallback.', [
+                    'purpose' => $purpose,
+                    'user_id' => $user->getKey(),
+                    'recipient' => $recipient,
+                    'from_email' => $fromEmail,
+                    'subject' => $subject,
+                    'host' => PlyrcardMailSender::currentHost(),
+                ]);
+
+                return [
+                    'success' => true,
+                    'transport' => 'laravel_sendmail',
+                    'recipient' => $recipient,
+                    'from_email' => $fromEmail,
+                ];
+            } catch (\Throwable $exception) {
+                $sendmailError = $exception->getMessage();
+
+                Log::warning('PLYRCARD sendmail fallback rejected system email.', [
+                    'purpose' => $purpose,
+                    'user_id' => $user->getKey(),
+                    'recipient' => $recipient,
+                    'error' => $sendmailError,
+                ]);
+
+                $laravelError = collect([$laravelError, $sendmailError])
+                    ->filter()
+                    ->implode(' | ');
             }
         }
 

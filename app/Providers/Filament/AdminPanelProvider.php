@@ -122,6 +122,23 @@ class AdminPanelProvider extends PanelProvider
                             --plyr-orange-soft-hover: rgba(255, 99, 56, .21);
                         }
 
+                        /*
+                         * Filament places toast notifications at inset-4 by default,
+                         * which overlaps PLYRCARD's dark-mode and profile controls.
+                         * Keep the normal right alignment, but push top-aligned
+                         * notifications below the header controls globally.
+                         */
+                        .fi-no.fi-vertical-align-start {
+                            top: 5.75rem !important;
+                            bottom: 1rem !important;
+                        }
+
+                        @media (max-width: 640px) {
+                            .fi-no.fi-vertical-align-start {
+                                top: 5rem !important;
+                            }
+                        }
+
                         html,
                         body,
                         .fi-body,
