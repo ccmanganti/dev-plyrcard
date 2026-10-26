@@ -233,6 +233,8 @@ class CreditServiceRequestResource extends Resource
                                         ->content(fn (?CreditServiceRequest $record): string => $record
                                             ? match ($record->email_alert_status) {
                                                 'sent' => 'Sent ' . (optional($record->email_alerted_at)->format('M j, Y g:i A') ?: ''),
+                                                'partial' => 'Partial ' . (optional($record->email_alerted_at)->format('M j, Y g:i A') ?: '')
+                                                    . ($record->email_alert_error ? ': ' . $record->email_alert_error : ''),
                                                 'failed' => 'Failed' . ($record->email_alert_error ? ': ' . $record->email_alert_error : ''),
                                                 default => 'Not recorded',
                                             }
@@ -387,22 +389,12 @@ class CreditServiceRequestResource extends Resource
 
                         $fresh = $record->fresh(['user', 'managedBy']) ?? $record;
 
-                        $result = app(CreditServiceRequestNotificationService::class)
+                        app(CreditServiceRequestNotificationService::class)
                             ->notifyStatusChangedAndRecord($fresh, $previousStatus);
 
-                        if (! ($result['success'] ?? false)) {
-                            Notification::make()
-                                ->warning()
-                                ->persistent()
-                                ->title('Status saved, but notification email failed.')
-                                ->body(
-                                    ($result['error'] ?? null)
-                                        ? 'Email error: ' . Str::limit((string) $result['error'], 300)
-                                        : 'Open Fulfillment & Audit → Admin Alert Email for the delivery error.'
-                                )
-                                ->send();
-                        }
-
+                        // Do not surface mail-delivery banners over the admin
+                        // header/profile controls. Delivery detail stays available
+                        // under Fulfillment & Audit → Admin Alert Email.
                         return $record->refresh();
                     }),
 
