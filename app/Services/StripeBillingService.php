@@ -8,12 +8,16 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use RuntimeException;
 class StripeBillingService
 {
     public function startRegistration(User $user, BillingInformation $billing, string $planKey, array $plan): array
     {
         $this->assertConfigured();
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         if ($billing->payment_status === 'paid') {
             return $this->checkoutPayload($billing, null, true);
         }
@@ -46,7 +50,11 @@ class StripeBillingService
             }
         }
         $journeyPlan = (array) config('plyrcard-registration.plans.my-journey', []);
-        $journeyProductId = trim((string) ($journeyPlan['stripe_product_id'] ?? ''));
+        $journeyProductId = $this->resolveProductId(
+            trim((string) ($journeyPlan['stripe_product_id'] ?? '')),
+            (string) ($journeyPlan['label'] ?? 'My Journey'),
+            'my-journey',
+        );
         $journeyAmount = max(1, (int) ($journeyPlan['recurring_amount_cents'] ?? 4900));
         $journeyPriceId = $this->resolvePriceId(
             $journeyProductId,
@@ -57,7 +65,11 @@ class StripeBillingService
         $setupAmount = max(0, (int) ($plan['setup_fee_cents'] ?? 0));
         $setupPriceId = null;
         if ($setupAmount > 0) {
-            $setupProductId = trim((string) ($plan['stripe_product_id'] ?? ''));
+            $setupProductId = $this->resolveProductId(
+                trim((string) ($plan['stripe_product_id'] ?? '')),
+                (string) ($plan['label'] ?? ucfirst($planKey)),
+                $planKey,
+            );
             $setupPriceId = $this->resolvePriceId(
                 $setupProductId,
                 $setupAmount,
@@ -143,6 +155,10 @@ class StripeBillingService
     }
     public function refreshRegistration(User $user, BillingInformation $billing): array
     {
+        $this->assertConfigured();
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         if ($billing->payment_status === 'paid') {
             return [
                 'paid' => true,
@@ -181,6 +197,9 @@ class StripeBillingService
                 'currency' => 'USD',
             ],
         );
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         $hasJourney = method_exists($user, 'hasRole') && ($user->hasRole('My Journey') || $user->hasRole('my journey'));
         if ($planKey === 'my-journey' && $hasJourney) {
             return array_merge($this->billingSummary($user), ['success' => true, 'completed' => true, 'message' => 'My Journey is already active.']);
@@ -278,11 +297,16 @@ class StripeBillingService
     }
     public function upgradeStatus(User $user, string $planKey): array
     {
+        $this->assertConfigured();
         $user->refresh()->loadMissing('roles');
         $billing = BillingInformation::query()->where('user_id', $user->getKey())->latest('id')->first();
         if (! $billing) {
             return ['success' => true, 'completed' => false, 'message' => 'Waiting for Stripe payment confirmation…'];
         }
+
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         if (in_array($planKey, ['jumpstart', 'amplify'], true)) {
             $intentId = (string) data_get($billing->registration_meta ?? [], 'stripe_upgrade.' . $planKey . '.payment_intent_id', '');
             if ($intentId !== '') {
@@ -380,10 +404,6 @@ class StripeBillingService
         if ($pack === [] || ! ($pack['enabled'] ?? true) || $points <= 0 || $amount <= 0) {
             throw new RuntimeException('This point pack is not available.');
         }
-        if ($productId === '') {
-            throw new RuntimeException('The Stripe Product ID for this point pack is not configured.');
-        }
-        $priceId = $this->resolvePriceId($productId, $amount, null);
         if (! method_exists($user, 'hasRole') || ! ($user->hasRole('My Journey') || $user->hasRole('my journey'))) {
             throw new RuntimeException('Point packs are available to active My Journey members.');
         }
@@ -400,6 +420,16 @@ class StripeBillingService
                 'currency' => 'USD',
             ],
         );
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
+        $productId = $this->resolveProductId(
+            $productId,
+            (string) ($pack['label'] ?? ('PLYRCARD ' . $packKey . ' Point Pack')),
+            'point-pack-' . $packKey,
+        );
+        $priceId = $this->resolvePriceId($productId, $amount, null);
+
         $customerId = $this->ensureCustomer($user, $billing);
         $savedPaymentMethodId = $this->resolveSavedPaymentMethodId($billing);
         $meta = $this->metadata($user, $billing, 'point-pack-' . $packKey);
@@ -1150,9 +1180,41 @@ class StripeBillingService
     }
     protected function ensureCustomer(User $user, BillingInformation $billing): string
     {
+        $this->prepareBillingForCurrentStripeMode($billing);
+        $billing->refresh();
+
         if (filled($billing->stripe_customer_id)) {
-            return (string) $billing->stripe_customer_id;
+            $customerId = trim((string) $billing->stripe_customer_id);
+
+            try {
+                $customer = $this->get('/v1/customers/' . rawurlencode($customerId));
+
+                if ((bool) ($customer['livemode'] ?? false) !== $this->currentStripeLiveMode()) {
+                    $this->resetStripeStateForCurrentMode(
+                        $billing,
+                        'Stored Stripe customer mode did not match the configured Stripe key.',
+                    );
+                } else {
+                    return $customerId;
+                }
+            } catch (\Throwable $exception) {
+                if (! $this->isMissingOrWrongModeStripeObject($exception, 'customer')) {
+                    throw $exception;
+                }
+
+                Log::warning('Stored Stripe customer is not valid for the active Stripe mode; creating a new customer.', [
+                    'billing_id' => $billing->getKey(),
+                    'customer_id' => $customerId,
+                    'stripe_mode' => $this->currentStripeMode(),
+                    'error' => $exception->getMessage(),
+                ]);
+
+                $this->resetStripeStateForCurrentMode($billing, $exception->getMessage());
+            }
+
+            $billing->refresh();
         }
+
         $customer = $this->post('/v1/customers', [
             'email' => $billing->billing_email ?: $user->email,
             'name' => $billing->billing_name ?: trim((string) $user->first_name . ' ' . (string) $user->last_name),
@@ -1166,27 +1228,150 @@ class StripeBillingService
                 'country' => strtoupper((string) ($billing->billing_country ?: 'US')),
             ],
             'metadata' => $this->metadata($user, $billing, (string) data_get($billing->registration_meta, 'stripe.checkout_plan_key', $billing->plan_key)),
-        ], 'plyrcard-registration-customer-' . $billing->getKey());
+        ], 'plyrcard-registration-customer-' . $billing->getKey() . '-' . $this->currentStripeMode());
+
         $customerId = trim((string) ($customer['id'] ?? ''));
+
         if ($customerId === '') {
             throw new RuntimeException('Stripe did not return a customer ID.');
         }
+
         $billing->forceFill([
             'stripe_customer_id' => $customerId,
             'payment_provider' => 'stripe',
-            'payment_mode' => ! empty($customer['livemode']) ? 'live' : 'test',
-            'payment_live_mode' => (bool) ($customer['livemode'] ?? false),
+            'payment_mode' => $this->currentStripeMode(),
+            'payment_live_mode' => $this->currentStripeLiveMode(),
             'stripe_synced_at' => now(),
         ])->save();
+
         return $customerId;
     }
+
+    protected function resolveProductId(string $configuredProductId, string $label, string $productKey): string
+    {
+        $configuredProductId = trim($configuredProductId);
+        $label = trim($label) !== '' ? trim($label) : Str::headline($productKey);
+
+        if ($configuredProductId !== '') {
+            try {
+                $product = $this->get('/v1/products/' . rawurlencode($configuredProductId));
+
+                if (($product['active'] ?? true) !== false) {
+                    return (string) ($product['id'] ?? $configuredProductId);
+                }
+            } catch (\Throwable $exception) {
+                if (! $this->isMissingOrWrongModeStripeObject($exception, 'product')) {
+                    throw $exception;
+                }
+
+                if ($this->currentStripeLiveMode()) {
+                    throw new RuntimeException(
+                        'The configured Stripe Product ID for ' . $label . ' is not available in live mode. '
+                        . 'Set the correct live Stripe product ID in the environment. Original Stripe error: '
+                        . $exception->getMessage()
+                    );
+                }
+
+                Log::info('Configured Stripe product is not available in test mode; resolving a test-mode product instead.', [
+                    'product_key' => $productKey,
+                    'configured_product_id' => $configuredProductId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $products = $this->get('/v1/products', [
+            'active' => 'true',
+            'limit' => 100,
+        ]);
+
+        foreach ((array) ($products['data'] ?? []) as $product) {
+            if (! is_array($product)) {
+                continue;
+            }
+
+            $metadataKey = trim((string) data_get($product, 'metadata.plyrcard_product_key', ''));
+            $name = trim((string) ($product['name'] ?? ''));
+
+            if ($metadataKey === $productKey || strcasecmp($name, $label) === 0) {
+                return (string) $product['id'];
+            }
+        }
+
+        if ($this->currentStripeLiveMode()) {
+            throw new RuntimeException(
+                'No live Stripe product could be resolved for ' . $label . '. Configure the product ID explicitly.'
+            );
+        }
+
+        $product = $this->post('/v1/products', [
+            'name' => $label,
+            'metadata' => [
+                'plyrcard_product_key' => $productKey,
+                'plyrcard_managed' => 'true',
+                'plyrcard_mode' => 'test',
+            ],
+        ], 'plyrcard-product-' . $productKey . '-test');
+
+        $productId = trim((string) ($product['id'] ?? ''));
+
+        if ($productId === '') {
+            throw new RuntimeException('Stripe did not return a Product ID for ' . $label . '.');
+        }
+
+        return $productId;
+    }
+
     protected function resolvePriceId(string $productId, int $amountCents, ?string $interval, ?string $configuredPriceId = null): string
     {
-        if ($configuredPriceId) {
-            return $configuredPriceId;
-        }
         if ($productId === '') {
             throw new RuntimeException('A Stripe Product ID is missing from the PLYRCARD plan configuration.');
+        }
+
+        if ($configuredPriceId) {
+            try {
+                $configuredPrice = $this->get('/v1/prices/' . rawurlencode($configuredPriceId));
+                $configuredInterval = data_get($configuredPrice, 'recurring.interval');
+                $matchesInterval = $interval === null
+                    ? blank($configuredInterval)
+                    : $configuredInterval === $interval;
+
+                if (
+                    $this->idValue($configuredPrice['product'] ?? null) === $productId
+                    && (int) ($configuredPrice['unit_amount'] ?? -1) === $amountCents
+                    && strtolower((string) ($configuredPrice['currency'] ?? '')) === 'usd'
+                    && $matchesInterval
+                    && ($configuredPrice['active'] ?? true)
+                ) {
+                    return (string) ($configuredPrice['id'] ?? $configuredPriceId);
+                }
+
+                Log::warning('Configured Stripe price does not match the active PLYRCARD plan; resolving a matching price.', [
+                    'configured_price_id' => $configuredPriceId,
+                    'product_id' => $productId,
+                    'amount_cents' => $amountCents,
+                    'interval' => $interval,
+                    'stripe_mode' => $this->currentStripeMode(),
+                ]);
+            } catch (\Throwable $exception) {
+                if (! $this->isMissingOrWrongModeStripeObject($exception, 'price')) {
+                    throw $exception;
+                }
+
+                if ($this->currentStripeLiveMode()) {
+                    throw new RuntimeException(
+                        'The configured Stripe Price ID is not available in live mode. '
+                        . 'Set the correct live Stripe price ID or leave it blank so PLYRCARD can resolve the price. '
+                        . 'Original Stripe error: ' . $exception->getMessage()
+                    );
+                }
+
+                Log::info('Configured Stripe price is not available in test mode; resolving a matching test price.', [
+                    'configured_price_id' => $configuredPriceId,
+                    'product_id' => $productId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
         $prices = $this->get('/v1/prices', [
             'product' => $productId,
@@ -1357,13 +1542,171 @@ class StripeBillingService
             'cardholder_name' => (string) ($billing->cardholder_name ?: ''),
         ];
     }
+    protected function prepareBillingForCurrentStripeMode(BillingInformation $billing): void
+    {
+        $hasStripeIdentifiers = collect([
+            $billing->stripe_customer_id,
+            $billing->stripe_subscription_id,
+            $billing->stripe_invoice_id,
+            $billing->stripe_payment_intent_id,
+            $billing->stripe_payment_method_id,
+        ])->contains(fn ($value): bool => filled($value));
+
+        $hasStripeState = $hasStripeIdentifiers
+            || strtolower(trim((string) $billing->payment_provider)) === 'stripe'
+            || in_array(strtolower(trim((string) $billing->payment_mode)), ['live', 'test'], true);
+
+        if (! $hasStripeState) {
+            return;
+        }
+
+        $savedMode = strtolower(trim((string) $billing->payment_mode));
+        $savedLiveMode = $billing->payment_live_mode;
+        $currentMode = $this->currentStripeMode();
+        $currentLiveMode = $this->currentStripeLiveMode();
+
+        $modeMismatch = ($savedMode === 'live' || $savedMode === 'test')
+            ? $savedMode !== $currentMode
+            : ($savedLiveMode !== null && (bool) $savedLiveMode !== $currentLiveMode);
+
+        if (! $modeMismatch) {
+            return;
+        }
+
+        $this->resetStripeStateForCurrentMode(
+            $billing,
+            'Stored billing Stripe mode (' . ($savedMode ?: ((bool) $savedLiveMode ? 'live' : 'test'))
+                . ') does not match configured Stripe mode (' . $currentMode . ').',
+        );
+    }
+
+    protected function resetStripeStateForCurrentMode(BillingInformation $billing, string $reason): void
+    {
+        $meta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
+        $history = (array) data_get($meta, 'stripe.mode_resets', []);
+
+        $history[] = [
+            'at' => now()->toIso8601String(),
+            'reason' => Str::limit($reason, 500, ''),
+            'from_mode' => $billing->payment_mode,
+            'to_mode' => $this->currentStripeMode(),
+            'customer_id' => $billing->stripe_customer_id,
+            'subscription_id' => $billing->stripe_subscription_id,
+            'payment_intent_id' => $billing->stripe_payment_intent_id,
+        ];
+
+        data_set($meta, 'stripe.mode_resets', array_slice($history, -10));
+
+        $updates = [
+            'registration_meta' => $meta,
+            'stripe_customer_id' => null,
+            'stripe_subscription_id' => null,
+            'stripe_invoice_id' => null,
+            'stripe_payment_intent_id' => null,
+            'stripe_payment_method_id' => null,
+            'stripe_recurring_price_id' => null,
+            'stripe_setup_price_id' => null,
+            'stripe_last_event_id' => null,
+            'stripe_last_event_at' => null,
+            'stripe_synced_at' => null,
+            'cardholder_name' => null,
+            'card_last_four' => null,
+            'card_expiration' => null,
+            'payment_brand' => null,
+            'payment_mode' => $this->currentStripeMode(),
+            'payment_live_mode' => $this->currentStripeLiveMode(),
+        ];
+
+        if (strtolower((string) $billing->payment_provider) === 'stripe') {
+            $updates['payment_status'] = 'pending';
+            $updates['subscription_status'] = 'pending';
+        }
+
+        $billing->forceFill($updates)->save();
+
+        Log::warning('Reset stale Stripe billing identifiers for active Stripe mode.', [
+            'billing_id' => $billing->getKey(),
+            'user_id' => $billing->user_id,
+            'stripe_mode' => $this->currentStripeMode(),
+            'reason' => $reason,
+        ]);
+    }
+
+    protected function currentStripeMode(): string
+    {
+        return $this->currentStripeLiveMode() ? 'live' : 'test';
+    }
+
+    protected function currentStripeLiveMode(): bool
+    {
+        $secret = trim((string) config('services.stripe.secret'));
+
+        if (str_starts_with($secret, 'sk_live_') || str_starts_with($secret, 'rk_live_')) {
+            return true;
+        }
+
+        if (str_starts_with($secret, 'sk_test_') || str_starts_with($secret, 'rk_test_')) {
+            return false;
+        }
+
+        $publishable = trim((string) config('services.stripe.key'));
+
+        return str_starts_with($publishable, 'pk_live_');
+    }
+
+    protected function stripeKeyMode(string $key): ?string
+    {
+        $key = trim($key);
+
+        if (
+            str_starts_with($key, 'sk_live_')
+            || str_starts_with($key, 'rk_live_')
+            || str_starts_with($key, 'pk_live_')
+        ) {
+            return 'live';
+        }
+
+        if (
+            str_starts_with($key, 'sk_test_')
+            || str_starts_with($key, 'rk_test_')
+            || str_starts_with($key, 'pk_test_')
+        ) {
+            return 'test';
+        }
+
+        return null;
+    }
+
+    protected function isMissingOrWrongModeStripeObject(\Throwable $exception, string $object): bool
+    {
+        $message = strtolower($exception->getMessage());
+
+        return str_contains($message, 'no such ' . strtolower($object))
+            || str_contains($message, 'similar object exists in live mode')
+            || str_contains($message, 'similar object exists in test mode');
+    }
+
     protected function assertConfigured(): void
     {
-        if (blank(config('services.stripe.secret'))) {
+        $secret = trim((string) config('services.stripe.secret'));
+        $publishable = trim((string) config('services.stripe.key'));
+
+        if ($secret === '') {
             throw new RuntimeException('Stripe is not configured. Set STRIPE_SECRET in the environment.');
         }
-        if (blank(config('services.stripe.key'))) {
+
+        if ($publishable === '') {
             throw new RuntimeException('Stripe is not configured. Set STRIPE_KEY in the environment.');
+        }
+
+        $secretMode = $this->stripeKeyMode($secret);
+        $publishableMode = $this->stripeKeyMode($publishable);
+
+        if ($secretMode !== null && $publishableMode !== null && $secretMode !== $publishableMode) {
+            throw new RuntimeException(
+                'Stripe configuration mixes ' . $secretMode . '-mode STRIPE_SECRET with '
+                . $publishableMode . '-mode STRIPE_KEY. Use keys from the same Stripe mode.'
+            );
         }
     }
     protected function get(string $path, array $query = []): array
