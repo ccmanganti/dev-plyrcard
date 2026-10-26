@@ -1544,13 +1544,17 @@ class StripeBillingService
     }
     protected function prepareBillingForCurrentStripeMode(BillingInformation $billing): void
     {
-        $hasStripeState = collect([
+        $hasStripeIdentifiers = collect([
             $billing->stripe_customer_id,
             $billing->stripe_subscription_id,
             $billing->stripe_invoice_id,
             $billing->stripe_payment_intent_id,
             $billing->stripe_payment_method_id,
         ])->contains(fn ($value): bool => filled($value));
+
+        $hasStripeState = $hasStripeIdentifiers
+            || strtolower(trim((string) $billing->payment_provider)) === 'stripe'
+            || in_array(strtolower(trim((string) $billing->payment_mode)), ['live', 'test'], true);
 
         if (! $hasStripeState) {
             return;
