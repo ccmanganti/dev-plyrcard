@@ -6,6 +6,7 @@ use App\Filament\Resources\CreditServiceRequests\Pages\EditCreditServiceRequest;
 use App\Filament\Resources\CreditServiceRequests\Pages\ListCreditServiceRequests;
 use App\Models\CreditServiceRequest;
 use App\Services\CreditPointService;
+use App\Services\CreditServiceRequestNotificationService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -363,7 +364,47 @@ class CreditServiceRequestResource extends Resource
                     ->iconButton()
                     ->tooltip('Review request')
                     ->slideOver()
-                    ->modalWidth('4xl'),
+                    ->modalWidth('4xl')
+                    ->using(function (CreditServiceRequest $record, array $data): CreditServiceRequest {
+                        $previousStatus = trim((string) $record->status);
+                        $nextStatus = trim((string) ($data['status'] ?? $previousStatus));
+                        $statusChanged = $nextStatus !== '' && $nextStatus !== $previousStatus;
+
+                        // Filament's modal save is the authoritative path for the
+                        // status dropdown shown in Credit Requests. Save normally so
+                        // timestamps / managed_by hooks still run, but suppress the
+                        // model-event email for this one save to prevent duplicates.
+                        CreditServiceRequest::withoutStatusChangeNotifications(
+                            function () use ($record, $data): void {
+                                $record->fill($data);
+                                $record->save();
+                            },
+                        );
+
+                        if (! $statusChanged) {
+                            return $record->refresh();
+                        }
+
+                        $fresh = $record->fresh(['user', 'managedBy']) ?? $record;
+
+                        $result = app(CreditServiceRequestNotificationService::class)
+                            ->notifyStatusChangedAndRecord($fresh, $previousStatus);
+
+                        if (! ($result['success'] ?? false)) {
+                            Notification::make()
+                                ->warning()
+                                ->persistent()
+                                ->title('Status saved, but notification email failed.')
+                                ->body(
+                                    ($result['error'] ?? null)
+                                        ? 'Email error: ' . Str::limit((string) $result['error'], 300)
+                                        : 'Open Fulfillment & Audit → Admin Alert Email for the delivery error.'
+                                )
+                                ->send();
+                        }
+
+                        return $record->refresh();
+                    }),
 
                 Action::make('followUp')
                     ->label('Follow Up')
