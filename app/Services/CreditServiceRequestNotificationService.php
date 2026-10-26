@@ -379,7 +379,7 @@ class CreditServiceRequestNotificationService
         $configuredFrom = $this->sanitizeEmail((string) config('mail.from.address'));
         $fromEmail = ($configuredFrom && ! str_ends_with($configuredFrom, '@example.com'))
             ? $configuredFrom
-            : $this->sanitizeEmail(PlyrcardMailSender::email());
+            : $this->sanitizeEmail('support@plyrcard.com');
         $fromName = trim((string) config('mail.from.name')) ?: PlyrcardMailSender::name();
         $subject = trim(str_replace(["\r", "\n"], ' ', $subject));
 
@@ -436,6 +436,47 @@ class CreditServiceRequestNotificationService
                     'mailer' => $mailer,
                     'error' => $laravelError,
                 ]);
+            }
+        }
+
+        // Shared hosting often exposes sendmail even when PHP mail() is
+        // disabled. Try Laravel's sendmail transport before native mail().
+        if ($mailer !== 'sendmail') {
+            try {
+                Mail::mailer('sendmail')->html($html, function ($message) use ($recipient, $fromEmail, $fromName, $subject): void {
+                    $message->to($recipient)
+                        ->from($fromEmail, $fromName)
+                        ->replyTo($fromEmail, $fromName)
+                        ->subject($subject);
+                });
+
+                Log::info('PLYRCARD credit-request admin email sent through sendmail fallback.', [
+                    'purpose' => $purpose,
+                    'request_id' => $request->getKey(),
+                    'recipient' => $recipient,
+                    'from_email' => $fromEmail,
+                    'subject' => $subject,
+                    'host' => PlyrcardMailSender::currentHost(),
+                ]);
+
+                return [
+                    'success' => true,
+                    'transport' => 'laravel_sendmail',
+                    'recipient' => $recipient,
+                ];
+            } catch (\Throwable $exception) {
+                $sendmailError = $exception->getMessage();
+
+                Log::warning('PLYRCARD sendmail fallback rejected credit-request admin email.', [
+                    'purpose' => $purpose,
+                    'request_id' => $request->getKey(),
+                    'recipient' => $recipient,
+                    'error' => $sendmailError,
+                ]);
+
+                $laravelError = collect([$laravelError, $sendmailError])
+                    ->filter()
+                    ->implode(' | ');
             }
         }
 
