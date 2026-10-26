@@ -169,42 +169,42 @@ class CreditUsageController extends Controller
         }
 
         if ($result['created_new']) {
+            $adminAlert = ['success' => false, 'all_success' => false, 'error' => 'Admin notification was not attempted.'];
+            $playerAlert = ['success' => false, 'error' => 'Player notification was not attempted.'];
+
             try {
-                $alert = $alerts->sendCreditServiceRequestBatch(
+                $adminAlert = $alerts->sendCreditServiceRequestBatch(
                     $user->fresh() ?? $user,
                     $result['requests'],
                     (int) $result['points'],
                 );
-
-                $this->recordAlertResult($result['requests'], $alert);
             } catch (\Throwable $exception) {
+                $adminAlert = ['success' => false, 'all_success' => false, 'error' => $exception->getMessage()];
+
                 Log::warning('PLYRCARD credit request admin notification failed after redemption.', [
                     'user_id' => $user->getKey(),
                     'request_ids' => $result['requests']->pluck('id')->all(),
                     'error' => $exception->getMessage(),
                 ]);
-
-                $this->recordAlertResult($result['requests'], [
-                    'success' => false,
-                    'error' => $exception->getMessage(),
-                ]);
             }
-        }
 
-        if ($result['created_new']) {
             try {
-                $systemEmail->sendServiceRequestSubmitted(
+                $playerAlert = $systemEmail->sendServiceRequestSubmitted(
                     $user->fresh() ?? $user,
                     $result['requests']->pluck('item_name')->filter()->values()->all(),
                     (int) $result['points'],
                 );
             } catch (\Throwable $exception) {
+                $playerAlert = ['success' => false, 'error' => $exception->getMessage()];
+
                 Log::warning('PLYRCARD service request player notification failed.', [
                     'user_id' => $user->getKey(),
                     'request_ids' => $result['requests']->pluck('id')->all(),
                     'error' => $exception->getMessage(),
                 ]);
             }
+
+            $this->recordAlertResult($result['requests'], $adminAlert, $playerAlert);
         }
 
         $count = $result['requests']->count();
@@ -244,20 +244,40 @@ class CreditUsageController extends Controller
     }
 
     /** @param Collection<int, CreditServiceRequest> $requests */
-    protected function recordAlertResult(Collection $requests, array $alert): void
+    protected function recordAlertResult(Collection $requests, array $adminAlert, array $playerAlert): void
     {
         if (! Schema::hasColumn('credit_service_requests', 'email_alert_status')) {
             return;
         }
 
-        $success = (bool) ($alert['success'] ?? false);
+        $playerSent = (bool) ($playerAlert['success'] ?? false);
+        $adminSent = (bool) ($adminAlert['success'] ?? false);
+        $adminsAllSent = (bool) ($adminAlert['all_success'] ?? $adminSent);
+        $allSent = $playerSent && $adminsAllSent;
+        $anySent = $playerSent || $adminSent;
+        $status = $allSent ? 'sent' : ($anySent ? 'partial' : 'failed');
+
+        $errors = collect();
+        if (! $playerSent) {
+            $errors->push('Player: ' . (string) ($playerAlert['error'] ?? 'email delivery failed'));
+        }
+        if (! $adminsAllSent) {
+            $failedRecipients = (array) ($adminAlert['failed_recipients'] ?? []);
+            if ($failedRecipients !== []) {
+                $errors->push('Admin: failed for ' . implode(', ', $failedRecipients));
+            } else {
+                $errors->push('Admin: ' . (string) ($adminAlert['error'] ?? 'email delivery failed'));
+            }
+        }
 
         CreditServiceRequest::query()
             ->whereKey($requests->pluck('id')->filter()->all())
             ->update([
-                'email_alert_status' => $success ? 'sent' : 'failed',
-                'email_alerted_at' => $success ? now() : null,
-                'email_alert_error' => $success ? null : ($alert['error'] ?? 'Admin alert email was not accepted by the mail server.'),
+                'email_alert_status' => $status,
+                'email_alerted_at' => $anySent ? now() : null,
+                'email_alert_error' => $errors->isEmpty()
+                    ? null
+                    : substr($errors->unique()->implode(' | '), 0, 1000),
                 'updated_at' => now(),
             ]);
     }
