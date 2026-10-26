@@ -18112,6 +18112,10 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             sampleIndex: 0,
             observerQueued: false,
             deepLinkKey: '',
+            // Durable UI intent: Livewire can replace the drawer DOM node while
+            // background requests/morphs are running. Keep the requested open
+            // state outside the node so a rebind cannot silently close it.
+            requestDrawerOpen: false,
             refreshBusy: false,
             refreshTimer: null,
             refreshSignature: '',
@@ -18297,6 +18301,7 @@ if (window.__plyrPointsEnhancerInstalledV15) {
         };
 
         const anyDrawerOpen = () => !!(
+            state.requestDrawerOpen ||
             state.requestPanel?.classList.contains('is-open') ||
             state.historyDrawer?.classList.contains('is-open') ||
             state.sampleDrawer?.classList.contains('is-open')
@@ -18307,6 +18312,9 @@ if (window.__plyrPointsEnhancerInstalledV15) {
         const usePointsTab = () => state.root ? Array.from(state.root.querySelectorAll('.rc-support-tabs-v5 button')).find(button => /use points/i.test(button.textContent || '')) || null : null;
 
         const openRequestDrawer = (serviceKey = '') => {
+            // Set intent before touching the DOM. If Livewire morphs the panel
+            // during this click, installRequestDrawer() will restore it open.
+            state.requestDrawerOpen = true;
             if (!state.requestPanel?.isConnected) enhance();
             if (!state.requestPanel) return;
             usePointsTab()?.click();
@@ -18318,7 +18326,14 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             showOverlay();
             window.setTimeout(()=>state.requestPanel?.querySelector('.rc-credit-steps-v7')?.scrollIntoView({block:'start'}),30);
         };
-        const closeRequestDrawer = () => { if(!state.requestPanel)return;if(state.requestPanel.querySelector('.rc-credit-submit-v6.is-submitting'))return;state.requestPanel.classList.remove('is-open');state.requestPanel.setAttribute('aria-hidden','true');hideOverlayIfUnused(); };
+        const closeRequestDrawer = () => {
+            if(state.requestPanel?.querySelector('.rc-credit-submit-v6.is-submitting'))return;
+            state.requestDrawerOpen = false;
+            if(!state.requestPanel){hideOverlayIfUnused();return;}
+            state.requestPanel.classList.remove('is-open');
+            state.requestPanel.setAttribute('aria-hidden','true');
+            hideOverlayIfUnused();
+        };
         const closeHistoryDrawer = () => { state.historyDrawer?.classList.remove('is-open');hideOverlayIfUnused(); };
         const closeSampleDrawer = () => { state.sampleDrawer?.classList.remove('is-open');hideOverlayIfUnused(); };
         function closeAllDrawers(){closeRequestDrawer();closeHistoryDrawer();closeSampleDrawer();}
@@ -18332,6 +18347,13 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             requestPanel.classList.remove('plyr-points-request-drawer-v14');
             requestPanel.classList.add('plyr-points-request-drawer-v15');
             requestPanel.setAttribute('role','dialog');requestPanel.setAttribute('aria-modal','true');requestPanel.setAttribute('aria-label','Request PLYR Points service');
+
+            // A Livewire morph can replace requestPanel with a brand-new node.
+            // Reapply the durable intent every time the enhancer binds to it.
+            requestPanel.classList.toggle('is-open', Boolean(state.requestDrawerOpen));
+            requestPanel.setAttribute('aria-hidden', state.requestDrawerOpen ? 'false' : 'true');
+            if(state.requestDrawerOpen) showOverlay();
+
             requestPanel.querySelector('[data-plyr-points-request-head]')?.remove();
             if(!requestPanel.querySelector('[data-plyr-points-request-head-v15]')){
                 const balanceText=Number(payload().balance||0).toLocaleString();
@@ -18523,10 +18545,25 @@ if (window.__plyrPointsEnhancerInstalledV15) {
         };
         const queueEnhance = () => { if(state.observerQueued)return;state.observerQueued=true;requestAnimationFrame(()=>{state.observerQueued=false;enhance();}); };
 
+        const syncRouteDrawerIntent = () => {
+            if(SERVICES_PATH_RE.test(window.location.pathname)) return true;
+
+            // Navigating away is a real close. Do not let the persistent intent
+            // reopen the PLYR Points request drawer on another Recruiting page.
+            state.requestDrawerOpen = false;
+            state.requestPanel?.classList.remove('is-open');
+            state.requestPanel?.setAttribute('aria-hidden','true');
+            state.historyDrawer?.classList.remove('is-open');
+            state.sampleDrawer?.classList.remove('is-open');
+            syncDrawerOverlayState();
+            return false;
+        };
+
         window.addEventListener('plyr-points-server-sync-v15',()=>{syncServerPayload();queueEnhance();});
         document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(anyDrawerOpen()){event.preventDefault();closeAllDrawers();}});
         document.addEventListener('click',event=>{const anchor=event.target.closest('a[href]');if(!anchor)return;try{const pathname=new URL(anchor.href,window.location.href).pathname;if(SERVICES_PATH_RE.test(pathname))window.setTimeout(()=>{enhance();syncChrome();},25);}catch(_){}},true);
-        document.addEventListener('livewire:navigated',()=>window.setTimeout(()=>{enhance();syncChrome();},0));window.addEventListener('popstate',()=>window.setTimeout(syncChrome,0));
+        document.addEventListener('livewire:navigated',()=>window.setTimeout(()=>{if(syncRouteDrawerIntent()){enhance();syncChrome();}},0));
+        window.addEventListener('popstate',()=>window.setTimeout(()=>{if(syncRouteDrawerIntent()){enhance();syncChrome();}},0));
         const observer=new MutationObserver(queueEnhance);const start=()=>{injectStyles();enhance();observer.observe(document.body,{childList:true,subtree:true});window.setInterval(syncDrawerOverlayState,1200);};if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
     })();
 }
