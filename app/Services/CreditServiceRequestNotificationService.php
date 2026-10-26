@@ -55,6 +55,107 @@ class CreditServiceRequestNotificationService
     }
 
     /**
+     * Send a status-change notification and persist an audit result on the
+     * request. This is used by both the Filament EditAction and the model-event
+     * fallback so the two paths share the exact same delivery logic.
+     */
+    public function notifyStatusChangedAndRecord(CreditServiceRequest $request, ?string $previousStatus = null): array
+    {
+        $requestId = (int) $request->getKey();
+        $currentStatus = trim((string) $request->status);
+        $previousStatus = trim((string) $previousStatus);
+
+        try {
+            $result = $this->notifyStatusChanged(
+                $request,
+                $previousStatus !== '' ? $previousStatus : null,
+            );
+
+            $playerResult = (array) ($result['player'] ?? []);
+            $adminResults = (array) ($result['admins'] ?? []);
+            $playerSent = (bool) ($playerResult['success'] ?? false);
+            $adminsSent = $adminResults !== []
+                && collect($adminResults)->every(
+                    fn (array $adminResult): bool => (bool) ($adminResult['success'] ?? false),
+                );
+
+            $errors = collect();
+
+            if (! $playerSent) {
+                $errors->push('Player: ' . (string) ($playerResult['error'] ?? 'email was not accepted'));
+            }
+
+            if ($adminResults === []) {
+                $errors->push('Admin: no Superadmin email recipient was found');
+            } else {
+                foreach ($adminResults as $adminResult) {
+                    if (! ($adminResult['success'] ?? false)) {
+                        $errors->push('Admin: ' . (string) ($adminResult['error'] ?? 'email was not accepted'));
+                    }
+                }
+            }
+
+            $success = $playerSent && $adminsSent;
+            $errorMessage = $errors->isEmpty()
+                ? null
+                : Str::limit($errors->unique()->implode(' | '), 1000, '');
+
+            CreditServiceRequest::query()
+                ->whereKey($requestId)
+                ->update([
+                    'email_alerted_at' => now(),
+                    'email_alert_status' => $success ? 'sent' : 'failed',
+                    'email_alert_error' => $errorMessage,
+                ]);
+
+            Log::log(
+                $success ? 'info' : 'warning',
+                $success
+                    ? 'PLYRCARD credit-request status emails sent.'
+                    : 'PLYRCARD credit-request status email delivery was incomplete.',
+                [
+                    'request_id' => $requestId,
+                    'previous_status' => $previousStatus,
+                    'status' => $currentStatus,
+                    'player_sent' => $playerSent,
+                    'admin_results' => $adminResults,
+                    'errors' => $errors->values()->all(),
+                ],
+            );
+
+            return [
+                ...$result,
+                'success' => $success,
+                'error' => $errorMessage,
+            ];
+        } catch (\Throwable $exception) {
+            $errorMessage = Str::limit($exception->getMessage(), 1000, '');
+
+            CreditServiceRequest::query()
+                ->whereKey($requestId)
+                ->update([
+                    'email_alerted_at' => now(),
+                    'email_alert_status' => 'failed',
+                    'email_alert_error' => $errorMessage,
+                ]);
+
+            Log::warning('PLYRCARD service-request status notification failed.', [
+                'request_id' => $requestId,
+                'previous_status' => $previousStatus,
+                'status' => $currentStatus,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'player' => ['success' => false, 'error' => $errorMessage],
+                'admins' => [],
+                'error' => $errorMessage,
+            ];
+        }
+    }
+
+    /**
      * A new submission already sends the normal player receipt elsewhere in the
      * current PLYR Points flow. This method sends only the missing admin email so
      * the player never gets two identical submission confirmations.
