@@ -572,17 +572,18 @@ HTML;
     | Schedules
     |--------------------------------------------------------------------------
     */
-    $playerSchedules = collect(
-        $user?->createdSchedules
-            ? $user->createdSchedules
-                ->sortBy([
-                    ['game_date', 'asc'],
-                    ['game_time', 'asc'],
-                ])
-                ->values()
-                ->all()
-            : []
-    );
+    $playerSchedules = $user
+        ? \App\Models\Schedule::query()
+            ->where(function ($query) use ($user) {
+                $query->where('created_by_user_id', $user->id)
+                    ->orWhereHas('users', fn ($q) => $q->where('users.id', $user->id));
+            })
+            ->orderBy('game_date')
+            ->orderBy('game_time')
+            ->get()
+            ->unique('id')
+            ->values()
+        : collect();
 
     $formatScheduleTitle = function ($schedule) {
         $opponent = trim((string) ($schedule->opponent ?? ''));
