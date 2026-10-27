@@ -888,15 +888,44 @@ class StripeBillingService
 
         if (blank($notification['player_sent_at'] ?? null)) {
             try {
+                $retryRecipients = array_values(array_filter((array) ($notification['player_failed_recipients'] ?? [])));
+
                 $playerResult = app(PlyrcardSystemEmailService::class)
-                    ->sendPointsPurchased($user->fresh() ?? $user, $points, $label, $amountCents);
+                    ->sendPointsPurchased(
+                        $user->fresh() ?? $user,
+                        $points,
+                        $label,
+                        $amountCents,
+                        $retryRecipients !== [] ? $retryRecipients : null,
+                    );
 
+                $sentNow = collect((array) ($playerResult['sent_recipients'] ?? []))
+                    ->map(fn ($email) => strtolower(trim((string) $email)))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $alreadySent = collect((array) ($notification['player_sent_recipients'] ?? []))
+                    ->map(fn ($email) => strtolower(trim((string) $email)))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $notification['player_sent_recipients'] = collect(array_merge($alreadySent, $sentNow))
+                    ->unique()
+                    ->values()
+                    ->all();
+                $notification['player_failed_recipients'] = array_values((array) ($playerResult['failed_recipients'] ?? []));
                 $notification['player_last_attempt_at'] = $now;
-                $notification['player_last_error'] = $playerResult['success'] ?? false
+                $notification['player_last_error'] = ($playerResult['all_success'] ?? false)
                     ? null
-                    : ($playerResult['error'] ?? 'Player purchase email failed.');
+                    : ($playerResult['error'] ?? (
+                        $notification['player_failed_recipients'] !== []
+                            ? 'Purchase receipt failed for: ' . implode(', ', $notification['player_failed_recipients'])
+                            : 'Player purchase email failed.'
+                    ));
 
-                if ($playerResult['success'] ?? false) {
+                if ($playerResult['all_success'] ?? false) {
                     $notification['player_sent_at'] = $now;
                     $notification['player_transport'] = $playerResult['transport'] ?? null;
                 }
