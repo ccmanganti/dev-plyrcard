@@ -271,6 +271,87 @@
         color: #cbd5e1;
     }
 
+    .plyr-point-purchase-toast[hidden] {
+        display: none !important;
+    }
+
+    .plyr-point-purchase-toast {
+        position: fixed;
+        right: 1.5rem;
+        bottom: 6.5rem;
+        z-index: 2147483645;
+        width: min(420px, calc(100vw - 2rem));
+        display: flex;
+        align-items: flex-start;
+        gap: .85rem;
+        padding: 1rem 1.05rem;
+        border: 1px solid rgba(22, 163, 74, .24);
+        border-radius: 16px;
+        background: #fff;
+        box-shadow: 0 22px 60px rgba(15, 23, 42, .18);
+        color: #101828;
+    }
+
+    .dark .plyr-point-purchase-toast {
+        background: #111318;
+        border-color: rgba(74, 222, 128, .24);
+        color: #fff;
+    }
+
+    .plyr-point-purchase-toast-icon {
+        width: 36px;
+        height: 36px;
+        flex: 0 0 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 999px;
+        background: #dcfce7;
+        color: #15803d;
+        font-size: 18px;
+        font-weight: 900;
+    }
+
+    .plyr-point-purchase-toast-copy {
+        min-width: 0;
+        flex: 1;
+    }
+
+    .plyr-point-purchase-toast-copy strong {
+        display: block;
+        font-size: .92rem;
+        line-height: 1.25;
+        color: inherit;
+    }
+
+    .plyr-point-purchase-toast-copy span {
+        display: block;
+        margin-top: .22rem;
+        font-size: .8rem;
+        line-height: 1.45;
+        color: #667085;
+    }
+
+    .dark .plyr-point-purchase-toast-copy span {
+        color: #cbd5e1;
+    }
+
+    .plyr-point-purchase-toast-close {
+        border: 0;
+        background: transparent;
+        color: #98a2b3;
+        cursor: pointer;
+        padding: .15rem;
+        font-size: 1.1rem;
+        line-height: 1;
+    }
+
+    @media (max-width: 640px) {
+        .plyr-point-purchase-toast {
+            right: 1rem;
+            bottom: 5.75rem;
+        }
+    }
+
     .plyr-checkout-spinner {
         width: .9rem;
         height: .9rem;
@@ -301,6 +382,15 @@
         <p data-plyr-purchase-thank-you-copy></p>
         <div class="plyr-purchase-thank-you-wait">Updating your PLYRCARD account…</div>
     </div>
+</div>
+
+<div class="plyr-point-purchase-toast" data-plyr-point-purchase-toast hidden role="status" aria-live="polite">
+    <div class="plyr-point-purchase-toast-icon" aria-hidden="true">✓</div>
+    <div class="plyr-point-purchase-toast-copy">
+        <strong data-plyr-point-purchase-toast-title>PLYR Points added successfully</strong>
+        <span data-plyr-point-purchase-toast-body>Your updated balance is ready to use.</span>
+    </div>
+    <button type="button" class="plyr-point-purchase-toast-close" data-plyr-point-purchase-toast-close aria-label="Dismiss notification">×</button>
 </div>
 
 <div class="plyr-stripe-modal" id="plyr-stripe-upgrade-modal" hidden>
@@ -575,7 +665,55 @@
             this.setTriggerBusy(this.activeTrigger, false);
         },
 
-        showThankYou(message) {
+        rememberPurchaseSuccess(data = {}, route = null, type = '') {
+            if (!String(type || '').startsWith('point-pack-')) return;
+
+            const points = Number(data.points ?? route?.points ?? 0);
+            const balance = Number(data.points_available ?? 0);
+            const payload = {
+                title: 'PLYR Points added successfully',
+                body: points > 0
+                    ? `${points.toLocaleString()} point${points === 1 ? '' : 's'} were added to your account.${balance >= 0 ? ` New balance: ${balance.toLocaleString()} points.` : ''}`
+                    : 'Your point purchase was successful and your updated balance is ready to use.',
+                savedAt: Date.now(),
+            };
+
+            try {
+                sessionStorage.setItem('plyrcard:last-point-purchase-success', JSON.stringify(payload));
+            } catch (_) {}
+        },
+
+        restorePurchaseSuccess() {
+            let payload = null;
+
+            try {
+                const raw = sessionStorage.getItem('plyrcard:last-point-purchase-success');
+                if (raw) {
+                    payload = JSON.parse(raw);
+                    sessionStorage.removeItem('plyrcard:last-point-purchase-success');
+                }
+            } catch (_) {}
+
+            if (!payload || (payload.savedAt && Date.now() - Number(payload.savedAt) > 120000)) return;
+
+            const toast = document.querySelector('[data-plyr-point-purchase-toast]');
+            if (!toast) return;
+
+            const title = toast.querySelector('[data-plyr-point-purchase-toast-title]');
+            const body = toast.querySelector('[data-plyr-point-purchase-toast-body]');
+            if (title) title.textContent = payload.title || 'PLYR Points added successfully';
+            if (body) body.textContent = payload.body || 'Your updated balance is ready to use.';
+
+            toast.hidden = false;
+            clearTimeout(window.__plyrcardPointPurchaseToastTimer);
+            window.__plyrcardPointPurchaseToastTimer = setTimeout(() => {
+                toast.hidden = true;
+            }, 8000);
+        },
+
+        showThankYou(message, data = {}, route = null, type = '') {
+            this.rememberPurchaseSuccess(data, route, type);
+
             const overlay = this.thankYou();
             if (!overlay) {
                 window.location.reload();
@@ -647,6 +785,9 @@
                         purchase
                             ? `Your ${route.title} purchase is complete. Your updated points are now available.`
                             : `Your ${route.title} is complete and your account has been updated.`,
+                        data,
+                        route,
+                        this.activeType,
                     );
                     return;
                 }
@@ -708,6 +849,9 @@
                         purchase
                             ? `Your ${route.title} purchase is complete. Your points have been added successfully.`
                             : `Your ${route.title} is complete and your account has been updated.`,
+                        data,
+                        route,
+                        type,
                     );
                     return;
                 }
@@ -757,6 +901,13 @@
     };
 
     window.PlyrcardStripeCheckout = manager;
+    manager.restorePurchaseSuccess();
+
+    document.querySelector('[data-plyr-point-purchase-toast-close]')?.addEventListener('click', () => {
+        const toast = document.querySelector('[data-plyr-point-purchase-toast]');
+        if (toast) toast.hidden = true;
+        clearTimeout(window.__plyrcardPointPurchaseToastTimer);
+    });
 
     if (!window.__plyrcardStripeCheckoutDelegatedV22) {
         window.__plyrcardStripeCheckoutDelegatedV22 = true;
