@@ -596,7 +596,18 @@ HTML;
     };
 
     $schedulePayload = $playerSchedules
-        ->filter(fn ($schedule) => ! blank($schedule->game_date))
+        ->filter(function ($schedule): bool {
+            if (blank($schedule->game_date)) {
+                return false;
+            }
+
+            // "Coming Soon" schedule rows are placeholders and should not be
+            // published on the player's public website.
+            $status = strtolower(trim((string) ($schedule->status ?? '')));
+            $normalizedStatus = str_replace(['_', '-'], ' ', $status);
+
+            return $normalizedStatus !== 'coming soon';
+        })
         ->map(function ($schedule) use ($formatScheduleTitle) {
             $date = optional($schedule->game_date);
 
@@ -1687,142 +1698,6 @@ HTML;
         }
 
 
-        .watch-me-follow{
-            margin-top: 2rem;
-            padding-top: 1.55rem;
-            border-top: 1px solid color-mix(in srgb, var(--on-primary) 34%, transparent 66%);
-        }
-
-        .watch-me-follow-title{
-            margin: 0 0 .4rem;
-            color: var(--on-primary);
-            font-family: "Bebas Neue", "Antonio", ui-sans-serif, system-ui;
-            font-size: clamp(2rem, 3.5vw, 2.65rem);
-            font-weight: 400;
-            line-height: 1;
-            letter-spacing: .015em;
-        }
-
-        .watch-me-follow-copy{
-            margin: 0 0 1rem;
-            color: color-mix(in srgb, var(--on-primary) 86%, transparent 14%);
-            font-size: .9rem;
-            font-weight: 500;
-            line-height: 1.45;
-        }
-
-        .watch-me-follow-form{
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            gap: .75rem;
-            align-items: end;
-        }
-
-        .watch-me-follow-field{
-            min-width: 0;
-        }
-
-        .watch-me-follow-label{
-            display: block;
-            margin-bottom: .32rem;
-            color: color-mix(in srgb, var(--on-primary) 78%, transparent 22%);
-            font-family: "Antonio", ui-sans-serif, system-ui;
-            font-size: .74rem;
-            font-weight: 800;
-            line-height: 1;
-            letter-spacing: .1em;
-            text-transform: uppercase;
-        }
-
-        .watch-me-follow-input{
-            width: 100%;
-            min-height: 48px;
-            border: 0;
-            border-bottom: 2px solid color-mix(in srgb, var(--on-primary) 74%, transparent 26%);
-            border-radius: 0;
-            outline: 0;
-            padding: .55rem .05rem .48rem;
-            background: transparent;
-            color: var(--on-primary);
-            font-family: "Antonio", ui-sans-serif, system-ui;
-            font-size: 1rem;
-            font-weight: 600;
-        }
-
-        .watch-me-follow-input::placeholder{
-            color: color-mix(in srgb, var(--on-primary) 54%, transparent 46%);
-        }
-
-        .watch-me-follow-input:focus{
-            border-bottom-color: var(--on-primary);
-        }
-
-        .watch-me-follow-btn{
-            min-height: 48px;
-            border: 0;
-            border-radius: 999px;
-            padding: 0 1.35rem;
-            background: var(--on-primary);
-            color: var(--primary);
-            font-family: "Antonio", ui-sans-serif, system-ui;
-            font-size: .88rem;
-            font-weight: 800;
-            letter-spacing: .1em;
-            text-transform: uppercase;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: transform .16s ease, opacity .16s ease;
-        }
-
-        .watch-me-follow-btn:hover{
-            transform: translateY(-1px);
-        }
-
-        .watch-me-follow-btn:disabled{
-            opacity: .68;
-            cursor: wait;
-            transform: none;
-        }
-
-        .watch-me-follow-error{
-            display: none;
-            margin-top: .42rem;
-            color: var(--on-primary);
-            font-size: .78rem;
-            font-weight: 700;
-        }
-
-        .watch-me-follow-field.has-error .watch-me-follow-error{
-            display: block;
-        }
-
-        .watch-me-follow-status{
-            display: none;
-            grid-column: 1 / -1;
-            margin-top: .1rem;
-            padding: .7rem .85rem;
-            border-radius: 10px;
-            background: color-mix(in srgb, var(--on-primary) 14%, transparent 86%);
-            color: var(--on-primary);
-            font-size: .82rem;
-            font-weight: 700;
-            line-height: 1.4;
-        }
-
-        .watch-me-follow-status.is-visible{
-            display: block;
-        }
-
-        @media (max-width: 480px){
-            .watch-me-follow-form{
-                grid-template-columns: 1fr;
-            }
-
-            .watch-me-follow-btn{
-                width: 100%;
-            }
-        }
-
         @media (max-width: 1023px){
             .watch-me-title{
                 font-size: clamp(3rem, 8vw, 4.8rem);
@@ -2667,7 +2542,7 @@ HTML;
                         ></iframe>
                         <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
                     @endif
-                @else
+                @elseif(! empty($watchSchedulePayload))
                     <div class="watch-me-panel">
                         <h2 class="watch-me-title">Where to<br>Watch Me</h2>
 
@@ -2676,7 +2551,7 @@ HTML;
                         </p>
 
                         <div class="watch-me-stack">
-                            @forelse($watchSchedulePayload as $watchIndex => $watchSchedule)
+                            @foreach($watchSchedulePayload as $watchIndex => $watchSchedule)
                                 @php
                                     $watchSearchText = strtolower(trim(implode(' ', [
                                         (string) ($watchSchedule['title'] ?? ''),
@@ -2741,63 +2616,9 @@ HTML;
                                         </button>
                                     </div>
                                 </article>
-                            @empty
-                                <div class="watch-me-empty">
-                                    <div class="watch-me-empty-title">Schedule coming soon</div>
-                                    <div class="watch-me-empty-copy">
-                                        Upcoming games and showcases will appear here as soon as they are added.
-                                    </div>
-                                </div>
-                            @endforelse
+                            @endforeach
                         </div>
 
-                        @php
-                            $watchFollowAction = \Illuminate\Support\Facades\Route::has('public.follow-me.store')
-                                ? route('public.follow-me.store', $website)
-                                : null;
-                        @endphp
-
-                        <div class="watch-me-follow">
-                            <h3 class="watch-me-follow-title">Get my schedule updates</h3>
-                            <p class="watch-me-follow-copy">
-                                Follow my upcoming games, showcases, and schedule changes.
-                            </p>
-
-                            <form
-                                class="watch-me-follow-form"
-                                method="POST"
-                                action="{{ $watchFollowAction ?: '#' }}"
-                                data-follow-me-form
-                                data-follow-compact="1"
-                                data-player-email="{{ $playerEmail }}"
-                                novalidate
-                            >
-                                @csrf
-                                <input type="hidden" name="website_id" value="{{ $website->id }}">
-                                <input type="hidden" name="player_id" value="{{ $user?->id }}">
-                                <input type="hidden" name="player_name" value="{{ $playerDisplayName }}">
-
-                                <div class="watch-me-follow-field" data-field-wrap>
-                                    <label class="watch-me-follow-label" for="watch_follow_email_{{ $website->id }}">Coach email</label>
-                                    <input
-                                        id="watch_follow_email_{{ $website->id }}"
-                                        class="watch-me-follow-input"
-                                        type="email"
-                                        name="email"
-                                        placeholder="coach@email.com"
-                                        autocomplete="email"
-                                        required
-                                    >
-                                    <span class="watch-me-follow-error">Enter a valid email address.</span>
-                                </div>
-
-                                <button class="watch-me-follow-btn follow-me-submit" type="submit" data-default-text="Follow">
-                                    Follow
-                                </button>
-
-                                <div class="watch-me-follow-status follow-me-status" data-follow-me-status aria-live="polite"></div>
-                            </form>
-                        </div>
                     </div>
                 @endif
             </div>
@@ -3704,146 +3525,6 @@ HTML;
                     link.remove();
 
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
-                });
-            });
-        });
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('[data-follow-me-form]').forEach(function (form) {
-                const submitButton = form.querySelector('.follow-me-submit');
-                const status = form.querySelector('[data-follow-me-status]');
-                const defaultText = submitButton?.dataset.defaultText || 'Follow Me';
-
-                const setStatus = function (message, visible = true) {
-                    if (!status) {
-                        return;
-                    }
-
-                    status.textContent = message;
-                    status.classList.toggle('is-visible', visible);
-                };
-
-                const clearErrors = function () {
-                    form.querySelectorAll('[data-field-wrap]').forEach(function (wrap) {
-                        wrap.classList.remove('has-error');
-                    });
-                };
-
-                const validate = function () {
-                    clearErrors();
-
-                    let isValid = true;
-                    const requiredFields = form.querySelectorAll('[required]');
-
-                    requiredFields.forEach(function (field) {
-                        const wrap = field.closest('[data-field-wrap]');
-                        const value = String(field.value || '').trim();
-                        let fieldValid = value.length > 0;
-
-                        if (field.type === 'email') {
-                            fieldValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-                        }
-
-                        if (!fieldValid) {
-                            isValid = false;
-                            wrap?.classList.add('has-error');
-                        }
-                    });
-
-                    return isValid;
-                };
-
-                const fallbackMailTo = function () {
-                    const playerEmail = form.dataset.playerEmail || '';
-
-                    if (!playerEmail) {
-                        setStatus('We could not submit this follow request right now. Please contact the player directly.');
-                        return;
-                    }
-
-                    const formData = new FormData(form);
-                    const firstName = formData.get('first_name') || '';
-                    const lastName = formData.get('last_name') || '';
-                    const email = formData.get('email') || '';
-                    const school = formData.get('school') || '';
-                    const message = formData.get('message') || '';
-                    const playerName = formData.get('player_name') || 'this player';
-
-                    const subject = encodeURIComponent('Schedule Follow Request for ' + playerName);
-                    const bodyLines = [
-                        'New schedule follow request:',
-                        '',
-                        email ? 'Coach email: ' + email : '',
-                        [firstName, lastName].filter(Boolean).length ? 'Name: ' + [firstName, lastName].filter(Boolean).join(' ') : '',
-                        school ? 'School / Organization: ' + school : '',
-                        message ? '' : '',
-                        message ? 'Message:' : '',
-                        message || '',
-                    ].filter(Boolean);
-                    const body = encodeURIComponent(bodyLines.join('\n'));
-
-                    window.location.href = 'mailto:' + encodeURIComponent(playerEmail) + '?subject=' + subject + '&body=' + body;
-                    setStatus('Opening your email app so you can send the follow request.');
-                };
-
-                form.addEventListener('submit', async function (event) {
-                    event.preventDefault();
-                    setStatus('', false);
-
-                    if (!validate()) {
-                        setStatus('Please complete the required fields before submitting.');
-                        return;
-                    }
-
-                    if (submitButton) {
-                        submitButton.disabled = true;
-                        submitButton.textContent = 'Sending...';
-                    }
-
-                    const action = form.getAttribute('action');
-                    const hasRealAction = action && action !== '#';
-
-                    try {
-                        if (!hasRealAction) {
-                            fallbackMailTo();
-                            form.reset();
-                            return;
-                        }
-
-                        const response = await fetch(action, {
-                            method: 'POST',
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'Accept': 'application/json',
-                            },
-                            body: new FormData(form),
-                            credentials: 'same-origin',
-                        });
-
-                        const payload = await response.json().catch(function () {
-                            return {};
-                        });
-
-                        if (!response.ok || payload.success === false) {
-                            throw new Error(payload.message || 'We could not submit the form right now.');
-                        }
-
-                        form.reset();
-                        setStatus(payload.message || 'Thanks — your follow request has been sent.');
-                    } catch (error) {
-                        if (form.dataset.followCompact === '1') {
-                            fallbackMailTo();
-                        } else {
-                            setStatus(error.message || 'Something went wrong. Please try again.');
-                        }
-                    } finally {
-                        if (submitButton) {
-                            submitButton.disabled = false;
-                            submitButton.textContent = defaultText;
-                        }
-                    }
                 });
             });
         });
