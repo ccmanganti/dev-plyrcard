@@ -596,7 +596,18 @@ HTML;
     };
 
     $schedulePayload = $playerSchedules
-        ->filter(fn ($schedule) => ! blank($schedule->game_date))
+        ->filter(function ($schedule): bool {
+            if (blank($schedule->game_date)) {
+                return false;
+            }
+
+            // "Coming Soon" schedule rows are placeholders and should not be
+            // published on the player's public website.
+            $status = strtolower(trim((string) ($schedule->status ?? '')));
+            $normalizedStatus = str_replace(['_', '-'], ' ', $status);
+
+            return $normalizedStatus !== 'coming soon';
+        })
         ->map(function ($schedule) use ($formatScheduleTitle) {
             $date = optional($schedule->game_date);
 
@@ -2667,7 +2678,7 @@ HTML;
                         ></iframe>
                         <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
                     @endif
-                @else
+                @elseif(! empty($watchSchedulePayload))
                     <div class="watch-me-panel">
                         <h2 class="watch-me-title">Where to<br>Watch Me</h2>
 
@@ -2676,7 +2687,7 @@ HTML;
                         </p>
 
                         <div class="watch-me-stack">
-                            @forelse($watchSchedulePayload as $watchIndex => $watchSchedule)
+                            @foreach($watchSchedulePayload as $watchIndex => $watchSchedule)
                                 @php
                                     $watchSearchText = strtolower(trim(implode(' ', [
                                         (string) ($watchSchedule['title'] ?? ''),
@@ -2741,63 +2752,9 @@ HTML;
                                         </button>
                                     </div>
                                 </article>
-                            @empty
-                                <div class="watch-me-empty">
-                                    <div class="watch-me-empty-title">Schedule coming soon</div>
-                                    <div class="watch-me-empty-copy">
-                                        Upcoming games and showcases will appear here as soon as they are added.
-                                    </div>
-                                </div>
-                            @endforelse
+                            @endforeach
                         </div>
 
-                        @php
-                            $watchFollowAction = \Illuminate\Support\Facades\Route::has('public.follow-me.store')
-                                ? route('public.follow-me.store', $website)
-                                : null;
-                        @endphp
-
-                        <div class="watch-me-follow">
-                            <h3 class="watch-me-follow-title">Get my schedule updates</h3>
-                            <p class="watch-me-follow-copy">
-                                Follow my upcoming games, showcases, and schedule changes.
-                            </p>
-
-                            <form
-                                class="watch-me-follow-form"
-                                method="POST"
-                                action="{{ $watchFollowAction ?: '#' }}"
-                                data-follow-me-form
-                                data-follow-compact="1"
-                                data-player-email="{{ $playerEmail }}"
-                                novalidate
-                            >
-                                @csrf
-                                <input type="hidden" name="website_id" value="{{ $website->id }}">
-                                <input type="hidden" name="player_id" value="{{ $user?->id }}">
-                                <input type="hidden" name="player_name" value="{{ $playerDisplayName }}">
-
-                                <div class="watch-me-follow-field" data-field-wrap>
-                                    <label class="watch-me-follow-label" for="watch_follow_email_{{ $website->id }}">Coach email</label>
-                                    <input
-                                        id="watch_follow_email_{{ $website->id }}"
-                                        class="watch-me-follow-input"
-                                        type="email"
-                                        name="email"
-                                        placeholder="coach@email.com"
-                                        autocomplete="email"
-                                        required
-                                    >
-                                    <span class="watch-me-follow-error">Enter a valid email address.</span>
-                                </div>
-
-                                <button class="watch-me-follow-btn follow-me-submit" type="submit" data-default-text="Follow">
-                                    Follow
-                                </button>
-
-                                <div class="watch-me-follow-status follow-me-status" data-follow-me-status aria-live="polite"></div>
-                            </form>
-                        </div>
                     </div>
                 @endif
             </div>
@@ -3704,146 +3661,6 @@ HTML;
                     link.remove();
 
                     setTimeout(() => URL.revokeObjectURL(url), 1000);
-                });
-            });
-        });
-    </script>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            document.querySelectorAll('[data-follow-me-form]').forEach(function (form) {
-                const submitButton = form.querySelector('.follow-me-submit');
-                const status = form.querySelector('[data-follow-me-status]');
-                const defaultText = submitButton?.dataset.defaultText || 'Follow Me';
-
-                const setStatus = function (message, visible = true) {
-                    if (!status) {
-                        return;
-                    }
-
-                    status.textContent = message;
-                    status.classList.toggle('is-visible', visible);
-                };
-
-                const clearErrors = function () {
-                    form.querySelectorAll('[data-field-wrap]').forEach(function (wrap) {
-                        wrap.classList.remove('has-error');
-                    });
-                };
-
-                const validate = function () {
-                    clearErrors();
-
-                    let isValid = true;
-                    const requiredFields = form.querySelectorAll('[required]');
-
-                    requiredFields.forEach(function (field) {
-                        const wrap = field.closest('[data-field-wrap]');
-                        const value = String(field.value || '').trim();
-                        let fieldValid = value.length > 0;
-
-                        if (field.type === 'email') {
-                            fieldValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-                        }
-
-                        if (!fieldValid) {
-                            isValid = false;
-                            wrap?.classList.add('has-error');
-                        }
-                    });
-
-                    return isValid;
-                };
-
-                const fallbackMailTo = function () {
-                    const playerEmail = form.dataset.playerEmail || '';
-
-                    if (!playerEmail) {
-                        setStatus('We could not submit this follow request right now. Please contact the player directly.');
-                        return;
-                    }
-
-                    const formData = new FormData(form);
-                    const firstName = formData.get('first_name') || '';
-                    const lastName = formData.get('last_name') || '';
-                    const email = formData.get('email') || '';
-                    const school = formData.get('school') || '';
-                    const message = formData.get('message') || '';
-                    const playerName = formData.get('player_name') || 'this player';
-
-                    const subject = encodeURIComponent('Schedule Follow Request for ' + playerName);
-                    const bodyLines = [
-                        'New schedule follow request:',
-                        '',
-                        email ? 'Coach email: ' + email : '',
-                        [firstName, lastName].filter(Boolean).length ? 'Name: ' + [firstName, lastName].filter(Boolean).join(' ') : '',
-                        school ? 'School / Organization: ' + school : '',
-                        message ? '' : '',
-                        message ? 'Message:' : '',
-                        message || '',
-                    ].filter(Boolean);
-                    const body = encodeURIComponent(bodyLines.join('\n'));
-
-                    window.location.href = 'mailto:' + encodeURIComponent(playerEmail) + '?subject=' + subject + '&body=' + body;
-                    setStatus('Opening your email app so you can send the follow request.');
-                };
-
-                form.addEventListener('submit', async function (event) {
-                    event.preventDefault();
-                    setStatus('', false);
-
-                    if (!validate()) {
-                        setStatus('Please complete the required fields before submitting.');
-                        return;
-                    }
-
-                    if (submitButton) {
-                        submitButton.disabled = true;
-                        submitButton.textContent = 'Sending...';
-                    }
-
-                    const action = form.getAttribute('action');
-                    const hasRealAction = action && action !== '#';
-
-                    try {
-                        if (!hasRealAction) {
-                            fallbackMailTo();
-                            form.reset();
-                            return;
-                        }
-
-                        const response = await fetch(action, {
-                            method: 'POST',
-                            headers: {
-                                'X-Requested-With': 'XMLHttpRequest',
-                                'Accept': 'application/json',
-                            },
-                            body: new FormData(form),
-                            credentials: 'same-origin',
-                        });
-
-                        const payload = await response.json().catch(function () {
-                            return {};
-                        });
-
-                        if (!response.ok || payload.success === false) {
-                            throw new Error(payload.message || 'We could not submit the form right now.');
-                        }
-
-                        form.reset();
-                        setStatus(payload.message || 'Thanks — your follow request has been sent.');
-                    } catch (error) {
-                        if (form.dataset.followCompact === '1') {
-                            fallbackMailTo();
-                        } else {
-                            setStatus(error.message || 'Something went wrong. Please try again.');
-                        }
-                    } finally {
-                        if (submitButton) {
-                            submitButton.disabled = false;
-                            submitButton.textContent = defaultText;
-                        }
-                    }
                 });
             });
         });
