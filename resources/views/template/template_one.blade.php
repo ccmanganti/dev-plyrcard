@@ -2542,7 +2542,7 @@ HTML;
                         ></iframe>
                         <script src="https://systems.plyrcard.com/js/form_embed.js" type="text/javascript"></script>
                     @endif
-                @elseif(! empty($watchSchedulePayload))
+                @else
                     <div class="watch-me-panel">
                         <h2 class="watch-me-title">Where to<br>Watch Me</h2>
 
