@@ -1,6 +1,7 @@
 <?php
 namespace App\Services;
 use App\Models\BillingInformation;
+use App\Models\CreditPointTransaction;
 use App\Models\PaymentTransaction;
 use App\Models\User;
 use Illuminate\Http\Client\PendingRequest;
