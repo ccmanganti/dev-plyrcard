@@ -18276,13 +18276,10 @@ if (window.__plyrPointsEnhancerInstalledV15) {
                 .plyr-points-sample-title-v15 p{margin:0;color:var(--rc-muted);font-size:.7rem;line-height:1.4}
                 .plyr-points-sample-inclusions-v16{display:none!important}
                 .plyr-points-sample-grid-v24{min-height:0;display:grid;grid-template-columns:repeat(var(--sample-cols,1),minmax(0,1fr));grid-template-rows:repeat(var(--sample-rows,1),minmax(0,1fr));gap:.7rem;align-content:stretch}
-                .plyr-points-sample-card-v24{position:relative;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--rc-border);border-radius:.9rem;background:#0d1117;display:grid;grid-template-rows:minmax(0,1fr) auto;box-shadow:0 8px 24px rgba(15,23,42,.08)}
+                .plyr-points-sample-card-v24{position:relative;min-width:0;min-height:0;overflow:hidden;border:1px solid var(--rc-border);border-radius:.9rem;background:#0d1117;display:grid;place-items:stretch;box-shadow:0 8px 24px rgba(15,23,42,.08)}
                 .plyr-points-sample-media-v24{min-height:0;display:grid;place-items:center;overflow:hidden;background:#0d1117}
                 .plyr-points-sample-media-v24 img,.plyr-points-sample-media-v24 video,.plyr-points-sample-media-v24 iframe{width:100%;height:100%;min-height:0;border:0;object-fit:contain;background:#0d1117}
-                .plyr-points-sample-card-v24.is-single .plyr-points-sample-media-v24 img,.plyr-points-sample-card-v24.is-single .plyr-points-sample-media-v24 video,.plyr-points-sample-card-v24.is-single .plyr-points-sample-media-v24 iframe{max-height:calc(100vh - 235px)}
-                .plyr-points-sample-card-meta-v24{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.48rem .62rem;background:var(--rc-surface);border-top:1px solid var(--rc-border)}
-                .plyr-points-sample-card-meta-v24 strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--rc-text);font-size:.67rem}
-                .plyr-points-sample-card-meta-v24 span{flex:0 0 auto;color:var(--rc-muted);font-size:.58rem;font-weight:850}
+                .plyr-points-sample-card-v24.is-single .plyr-points-sample-media-v24 img,.plyr-points-sample-card-v24.is-single .plyr-points-sample-media-v24 video,.plyr-points-sample-card-v24.is-single .plyr-points-sample-media-v24 iframe{max-height:calc(100vh - 210px)}
                 .plyr-points-sample-empty-v15{display:grid;gap:.35rem;place-items:center;color:#cbd5e1;text-align:center;padding:1.25rem}.plyr-points-sample-empty-v15 strong{color:#fff;font-size:.9rem}.plyr-points-sample-empty-v15 span{font-size:.7rem;color:#94a3b8}
                 .plyr-points-sample-link-v16{height:100%;display:grid;place-items:center;align-content:center;gap:.5rem;padding:1rem;color:#fff;text-align:center}.plyr-points-sample-link-v16 span{color:#94a3b8;font-size:.68rem}.plyr-points-sample-link-v16 a{color:#fff;font-size:.72rem;font-weight:850;text-decoration:underline;text-underline-offset:3px}
                 .plyr-points-sample-footer-v15{position:relative;bottom:auto;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.6rem;padding:0;background:none}
@@ -18476,8 +18473,7 @@ if (window.__plyrPointsEnhancerInstalledV15) {
             if(state.sampleDrawer?.isConnected)return state.sampleDrawer;const drawer=document.createElement('aside');drawer.className='plyr-points-sample-drawer-v15';drawer.setAttribute('role','dialog');drawer.setAttribute('aria-modal','true');drawer.setAttribute('aria-label','PLYR Points service sample');drawer.innerHTML=`<div class="plyr-points-drawer-head-v15"><div><h2>Service sample</h2><p>Preview what this PLYR Points service can deliver.</p></div><button type="button" class="plyr-points-drawer-close-v15" data-plyr-points-sample-close-v15 aria-label="Close sample drawer">Close</button></div><div data-plyr-points-sample-body-v15></div>`;drawer.querySelector('[data-plyr-points-sample-close-v15]')?.addEventListener('click',closeSampleDrawer);document.body.appendChild(drawer);state.sampleDrawer=drawer;return drawer;
         };
         const sampleCardMarkup = (sample,service,index,total) => {
-            const name=escapeHtml(sample?.name||`Sample ${index+1}`);
-            return `<article class="plyr-points-sample-card-v24 ${total===1?'is-single':''}"><div class="plyr-points-sample-media-v24">${sampleMediaMarkup(sample,service)}</div><div class="plyr-points-sample-card-meta-v24"><strong title="${name}">${name}</strong><span>${index+1}/${total}</span></div></article>`;
+            return `<article class="plyr-points-sample-card-v24 ${total===1?'is-single':''}"><div class="plyr-points-sample-media-v24">${sampleMediaMarkup(sample,service)}</div></article>`;
         };
         const renderSampleDrawer = () => {
             const drawer=ensureSampleDrawer(),body=drawer.querySelector('[data-plyr-points-sample-body-v15]'),service=state.services?.[state.sampleServiceKey]||null;
