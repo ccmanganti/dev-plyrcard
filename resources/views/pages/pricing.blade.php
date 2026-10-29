@@ -1,1424 +1,513 @@
 @php
     $activePage = 'pricing';
-    $pricingPlans = (array) config('plyrcard-registration.plans', []);
-    $myJourneyCents = (int) data_get($pricingPlans, 'my-journey.recurring_amount_cents', 4900);
-    $amplifySetupCents = (int) data_get($pricingPlans, 'amplify.setup_fee_cents', 50000);
-    $amplifyFirstMonth = (bool) data_get($pricingPlans, 'amplify.charge_first_month_upfront', true);
-    $jumpstartCents = (int) config('plyrcard-registration.plans.jumpstart.setup_fee_cents', 14900);
-    $jumpstartEnrollmentCents = $jumpstartCents + $myJourneyCents;
-    $amplifyEnrollmentCents = $amplifySetupCents + ($amplifyFirstMonth ? $myJourneyCents : 0);
-    $pricingMoney = static fn (int $cents): string => '$' . (floor($cents / 100) === ($cents / 100) ? number_format($cents / 100, 0) : number_format($cents / 100, 2));
+    $plans = (array) config('plyrcard-registration.plans', []);
+    $catalog = (array) config('plyrcard-points.catalog', []);
+    $pointPacks = collect((array) config('plyrcard-points.point_packs', []))
+        ->filter(fn (array $pack): bool => (bool) ($pack['enabled'] ?? true))
+        ->keyBy(fn (array $pack, string $key): string => $key);
+
+    $myJourneyCents = (int) data_get($plans, 'my-journey.recurring_amount_cents', 4900);
+    $jumpstartCents = (int) data_get($plans, 'jumpstart.setup_fee_cents', 14900);
+    $amplifyCents = (int) data_get($plans, 'amplify.setup_fee_cents', 50000);
+    $jumpstartPoints = (int) config('plyrcard-points.packages.jumpstart', 320);
+    $amplifyPoints = (int) config('plyrcard-points.packages.amplify', 1280);
+    $customPointCents = max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100));
+    $customPointMin = max(1, (int) config('plyrcard-points.custom_point_purchase.min_points', 1));
+    $customPointMax = max($customPointMin, (int) config('plyrcard-points.custom_point_purchase.max_points', 1000));
+    $customPointsEnabled = (bool) config('plyrcard-points.custom_point_purchase.enabled', true);
+
+    $services = [
+        'outreach' => [
+            'label' => data_get($catalog, 'outreach.name', 'Coach Outreach Program'),
+            'points' => (int) data_get($catalog, 'outreach.points', 80),
+            'description' => 'Cast a wide net. Reach coaches in every division from D1 to JUCO, nationwide or by state and region.',
+            'icon' => 'send',
+        ],
+        'reel' => [
+            'label' => data_get($catalog, 'reel.name', 'Highlight Reel'),
+            'points' => (int) data_get($catalog, 'reel.points', 90),
+            'description' => 'Just send us your timestamps. We cut your best moments from VEO or game film and do the rest.',
+            'icon' => 'video',
+        ],
+        'graphic' => [
+            'label' => data_get($catalog, 'graphic.name', 'Custom Graphic'),
+            'points' => (int) data_get($catalog, 'graphic.points', 50),
+            'description' => 'Commitment posts, CV graphics, game day and stat cards. 100% custom, never AI generated.',
+            'icon' => 'image',
+        ],
+        'production_hour' => [
+            'label' => data_get($catalog, 'production_hour.name', 'Rep Hour'),
+            'points' => (int) data_get($catalog, 'production_hour.points', 50),
+            'description' => 'Have your rep review your profile, or hand off the work when you are short on time.',
+            'icon' => 'clock',
+        ],
+    ];
+
+    $money = static function (int $cents): string {
+        $amount = $cents / 100;
+        return '$' . ((int) $amount == $amount ? number_format($amount, 0) : number_format($amount, 2));
+    };
+
+    $freeHref = route('marketing.registration', ['plan' => 'free']);
+    $journeyHref = route('marketing.registration', ['plan' => 'my-journey']);
+    $jumpstartHref = route('marketing.registration', ['plan' => 'jumpstart']);
+    $amplifyHref = route('marketing.registration', ['plan' => 'amplify']);
 @endphp
-
-@include('partials.images')
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-	<!-- <script src="https://widgets.leadconnectorhq.com/loader.js" data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js" data-widget-id="6941fea74ca18223c7de491d"></script> -->
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="description" content="PLYRCARD Pricing — Choose Free or My Journey, then add Jumpstart or Amplify service support to strengthen your recruiting presence." />
-  <title>Pricing — PLYRCARD</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Antonio:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-
-  <style>
-    /* ─── RESET & TOKENS ────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --accent:       #FF5C35;
-      --accent-dark:  #E04520;
-      --black:        #0D0D0D;
-      --surface:      #171717;
-      --surface-2:    #111111;
-      --white:        #FFFFFF;
-      --font-display: 'Antonio', sans-serif;
-      --font-body:    'Inter', sans-serif;
-      --safe-top:     env(safe-area-inset-top, 0px);
-      --safe-bottom:  env(safe-area-inset-bottom, 0px);
-      --header-h:     60px;
-      --radius-card:  20px;
-      --radius-btn:   9999px;
-      --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: var(--font-body);
-      background: var(--black);
-      color: var(--white);
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-    img { display: block; max-width: 100%; }
-    a   { color: inherit; text-decoration: none; }
-
-    /* ─── HEADER ────────────────────────────────────── */
-    #site-header {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      height: calc(var(--header-h) + var(--safe-top));
-      padding-top: var(--safe-top);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding-left: 20px;
-      padding-right: 20px;
-      background: rgba(13,13,13,0.92);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid rgba(255,255,255,0.07);
-    }
-    #site-header.over-hero {
-      background: transparent;
-      border-bottom-color: transparent;
-    }
-    .logo-wrap {
-      display: flex;
-      align-items: center;
-      height: 32px;
-    }
-    .logo-wrap img {
-      height: 32px;
-      width: auto;
-      object-fit: contain;
-      filter: brightness(0) invert(1);
-    }
-    .logo-text {
-      font-family: var(--font-display);
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      line-height: 1;
-    }
-    .logo-text span { color: var(--accent); }
-
-    .menu-btn {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 5px;
-      width: 44px; height: 44px;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 10px 6px;
-      margin-right: -6px;
-    }
-    .menu-btn span {
-      display: block;
-      width: 24px; height: 2px;
-      background: var(--white);
-      border-radius: 2px;
-      transition: transform 0.3s, opacity 0.3s;
-    }
-    .menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    .menu-btn.open span:nth-child(2) { opacity: 0; }
-    .menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-    #mobile-nav {
-      position: fixed;
-      inset: 0;
-      z-index: 99;
-      background: var(--black);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      gap: 32px;
-      opacity: 0;
-      pointer-events: none;
-      transform: translateY(-12px);
-      transition: opacity 0.35s var(--ease-out), transform 0.35s var(--ease-out);
-    }
-    #mobile-nav.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
-    .nav-link {
-      font-family: var(--font-display);
-      font-size: 36px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--white);
-      text-transform: uppercase;
-      transition: color 0.2s;
-    }
-    .nav-link:hover,
-    .nav-link.active { color: var(--accent); }
-    .nav-cta-pill {
-      display: inline-flex;
-      align-items: center;
-      background: var(--accent);
-      color: var(--white);
-      font-family: var(--font-display);
-      font-size: 16px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      border-radius: var(--radius-btn);
-      padding: 14px 32px;
-      margin-top: 8px;
-    }
-
-    /* ─── PAGE HERO ──────────────────────────────────── */
-    #page-hero {
-      padding-top: calc(var(--header-h) + var(--safe-top) + 48px);
-      padding-bottom: 56px;
-      padding-left: 24px;
-      padding-right: 24px;
-      background: var(--black);
-      text-align: center;
-    }
-    .page-eyebrow {
-      font-family: var(--font-display);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 10px;
-    }
-    .page-hero-headline {
-      font-family: var(--font-display);
-      font-size: clamp(44px, 13vw, 68px);
-      font-weight: 700;
-      line-height: 0.92;
-      letter-spacing: -0.02em;
-      text-transform: uppercase;
-      color: var(--white);
-      margin-bottom: 16px;
-    }
-    .page-hero-sub {
-      font-size: 16px;
-      line-height: 1.55;
-      color: rgba(255,255,255,0.60);
-      max-width: 320px;
-      margin: 0 auto;
-    }
-
-    /* Billing toggle */
-    .billing-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 32px;
-    }
-    .toggle-label {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.45);
-      transition: color 0.2s;
-      cursor: pointer;
-    }
-    .toggle-label.active { color: var(--white); }
-    .toggle-switch {
-      position: relative;
-      width: 48px; height: 28px;
-      background: var(--surface);
-      border-radius: 9999px;
-      border: 1px solid rgba(255,255,255,0.12);
-      cursor: pointer;
-      flex-shrink: 0;
-    }
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 3px; left: 3px;
-      width: 20px; height: 20px;
-      border-radius: 50%;
-      background: var(--accent);
-      transition: transform 0.3s var(--ease-out);
-    }
-    .toggle-switch.annual::after { transform: translateX(20px); }
-    .save-badge {
-      display: inline-flex;
-      align-items: center;
-      background: rgba(255,92,53,0.15);
-      color: var(--accent);
-      font-family: var(--font-display);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      border-radius: var(--radius-btn);
-      padding: 4px 10px;
-      margin-left: 4px;
-    }
-
-    /* ─── PRICING SECTION ───────────────────────────── */
-    #pricing-cards {
-      padding: 0 16px 72px;
-      background: var(--black);
-    }
-
-    /* Sticky plan label strip */
-    .plan-strip {
-      position: sticky;
-      top: calc(var(--header-h) + var(--safe-top));
-      z-index: 10;
-      background: rgba(13,13,13,0.95);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(255,255,255,0.07);
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      text-align: center;
-      padding: 10px 0;
-    }
-    .plan-strip-item {
-      font-family: var(--font-display);
-      font-size: 12px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.40);
-      padding: 4px 8px;
-      cursor: pointer;
-      transition: color 0.2s;
-    }
-    .plan-strip-item.active { color: var(--accent); }
-
-    /* Cards stack */
-    .pricing-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      padding-top: 24px;
-    }
-
-    .plan-card {
-      background: var(--surface);
-      border-radius: var(--radius-card);
-      border: 1px solid rgba(255,255,255,0.08);
-      overflow: hidden;
-      position: relative;
-      transition: border-color 0.3s;
-    }
-    .plan-card.featured {
-      border-color: var(--accent);
-      background: var(--surface);
-    }
-    .plan-card.featured::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--accent);
-    }
-
-    /* Popular badge */
-    .popular-badge {
-      display: inline-flex;
-      align-items: center;
-      background: var(--accent);
-      color: var(--white);
-      font-family: var(--font-display);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.10em;
-      text-transform: uppercase;
-      border-radius: var(--radius-btn);
-      padding: 4px 12px;
-      margin-bottom: 12px;
-    }
-
-    /* Card header */
-    .plan-header {
-      padding: 28px 24px 0;
-    }
-    .plan-name {
-      font-family: var(--font-display);
-      font-size: 28px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: -0.01em;
-      line-height: 1;
-      margin-bottom: 4px;
-    }
-    .plan-tagline {
-      font-size: 13px;
-      color: rgba(255,255,255,0.45);
-      line-height: 1.4;
-    }
-
-    /* Price block */
-    .plan-price-wrap {
-      padding: 20px 24px 0;
-      display: flex;
-      align-items: flex-end;
-      gap: 4px;
-    }
-    .plan-price {
-      font-family: var(--font-display);
-      font-size: 52px;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: -0.03em;
-    }
-    .plan-price-currency {
-      font-family: var(--font-display);
-      font-size: 22px;
-      font-weight: 700;
-      margin-bottom: 6px;
-    }
-    .plan-price-period {
-      font-size: 14px;
-      color: rgba(255,255,255,0.40);
-      margin-bottom: 8px;
-      margin-left: 2px;
-    }
-    .plan-setup {
-      padding: 6px 24px 0;
-      font-size: 12px;
-      color: rgba(255,255,255,0.35);
-    }
-    .plan-setup strong { color: rgba(255,255,255,0.60); }
-
-    /* Annual price display */
-    .annual-price { display: none; }
-    .monthly-price { display: flex; }
-    body.annual .annual-price { display: flex; }
-    body.annual .monthly-price { display: none; }
-
-    /* CTA */
-    .plan-cta-wrap {
-      padding: 20px 24px;
-    }
-    .plan-cta {
-      display: block;
-      width: 100%;
-      text-align: center;
-      font-family: var(--font-display);
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      border-radius: var(--radius-btn);
-      padding: 16px 24px;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s, color 0.2s;
-      text-decoration: none;
-    }
-    .plan-cta.solid {
-      background: var(--accent);
-      color: var(--white);
-    }
-    .plan-cta.solid:hover { background: var(--accent-dark); }
-    .plan-cta.outline {
-      background: transparent;
-      color: var(--white);
-      border: 1.5px solid rgba(255,255,255,0.25);
-    }
-    .plan-cta.outline:hover { border-color: var(--white); background: rgba(255,255,255,0.06); }
-
-    /* Divider */
-    .plan-divider {
-      height: 1px;
-      background: rgba(255,255,255,0.07);
-      margin: 0 24px;
-    }
-
-    /* Features list */
-    .plan-features {
-      padding: 20px 24px 28px;
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .feature-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      font-size: 14px;
-      color: rgba(255,255,255,0.75);
-      line-height: 1.4;
-    }
-    .feature-check {
-      flex-shrink: 0;
-      width: 18px; height: 18px;
-      border-radius: 50%;
-      background: rgba(255,92,53,0.15);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-top: 1px;
-    }
-    .feature-check svg {
-      width: 10px; height: 10px;
-      fill: none;
-      stroke: var(--accent);
-      stroke-width: 2.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-    .feature-check.muted { background: rgba(255,255,255,0.05); }
-    .feature-check.muted svg { stroke: rgba(255,255,255,0.20); }
-    .feature-item.dimmed { color: rgba(255,255,255,0.30); }
-
-    /* Section labels in features */
-    .feature-group-label {
-      font-family: var(--font-display);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.25);
-      margin-top: 4px;
-      padding-bottom: 4px;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-
-    /* ─── COMPARE TABLE (desktop) ───────────────────── */
-    #compare-section {
-      background: var(--surface-2);
-      padding: 64px 24px;
-    }
-    .section-eyebrow {
-      font-family: var(--font-display);
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 10px;
-    }
-    .section-title {
-      font-family: var(--font-display);
-      font-size: clamp(32px, 8vw, 48px);
-      font-weight: 700;
-      line-height: 0.95;
-      letter-spacing: -0.02em;
-      text-transform: uppercase;
-      margin-bottom: 32px;
-    }
-    .compare-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .compare-table th {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 12px 8px;
-      text-align: center;
-      color: rgba(255,255,255,0.50);
-      border-bottom: 1px solid rgba(255,255,255,0.08);
-    }
-    .compare-table th:first-child { text-align: left; color: rgba(255,255,255,0.30); }
-    .compare-table th.accent-col { color: var(--accent); }
-    .compare-table td {
-      font-size: 13px;
-      padding: 12px 8px;
-      text-align: center;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      color: rgba(255,255,255,0.65);
-      vertical-align: middle;
-    }
-    .compare-table td:first-child { text-align: left; color: rgba(255,255,255,0.55); padding-left: 0; }
-    .compare-table tr:last-child td { border-bottom: none; }
-    .compare-table .check-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px; height: 20px;
-      border-radius: 50%;
-      background: rgba(255,92,53,0.14);
-    }
-    .compare-table .check-icon svg {
-      width: 10px; height: 10px;
-      fill: none;
-      stroke: var(--accent);
-      stroke-width: 2.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-    .compare-table .dash {
-      color: rgba(255,255,255,0.18);
-      font-size: 16px;
-    }
-    .compare-table .section-row td {
-      font-family: var(--font-display);
-      font-size: 10px;
-      letter-spacing: 0.10em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.20);
-      padding-top: 20px;
-      border-bottom: none;
-    }
-
-    /* ─── FAQ ───────────────────────────────────────── */
-    #faq {
-      background: var(--black);
-      padding: 64px 24px;
-    }
-    .faq-list {
-      margin-top: 36px;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-    .faq-item {
-      border-bottom: 1px solid rgba(255,255,255,0.07);
-    }
-    .faq-question {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 20px 0;
-      cursor: pointer;
-      font-family: var(--font-display);
-      font-size: 17px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: -0.01em;
-      user-select: none;
-    }
-    .faq-question:hover { color: var(--accent); }
-    .faq-icon {
-      flex-shrink: 0;
-      width: 24px; height: 24px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.07);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: background 0.2s, transform 0.3s;
-    }
-    .faq-icon svg {
-      width: 12px; height: 12px;
-      fill: none;
-      stroke: var(--white);
-      stroke-width: 2.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-      transition: transform 0.3s var(--ease-out);
-    }
-    .faq-item.open .faq-icon { background: rgba(255,92,53,0.15); }
-    .faq-item.open .faq-icon svg { transform: rotate(45deg); stroke: var(--accent); }
-    .faq-answer {
-      overflow: hidden;
-      max-height: 0;
-      transition: max-height 0.4s var(--ease-out);
-    }
-    .faq-answer-inner {
-      padding-bottom: 20px;
-      font-size: 15px;
-      line-height: 1.65;
-      color: rgba(255,255,255,0.58);
-    }
-
-    /* ─── FINAL CTA ──────────────────────────────────── */
-    #final-cta {
-      background: var(--accent);
-      padding: 72px 24px calc(72px + var(--safe-bottom));
-      text-align: center;
-    }
-    #final-cta .section-eyebrow { color: rgba(255,255,255,0.70); }
-    #final-cta .section-title { color: var(--white); }
-    .cta-body {
-      font-size: 16px;
-      color: rgba(255,255,255,0.78);
-      line-height: 1.55;
-      margin-top: 10px;
-    }
-    .btn-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; justify-content: center; }
-    .btn-white-cta {
-      display: inline-flex;
-      align-items: center;
-      background: var(--white);
-      color: var(--accent);
-      font-family: var(--font-display);
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      border-radius: var(--radius-btn);
-      padding: 16px 32px;
-      border: none;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    .btn-white-cta:hover { opacity: 0.90; }
-    .btn-outline-white-cta {
-      display: inline-flex;
-      align-items: center;
-      background: transparent;
-      color: var(--white);
-      font-family: var(--font-display);
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      border-radius: var(--radius-btn);
-      padding: 16px 32px;
-      border: 2px solid rgba(255,255,255,0.50);
-      cursor: pointer;
-      transition: border-color 0.2s;
-    }
-    .btn-outline-white-cta:hover { border-color: var(--white); }
-    .fine-print { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 18px; }
-
-    /* ─── FOOTER ─────────────────────────────────────── */
-    #site-footer {
-      background: var(--black);
-      border-top: 1px solid rgba(255,255,255,0.07);
-      padding: 48px 24px calc(40px + var(--safe-bottom));
-    }
-    .footer-logo { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 28px; }
-    .footer-logo span { color: var(--accent); }
-    .footer-nav { display: flex; flex-direction: column; gap: 14px; margin-bottom: 36px; }
-    .footer-nav a { font-size: 15px; color: rgba(255,255,255,0.50); transition: color 0.2s; }
-    .footer-nav a:hover { color: var(--white); }
-    .footer-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 24px; }
-    .footer-copy { font-size: 12px; color: rgba(255,255,255,0.25); }
-    .footer-tagline { font-family: var(--font-display); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.18); }
-
-    /* ─── REVEAL ─────────────────────────────────────── */
-    .reveal { opacity: 0; transform: translateY(20px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-
-    @media(min-width: 768px) {
-      #pricing-cards { padding: 0 24px 80px; }
-      .pricing-stack { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:16px; }
-      .plan-card { flex: 1; }
-      section, #compare-section, #faq { padding: 80px 48px; }
-    }
-
-    /* ─── MINIMAL DESKTOP ENHANCEMENTS ───────────────────────────── */
-    .desktop-nav {
-      display: none;
-      align-items: center;
-      gap: 26px;
-      margin-left: auto;
-    }
-
-    .desktop-nav a {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.72);
-      transition: color 0.2s, background 0.2s;
-    }
-
-    .desktop-nav a:hover,
-    .desktop-nav a.active {
-      color: var(--white);
-    }
-
-    .desktop-nav-cta {
-      background: var(--accent);
-      color: var(--white) !important;
-      border-radius: var(--radius-btn);
-      padding: 11px 20px;
-    }
-
-    .desktop-nav-cta:hover {
-      background: var(--accent-dark);
-    }
-
-    @media (min-width: 1024px) {
-      :root { --header-h: 72px; }
-      .pricing-stack { grid-template-columns:repeat(4,minmax(0,1fr)); }
-
-      #site-header {
-        padding-left: 48px;
-        padding-right: 48px;
-      }
-
-      .logo-wrap img { height: 36px; }
-      .desktop-nav { display: flex; }
-      .menu-btn { display: none; }
-      #mobile-nav { display: none; }
-
-      #page-hero {
-        padding-top: calc(var(--header-h) + var(--safe-top) + 76px);
-        padding-bottom: 70px;
-      }
-
-      .page-hero-headline {
-        font-size: clamp(72px, 6vw, 104px);
-      }
-
-      .page-hero-sub {
-        max-width: 520px;
-        font-size: 18px;
-      }
-
-      #pricing-cards {
-        padding-left: 48px;
-        padding-right: 48px;
-        padding-bottom: 96px;
-      }
-
-      .plan-strip,
-      .pricing-stack,
-      #compare-section > *,
-      #faq > *,
-      #final-cta > *,
-      #site-footer > * {
-        width: min(1180px, 100%);
-        margin-left: auto;
-        margin-right: auto;
-      }
-
-      .plan-strip {
-        position: static;
-        border: 1px solid rgba(255,255,255,0.07);
-        border-radius: var(--radius-card);
-        margin-bottom: 22px;
-        overflow: hidden;
-      }
-
-      .pricing-stack {
-        gap: 18px;
-        align-items: stretch;
-      }
-
-      .plan-card {
-        display: flex;
-        flex-direction: column;
-      }
-
-      .plan-card.featured {
-        transform: translateY(-8px);
-        box-shadow: 0 28px 70px rgba(0,0,0,0.35);
-      }
-
-      .plan-features {
-        flex: 1;
-      }
-
-      #compare-section,
-      #faq {
-        padding-left: 48px;
-        padding-right: 48px;
-      }
-
-      .section-title {
-        font-size: clamp(48px, 4vw, 70px);
-      }
-
-      .compare-table th,
-      .compare-table td {
-        font-size: 14px;
-        padding: 15px 12px;
-      }
-
-      .faq-list {
-        max-width: 860px;
-      }
-
-      .faq-question {
-        font-size: 19px;
-      }
-
-      #final-cta {
-        padding-left: 48px;
-        padding-right: 48px;
-      }
-
-      #final-cta .section-title {
-        font-size: clamp(58px, 5vw, 92px);
-      }
-
-      .cta-body {
-        font-size: 18px;
-      }
-
-      #site-footer {
-        padding-left: 48px;
-        padding-right: 48px;
-      }
-
-      .footer-nav {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 22px;
-      }
-    }
-
-    @media (min-width: 1280px) {
-      #site-header {
-        padding-left: max(64px, calc((100vw - 1180px) / 2));
-        padding-right: max(64px, calc((100vw - 1180px) / 2));
-      }
-    }
-
-
-  
-    /* SHARED NAV / FOOTER TEMPLATE SUPPORT */
-    .desktop-nav {
-      display: none;
-      align-items: center;
-      gap: 28px;
-      margin-left: auto;
-      flex-wrap: nowrap;
-    }
-    .desktop-nav a {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.72);
-      white-space: nowrap;
-      transition: color 0.2s, background 0.2s;
-    }
-    .desktop-nav a:hover,
-    .desktop-nav a.active { color: var(--white); }
-    .desktop-nav-cta {
-      background: var(--accent);
-      color: var(--white) !important;
-      border-radius: var(--radius-btn);
-      padding: 12px 22px;
-    }
-    .desktop-nav-cta:hover { background: var(--accent-dark); }
-    @media (min-width: 1024px) {
-      #site-header {
-        padding-left: clamp(40px, 5vw, 72px);
-        padding-right: clamp(40px, 5vw, 72px);
-        white-space: nowrap;
-      }
-      .logo-wrap { flex-shrink: 0; }
-      .logo-wrap img { height: 36px; }
-      .desktop-nav { display: flex; justify-content: flex-end; }
-      .menu-btn, #mobile-nav { display: none; }
-      #site-footer {
-        padding-left: clamp(40px, 5vw, 72px);
-        padding-right: clamp(40px, 5vw, 72px);
-      }
-      .footer-nav {
-        flex-direction: row;
-        flex-wrap: wrap;
-        gap: 24px;
-      }
-    }
-    @media (max-width: 1140px) and (min-width: 1024px) {
-      .desktop-nav { gap: 18px; }
-      .desktop-nav a { font-size: 12px; }
-      .desktop-nav-cta { padding: 10px 18px; }
-    }
-
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="PLYRCARD pricing: start free, join My Journey, then add PLYR Points for recruiting services whenever you need them.">
+<title>PLYRCARD Pricing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Oswald:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--pc-bg:#0b0b0c;--pc-panel:#161617;--pc-panel2:#111112;--pc-line:#2a2a2c;--pc-line2:#3a3a3d;--pc-text:#f2f2f2;--pc-muted:#a1a1a6;--pc-dim:#8a8a8f;--pc-accent:#ee6a47;--pc-accent2:#ff633f;--pc-blue:#5fa0f5;--pc-gold:#e9c46a;--pc-green:#8ee0ab;--pc-radius:26px;--pc-max:1240px}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body.plyrcard-pricing-page{margin:0;background:var(--pc-bg);color:var(--pc-text);font-family:Inter,system-ui,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body.plyrcard-pricing-page a{color:inherit;text-decoration:none}
+body.plyrcard-pricing-page button{font:inherit}
+.pc-wrap{width:min(var(--pc-max),calc(100% - 48px));margin-inline:auto}
+.pc-kicker{font-family:Oswald,sans-serif;font-size:14px;letter-spacing:.2em;text-transform:uppercase;color:var(--pc-accent)}
+.pc-display{font-family:"Bebas Neue",sans-serif;font-weight:400;text-transform:uppercase}
+.pc-section{padding:80px 0}
+.pc-section-head{display:flex;flex-direction:column;gap:5px;margin-bottom:28px}
+.pc-section-head h2{margin:0;font-family:"Bebas Neue",sans-serif;font-size:clamp(40px,5vw,60px);font-weight:400;line-height:1;text-transform:uppercase}
+.pc-section-head p{margin:0;color:var(--pc-muted);max-width:700px}
+.pc-btn{min-height:58px;padding:0 28px;border-radius:999px;border:1.5px solid var(--pc-line2);display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:Oswald,sans-serif;font-size:18px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;background:transparent;color:var(--pc-text);transition:.18s ease}
+.pc-btn:hover{border-color:#666;background:rgba(255,255,255,.035)}
+.pc-btn.primary{border-color:var(--pc-accent);background:var(--pc-accent);color:#fff}
+.pc-btn.primary:hover{background:#ff7758}
+.pc-check{width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#3a2620;flex:0 0 24px;color:var(--pc-accent);font-size:14px;font-weight:900}
+.pc-card{background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:var(--pc-radius)}
+.pc-hero{padding:148px 24px 54px;text-align:center}
+.pc-hero .pc-kicker{margin-bottom:16px}
+.pc-hero h1{margin:0 auto;max-width:13ch;font-family:"Bebas Neue",sans-serif;font-size:clamp(60px,8vw,104px);font-weight:400;line-height:.92;letter-spacing:.01em;text-transform:uppercase}
+.pc-hero p{margin:20px auto 0;max-width:50ch;color:var(--pc-muted);font-size:18px}
+.pc-hero-steps{list-style:none;margin:20px 0 0;padding:0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.pc-hero-steps a{min-height:44px;padding:0 18px;border:1.5px solid var(--pc-line2);border-radius:999px;display:flex;align-items:center;gap:9px;font-family:Oswald,sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase}
+.pc-hero-steps b{color:var(--pc-accent)}
+.pc-plan-grid{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:24px;align-items:stretch}
+.pc-plan-card{padding:36px;display:flex;flex-direction:column;gap:20px}
+.pc-plan-card.featured{border-color:var(--pc-accent)}
+.pc-badge{align-self:flex-start;padding:5px 14px;border-radius:999px;background:var(--pc-accent);font-family:Oswald,sans-serif;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#fff}
+.pc-plan-card h3{font-family:"Bebas Neue",sans-serif;font-size:52px;font-weight:400;line-height:.95;text-transform:uppercase;margin:0}
+.pc-plan-card .desc{color:var(--pc-muted);min-height:52px}
+.pc-price{display:flex;align-items:baseline;gap:6px}
+.pc-price .currency{font-family:"Bebas Neue",sans-serif;font-size:30px}
+.pc-price strong{font-family:"Bebas Neue",sans-serif;font-size:82px;line-height:.9;font-weight:400}
+.pc-price .period{color:var(--pc-muted)}
+.pc-subnote{font-size:14px;color:var(--pc-muted)}
+.pc-feature-box{border-top:1px solid var(--pc-line);padding-top:20px;display:grid;gap:13px}
+.pc-feature-title{padding-bottom:9px;border-bottom:1px solid var(--pc-line);font-family:Oswald,sans-serif;font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--pc-dim)}
+.pc-feature{display:flex;gap:11px;align-items:flex-start}
+.pc-feature-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px 24px}
+.pc-points-band{background:var(--pc-panel2);border-block:1px solid #1f1f21}
+.pc-points-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:30px}
+.pc-never{padding:9px 16px;border-radius:999px;background:#17271d;color:var(--pc-green);font-family:Oswald,sans-serif;font-size:14px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.pc-package-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.pc-package{padding:34px;display:flex;flex-direction:column;gap:18px}
+.pc-package.jumpstart{border-color:#3d7fd6}.pc-package.amplify{border-color:#d9b24f}
+.pc-package .pc-badge.blue{background:#3d8bf0;color:#071522}.pc-package .pc-badge.gold{background:var(--pc-gold);color:#0b0b0c}
+.pc-package h3{margin:0;font-family:"Bebas Neue",sans-serif;font-size:52px;font-weight:400;line-height:.95;text-transform:uppercase}
+.pc-package .desc{color:var(--pc-muted)}
+.pc-points-big{font-family:"Bebas Neue",sans-serif;font-size:70px;line-height:.9;color:var(--pc-blue)}.pc-package.amplify .pc-points-big{color:var(--pc-gold)}
+.pc-points-big small{font-size:28px;color:var(--pc-text)}
+.pc-sale{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.pc-sale .retail{font-family:"Bebas Neue",sans-serif;font-size:32px;color:#777;text-decoration:line-through;text-decoration-color:var(--pc-accent);text-decoration-thickness:3px}
+.pc-sale strong{font-family:"Bebas Neue",sans-serif;font-size:62px;line-height:.9;font-weight:400}
+.pc-sale span{color:var(--pc-muted);font-size:14px}
+.pc-save{padding:4px 10px;border-radius:999px;background:var(--pc-accent);color:#fff;font-family:Oswald,sans-serif;font-size:12px;letter-spacing:.07em}
+.pc-package-list{border-top:1px solid var(--pc-line);padding-top:18px;display:grid;gap:10px;font-size:14px}
+.pc-package-list .row{display:flex;justify-content:space-between;gap:14px}.pc-package-list .row span:last-child{font-family:Oswald;color:var(--pc-dim)}
+.pc-topups{margin-top:24px;padding:20px 26px;display:flex;align-items:center;gap:16px 20px;flex-wrap:wrap}
+.pc-topups h3{margin:0;font-family:"Bebas Neue",sans-serif;font-size:28px;font-weight:400;text-transform:uppercase}
+.pc-topup-pills{display:flex;gap:9px;flex-wrap:wrap;flex:1}
+.pc-topup-pill{padding:9px 16px;border:1.5px solid var(--pc-line2);border-radius:999px;font-family:Oswald,sans-serif;font-size:15px}
+.pc-topup-pill b{font-family:"Bebas Neue",sans-serif;font-size:22px;color:var(--pc-accent);margin-right:8px}
+.pc-topups small{color:var(--pc-dim)}
+.pc-service-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
+.pc-service{padding:26px;display:flex;flex-direction:column;min-height:300px;gap:9px}
+.pc-service-icon{width:29px;height:29px;color:var(--pc-accent)}
+.pc-service h3{margin:0;font-family:Oswald,sans-serif;font-size:17px;font-weight:500;letter-spacing:.04em;text-transform:uppercase}
+.pc-service .points{font-family:"Bebas Neue",sans-serif;font-size:54px;line-height:.9;color:var(--pc-accent)}.pc-service .points small{font-size:20px;color:var(--pc-text)}
+.pc-service p{margin:0;color:var(--pc-muted);font-size:14px;flex:1}
+.pc-service .pc-btn{min-height:44px;font-size:14px;padding:0 16px}
+.pc-how{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:20px}
+.pc-how-item{display:flex;gap:13px}.pc-how-num{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--pc-accent);font-family:"Bebas Neue",sans-serif;font-size:22px}
+.pc-how-item h4{margin:0;font-family:Oswald;font-weight:500;text-transform:uppercase}.pc-how-item p{margin:3px 0 0;color:var(--pc-muted);font-size:14px}
+.pc-calculator{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,.8fr);gap:24px;align-items:stretch}
+.pc-calc-list{padding:14px 30px}
+.pc-calc-row{display:grid;grid-template-columns:minmax(210px,1fr) auto 90px;gap:18px;align-items:center;padding:18px 0;border-bottom:1px solid var(--pc-line)}
+.pc-calc-label strong{display:block;font-family:Oswald;font-size:17px;font-weight:500;text-transform:uppercase}.pc-calc-label small{color:var(--pc-dim)}
+.pc-stepper{display:flex;align-items:center;gap:8px}.pc-stepper button{width:40px;height:40px;border-radius:50%;border:1.5px solid var(--pc-line2);background:transparent;color:var(--pc-text);font-size:20px;cursor:pointer}.pc-stepper button.plus{background:var(--pc-accent);border-color:var(--pc-accent);color:#fff}.pc-stepper output{width:34px;text-align:center;font-family:"Bebas Neue";font-size:27px}
+.pc-calc-sub{text-align:right;font-family:Oswald;font-size:16px}
+.pc-calc-total{display:flex;justify-content:space-between;align-items:baseline;padding:18px 0 8px}.pc-calc-total span{font-family:Oswald;font-size:14px;letter-spacing:.14em;text-transform:uppercase;color:var(--pc-dim)}.pc-calc-total strong{font-family:"Bebas Neue";font-size:42px;color:var(--pc-accent);font-weight:400}
+.pc-rec{padding:30px;border-color:var(--pc-accent);display:flex;flex-direction:column;gap:12px}
+.pc-rec h3{margin:0;font-family:"Bebas Neue";font-size:40px;font-weight:400;line-height:.98;text-transform:uppercase}
+.pc-rec-price{display:flex;align-items:baseline;gap:8px}.pc-rec-price .strike{font-family:"Bebas Neue";font-size:27px;color:#777;text-decoration:line-through;text-decoration-color:var(--pc-accent)}.pc-rec-price strong{font-family:"Bebas Neue";font-size:60px;font-weight:400;line-height:.9}
+.pc-rec .save{align-self:flex-start;padding:4px 10px;background:var(--pc-accent);border-radius:999px;font-family:Oswald;font-size:12px}
+.pc-rec p{margin:0;color:var(--pc-muted);font-size:14px}.pc-rec .green{color:var(--pc-green);font-weight:600}.pc-rec .pc-btn{margin-top:auto}
+.pc-compare{overflow:auto}
+.pc-compare table{width:100%;min-width:600px;border-collapse:collapse;background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:var(--pc-radius);overflow:hidden}
+.pc-compare th,.pc-compare td{padding:15px 24px;border-top:1px solid var(--pc-line);font-size:14px}.pc-compare thead th{border-top:0;font-family:Oswald;text-transform:uppercase;letter-spacing:.08em;color:var(--pc-dim)}.pc-compare th:first-child,.pc-compare td:first-child{text-align:left}.pc-compare th:not(:first-child),.pc-compare td:not(:first-child){text-align:center}.pc-compare th:last-child{color:var(--pc-accent)}.pc-yes{color:var(--pc-accent);font-weight:800}.pc-no{color:#555}
+.pc-faq{width:min(900px,calc(100% - 48px));margin-inline:auto;padding:30px 0 88px}.pc-faq .pc-section-head{text-align:center;align-items:center}
+.pc-faq details{background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:16px;margin-bottom:10px;padding:0 20px}.pc-faq summary{list-style:none;min-height:58px;display:flex;justify-content:space-between;align-items:center;gap:16px;cursor:pointer;font-weight:600;font-size:15px}.pc-faq summary::-webkit-details-marker{display:none}.pc-faq .plus{color:var(--pc-accent);font-size:24px;transition:.2s}.pc-faq details[open] .plus{transform:rotate(45deg)}.pc-faq details p{margin:0 0 18px;color:var(--pc-muted);font-size:14px;line-height:1.65}
+.pc-final{border-top:1px solid #1f1f21;text-align:center;padding:84px 24px}.pc-final h2{margin:8px auto 0;max-width:14ch;font-family:"Bebas Neue";font-size:clamp(50px,6vw,80px);font-weight:400;line-height:.95;text-transform:uppercase}.pc-final p{color:var(--pc-muted);margin:15px auto 0}.pc-final-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:22px}.pc-final small{display:block;color:var(--pc-dim);margin-top:12px}
+.pc-dialog[hidden]{display:none}.pc-dialog{position:fixed;inset:0;z-index:999;display:grid;place-items:center;padding:24px;background:rgba(5,5,6,.8)}.pc-dialog-card{width:min(560px,100%);max-height:85vh;overflow:auto;padding:28px;background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:22px}.pc-dialog-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.pc-dialog-head h3{margin:4px 0 0;font-family:"Bebas Neue";font-size:38px;font-weight:400;text-transform:uppercase}.pc-dialog-close{width:40px;height:40px;border-radius:50%;border:1px solid var(--pc-line2);background:transparent;color:#fff;cursor:pointer}.pc-dialog-copy{color:var(--pc-muted);margin:18px 0 0}.pc-dialog-note{margin-top:16px;padding:14px;border-radius:12px;background:#111;color:#ccc;font-size:14px}
+body.plyrcard-pricing-page #site-header.plyrcard-site-header{background:#0b0b0c!important;border-bottom-color:#1f1f21!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+body.plyrcard-pricing-page #site-footer{border-top:1px solid #1f1f21;background:var(--pc-bg);padding:28px max(24px,calc((100vw - var(--pc-max))/2));color:var(--pc-dim)}
+body.plyrcard-pricing-page #site-footer .footer-logo{font-family:"Bebas Neue";font-size:26px;color:var(--pc-text)}body.plyrcard-pricing-page #site-footer .footer-logo span{color:var(--pc-accent)}
+body.plyrcard-pricing-page #site-footer .footer-nav{display:flex;gap:18px;flex-wrap:wrap;font-family:Oswald;font-size:13px;text-transform:uppercase}body.plyrcard-pricing-page #site-footer .footer-nav a.active{color:var(--pc-accent)}
+body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:18px}
+@media(max-width:900px){.pc-plan-grid,.pc-package-grid,.pc-calculator{grid-template-columns:1fr}.pc-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-how{grid-template-columns:1fr}.pc-rec .pc-btn{margin-top:10px}.pc-plan-card .desc{min-height:0}}
+@media(max-width:620px){.pc-wrap{width:min(100% - 28px,var(--pc-max))}.pc-hero{padding:118px 16px 42px}.pc-section{padding:58px 0}.pc-plan-card,.pc-package{padding:25px}.pc-feature-columns{grid-template-columns:1fr}.pc-points-head{align-items:flex-start;flex-direction:column}.pc-service-grid{grid-template-columns:1fr}.pc-calc-list{padding:8px 20px}.pc-calc-row{grid-template-columns:1fr auto;gap:10px}.pc-calc-sub{grid-column:2}.pc-topups{padding:18px}.pc-price strong{font-size:70px}.pc-faq{width:calc(100% - 28px)}}
+</style>
 </head>
-<body>
-<!-- ══════════════════════════════════════════════
-     HEADER
-═══════════════════════════════════════════════ -->
+<body class="plyrcard-pricing-page">
 @include('partials.navigation')
 
-
-<!-- ══════════════════════════════════════════════
-     PAGE HERO
-═══════════════════════════════════════════════ -->
-<section id="page-hero" aria-labelledby="pricing-title">
-  <p class="page-eyebrow reveal">Simple, Transparent Pricing</p>
-  <h1 class="page-hero-headline reveal" id="pricing-title">Choose Your Plan</h1>
-  <p class="page-hero-sub reveal" style="transition-delay:0.08s">
-    Start free and upgrade when you're ready. Every plan includes a recruiting card built to get you noticed.
-  </p>
+<main>
+<section class="pc-hero">
+  <div class="pc-kicker">Simple, transparent pricing</div>
+  <h1>Your journey.<br>Your points.<br>Your way.</h1>
+  <p>Start free. Join My Journey to run your own recruiting. Add PLYR Points when you want our team to build for you, and spend them on whatever you need.</p>
+  <ol class="pc-hero-steps">
+    <li><a href="#plans"><b>1</b> Pick your plan</a></li>
+    <li><a href="#points"><b>2</b> Add points</a></li>
+    <li><a href="#mix"><b>3</b> Spend them your way</a></li>
+  </ol>
 </section>
 
+<section id="plans" class="pc-section">
+  <div class="pc-wrap">
+    <div class="pc-section-head"><span class="pc-kicker">Step 1</span><h2>Pick your plan</h2></div>
+    <div class="pc-plan-grid">
+      <article class="pc-card pc-plan-card">
+        <div><h3>Free</h3><div class="desc">A simple PLYRSITE with your quick info. Get started in minutes.</div></div>
+        <div><div class="pc-price"><span class="currency">$</span><strong>0</strong><span class="period">/mo</span></div><div class="pc-subnote">No credit card required</div></div>
+        <a class="pc-btn" href="{{ $freeHref }}">Get Started Free</a>
+        <div class="pc-feature-box">
+          <div class="pc-feature-title">The basics</div>
+          <div class="pc-feature"><span class="pc-check">✓</span><span>Simple PLYRSITE page</span></div>
+          <div class="pc-feature"><span class="pc-check">✓</span><span>Quick athlete info</span></div>
+          <div class="pc-feature"><span class="pc-check">✓</span><span>Bio and basic stats</span></div>
+          <div class="pc-feature"><span class="pc-check">✓</span><span>Email support</span></div>
+        </div>
+      </article>
 
-<!-- ══════════════════════════════════════════════
-     PRICING CARDS
-═══════════════════════════════════════════════ -->
-<div id="pricing-cards">
-
-  <!-- Sticky strip -->
-  <div class="plan-strip" role="list" aria-label="Plan names">
-    <div class="plan-strip-item" role="listitem">Free</div>
-    <div class="plan-strip-item active" role="listitem">My Journey</div>
-    <div class="plan-strip-item" role="listitem">Jumpstart</div>
-    <div class="plan-strip-item" role="listitem">Amplify</div>
-  </div>
-
-  <div class="pricing-stack">
-
-    <article class="plan-card reveal" aria-label="Free plan">
-      <div class="plan-header">
-        <div class="plan-name">Free</div>
-        <div class="plan-tagline">A simple PLYRSite with your quick info. Get started in minutes.</div>
-      </div>
-      <div class="plan-price-wrap" aria-label="Free">
-        <span class="plan-price-currency">$</span><span class="plan-price">0</span>
-        <span class="plan-price-period">/mo</span>
-      </div>
-      <p class="plan-setup">No credit card required</p>
-      <div class="plan-cta-wrap"><a href="/registration?utm_plan=free" class="plan-cta outline">Get Started Free</a></div>
-      <div class="plan-divider"></div>
-      <ul class="plan-features" aria-label="Free plan features">
-        <li class="feature-group-label">The Basics</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Simple PLYRSite page</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Quick athlete info</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Bio &amp; basic stats</li>
-        <li class="feature-group-label" style="margin-top:8px">Support</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Email support</li>
-      </ul>
-    </article>
-
-    <article class="plan-card featured reveal" style="transition-delay:0.08s" aria-label="My Journey plan — most popular">
-      <div class="plan-header">
-        <div class="popular-badge">Most Popular</div>
-        <div class="plan-name">My Journey</div>
-        <div class="plan-tagline">Your own recruiting HQ — domain, email, tracking, templates, and the coach database.</div>
-      </div>
-      <div class="plan-price-wrap" aria-label="$49 per month">
-        <span class="plan-price">{{ $pricingMoney($myJourneyCents) }}</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span><span class="plan-price-period">/mo</span></span>
-      </div>
-      <p class="plan-setup">Monthly subscription &nbsp;· Cancel anytime</p>
-      <div class="plan-cta-wrap"><a href="/registration?utm_plan=my-journey" class="plan-cta solid">Get My Journey</a></div>
-      <div class="plan-divider"></div>
-      <ul class="plan-features" aria-label="My Journey plan features">
-        <li class="feature-group-label">Everything in Free, plus:</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own personalized domain</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Your own email — sends from you, not a third party</li>
-        <li class="feature-group-label" style="margin-top:8px">Tools</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach engagement tracking tool</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Outreach templates</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Coach database access — weekly verifications</li>
-        <li class="feature-group-label" style="margin-top:8px">Support</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>1-on-1 onboarding</li>
-      </ul>
-    </article>
-
-
-    <article class="plan-card reveal" style="transition-delay:0.12s;border-color:rgba(25,167,255,.45)" aria-label="Jumpstart one-time package">
-      <div class="plan-header">
-        <div class="popular-badge" style="background:#19a7ff;color:#071522;">One-Time Push</div>
-        <div class="plan-name">Jumpstart</div>
-        <div class="plan-tagline">One clean recruiting push added to My Journey — your recruiting workspace, domain, and tools stay underneath it.</div>
-      </div>
-      <div class="plan-price-wrap" aria-label="Jumpstart one-time price">
-        <span class="plan-price">{{ $pricingMoney($jumpstartCents) }}</span>
-        <span class="plan-price-period">one time</span>
-      </div>
-      <p class="plan-setup"><strong>{{ $pricingMoney($jumpstartCents) }} one-time Jumpstart service</strong> &nbsp;· New players also start My Journey at {{ $pricingMoney($myJourneyCents) }}/month ({{ $pricingMoney($jumpstartEnrollmentCents) }} due today). Existing My Journey members pay only {{ $pricingMoney($jumpstartCents) }}.</p>
-      <div class="plan-cta-wrap"><a href="/registration?utm_plan=jumpstart" class="plan-cta outline">Get Jumpstart</a></div>
-      <div class="plan-divider"></div>
-      <ul class="plan-features" aria-label="Jumpstart package features">
-        <li class="feature-group-label">Everything in My Journey, plus:</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>1 Coach Outreach Campaign</strong></li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>1 Highlight Edit</strong></li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>1 Custom Graphic</strong></li>
-      </ul>
-    </article>
-
-    <article class="plan-card reveal" style="transition-delay:0.16s;border-color:rgba(245,196,81,.55)" aria-label="Amplify plan">
-      <div class="plan-header">
-        <div class="popular-badge" style="background:#f5c451;color:#241701;">Done For You</div>
-        <div class="plan-name">Amplify</div>
-        <div class="plan-tagline">Your complete recruiting package with custom graphics, highlight reels, managed coach outreach, and hands-on support.</div>
-      </div>
-      <div class="plan-price-wrap" aria-label="$500 Amplify service plus My Journey when needed">
-        <span class="plan-price">{{ $pricingMoney($amplifySetupCents) }}</span>
-        <span style="display:flex;flex-direction:column;justify-content:flex-end;margin-bottom:10px;"><span style="font-family:var(--font-display);font-size:18px;font-weight:700;line-height:1;">.00</span></span>
-      </div>
-      <p class="plan-setup"><strong>{{ $pricingMoney($amplifySetupCents) }} one-time Amplify service</strong> &nbsp;· Free players also start My Journey at {{ $pricingMoney($myJourneyCents) }}/month ({{ $pricingMoney($amplifyEnrollmentCents) }} due today)</p>
-      <div class="plan-cta-wrap"><a href="/registration?utm_plan=amplify" class="plan-cta outline">Amplify My Recruiting</a></div>
-      <div class="plan-divider"></div>
-      <ul class="plan-features" aria-label="Amplify plan features">
-        <li class="feature-group-label">Everything in My Journey, plus:</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>4 Highlight Reels</strong></li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>4 Custom Graphics</strong></li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>4 Managed Coach Outreach sends</strong></li>
-        <li class="feature-group-label" style="margin-top:8px">Support</li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span><strong>8 Hours of Support</strong></li>
-        <li class="feature-item"><span class="feature-check"><svg viewBox="0 0 12 12"><polyline points="1.5,6 5,9.5 10.5,2.5"/></svg></span>Full onboarding</li>
-      </ul>
-    </article>
-
-  </div><!-- /pricing-stack -->
-</div><!-- /pricing-cards -->
-
-
-<!-- ══════════════════════════════════════════════
-     COMPARE TABLE
-═══════════════════════════════════════════════ -->
-<section id="compare-section" aria-labelledby="compare">
-  <p class="section-eyebrow reveal">Side by Side</p>
-  <h2 class="section-title reveal" id="compare">Compare<br>Plans</h2>
-  <div style="overflow-x:auto;" role="region" aria-label="Plan comparison table" tabindex="0">
-    <table class="compare-table" aria-label="Feature comparison across Free, My Journey, Jumpstart, and Amplify plans">
-      <thead><tr><th scope="col">Feature</th><th scope="col">Free</th><th scope="col" class="accent-col">My Journey</th><th scope="col" style="color:#19a7ff">Jumpstart</th><th scope="col" style="color:#f5c451">Amplify</th></tr></thead>
-      <tbody>
-        <tr class="section-row"><td colspan="5">Your Presence</td></tr>
-        <tr><td>Simple PLYRSite page</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Quick athlete info &amp; bio</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Personalized domain</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Personal email</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr class="section-row"><td colspan="5">Recruiting Tools</td></tr>
-        <tr><td>Coach engagement tracking</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Outreach templates</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Coach database</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr class="section-row"><td colspan="5">Done-For-You Production</td></tr>
-        <tr><td>Highlight edits / reels included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>1</td><td>4</td></tr>
-        <tr><td>Custom graphics included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>1</td><td>4</td></tr>
-        <tr><td>Managed coach outreach included</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>1 campaign</td><td>4 sends</td></tr>
-        <tr class="section-row"><td colspan="5">Support</td></tr>
-        <tr><td>Email support</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>1-on-1 onboarding</td><td><span class="dash">—</span></td><td>✓</td><td>✓</td><td>✓</td></tr>
-        <tr><td>Dedicated support</td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td><span class="dash">—</span></td><td>8 hrs</td></tr>
-      </tbody>
-    </table>
+      <article class="pc-card pc-plan-card featured">
+        <span class="pc-badge">Most popular</span>
+        <div><h3>My Journey</h3><div class="desc">Your own recruiting HQ. Domain, email, tracking, templates, the coach database, and access to PLYR Points.</div></div>
+        <div><div class="pc-price"><strong>{{ $money($myJourneyCents) }}</strong><span class="period">/mo</span></div><div class="pc-subnote">Monthly subscription · Cancel anytime</div></div>
+        <a class="pc-btn primary" href="{{ $journeyHref }}">Get My Journey</a>
+        <div class="pc-feature-box">
+          <div class="pc-feature-title">Everything in Free, plus:</div>
+          <div class="pc-feature-columns">
+            <div class="pc-feature"><span class="pc-check">✓</span><span>Your own personalized domain</span></div>
+            <div class="pc-feature"><span class="pc-check">✓</span><span>Your own email, sent from you</span></div>
+            <div class="pc-feature"><span class="pc-check">✓</span><span>Coach engagement tracking</span></div>
+            <div class="pc-feature"><span class="pc-check">✓</span><span>Outreach templates</span></div>
+            <div class="pc-feature"><span class="pc-check">✓</span><span>Coach database, verified weekly</span></div>
+            <div class="pc-feature"><span class="pc-check">✓</span><span>1-on-1 onboarding</span></div>
+            <div class="pc-feature"><span class="pc-check">✓</span><span><strong>Unlocks PLYR Points</strong></span></div>
+          </div>
+        </div>
+      </article>
+    </div>
   </div>
 </section>
 
+<section id="points" class="pc-points-band">
+  <div class="pc-wrap pc-section">
+    <div class="pc-points-head">
+      <div class="pc-section-head" style="margin:0"><span class="pc-kicker">Step 2 · For My Journey members</span><h2>Add PLYR Points</h2><p>You asked, so we listened. Load points once and spend them on any mix of reels, graphics, coach outreach and rep time.</p></div>
+      <div class="pc-never">✓ Points never expire</div>
+    </div>
+    <div class="pc-package-grid">
+      <article class="pc-card pc-package jumpstart">
+        <span class="pc-badge blue">One-time push</span>
+        <div><h3>Jumpstart</h3><div class="desc">One clean recruiting push added to My Journey. Spend the points on any mix you want.</div></div>
+        <div class="pc-points-big">{{ number_format($jumpstartPoints) }} <small>pts</small></div>
+        <div class="pc-sale"><span class="retail">{{ $money($jumpstartPoints * $customPointCents) }}</span><strong>{{ $money($jumpstartCents) }}</strong><span>one time</span><b class="pc-save">SAVE {{ $money(max(0, $jumpstartPoints * $customPointCents - $jumpstartCents)) }}</b></div>
+        <div class="pc-subnote">New players also start My Journey at {{ $money($myJourneyCents) }}/month ({{ $money($jumpstartCents + $myJourneyCents) }} due today). Existing members pay only {{ $money($jumpstartCents) }}.</div>
+        <a class="pc-btn" href="{{ $jumpstartHref }}">Get Jumpstart</a>
+        <div class="pc-package-list">
+          <div class="pc-feature-title">{{ number_format($jumpstartPoints) }} points is enough for:</div>
+          <div class="row"><span>1 Coach Outreach Program</span><span>{{ number_format($services['outreach']['points']) }}</span></div>
+          <div class="row"><span>1 Highlight Reel</span><span>{{ number_format($services['reel']['points']) }}</span></div>
+          <div class="row"><span>1 Custom Graphic</span><span>{{ number_format($services['graphic']['points']) }}</span></div>
+          <div class="row"><span>2 Rep Hours</span><span>{{ number_format($services['production_hour']['points'] * 2) }}</span></div>
+          <small>Or any mix that adds up to {{ number_format($jumpstartPoints) }}.</small>
+        </div>
+      </article>
 
-<!-- ══════════════════════════════════════════════
-     FAQ
-═══════════════════════════════════════════════ -->
-<section id="faq" aria-labelledby="faq-title">
-  <p class="section-eyebrow reveal">Got Questions</p>
-  <h2 class="section-title reveal" id="faq-title">We've Got<br>Answers.</h2>
-
-  <div class="faq-list" role="list">
-
-    <div class="faq-item reveal" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        What is the Amplify setup fee for?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
-      </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Amplify is a {{ $pricingMoney($amplifySetupCents) }} one-time done-for-you service. Players who are not already on My Journey also start the {{ $pricingMoney($myJourneyCents) }}/month My Journey subscription, making {{ $pricingMoney($amplifyEnrollmentCents) }} due today for a new Amplify enrollment. The Amplify service covers the initial graphics, highlight reels, coach outreach assets, onboarding, and done-for-you production work needed to launch the athlete's recruiting package.</p>
-      </div>
+      <article class="pc-card pc-package amplify">
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pc-badge gold">Done for you</span><span class="pc-badge" style="background:transparent;border:1px solid var(--pc-gold);color:var(--pc-gold)">Best value</span></div>
+        <div><h3>Amplify</h3><div class="desc">Your complete recruiting package. Graphics, highlight reels, managed coach outreach and hands-on support, your mix.</div></div>
+        <div class="pc-points-big">{{ number_format($amplifyPoints) }} <small>pts</small></div>
+        <div class="pc-sale"><span class="retail">{{ $money($amplifyPoints * $customPointCents) }}</span><strong>{{ $money($amplifyCents) }}</strong><span>one time</span><b class="pc-save">SAVE {{ $money(max(0, $amplifyPoints * $customPointCents - $amplifyCents)) }}</b></div>
+        <div class="pc-subnote">New players also start My Journey at {{ $money($myJourneyCents) }}/month ({{ $money($amplifyCents + $myJourneyCents) }} due today). Existing members pay only {{ $money($amplifyCents) }}.</div>
+        <a class="pc-btn primary" href="{{ $amplifyHref }}">Amplify My Recruiting</a>
+        <div class="pc-package-list">
+          <div class="pc-feature-title">{{ number_format($amplifyPoints) }} points is enough for:</div>
+          <div class="row"><span>4 Coach Outreach Programs</span><span>{{ number_format($services['outreach']['points'] * 4) }}</span></div>
+          <div class="row"><span>4 Highlight Reels</span><span>{{ number_format($services['reel']['points'] * 4) }}</span></div>
+          <div class="row"><span>4 Custom Graphics</span><span>{{ number_format($services['graphic']['points'] * 4) }}</span></div>
+          <div class="row"><span>8 Rep Hours</span><span>{{ number_format($services['production_hour']['points'] * 8) }}</span></div>
+          <small>Or any mix that adds up to {{ number_format($amplifyPoints) }}.</small>
+        </div>
+      </article>
     </div>
 
-    <div class="faq-item reveal" style="transition-delay:0.04s" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        How does Jumpstart work with My Journey?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
+    <div class="pc-card pc-topups">
+      <h3>Just need a few more?</h3>
+      <div class="pc-topup-pills">
+        @foreach(['100','250','500'] as $packKey)
+          @php($pack = $pointPacks->get($packKey))
+          @if($pack)
+            <span class="pc-topup-pill"><b>{{ number_format((int) $pack['points']) }} pts</b>{{ $money((int) $pack['price_cents']) }}</span>
+          @endif
+        @endforeach
+        @if($customPointsEnabled)<span class="pc-topup-pill"><b>Custom</b>{{ $money($customPointCents) }} / point</span>@endif
       </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Jumpstart is a {{ $pricingMoney($jumpstartCents) }} one-time recruiting service extension of My Journey. If you are new to My Journey, {{ $pricingMoney($jumpstartEnrollmentCents) }} is due today: the Jumpstart service plus your first {{ $pricingMoney($myJourneyCents) }} My Journey month. If you already have My Journey, only the {{ $pricingMoney($jumpstartCents) }} Jumpstart service is charged.</p>
-      </div>
+      <small>Point packs are available in your dashboard.</small>
     </div>
-
-    <div class="faq-item reveal" style="transition-delay:0.05s" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        Can I cancel anytime?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
-      </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">My Journey is the recurring {{ $pricingMoney($myJourneyCents) }}/month subscription underneath both service extensions. Jumpstart adds a {{ $pricingMoney($jumpstartCents) }} one-time service and Amplify adds a {{ $pricingMoney($amplifySetupCents) }} one-time service. Cancelling My Journey ends the recurring subscription; the service fees themselves do not recur.</p>
-      </div>
-    </div>
-
-    <div class="faq-item reveal" style="transition-delay:0.10s" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        Can I upgrade my plan later?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
-      </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Absolutely. You can upgrade from Free to My Journey, add Jumpstart, or move into Amplify at any time. Your profile stays intact while the new features and support are added.</p>
-      </div>
-    </div>
-
-    <div class="faq-item reveal" style="transition-delay:0.15s" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        What sports does PLYRCARD support?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
-      </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">PLYRCARD works for any sport with a recruiting process — soccer, football, basketball, volleyball, softball, baseball, lacrosse, track, swimming, tennis, and more. If you're recruiting, we're built for you.</p>
-      </div>
-    </div>
-
-    <div class="faq-item reveal" style="transition-delay:0.20s" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        How does email tracking work?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
-      </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">When a coach opens your outreach email or clicks your card link, PLYRCARD captures that signal and shows it in your dashboard. You'll know who's engaging so you can follow up at the right moment.</p>
-      </div>
-    </div>
-
-    <div class="faq-item reveal" style="transition-delay:0.25s" role="listitem">
-      <div class="faq-question" role="button" tabindex="0" aria-expanded="false">
-        Is there a free plan or trial?
-        <span class="faq-icon"><svg viewBox="0 0 12 12"><line x1="6" y1="1" x2="6" y2="11"/><line x1="1" y1="6" x2="11" y2="6"/></svg></span>
-      </div>
-      <div class="faq-answer" role="region">
-        <p class="faq-answer-inner">Yes — you can create a free account and start building your profile. Upgrade to a paid plan when you're ready to unlock full card creation, sharing, and coach tracking features.</p>
-      </div>
-    </div>
-
   </div>
 </section>
 
-
-<!-- ══════════════════════════════════════════════
-     FINAL CTA
-═══════════════════════════════════════════════ -->
-<section id="final-cta" aria-labelledby="pricing-cta-title">
-  <p class="section-eyebrow">Ready to Stand Out</p>
-  <h2 class="section-title" id="pricing-cta-title">Start Your<br>Journey</h2>
-  <p class="cta-body">Build a recruiting card coaches will actually remember.</p>
-  <div class="btn-row">
-    <a href="/registration?utm_plan=free" class="btn-white-cta">Create Free Account</a>
-    <a href="/book-demo" class="btn-outline-white-cta">Book a Demo</a>
+<section class="pc-section">
+  <div class="pc-wrap">
+    <div class="pc-section-head"><span class="pc-kicker">What points buy</span><h2>Every service has a number</h2></div>
+    <div class="pc-service-grid">
+      @foreach($services as $serviceKey => $service)
+      <article class="pc-card pc-service">
+        @if($service['icon']==='send')
+          <svg class="pc-service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 3L10 14"></path><path d="M21 3l-7 18-4-7-7-4z"></path></svg>
+        @elseif($service['icon']==='video')
+          <svg class="pc-service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M10 9l5 3-5 3z"></path></svg>
+        @elseif($service['icon']==='image')
+          <svg class="pc-service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.5"></circle><path d="M21 16l-5-5-8 8"></path></svg>
+        @else
+          <svg class="pc-service-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        @endif
+        <h3>{{ $service['label'] }}</h3>
+        <div class="points">{{ number_format($service['points']) }} <small>pts</small></div>
+        <p>{{ $service['description'] }}</p>
+        <button type="button" class="pc-btn" data-sample="{{ $serviceKey }}">◉ See sample</button>
+      </article>
+      @endforeach
+    </div>
+    <div class="pc-how">
+      <div class="pc-how-item"><span class="pc-how-num">1</span><div><h4>Load your points</h4><p>They land in your dashboard right away after confirmed payment.</p></div></div>
+      <div class="pc-how-item"><span class="pc-how-num">2</span><div><h4>Request what you need</h4><p>A reel this week, an outreach program next month.</p></div></div>
+      <div class="pc-how-item"><span class="pc-how-num">3</span><div><h4>Points come off on delivery</h4><p>Whatever is left stays until you use it.</p></div></div>
+    </div>
   </div>
-  <p class="fine-print">No credit card required &nbsp;·&nbsp; Free plan available &nbsp;·&nbsp; Set up in minutes</p>
 </section>
 
+<section id="mix" class="pc-section" style="padding-top:48px">
+  <div class="pc-wrap">
+    <div class="pc-section-head"><span class="pc-kicker">Not sure what to get?</span><h2>Build your mix</h2><p>Tell us what you need this season. We will show you the cheapest way to get it.</p></div>
+    <div class="pc-calculator">
+      <div class="pc-card pc-calc-list" id="pcCalculator">
+        @php($defaultQty = ['outreach'=>2,'reel'=>2,'graphic'=>1,'production_hour'=>0])
+        @foreach($services as $serviceKey => $service)
+        <div class="pc-calc-row" data-service="{{ $serviceKey }}" data-points="{{ $service['points'] }}">
+          <div class="pc-calc-label"><strong>{{ $service['label'] }}</strong><small>{{ number_format($service['points']) }} pts each</small></div>
+          <div class="pc-stepper"><button type="button" data-step="-1" aria-label="Remove one {{ $service['label'] }}">−</button><output data-qty>{{ $defaultQty[$serviceKey] ?? 0 }}</output><button type="button" class="plus" data-step="1" aria-label="Add one {{ $service['label'] }}">+</button></div>
+          <div class="pc-calc-sub"><span data-subtotal>0</span> pts</div>
+        </div>
+        @endforeach
+        <div class="pc-calc-total"><span>Total</span><strong><span id="pcTotal">0</span> pts</strong></div>
+      </div>
 
-<!-- ══════════════════════════════════════════════
-     FOOTER
-═══════════════════════════════════════════════ -->
+      <aside class="pc-card pc-rec" aria-live="polite">
+        <span class="pc-badge">Your best option</span>
+        <div id="pcRecEmpty" style="color:var(--pc-muted)">Add a service on the left to see what fits.</div>
+        <div id="pcRecContent" hidden>
+          <h3 id="pcRecTitle"></h3>
+          <div class="pc-rec-price"><span class="strike" id="pcRecStrike"></span><strong id="pcRecPrice"></strong></div>
+          <span class="save" id="pcRecSave" hidden></span>
+          <p id="pcRecDetail"></p>
+          <p class="green" id="pcRecLeft"></p>
+          <p id="pcRecDue"></p>
+          <a class="pc-btn primary" id="pcRecCta" href="{{ $journeyHref }}">Get My Journey</a>
+        </div>
+        <small style="color:var(--pc-dim)">Points require an active My Journey membership ({{ $money($myJourneyCents) }}/mo).</small>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<section class="pc-section" style="padding-top:24px">
+  <div class="pc-wrap">
+    <div class="pc-section-head"><h2>Compare plans</h2></div>
+    <div class="pc-compare">
+      <table>
+        <thead><tr><th>Feature</th><th>Free</th><th>My Journey</th></tr></thead>
+        <tbody>
+          <tr><td>PLYRSITE profile page</td><td>Simple</td><td>Full</td></tr>
+          <tr><td>Your own domain and email</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
+          <tr><td>Coach engagement tracking</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
+          <tr><td>Coach database, verified weekly</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
+          <tr><td>Outreach templates</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
+          <tr><td>1-on-1 onboarding</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
+          <tr><td>Buy PLYR Points for reels, graphics, outreach and rep time</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
+          <tr><td>Email support</td><td class="pc-yes">✓</td><td class="pc-yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="pc-faq">
+  <div class="pc-section-head"><span class="pc-kicker">FAQ</span><h2>We've got answers</h2></div>
+  <details><summary>What are PLYR Points?<span class="plus">+</span></summary><p>Points are how you pay for the work our team does for you. Every service has a set number of points, so you can spend them on whatever mix your recruiting needs.</p></details>
+  <details><summary>Do points expire?<span class="plus">+</span></summary><p>No. Your points stay in your account until you use them. Recruiting does not run on a 30-day clock, and neither do we.</p></details>
+  <details><summary>Do I need My Journey to buy points?<span class="plus">+</span></summary><p>Yes. Your points, requests and deliveries live in your My Journey dashboard. New players can join My Journey and add their exact starting point balance in the same checkout.</p></details>
+  <details><summary>Can I mix services inside Jumpstart or Amplify?<span class="plus">+</span></summary><p>Yes. A package is a point balance. Want more film and fewer graphics? Spend it that way.</p></details>
+  <details><summary>When do points come off my balance?<span class="plus">+</span></summary><p>When the work is delivered. While we build it, the points are held. Cancel a request before delivery and eligible points go back.</p></details>
+  <details><summary>Can I cancel?<span class="plus">+</span></summary><p>Anytime. My Journey is the only thing that renews monthly. Jumpstart, Amplify and point purchases are one-time charges.</p></details>
+  <details><summary>Is there a free plan?<span class="plus">+</span></summary><p>Yes. Start free with a simple PLYRSITE page, no credit card needed, and upgrade whenever you are ready.</p></details>
+</section>
+
+<section class="pc-final">
+  <span class="pc-kicker">Start your journey</span>
+  <h2>This is your journey. It has to come from you.</h2>
+  <p>Authenticity is key. Start free, then add points when you are ready.</p>
+  <div class="pc-final-actions"><a class="pc-btn primary" href="{{ $freeHref }}">Create Free Account</a><a class="pc-btn" href="{{ route('marketing.book-demo') }}">Book a Demo</a></div>
+  <small>No credit card · Free plan available · Quick setup</small>
+</section>
+</main>
+
 @include('partials.footer')
 
+<div class="pc-dialog" id="pcSampleDialog" hidden>
+  <div class="pc-dialog-card" role="dialog" aria-modal="true" aria-labelledby="pcSampleTitle">
+    <div class="pc-dialog-head"><div><span class="pc-kicker">Service sample</span><h3 id="pcSampleTitle">PLYR service</h3></div><button class="pc-dialog-close" type="button" aria-label="Close sample">×</button></div>
+    <p class="pc-dialog-copy" id="pcSampleCopy"></p>
+    <div class="pc-dialog-note" id="pcSampleNote"></div>
+  </div>
+</div>
+
 <script>
-(function () {
+(function(){
   'use strict';
+  var MY_JOURNEY_CENTS={{ $myJourneyCents }};
+  var JUMPSTART_CENTS={{ $jumpstartCents }};
+  var AMPLIFY_CENTS={{ $amplifyCents }};
+  var JUMPSTART_POINTS={{ $jumpstartPoints }};
+  var AMPLIFY_POINTS={{ $amplifyPoints }};
+  var CUSTOM_POINT_CENTS={{ $customPointCents }};
+  var CUSTOM_MIN={{ $customPointMin }};
+  var CUSTOM_MAX={{ $customPointMax }};
+  var CUSTOM_ENABLED=@json($customPointsEnabled);
+  var REG_URL=@json(route('marketing.registration'));
+  var rows=Array.from(document.querySelectorAll('.pc-calc-row'));
+  var totalEl=document.getElementById('pcTotal');
+  var empty=document.getElementById('pcRecEmpty');
+  var content=document.getElementById('pcRecContent');
+  var title=document.getElementById('pcRecTitle');
+  var strike=document.getElementById('pcRecStrike');
+  var price=document.getElementById('pcRecPrice');
+  var save=document.getElementById('pcRecSave');
+  var detail=document.getElementById('pcRecDetail');
+  var left=document.getElementById('pcRecLeft');
+  var due=document.getElementById('pcRecDue');
+  var cta=document.getElementById('pcRecCta');
 
-  const SLIDE_DUR = 6000;
-  const slides = document.querySelectorAll('.hero-slide');
-  const rails = document.querySelectorAll('.indicator-rail');
-  const hero = document.getElementById('hero-carousel');
-
-  let current = 0;
-  let timer = null;
-  let paused = false;
-  let touchStartX = 0;
-  let isDragging = false;
-
-  function startTimer() {
-    if (slides.length <= 1) return;
-    clearInterval(timer);
-    timer = setInterval(() => goTo(current + 1), SLIDE_DUR);
+  function dollars(cents){return '$'+(cents/100).toLocaleString('en-US',{minimumFractionDigits:cents%100?2:0,maximumFractionDigits:2});}
+  function query(plan,points){
+    var u=new URL(REG_URL,window.location.origin);
+    u.searchParams.set('plan',plan);
+    if(points>0)u.searchParams.set('initial_points',String(points));
+    return u.pathname+u.search;
   }
-
-  function goTo(idx) {
-    if (!slides.length || !rails.length) return;
-
-    slides[current]?.classList.remove('active');
-    rails[current]?.classList.remove('active');
-
-    current = (idx + slides.length) % slides.length;
-
-    slides[current]?.classList.add('active');
-    rails[current]?.classList.add('active');
-
-    rails.forEach((rail, i) => {
-      const fill = rail.querySelector('.indicator-fill');
-      if (!fill) return;
-
-      fill.style.animation = 'none';
-      fill.offsetHeight;
-
-      if (i === current) {
-        rail.classList.add('active');
-        fill.style.animation = `railFill ${SLIDE_DUR}ms linear forwards`;
-      } else {
-        rail.classList.remove('active');
-      }
+  function option(name,plan,basePoints,baseCents,needed){
+    var extra=Math.max(0,needed-basePoints);
+    if(extra>0&&!CUSTOM_ENABLED)return null;
+    if(extra>CUSTOM_MAX)return null;
+    var effectiveExtra=extra>0?Math.max(CUSTOM_MIN,extra):0;
+    var supplied=basePoints+effectiveExtra;
+    var oneTime=baseCents+(effectiveExtra*CUSTOM_POINT_CENTS);
+    return {name:name,plan:plan,basePoints:basePoints,extra:effectiveExtra,supplied:supplied,oneTime:oneTime,left:Math.max(0,supplied-needed)};
+  }
+  function recommend(needed){
+    var options=[];
+    if(CUSTOM_ENABLED&&needed<=CUSTOM_MAX)options.push(option('Custom PLYR Points','my-journey',0,0,needed));
+    options.push(option('Jumpstart','jumpstart',JUMPSTART_POINTS,JUMPSTART_CENTS,needed));
+    options.push(option('Amplify','amplify',AMPLIFY_POINTS,AMPLIFY_CENTS,needed));
+    options=options.filter(Boolean);
+    options.sort(function(a,b){if(a.oneTime!==b.oneTime)return a.oneTime-b.oneTime;if(a.left!==b.left)return a.left-b.left;return a.supplied-b.supplied;});
+    return options[0]||null;
+  }
+  function render(){
+    var total=0;
+    rows.forEach(function(row){
+      var qty=parseInt(row.querySelector('[data-qty]').textContent,10)||0;
+      var pts=parseInt(row.dataset.points,10)||0;
+      var sub=qty*pts;
+      row.querySelector('[data-subtotal]').textContent=sub.toLocaleString('en-US');
+      total+=sub;
     });
-
-    if (!paused) startTimer();
+    totalEl.textContent=total.toLocaleString('en-US');
+    if(total<=0){empty.hidden=false;content.hidden=true;return;}
+    var rec=recommend(total);
+    if(!rec){empty.hidden=false;empty.textContent='This mix is larger than the current online custom checkout limit. Book a demo and we will build the right package.';content.hidden=true;return;}
+    empty.hidden=true;content.hidden=false;
+    var recTitle=rec.name;
+    if(rec.extra>0&&rec.plan!=='my-journey')recTitle+=' + '+rec.extra.toLocaleString('en-US')+' Custom Points';
+    if(rec.plan==='my-journey')recTitle=total.toLocaleString('en-US')+' Custom PLYR Points';
+    title.textContent=recTitle;
+    price.textContent=dollars(rec.oneTime);
+    var ala=total*CUSTOM_POINT_CENTS;
+    if(rec.oneTime<ala){strike.textContent=dollars(ala);strike.style.display='inline';save.hidden=false;save.textContent='SAVE '+dollars(ala-rec.oneTime);}else{strike.style.display='none';save.hidden=true;}
+    detail.textContent=rec.supplied.toLocaleString('en-US')+' points for '+total.toLocaleString('en-US')+' points of services.';
+    left.textContent=rec.left>0?rec.left.toLocaleString('en-US')+' points left over. They never expire.':'Uses every point.';
+    due.textContent='New player due today: '+dollars(rec.oneTime+MY_JOURNEY_CENTS)+', including the first My Journey month. Then '+dollars(MY_JOURNEY_CENTS)+'/month.';
+    cta.href=query(rec.plan,rec.extra>0?rec.extra:(rec.plan==='my-journey'?total:0));
+    cta.textContent=rec.plan==='my-journey'?'Get My Journey + Points':'Get '+recTitle;
   }
-
-  if (slides.length && rails.length) {
-    const firstFill = rails[0]?.querySelector('.indicator-fill');
-    if (firstFill) firstFill.style.animation = `railFill ${SLIDE_DUR}ms linear forwards`;
-
-    startTimer();
-
-    const prevBtn = document.getElementById('hero-prev');
-    const nextBtn = document.getElementById('hero-next');
-
-    if (prevBtn) prevBtn.addEventListener('click', () => { paused = true; goTo(current - 1); });
-    if (nextBtn) nextBtn.addEventListener('click', () => { paused = true; goTo(current + 1); });
-
-    rails.forEach(rail => {
-      rail.addEventListener('click', () => {
-        paused = true;
-        goTo(Number(rail.dataset.slide || 0));
+  rows.forEach(function(row){
+    row.querySelectorAll('[data-step]').forEach(function(button){
+      button.addEventListener('click',function(){
+        var output=row.querySelector('[data-qty]');
+        var qty=parseInt(output.textContent,10)||0;
+        qty=Math.max(0,Math.min(12,qty+parseInt(button.dataset.step,10)));
+        output.textContent=String(qty);
+        render();
       });
-
-      rail.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          paused = true;
-          goTo(Number(rail.dataset.slide || 0));
-        }
-      });
-    });
-  }
-
-  if (hero) {
-    hero.addEventListener('touchstart', e => {
-      touchStartX = e.touches[0].clientX;
-      isDragging = false;
-    }, { passive: true });
-
-    hero.addEventListener('touchmove', e => {
-      if (Math.abs(e.touches[0].clientX - touchStartX) > 10) isDragging = true;
-    }, { passive: true });
-
-    hero.addEventListener('touchend', e => {
-      if (!isDragging) return;
-
-      const dx = e.changedTouches[0].clientX - touchStartX;
-      if (Math.abs(dx) > 40) {
-        paused = true;
-        goTo(dx < 0 ? current + 1 : current - 1);
-      }
-
-      setTimeout(() => {
-        paused = false;
-        startTimer();
-      }, 10000);
-    });
-  }
-
-  const header = document.getElementById('site-header');
-
-  if (header) {
-    const pageHero = document.getElementById('page-hero');
-
-    const onScroll = () => {
-      header.classList.toggle('scrolled', window.scrollY > 24);
-      if (pageHero) {
-        header.classList.toggle('over-hero', window.scrollY < pageHero.offsetHeight - 80);
-      } else {
-        header.classList.toggle('over-hero', window.scrollY < 36);
-      }
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-  }
-
-  const menuBtn = document.getElementById('menu-btn');
-  const mobileNav = document.getElementById('mobile-nav');
-
-  if (menuBtn && mobileNav) {
-    menuBtn.addEventListener('click', () => {
-      const open = menuBtn.classList.toggle('open');
-      mobileNav.classList.toggle('open', open);
-      menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      document.body.style.overflow = open ? 'hidden' : '';
-    });
-
-    document.querySelectorAll('[data-nav]').forEach(link => {
-      link.addEventListener('click', () => {
-        menuBtn.classList.remove('open');
-        mobileNav.classList.remove('open');
-        menuBtn.setAttribute('aria-expanded', 'false');
-        document.body.style.overflow = '';
-      });
-    });
-  }
-
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const key = btn.dataset.tab;
-      if (!key) return;
-
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.remove('active');
-        b.setAttribute('aria-selected', 'false');
-      });
-
-      document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
-
-      btn.classList.add('active');
-      btn.setAttribute('aria-selected', 'true');
-
-      const targetPanel = document.getElementById('tab-' + key);
-      if (targetPanel) targetPanel.classList.add('active');
     });
   });
+  render();
 
-  document.querySelectorAll('.faq-question').forEach(question => {
-    const item = question.closest('.faq-item');
-    const answer = item ? item.querySelector('.faq-answer') : null;
-    if (!item || !answer) return;
-
-    const toggle = () => {
-      const open = item.classList.toggle('open');
-      question.setAttribute('aria-expanded', open ? 'true' : 'false');
-      answer.style.maxHeight = open ? answer.scrollHeight + 'px' : '0';
-    };
-
-    question.addEventListener('click', toggle);
-    question.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        toggle();
-      }
+  var sampleInfo={
+    outreach:{title:'Coach Outreach Program',copy:'Reach more coaches at once across divisions, conferences, states and regions.',note:'Your outreach is sent from your recruiting identity and directs coaches back to your PLYRSITE.'},
+    reel:{title:'Highlight Reel',copy:'Send your game-film link and timestamps. Our team cuts the moments into a coach-ready reel.',note:'The final delivery is ready to share from your recruiting profile and outreach.'},
+    graphic:{title:'Custom Graphic',copy:'Commitment posts, player CV graphics, game-day cards and stat graphics built around your real photos and information.',note:'100% custom design. Never AI generated.'},
+    production_hour:{title:'Rep Hour',copy:'Use an hour of your rep\'s time for profile review, updates or hands-on recruiting work.',note:'Use the hour where you need the help most.'}
+  };
+  var dialog=document.getElementById('pcSampleDialog');
+  var close=dialog.querySelector('.pc-dialog-close');
+  document.querySelectorAll('[data-sample]').forEach(function(button){
+    button.addEventListener('click',function(){
+      var info=sampleInfo[button.dataset.sample]||{};
+      document.getElementById('pcSampleTitle').textContent=info.title||'PLYR service';
+      document.getElementById('pcSampleCopy').textContent=info.copy||'See what this PLYR Points service can do for your recruiting.';
+      document.getElementById('pcSampleNote').textContent=info.note||'Your completed work is delivered through your PLYRCARD account.';
+      dialog.hidden=false;
+      document.documentElement.style.overflow='hidden';
     });
   });
-
-
-  if ('IntersectionObserver' in window) {
-    const revealObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          revealObserver.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.12 });
-
-    document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
-
-    const counterObserver = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-
-        const el = entry.target;
-        const target = Number(el.dataset.count || 0);
-        const suffix = el.dataset.suffix || '';
-        const duration = 1200;
-        const step = 16;
-        const increment = target / (duration / step);
-        let count = 0;
-
-        const tick = setInterval(() => {
-          count += increment;
-          if (count >= target) {
-            count = target;
-            clearInterval(tick);
-          }
-          el.textContent = Math.floor(count).toLocaleString() + suffix;
-        }, step);
-
-        counterObserver.unobserve(el);
-      });
-    }, { threshold: 0.5 });
-
-    document.querySelectorAll('[data-count]').forEach(el => counterObserver.observe(el));
-  } else {
-    document.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
-  }
-
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    clearInterval(timer);
-    rails.forEach(rail => {
-      const fill = rail.querySelector('.indicator-fill');
-      if (fill) {
-        fill.style.animation = 'none';
-        fill.style.width = '100%';
-      }
-    });
-  }
+  function closeDialog(){dialog.hidden=true;document.documentElement.style.overflow='';}
+  close.addEventListener('click',closeDialog);
+  dialog.addEventListener('click',function(e){if(e.target===dialog)closeDialog();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!dialog.hidden)closeDialog();});
 })();
 </script>
-
 </body>
 </html>
