@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\SuperadminActivityWidget;
 use App\Filament\Widgets\SuperadminOverviewWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
@@ -47,6 +48,7 @@ class SuperadminDashboard extends BaseDashboard
     {
         return [
             SuperadminOverviewWidget::class,
+            SuperadminActivityWidget::class,
         ];
     }
 
