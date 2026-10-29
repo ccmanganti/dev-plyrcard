@@ -69,6 +69,7 @@ class SuperadminActivityWidget extends Widget
         if (! class_exists(CreditServiceRequest::class) || ! Schema::hasTable('credit_service_requests')) {
             return [
                 'items' => [],
+                'drawer_items' => [],
                 'summary' => 'No request data yet',
                 'all_url' => null,
             ];
@@ -83,7 +84,7 @@ class SuperadminActivityWidget extends Widget
                 ->with('user:id,first_name,last_name,email')
                 ->latest('created_at')
                 ->latest('id')
-                ->limit(5)
+                ->limit(20)
                 ->get()
                 ->map(function (CreditServiceRequest $request): array {
                     $user = $request->user;
@@ -105,13 +106,15 @@ class SuperadminActivityWidget extends Widget
                 ->all();
 
             return [
-                'items' => $items,
+                'items' => array_slice($items, 0, 5),
+                'drawer_items' => $items,
                 'summary' => number_format($weekCount) . ' new this week',
                 'all_url' => $this->requestIndexUrl(),
             ];
         } catch (Throwable) {
             return [
                 'items' => [],
+                'drawer_items' => [],
                 'summary' => 'Request activity unavailable',
                 'all_url' => null,
             ];
@@ -163,8 +166,9 @@ class SuperadminActivityWidget extends Widget
         if (! class_exists(PaymentTransaction::class) || ! Schema::hasTable('payment_transactions')) {
             return [
                 'items' => [],
+                'drawer_items' => [],
                 'summary' => 'No payment data yet',
-                'all_url' => null,
+                'all_url' => $this->userIndexUrl(),
             ];
         }
 
@@ -187,7 +191,7 @@ class SuperadminActivityWidget extends Widget
                 ->with('user:id,first_name,last_name,email')
                 ->latest('paid_at')
                 ->latest('id')
-                ->limit(5)
+                ->limit(20)
                 ->get()
                 ->map(function (PaymentTransaction $payment): array {
                     $user = $payment->user;
@@ -219,15 +223,17 @@ class SuperadminActivityWidget extends Widget
                 : 'No successful payments this week';
 
             return [
-                'items' => $items,
+                'items' => array_slice($items, 0, 5),
+                'drawer_items' => $items,
                 'summary' => $summary,
-                'all_url' => null,
+                'all_url' => $this->userIndexUrl(),
             ];
         } catch (Throwable) {
             return [
                 'items' => [],
+                'drawer_items' => [],
                 'summary' => 'Payment activity unavailable',
-                'all_url' => null,
+                'all_url' => $this->userIndexUrl(),
             ];
         }
     }
