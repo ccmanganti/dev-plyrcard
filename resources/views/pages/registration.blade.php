@@ -169,7 +169,15 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
     <li><span>PLYRSITE profile and recruiting tools</span><b>Included</b></li>
     @if($isJumpstart)<li><span>My Journey membership</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}/mo</b></li><li><span>1 coach outreach campaign</span><b>Included</b></li><li><span>1 highlight edit</span><b>Included</b></li><li><span>1 custom graphic</span><b>Included</b></li><li><span>Jumpstart service extension</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
     @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li><li><span>First month</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b></li>@endif
-  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)$500 setup + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @elseif($isJumpstart)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Jumpstart service + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first My Journey month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
+    @if($initialPoints > 0)<li><span>{{ number_format($initialPoints) }} initial PLYR Points</span><b>${{ rtrim(rtrim($customPointsDollars, '0'), '.') }}</b></li>@endif
+  </ul><div class="total"><div class="l">Due today<small>
+    @if($isAmplify)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Amplify + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month
+    @elseif($isJumpstart)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Jumpstart + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month
+    @else ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first My Journey month
+    @endif
+    @if($initialPoints > 0) + ${{ rtrim(rtrim($customPointsDollars, '0'), '.') }} for {{ number_format($initialPoints) }} PLYR Points@endif.
+    Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month.
+  </small></div><div class="r">${{ $initialDollars }}</div></div></div>
   <div class="fields" style="margin-top:24px">
     <div class="divider" id="billingInfoStart"><span>Billing information</span></div>
     <div class="f"><label>Billing name</label><input name="billing_name" id="billingName" type="text" autocomplete="name" placeholder="Name on billing account"><div class="msg">Enter billing name.</div></div>
