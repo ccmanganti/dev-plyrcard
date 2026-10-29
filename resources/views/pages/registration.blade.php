@@ -210,7 +210,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 
 <section class="panel" data-step="5">
   <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1>@if($requiresDomain)<div class="live-dom" id="final-dom">yourname.com</div>@endif @if($requiresDomain)<div class="domain-review-note" style="max-width:520px;margin-left:auto;margin-right:auto;text-align:left"><i aria-hidden="true"></i><span><strong>Pending PLYRCARD team review.</strong> This domain will not be publicly visible yet. It will become available after the team reviews and approves your domain request.</span></div>@endif<div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Complete your secure Stripe payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
-  <div class="next"><h3>What happens next</h3><ol><li><div><b>Payment confirmation</b>Your selected paid plan activates after Stripe confirms the first invoice.</div></li>@if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
+  <div class="next"><h3>What happens next</h3><ol><li><div><b>Payment confirmation</b>Your selected paid plan activates after Stripe confirms the first invoice.</div></li>@if($initialPoints > 0)<li><div><b>Your PLYR Points are added</b>{{ number_format($initialPoints) }} points are credited to your account from the same confirmed checkout.</div></li>@endif @if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
 </section>
 @else
 <section class="panel active" data-step="1">
@@ -240,7 +240,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 <script>
 (function(){
 'use strict';
-const PAID=@json($isPaid), DOMAIN_REQUIRED=@json($requiresDomain), PLAN=@json($planKey), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status')), STRIPE_START_URL=@json(route('marketing.registration.stripe-start')), STRIPE_KEY=@json($stripePublishableKey ?? config('services.stripe.key'));
+const PAID=@json($isPaid), DOMAIN_REQUIRED=@json($requiresDomain), PLAN=@json($planKey), INITIAL_POINTS=@json($initialPoints), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status')), STRIPE_START_URL=@json(route('marketing.registration.stripe-start')), STRIPE_KEY=@json($stripePublishableKey ?? config('services.stripe.key'));
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const form=$('#registrationForm'), alertBox=$('#formAlert'), loader=$('#pageLoader'), maxStep=4, successStep=5;
 const CACHE_KEY='plyrcard:registration:'+window.location.pathname+':'+PLAN+':v11-stripe';
@@ -494,7 +494,9 @@ function applyPaidStatus(data){
   if($('#paymentProvText'))$('#paymentProvText').textContent='Payment confirmed — plan active';
   if($('#paidDoneTitle'))$('#paidDoneTitle').textContent='You’re in';
   if($('#continueProfile'))$('#continueProfile').style.display='inline-flex';
-  if($('#doneMessage'))$('#doneMessage').textContent='Your payment is confirmed. Your paid PLYRCARD plan is now active.';
+  if($('#doneMessage'))$('#doneMessage').textContent=INITIAL_POINTS>0
+    ? 'Your payment is confirmed. Your paid PLYRCARD plan is active and '+Number(INITIAL_POINTS).toLocaleString('en-US')+' PLYR Points were added to your account.'
+    : 'Your payment is confirmed. Your paid PLYRCARD plan is now active.';
   const watch=$('#paymentWatch');
   if(watch){watch.classList.add('show');watch.innerHTML='<span aria-hidden="true" style="color:var(--good);font-weight:800">✓</span><span><strong>Payment confirmed</strong>Your plan is active. Taking you to the final step…</span>'}
   setTimeout(()=>goto(successStep,false),450);
