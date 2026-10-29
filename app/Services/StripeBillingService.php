@@ -869,7 +869,7 @@ class StripeBillingService
         });
         $points = (int) $transaction->points;
         $label = $plan === 'jumpstart' ? 'Jumpstart' : 'Amplify';
-        $amount = (int) $billing->amount_paid_cents;
+        $amount = max(0, (int) config('plyrcard-registration.plans.' . $plan . '.setup_fee_cents', 0));
 
         $this->notifyPointPurchaseIfNeeded(
             $transaction,
