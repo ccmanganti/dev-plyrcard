@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Filament\Resources\Users\UserResource;
 use App\Models\AdminSupportMessage;
 use App\Models\CoachDatabaseEmailMessage;
 use App\Models\User;
@@ -90,7 +91,7 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
     public function getViewData(): array
     {
         return Cache::remember(
-            'superadmin:overview:v10.109.1',
+            'superadmin:overview:v10.111.0',
             now()->addSeconds(60),
             fn (): array => $this->buildDashboardData(),
         );
@@ -127,16 +128,23 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
                     'id' => (int) $user->getKey(),
                     'name' => trim((string) (($user->first_name ?? '') . ' ' . ($user->last_name ?? ''))) ?: (string) ($user->email ?? 'Athlete'),
                     'initials' => $this->initials($user),
+                    'email' => (string) ($user->personal_email ?: $user->email ?: ''),
                     'sport' => $this->sportLabel((string) ($user->sport ?? '')),
                     'sport_key' => trim((string) ($user->sport ?? '')),
                     'plan' => $this->planLabel($user),
                     'profile_completion' => $profileCompletion,
                     'is_recurring' => $isRecurring,
                     'billing_issue' => collect($flags)->contains(fn (array $flag): bool => $flag['key'] === 'billing'),
+                    'billing' => [
+                        'payment_status' => trim((string) ($billing?->payment_status ?? '')) ?: 'Not available',
+                        'subscription_status' => trim((string) ($billing?->subscription_status ?? '')) ?: 'Not available',
+                        'recurring' => max(0, (int) ($billing?->recurring_amount_cents ?? 0)),
+                    ],
                     'flags' => $flags,
                     'top_flag' => $topFlag,
                     'health' => $health,
                     'reminder_concern' => $this->reminderConcernForFlag($topFlag),
+                    'user_url' => $this->userUrl($user),
                 ];
             })
             ->values();
@@ -172,6 +180,27 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
             : 0);
 
         $billingFollowUps = $attention->where('billing_issue', true)->count();
+        $profileFollowUps = $attention->filter(
+            fn (array $row): bool => collect($row['flags'])->contains(fn (array $flag): bool => $flag['key'] === 'profile')
+        )->count();
+        $mediaFollowUps = $attention->filter(
+            fn (array $row): bool => collect($row['flags'])->contains(fn (array $flag): bool => in_array($flag['key'], ['photo', 'film'], true))
+        )->count();
+        $outreachFollowUps = $attention->filter(
+            fn (array $row): bool => collect($row['flags'])->contains(fn (array $flag): bool => $flag['key'] === 'outreach')
+        )->count();
+
+        $followUpBreakdown = [
+            'billing' => $billingFollowUps,
+            'profile' => $profileFollowUps,
+            'media' => $mediaFollowUps,
+            'outreach' => $outreachFollowUps,
+        ];
+
+        $followUpSummary = collect($followUpBreakdown)
+            ->filter(fn (int $count): bool => $count > 0)
+            ->map(fn (int $count, string $label): string => number_format($count) . ' ' . $label)
+            ->implode(' · ');
 
         return [
             'stats' => [
@@ -185,13 +214,13 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
                 ],
                 'follow_up' => [
                     'value' => $attention->count(),
-                    'sub' => $billingFollowUps > 0
-                        ? number_format($billingFollowUps) . ' billing-related'
-                        : 'profile, media, billing, and outreach checks',
+                    'sub' => $followUpSummary !== '' ? $followUpSummary : 'No follow-ups currently flagged',
                 ],
             ],
             'attention' => $attention->take(7)->all(),
+            'attention_details' => $attention->take(50)->all(),
             'attention_total' => $attention->count(),
+            'follow_up_breakdown' => $followUpBreakdown,
             'sports' => $sports,
             'reminders' => $this->recentReminders(),
             'last_updated' => now()->format('g:i A'),
@@ -244,42 +273,90 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
         }
     }
 
-    /** @return array<int, array{key:string,label:string,weight:int,tone:string}> */
+    /** @return array<int, array{key:string,label:string,detail:string,weight:int,tone:string,concern:string,action_label:string}> */
     protected function followUpFlags(User $user, ?int $profileCompletion, bool $isRecurring, mixed $lastOutreachAt): array
     {
         $flags = [];
         $billing = $user->billingInformation;
 
-        $paymentStatus = Str::lower(trim((string) ($billing?->payment_status ?? '')));
-        $subscriptionStatus = Str::lower(trim((string) ($billing?->subscription_status ?? '')));
+        $paymentStatusRaw = trim((string) ($billing?->payment_status ?? ''));
+        $subscriptionStatusRaw = trim((string) ($billing?->subscription_status ?? ''));
+        $paymentStatus = Str::lower($paymentStatusRaw);
+        $subscriptionStatus = Str::lower($subscriptionStatusRaw);
         $billingProblem = in_array($paymentStatus, ['failed', 'past_due', 'past due', 'unpaid', 'declined', 'incomplete'], true)
             || in_array($subscriptionStatus, ['past_due', 'past due', 'unpaid', 'incomplete'], true);
 
         if ($billingProblem) {
-            $flags[] = ['key' => 'billing', 'label' => 'Payment needs attention', 'weight' => 30, 'tone' => 'danger'];
+            $detailParts = [];
+            if ($paymentStatusRaw !== '') {
+                $detailParts[] = 'Payment: ' . Str::headline($paymentStatusRaw);
+            }
+            if ($subscriptionStatusRaw !== '') {
+                $detailParts[] = 'Subscription: ' . Str::headline($subscriptionStatusRaw);
+            }
+            if ((int) ($billing?->recurring_amount_cents ?? 0) > 0) {
+                $detailParts[] = $this->money((int) $billing->recurring_amount_cents) . '/month';
+            }
+
+            $flags[] = [
+                'key' => 'billing',
+                'label' => 'Payment needs attention',
+                'detail' => implode(' · ', $detailParts) ?: 'Billing or subscription status needs review.',
+                'weight' => 30,
+                'tone' => 'danger',
+                'concern' => 'payment_attention',
+                'action_label' => 'Message about billing',
+            ];
         }
 
         if ($profileCompletion !== null && $profileCompletion < 60) {
             $flags[] = [
                 'key' => 'profile',
                 'label' => 'Profile ' . $profileCompletion . '%',
+                'detail' => 'Profile completion is below the 60% follow-up threshold.',
                 'weight' => 20,
                 'tone' => 'warning',
+                'concern' => 'finish_profile',
+                'action_label' => 'Ask to finish profile',
             ];
         }
 
         if (blank($user->player_image) && blank($user->action_image)) {
-            $flags[] = ['key' => 'photo', 'label' => 'No photo', 'weight' => 10, 'tone' => 'warning'];
+            $flags[] = [
+                'key' => 'photo',
+                'label' => 'No photo',
+                'detail' => 'No player or action photo is currently on file.',
+                'weight' => 10,
+                'tone' => 'warning',
+                'concern' => 'send_photo',
+                'action_label' => 'Request a photo',
+            ];
         }
 
         $videoUrls = is_array($user->featured_video_urls ?? null) ? array_filter($user->featured_video_urls) : [];
         if (blank($user->featured_video_url) && $videoUrls === [] && blank($user->yt_url)) {
-            $flags[] = ['key' => 'film', 'label' => 'No film', 'weight' => 12, 'tone' => 'warning'];
+            $flags[] = [
+                'key' => 'film',
+                'label' => 'No film',
+                'detail' => 'No featured video, video list, or YouTube film is currently on file.',
+                'weight' => 12,
+                'tone' => 'warning',
+                'concern' => 'send_film',
+                'action_label' => 'Request film',
+            ];
         }
 
         if ($isRecurring && Schema::hasTable('coach_database_email_messages')) {
             if (blank($lastOutreachAt)) {
-                $flags[] = ['key' => 'outreach', 'label' => 'No outreach yet', 'weight' => 16, 'tone' => 'warning'];
+                $flags[] = [
+                    'key' => 'outreach',
+                    'label' => 'No outreach yet',
+                    'detail' => 'This paying athlete has no recorded coach outreach yet.',
+                    'weight' => 16,
+                    'tone' => 'warning',
+                    'concern' => 'start_outreach',
+                    'action_label' => 'Start outreach reminder',
+                ];
             } else {
                 try {
                     $days = max(0, now()->diffInDays($lastOutreachAt));
@@ -287,8 +364,11 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
                         $flags[] = [
                             'key' => 'outreach',
                             'label' => 'Quiet ' . ($days > 90 ? '90+' : $days) . 'd',
+                            'detail' => 'Last recorded coach outreach was ' . number_format($days) . ' days ago.',
                             'weight' => 16,
                             'tone' => 'warning',
+                            'concern' => 'start_outreach',
+                            'action_label' => 'Send outreach reminder',
                         ];
                     }
                 } catch (Throwable) {
@@ -299,7 +379,6 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
 
         return $flags;
     }
-
 
     protected function reminderConcernForFlag(?array $flag): string
     {
@@ -420,6 +499,15 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
                 ->all();
         } catch (Throwable) {
             return [];
+        }
+    }
+
+    protected function userUrl(User $user): ?string
+    {
+        try {
+            return UserResource::getUrl('view', ['record' => $user]);
+        } catch (Throwable) {
+            return null;
         }
     }
 
