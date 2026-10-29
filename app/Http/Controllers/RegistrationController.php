@@ -33,6 +33,10 @@ class RegistrationController extends PublicPlayerIntakeController
         $planKey = $this->normalizePlanKey(
             $request->query('utm_plan', $request->query('plan', 'free'))
         );
+        $initialPoints = $this->normalizeInitialPoints($request->query('initial_points', 0));
+        if ($initialPoints > 0 && $planKey === 'free') {
+            $planKey = 'my-journey';
+        }
         $leagues = $this->canonicalLeagueQuery()->orderBy('name')->get();
         $programs = $this->activeClubLeagueQuery()->with(['club', 'league'])->get();
         $programsByLeague = $programs->groupBy('league_id');
@@ -109,6 +113,8 @@ class RegistrationController extends PublicPlayerIntakeController
                 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term',
                 'utm_club_id', 'utm_league_id', 'utm_team_name',
             ]), fn ($value) => filled($value)),
+            'initialPoints' => $initialPoints,
+            'initialPointsPriceCents' => $initialPoints * max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100)),
         ]);
     }
 
@@ -182,6 +188,10 @@ class RegistrationController extends PublicPlayerIntakeController
         $ghl = app(GoHighLevelService::class);
         $referrals = app(PlayerReferralService::class);
         $planKey = $this->normalizePlanKey($request->query('utm_plan', $request->input('plan_key', 'free')));
+        $initialPoints = $this->normalizeInitialPoints($request->input('initial_points', $request->query('initial_points', 0)));
+        if ($initialPoints > 0 && $planKey === 'free') {
+            $planKey = 'my-journey';
+        }
         $plan = $this->planConfig($planKey);
         $isPaid = $planKey !== 'free';
         $requiresDomain = in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true);
@@ -192,10 +202,17 @@ class RegistrationController extends PublicPlayerIntakeController
             'requested_handle' => $this->normalizeHandle((string) $request->input('requested_handle')),
             'requested_domain' => $this->normalizeDomain((string) $request->input('requested_domain')),
             'referral_code' => $referrals->normalizeCode($request->input('referral_code', $request->query('ref', ''))),
+            'initial_points' => $initialPoints,
         ]);
         $sportPositions = app(SportAvailabilityService::class)->filterSportPositions($this->sportPositions);
         $rules = [
             'plan_key' => ['required', Rule::in(['free', 'my-journey', 'jumpstart', 'amplify'])],
+            'initial_points' => [
+                'nullable',
+                'integer',
+                'min:0',
+                'max:' . max(1, (int) config('plyrcard-points.custom_point_purchase.max_points', 1000)),
+            ],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email'), Rule::unique('users', 'personal_email')],
@@ -275,7 +292,7 @@ class RegistrationController extends PublicPlayerIntakeController
             $validated['requested_handle'] = $this->generateAutomaticHandle($validated['first_name'], $validated['last_name']);
         }
 
-        [$user, $billing, $playerReferral] = DB::transaction(function () use ($validated, $plan, $planKey, $isPaid, $requiresDomain, $gender, $sport, $positions, $domainLookup, $referrals, $referrer, $referralCode) {
+        [$user, $billing, $playerReferral] = DB::transaction(function () use ($validated, $plan, $planKey, $isPaid, $requiresDomain, $gender, $sport, $positions, $domainLookup, $referrals, $referrer, $referralCode, $initialPoints) {
             $school = $this->resolveRegistrationSchool($validated['high_school'] ?? null, $validated['state'] ?? null);
             [$league, $club, $clubLeague, $teamName] = $this->resolveRegistrationProgram(
                 (int) $validated['league_id'],
@@ -349,11 +366,15 @@ class RegistrationController extends PublicPlayerIntakeController
                     'inviter_user_id' => $referrer->getKey(),
                     'inviter_name' => trim((string) ($referrer->first_name . ' ' . $referrer->last_name)),
                 ] : null,
+                'initial_points' => $initialPoints,
+                'initial_points_price_per_point_cents' => max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100)),
+                'initial_points_amount_cents' => $initialPoints * max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100)),
             ];
             $recurring = (int) ($plan['recurring_amount_cents'] ?? 0);
             $setup = (int) ($plan['setup_fee_cents'] ?? 0);
             $chargeFirstMonthUpfront = (bool) ($plan['charge_first_month_upfront'] ?? true);
-            $initialAmount = $setup + ($chargeFirstMonthUpfront ? $recurring : 0);
+            $initialPointAmount = $initialPoints * max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100));
+            $initialAmount = $setup + ($chargeFirstMonthUpfront ? $recurring : 0) + $initialPointAmount;
             $billing = BillingInformation::create([
                 'user_id' => $user->id,
                 'billing_name' => $isPaid ? $validated['billing_name'] : trim($validated['first_name'] . ' ' . $validated['last_name']),
@@ -542,6 +563,23 @@ class RegistrationController extends PublicPlayerIntakeController
             'verification' => $verification,
             'redirect_url' => url('/admin/my-profile'),
         ]);
+    }
+
+    protected function normalizeInitialPoints(mixed $value): int
+    {
+        if (! (bool) config('plyrcard-points.custom_point_purchase.enabled', true)) {
+            return 0;
+        }
+
+        $points = max(0, (int) $value);
+        if ($points === 0) {
+            return 0;
+        }
+
+        $min = max(1, (int) config('plyrcard-points.custom_point_purchase.min_points', 1));
+        $max = max($min, (int) config('plyrcard-points.custom_point_purchase.max_points', 1000));
+
+        return min($max, max($min, $points));
     }
 
     protected function normalizePlanKey(mixed $value): string
