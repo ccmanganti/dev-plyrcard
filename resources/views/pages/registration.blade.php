@@ -5,11 +5,19 @@
     $isJumpstart = $planKey === 'jumpstart';
     $requiresDomain = $requiresDomain ?? in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true);
     $isMyJourney = $planKey === 'my-journey';
-    $planLabel = $plan['label'] ?? 'Free';
+    $initialPoints = max(0, (int) ($initialPoints ?? 0));
+    $initialPointsPriceCents = max(0, (int) ($initialPointsPriceCents ?? 0));
+    $basePlanLabel = $plan['label'] ?? 'Free';
+    $planLabel = $initialPoints > 0
+        ? $basePlanLabel . ' + ' . number_format($initialPoints) . ' PLYR Points'
+        : $basePlanLabel;
     $recurringDollars = number_format(((int) ($plan['recurring_amount_cents'] ?? 0)) / 100, 2);
     $setupDollars = number_format(((int) ($plan['setup_fee_cents'] ?? 0)) / 100, 2);
+    $customPointsDollars = number_format($initialPointsPriceCents / 100, 2);
     $chargeFirstMonthUpfront = $isAmplify ? true : (bool) ($plan['charge_first_month_upfront'] ?? true);
-    $initialCents = ((int) ($plan['setup_fee_cents'] ?? 0)) + ($chargeFirstMonthUpfront ? ((int) ($plan['recurring_amount_cents'] ?? 0)) : 0);
+    $initialCents = ((int) ($plan['setup_fee_cents'] ?? 0))
+        + ($chargeFirstMonthUpfront ? ((int) ($plan['recurring_amount_cents'] ?? 0)) : 0)
+        + $initialPointsPriceCents;
     $initialDollars = number_format($initialCents / 100, 2);
 @endphp
 <!DOCTYPE html>
@@ -97,6 +105,9 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 <form id="registrationForm" method="POST" action="{{ route('marketing.registration.store', ['utm_plan' => $planKey]) }}" novalidate>
 @csrf
 <input type="hidden" name="plan_key" value="{{ $planKey }}">
+@if($initialPoints > 0)
+<input type="hidden" name="initial_points" value="{{ $initialPoints }}">
+@endif
 @foreach(($trackingParams ?? []) as $trackingKey => $trackingValue)
 <input type="hidden" name="{{ $trackingKey }}" value="{{ $trackingValue }}">
 @endforeach
