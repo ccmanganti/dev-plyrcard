@@ -622,7 +622,7 @@ class RegistrationController extends PublicPlayerIntakeController
                 'payment_form_url' => 'https\://systems.plyrcard.com/widget/survey/KmE9cOWtXltjhFEPw27w?notrack=true',
             ],
             'amplify' => [
-                'label' => 'Amplify', 'recurring_amount_cents' => 4900, 'setup_fee_cents' => 50000,
+                'label' => 'Amplify', 'recurring_amount_cents' => 4900, 'setup_fee_cents' => 55000,
                 'charge_first_month_upfront' => true, 'role_after_registration' => 'Free', 'role_after_payment' => 'My Journey',
                 'payment_form_url' => 'https\://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true',
             ],
