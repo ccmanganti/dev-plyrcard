@@ -8,7 +8,7 @@
 
     $myJourneyCents = (int) data_get($plans, 'my-journey.recurring_amount_cents', 4900);
     $jumpstartCents = (int) data_get($plans, 'jumpstart.setup_fee_cents', 14900);
-    $amplifyCents = (int) data_get($plans, 'amplify.setup_fee_cents', 50000);
+    $amplifyCents = (int) data_get($plans, 'amplify.setup_fee_cents', 55000);
     $jumpstartPoints = (int) config('plyrcard-points.packages.jumpstart', 320);
     $amplifyPoints = (int) config('plyrcard-points.packages.amplify', 1280);
     $customPointCents = max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100));
@@ -267,7 +267,9 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
       <h3>Just need a few more?</h3>
       <div class="pc-topup-pills">
         @foreach(['100','250','500'] as $packKey)
-          @php($pack = $pointPacks->get($packKey))
+          @php
+            $pack = $pointPacks->get($packKey);
+          @endphp
           @if($pack)
             <span class="pc-topup-pill"><b>{{ number_format((int) $pack['points']) }} pts</b>{{ $money((int) $pack['price_cents']) }}</span>
           @endif
@@ -314,7 +316,9 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
     <div class="pc-section-head"><span class="pc-kicker">Not sure what to get?</span><h2>Build your mix</h2><p>Tell us what you need this season. We will show you the cheapest way to get it.</p></div>
     <div class="pc-calculator">
       <div class="pc-card pc-calc-list" id="pcCalculator">
-        @php($defaultQty = ['outreach'=>2,'reel'=>2,'graphic'=>1,'production_hour'=>0])
+        @php
+          $defaultQty = ['outreach'=>2,'reel'=>2,'graphic'=>1,'production_hour'=>0];
+        @endphp
         @foreach($services as $serviceKey => $service)
         <div class="pc-calc-row" data-service="{{ $serviceKey }}" data-points="{{ $service['points'] }}">
           <div class="pc-calc-label"><strong>{{ $service['label'] }}</strong><small>{{ number_format($service['points']) }} pts each</small></div>
