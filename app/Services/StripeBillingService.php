@@ -79,6 +79,25 @@ class StripeBillingService
             );
         }
         $meta = is_array($billing->registration_meta) ? $billing->registration_meta : [];
+
+        $initialPoints = max(0, (int) data_get($meta, 'initial_points', 0));
+        $customPointPriceId = null;
+        if ($initialPoints > 0) {
+            $pointProductId = $this->resolveProductId(
+                trim((string) config('plyrcard-points.custom_point_purchase.stripe_product_id', '')),
+                'PLYR Points',
+                'custom-points',
+            );
+            $pointUnitAmount = max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100));
+            $customPointPriceId = $this->resolvePriceId(
+                $pointProductId,
+                $pointUnitAmount,
+                null,
+            );
+            data_set($meta, 'stripe.initial_points_price_id', $customPointPriceId);
+            data_set($meta, 'stripe.initial_points_quantity', $initialPoints);
+        }
+
         $attempt = max(0, (int) data_get($meta, 'stripe.checkout_attempt', 0)) + 1;
         data_set($meta, 'stripe.checkout_attempt', $attempt);
         data_set($meta, 'stripe.checkout_plan_key', $planKey);
@@ -104,8 +123,10 @@ class StripeBillingService
         if ($savedPaymentMethodId) {
             $params['default_payment_method'] = $savedPaymentMethodId;
         }
+        $invoiceItems = [];
+
         if ($setupPriceId) {
-            $params['add_invoice_items'] = [[
+            $invoiceItems[] = [
                 'price' => $setupPriceId,
                 'quantity' => 1,
                 'metadata' => [
@@ -113,7 +134,24 @@ class StripeBillingService
                     'plyrcard_registration_plan' => $planKey,
                     'plyrcard_charge_type' => 'registration_setup',
                 ],
-            ]];
+            ];
+        }
+
+        if ($customPointPriceId && $initialPoints > 0) {
+            $invoiceItems[] = [
+                'price' => $customPointPriceId,
+                'quantity' => $initialPoints,
+                'metadata' => [
+                    'plyrcard_billing_id' => (string) $billing->getKey(),
+                    'plyrcard_registration_plan' => $planKey,
+                    'plyrcard_charge_type' => 'registration_custom_points',
+                    'plyrcard_point_amount' => (string) $initialPoints,
+                ],
+            ];
+        }
+
+        if ($invoiceItems !== []) {
+            $params['add_invoice_items'] = $invoiceItems;
         }
         $subscription = $this->post(
             '/v1/subscriptions',
@@ -842,6 +880,46 @@ class StripeBillingService
             ['stripe_payment_intent_id' => $sourceId, 'package' => $plan],
         );
     }
+    protected function activateRegistrationCustomPoints(BillingInformation $billing, int $points, string $sourceId): void
+    {
+        $user = $billing->user;
+        $points = max(0, $points);
+        $sourceId = trim($sourceId);
+
+        if (! $user || $points <= 0 || $sourceId === '') {
+            return;
+        }
+
+        $pointUnitAmount = max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100));
+        $amount = $points * $pointUnitAmount;
+        $packKey = 'registration-custom-' . $points;
+
+        $transaction = app(CreditPointService::class)->grantTopUp(
+            $user,
+            $points,
+            $packKey,
+            $sourceId,
+            [
+                'stripe_billing_id' => $billing->getKey(),
+                'amount_cents' => $amount,
+                'registration_initial_points' => true,
+            ],
+        );
+
+        $this->notifyPointPurchaseIfNeeded(
+            $transaction,
+            $user,
+            $points,
+            number_format($points) . ' Initial PLYR Points',
+            $amount,
+            [
+                'stripe_invoice_id' => $sourceId,
+                'point_pack' => $packKey,
+                'registration_initial_points' => true,
+            ],
+        );
+    }
+
     protected function activatePointPackPurchase(BillingInformation $billing, array $intent): void
     {
         $user = $billing->user;
@@ -1151,14 +1229,23 @@ class StripeBillingService
             }
             $user->syncRoles(array_values(array_unique($roles)));
         }
-        if (in_array($checkoutPlan, ['jumpstart', 'amplify'], true)) {
-            $billingReason = is_array($invoice) ? (string) ($invoice['billing_reason'] ?? '') : '';
-            $isInitialPackageInvoice = $billingReason === '' || $billingReason === 'subscription_create';
-            $sourceId = is_array($invoice) ? (string) ($invoice['id'] ?? $billing->stripe_invoice_id ?? '') : (string) ($billing->stripe_invoice_id ?? '');
-            if ($isInitialPackageInvoice && $sourceId !== '') {
-                $this->activateServiceEntitlement($billing, $checkoutPlan, $sourceId);
-            }
+        $billingReason = is_array($invoice) ? (string) ($invoice['billing_reason'] ?? '') : '';
+        $isInitialRegistrationInvoice = $billingReason === '' || $billingReason === 'subscription_create';
+        $sourceId = is_array($invoice)
+            ? (string) ($invoice['id'] ?? $billing->stripe_invoice_id ?? '')
+            : (string) ($billing->stripe_invoice_id ?? '');
+
+        if (in_array($checkoutPlan, ['jumpstart', 'amplify'], true)
+            && $isInitialRegistrationInvoice
+            && $sourceId !== '') {
+            $this->activateServiceEntitlement($billing, $checkoutPlan, $sourceId);
         }
+
+        $initialPoints = max(0, (int) data_get($meta, 'initial_points', 0));
+        if ($initialPoints > 0 && $isInitialRegistrationInvoice && $sourceId !== '') {
+            $this->activateRegistrationCustomPoints($billing, $initialPoints, $sourceId);
+        }
+
         $journeyRecurring = (int) config('plyrcard-registration.plans.my-journey.recurring_amount_cents', 4900);
         $amountPaid = is_array($invoice) && isset($invoice['amount_paid'])
             ? (int) $invoice['amount_paid']
@@ -1173,8 +1260,7 @@ class StripeBillingService
             'stripe_synced_at' => now(),
             'payment_synced_at' => now(),
         ])->save();
-        $billingReason = is_array($invoice) ? (string) ($invoice['billing_reason'] ?? '') : '';
-        if (! $hadMyJourney && ($billingReason === '' || $billingReason === 'subscription_create')) {
+        if (! $hadMyJourney && $isInitialRegistrationInvoice) {
             try {
                 app(PlyrcardSystemEmailService::class)->sendMyJourneyUpgraded($user->fresh() ?? $user);
             } catch (\Throwable $exception) {
@@ -1620,12 +1706,15 @@ class StripeBillingService
     }
     protected function metadata(User $user, BillingInformation $billing, string $planKey): array
     {
-        return [
+        $initialPoints = max(0, (int) data_get($billing->registration_meta ?? [], 'initial_points', 0));
+
+        return array_filter([
             'plyrcard_user_id' => (string) $user->getKey(),
             'plyrcard_billing_id' => (string) $billing->getKey(),
             'plyrcard_registration_plan' => $planKey,
             'plyrcard_source' => 'native_registration',
-        ];
+            'plyrcard_initial_points' => $initialPoints > 0 ? (string) $initialPoints : null,
+        ], fn ($value) => $value !== null && $value !== '');
     }
     protected function checkoutPayload(BillingInformation $billing, ?string $clientSecret, bool $paid): array
     {
