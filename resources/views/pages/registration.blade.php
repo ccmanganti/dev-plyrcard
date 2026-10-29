@@ -5,11 +5,19 @@
     $isJumpstart = $planKey === 'jumpstart';
     $requiresDomain = $requiresDomain ?? in_array($planKey, ['my-journey', 'jumpstart', 'amplify'], true);
     $isMyJourney = $planKey === 'my-journey';
-    $planLabel = $plan['label'] ?? 'Free';
+    $initialPoints = max(0, (int) ($initialPoints ?? 0));
+    $initialPointsPriceCents = max(0, (int) ($initialPointsPriceCents ?? 0));
+    $basePlanLabel = $plan['label'] ?? 'Free';
+    $planLabel = $initialPoints > 0
+        ? $basePlanLabel . ' + ' . number_format($initialPoints) . ' PLYR Points'
+        : $basePlanLabel;
     $recurringDollars = number_format(((int) ($plan['recurring_amount_cents'] ?? 0)) / 100, 2);
     $setupDollars = number_format(((int) ($plan['setup_fee_cents'] ?? 0)) / 100, 2);
+    $customPointsDollars = number_format($initialPointsPriceCents / 100, 2);
     $chargeFirstMonthUpfront = $isAmplify ? true : (bool) ($plan['charge_first_month_upfront'] ?? true);
-    $initialCents = ((int) ($plan['setup_fee_cents'] ?? 0)) + ($chargeFirstMonthUpfront ? ((int) ($plan['recurring_amount_cents'] ?? 0)) : 0);
+    $initialCents = ((int) ($plan['setup_fee_cents'] ?? 0))
+        + ($chargeFirstMonthUpfront ? ((int) ($plan['recurring_amount_cents'] ?? 0)) : 0)
+        + $initialPointsPriceCents;
     $initialDollars = number_format($initialCents / 100, 2);
 @endphp
 <!DOCTYPE html>
@@ -97,6 +105,9 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 <form id="registrationForm" method="POST" action="{{ route('marketing.registration.store', ['utm_plan' => $planKey]) }}" novalidate>
 @csrf
 <input type="hidden" name="plan_key" value="{{ $planKey }}">
+@if($initialPoints > 0)
+<input type="hidden" name="initial_points" value="{{ $initialPoints }}">
+@endif
 @foreach(($trackingParams ?? []) as $trackingKey => $trackingValue)
 <input type="hidden" name="{{ $trackingKey }}" value="{{ $trackingValue }}">
 @endforeach
@@ -158,7 +169,15 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
     <li><span>PLYRSITE profile and recruiting tools</span><b>Included</b></li>
     @if($isJumpstart)<li><span>My Journey membership</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}/mo</b></li><li><span>1 coach outreach campaign</span><b>Included</b></li><li><span>1 highlight edit</span><b>Included</b></li><li><span>1 custom graphic</span><b>Included</b></li><li><span>Jumpstart service extension</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li>@endif
     @if($isAmplify)<li><span>4 highlight reels + 4 custom graphics</span><b>Included</b></li><li><span>4 managed coach outreach sends</span><b>Included</b></li><li><span>One-time setup</span><b>${{ rtrim(rtrim($setupDollars, '0'), '.') }}</b></li><li><span>First month</span><b>${{ rtrim(rtrim($recurringDollars, '0'), '.') }}</b></li>@endif
-  </ul><div class="total"><div class="l">Due today<small>@if($isAmplify)$500 setup + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @elseif($isJumpstart)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Jumpstart service + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first My Journey month. Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month. @else Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month @endif</small></div><div class="r">${{ $initialDollars }}</div></div></div>
+    @if($initialPoints > 0)<li><span>{{ number_format($initialPoints) }} initial PLYR Points</span><b>${{ rtrim(rtrim($customPointsDollars, '0'), '.') }}</b></li>@endif
+  </ul><div class="total"><div class="l">Due today<small>
+    @if($isAmplify)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Amplify + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month
+    @elseif($isJumpstart)${{ rtrim(rtrim($setupDollars, '0'), '.') }} Jumpstart + ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first month
+    @else ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} first My Journey month
+    @endif
+    @if($initialPoints > 0) + ${{ rtrim(rtrim($customPointsDollars, '0'), '.') }} for {{ number_format($initialPoints) }} PLYR Points@endif.
+    Then ${{ rtrim(rtrim($recurringDollars, '0'), '.') }} / month.
+  </small></div><div class="r">${{ $initialDollars }}</div></div></div>
   <div class="fields" style="margin-top:24px">
     <div class="divider" id="billingInfoStart"><span>Billing information</span></div>
     <div class="f"><label>Billing name</label><input name="billing_name" id="billingName" type="text" autocomplete="name" placeholder="Name on billing account"><div class="msg">Enter billing name.</div></div>
@@ -191,7 +210,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 
 <section class="panel" data-step="5">
   <div class="done-wrap"><div class="ring"><svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#FF5A3C" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 8l9 6 9-6"/></svg></div><div class="eyebrow">Account created</div><h1 id="paidDoneTitle">Finish your payment</h1>@if($requiresDomain)<div class="live-dom" id="final-dom">yourname.com</div>@endif @if($requiresDomain)<div class="domain-review-note" style="max-width:520px;margin-left:auto;margin-right:auto;text-align:left"><i aria-hidden="true"></i><span><strong>Pending PLYRCARD team review.</strong> This domain will not be publicly visible yet. It will become available after the team reviews and approves your domain request.</span></div>@endif<div class="prov" id="paymentProv"><i></i><span id="paymentProvText">Payment pending</span></div><p class="tiny" id="doneMessage" style="margin-top:18px">Complete your secure Stripe payment to activate your plan.</p><div class="nav" style="justify-content:center"><a class="btn pri" id="paymentLink" href="#" style="display:none;text-decoration:none;text-align:center">Continue to payment</a><a class="btn gho" id="continueProfile" href="/admin/my-profile" style="display:none;text-decoration:none">Continue to My Profile</a></div></div>
-  <div class="next"><h3>What happens next</h3><ol><li><div><b>Payment confirmation</b>Your selected paid plan activates after Stripe confirms the first invoice.</div></li>@if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
+  <div class="next"><h3>What happens next</h3><ol><li><div><b>Payment confirmation</b>Your selected paid plan activates after Stripe confirms the first invoice.</div></li>@if($initialPoints > 0)<li><div><b>Your PLYR Points are added</b>{{ number_format($initialPoints) }} points are credited to your account from the same confirmed checkout.</div></li>@endif @if($requiresDomain)<li><div><b>Your domain goes through review</b>Your domain request stays hidden while the PLYRCARD team reviews it. It will not be publicly visible until approved.</div></li>@endif @if($isJumpstart)<li><div><b>Your Jumpstart is queued</b>Your campaign, highlight edit, and graphic can move into production after payment confirmation while My Journey activates.</div></li>@endif<li><div><b>Build your PLYRCARD</b>Add film, photos, stats, and the rest of your profile from My Profile.</div></li></ol></div>
 </section>
 @else
 <section class="panel active" data-step="1">
@@ -221,7 +240,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 <script>
 (function(){
 'use strict';
-const PAID=@json($isPaid), DOMAIN_REQUIRED=@json($requiresDomain), PLAN=@json($planKey), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status')), STRIPE_START_URL=@json(route('marketing.registration.stripe-start')), STRIPE_KEY=@json($stripePublishableKey ?? config('services.stripe.key'));
+const PAID=@json($isPaid), DOMAIN_REQUIRED=@json($requiresDomain), PLAN=@json($planKey), INITIAL_POINTS=@json($initialPoints), POS=@json($sportPositions), LEAGUES=@json($leagueDirectory ?? []), CLUBS=@json($clubDirectory ?? []), AGE_GROUPS=@json(array_values($ageGroups ?? [])), DOMAIN_URL=@json(route('marketing.registration.check-domain')), STATUS_URL=@json(route('marketing.registration.payment-status')), STRIPE_START_URL=@json(route('marketing.registration.stripe-start')), STRIPE_KEY=@json($stripePublishableKey ?? config('services.stripe.key'));
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const form=$('#registrationForm'), alertBox=$('#formAlert'), loader=$('#pageLoader'), maxStep=4, successStep=5;
 const CACHE_KEY='plyrcard:registration:'+window.location.pathname+':'+PLAN+':v11-stripe';
@@ -475,7 +494,9 @@ function applyPaidStatus(data){
   if($('#paymentProvText'))$('#paymentProvText').textContent='Payment confirmed — plan active';
   if($('#paidDoneTitle'))$('#paidDoneTitle').textContent='You’re in';
   if($('#continueProfile'))$('#continueProfile').style.display='inline-flex';
-  if($('#doneMessage'))$('#doneMessage').textContent='Your payment is confirmed. Your paid PLYRCARD plan is now active.';
+  if($('#doneMessage'))$('#doneMessage').textContent=INITIAL_POINTS>0
+    ? 'Your payment is confirmed. Your paid PLYRCARD plan is active and '+Number(INITIAL_POINTS).toLocaleString('en-US')+' PLYR Points were added to your account.'
+    : 'Your payment is confirmed. Your paid PLYRCARD plan is now active.';
   const watch=$('#paymentWatch');
   if(watch){watch.classList.add('show');watch.innerHTML='<span aria-hidden="true" style="color:var(--good);font-weight:800">✓</span><span><strong>Payment confirmed</strong>Your plan is active. Taking you to the final step…</span>'}
   setTimeout(()=>goto(successStep,false),450);

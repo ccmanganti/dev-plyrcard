@@ -52,14 +52,14 @@ return [
 
         'amplify' => [
             'label' => 'Amplify',
-            // Registration charges $500 once + starts My Journey at $49/mo.
+            // Registration charges $550 once + starts My Journey at $49/mo.
             'recurring_amount_cents' => 4900,
-            'setup_fee_cents' => 50000,
+            'setup_fee_cents' => 55000,
             'charge_first_month_upfront' => true,
             'role_after_registration' => 'Free',
             'role_after_payment' => 'My Journey',
             'stripe_product_id' => env('STRIPE_AMPLIFY_PRODUCT_ID', 'prod_VM4UnjyEp0h0LY'),
-            // Optional. If blank, PLYRCARD finds or creates a matching $500 one-time Price.
+            // Optional. If blank, PLYRCARD finds or creates a matching $550 one-time Price.
             'stripe_price_id' => env('STRIPE_AMPLIFY_PRICE_ID'),
             'payment_form_url' => env('GHL_AMPLIFY_PAYMENT_FORM_URL', 'https://systems.plyrcard.com/widget/survey/FPx6oTagczUr0jH1X0ES?notrack=true'),
         ],
