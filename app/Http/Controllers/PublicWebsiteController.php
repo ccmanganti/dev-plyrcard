@@ -194,7 +194,9 @@ class PublicWebsiteController extends Controller
     {
         return [
             'user.school',
-            'user.club',
+            'user.club.league',
+            'user.league',
+            'user.clubLeague.league',
             'siteTemplate',
             'heroTemplate',
             'fieldValues.templateField',
