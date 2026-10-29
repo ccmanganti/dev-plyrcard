@@ -8,6 +8,12 @@
     $user = $website->user;
     $club = $user?->club;
 
+    // The player's selected league is authoritative. club_league_id is derived
+    // from that same selection; club->league is retained only as a legacy fallback.
+    $playerLeague = $user?->league
+        ?? $user?->clubLeague?->league
+        ?? $user?->club?->league;
+
     /*
     |--------------------------------------------------------------------------
     | Field Value Helpers
@@ -282,7 +288,7 @@ $text2 = $getFieldValue(
         ($user?->first_name ?? '') . ' ' . ($user?->last_name ?? '')
     );
 
-    $leagueOrClub = $user?->club?->league?->name
+    $leagueOrClub = $playerLeague?->name
         ?? $user?->club?->name
         ?? $user?->team_name
         ?? '';
@@ -489,7 +495,7 @@ HTML;
     );
 
     $footerLeagueLogoUrl = $resolveMediaUrl(
-        $user?->league?->logo ?? $user?->club?->league?->logo ?? '',
+        $playerLeague?->logo ?? '',
         ''
     );
 
@@ -718,7 +724,7 @@ HTML;
 
     $watchSeasonMeta = collect([
         $club?->name,
-        $club?->league?->name,
+        $playerLeague?->name,
         $gradYearText,
     ])->filter(fn ($value) => filled($value))->implode(' · ');
 
@@ -944,7 +950,7 @@ HTML;
 
     $schoolName = $user?->school?->name ?? '';
     $clubName = $user?->club?->name ?? ($user?->team_name ?? '');
-    $leagueName = $user?->club?->league?->name ?? '';
+    $leagueName = $playerLeague?->name ?? '';
 
     $locationText = collect([$user?->city, $user?->state])
         ->filter(fn ($v) => filled($v))
@@ -2569,7 +2575,7 @@ HTML;
 
                                     $watchCompetitionLine = collect([
                                         $club?->name,
-                                        $club?->league?->name,
+                                        $playerLeague?->name,
                                         $watchSchedule['time'] ?? null,
                                     ])->filter(fn ($value) => filled($value))->implode(' · ');
 
