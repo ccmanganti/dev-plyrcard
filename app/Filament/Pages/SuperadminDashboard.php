@@ -26,12 +26,12 @@ class SuperadminDashboard extends BaseDashboard
 
     public function getHeading(): string
     {
-        return 'Dashboard';
+        return '';
     }
 
     public function getSubheading(): ?string
     {
-        return 'Every athlete, plan, request, payment, and follow-up in one place.';
+        return null;
     }
 
     public function getColumns(): int | array
