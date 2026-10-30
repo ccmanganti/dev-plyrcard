@@ -1804,6 +1804,26 @@ HTML;
 
     protected function resolveHeroTemplate(string $sport = null): ?HeroTemplate
     {
+        // New player websites should start on Hero Soccer Two.
+        // RegistrationController inherits this intake helper, so this applies to
+        // both native registration and the legacy/public player intake flow.
+        $heroSoccerTwo = HeroTemplate::query()
+            ->where('is_active', true)
+            ->where(function ($query): void {
+                $query
+                    ->where('name', 'Hero Soccer Two')
+                    ->orWhere('blade_view', 'hero.hero_soccer_two');
+            })
+            ->orderByRaw("CASE WHEN name = 'Hero Soccer Two' THEN 0 ELSE 1 END")
+            ->orderBy('id')
+            ->first();
+
+        if ($heroSoccerTwo) {
+            return $heroSoccerTwo;
+        }
+
+        // Keep the previous Free hero as a deployment-safe fallback so account
+        // creation never fails if the target template has not been seeded yet.
         return HeroTemplate::query()
             ->where('is_active', true)
             ->where('blade_view', 'hero.hero_template_free')
