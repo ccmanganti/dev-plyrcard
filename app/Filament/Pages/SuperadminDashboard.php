@@ -2,8 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\SuperadminActivityWidget;
-use App\Filament\Widgets\SuperadminOverviewWidget;
+use App\Filament\Widgets\SuperadminControlCenterWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class SuperadminDashboard extends BaseDashboard
@@ -27,12 +26,12 @@ class SuperadminDashboard extends BaseDashboard
 
     public function getHeading(): string
     {
-        return 'Overview';
+        return 'Dashboard';
     }
 
     public function getSubheading(): ?string
     {
-        return 'Every athlete, every plan, and every follow-up in one place.';
+        return 'Every athlete, plan, request, payment, and follow-up in one place.';
     }
 
     public function getColumns(): int | array
@@ -47,8 +46,7 @@ class SuperadminDashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            SuperadminOverviewWidget::class,
-            SuperadminActivityWidget::class,
+            SuperadminControlCenterWidget::class,
         ];
     }
 
