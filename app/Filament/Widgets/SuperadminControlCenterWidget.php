@@ -8,6 +8,7 @@ use App\Models\CreditServiceRequest;
 use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Services\ProfileCompletionService;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -70,6 +71,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     lastOutreachAt: $lastOutreach[(int) $user->getKey()] ?? null,
                 );
 
+                $lastLoginLabel = $loginTracking ? 'Never' : 'Not tracked';
+
                 if ($loginTracking) {
                     $lastLogin = $user->getAttribute('last_login_at');
 
@@ -85,7 +88,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         ];
                     } else {
                         try {
-                            $days = max(0, now()->diffInDays($lastLogin));
+                            $lastLoginAt = $lastLogin instanceof \DateTimeInterface
+                                ? Carbon::instance($lastLogin)
+                                : Carbon::parse((string) $lastLogin);
+
+                            $days = max(0, now()->diffInDays($lastLoginAt));
+                            $lastLoginLabel = $lastLoginAt->diffForHumans();
+
                             if ($days > 21) {
                                 $flags[] = [
                                     'key' => 'getting_started',
@@ -120,10 +129,10 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
                 if ($lastOutreachAt) {
                     try {
-                        $lastOutreachLabel = now()->diffForHumans($lastOutreachAt, [
-                            'syntax' => \Carbon\CarbonInterface::DIFF_RELATIVE_TO_NOW,
-                            'short' => true,
-                        ]);
+                        $outreachAt = $lastOutreachAt instanceof \DateTimeInterface
+                            ? Carbon::instance($lastOutreachAt)
+                            : Carbon::parse((string) $lastOutreachAt);
+                        $lastOutreachLabel = $outreachAt->diffForHumans();
                     } catch (Throwable) {
                         $lastOutreachLabel = 'Recorded';
                     }
@@ -158,15 +167,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'profile_completion' => $profileCompletion ?? 0,
                     'joined' => $user->created_at?->format('M j, Y') ?? 'Unknown',
                     'joined_sort' => $user->created_at?->timestamp ?? 0,
-                    'last_login' => $loginTracking
-                        ? ($user->getAttribute('last_login_at')?->diffForHumans() ?? 'Never')
-                        : 'Not tracked',
+                    'last_login' => $lastLoginLabel,
                     'last_outreach' => $lastOutreachLabel,
                     'health' => $health,
                     'state' => $state,
                     'flags' => $flags,
                     'top_flag' => $topFlag,
-                    'reminder_concern' => $this->reminderConcernForFlag($topFlag),
+                    'reminder_concern' => (string) ($topFlag['concern'] ?? $this->reminderConcernForFlag($topFlag)),
                     'is_recurring' => $isRecurring,
                     'billing' => [
                         'plan_key' => trim((string) ($billing?->plan_key ?? '')),
