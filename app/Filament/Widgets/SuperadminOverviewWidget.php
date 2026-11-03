@@ -321,11 +321,11 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
             ];
         }
 
-        if (blank($user->player_image) && blank($user->action_image)) {
+        if (! $this->hasPlayerUploadedPhoto($user)) {
             $flags[] = [
                 'key' => 'photo',
-                'label' => 'No photo',
-                'detail' => 'No player or action photo is currently on file.',
+                'label' => 'No photo uploaded',
+                'detail' => '0 player-uploaded photos in My Photos / Quick Profile.',
                 'weight' => 10,
                 'tone' => 'warning',
                 'concern' => 'send_photo',
@@ -333,17 +333,34 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
             ];
         }
 
-        $videoUrls = is_array($user->featured_video_urls ?? null) ? array_filter($user->featured_video_urls) : [];
-        if (blank($user->featured_video_url) && $videoUrls === [] && blank($user->yt_url)) {
+        if (! $this->hasYoutubeFilmLink($user)) {
             $flags[] = [
                 'key' => 'film',
-                'label' => 'No film',
-                'detail' => 'No featured video, video list, or YouTube film is currently on file.',
+                'label' => 'No YouTube film',
+                'detail' => 'No YouTube or Youtu.be URL is saved in the player video/link fields.',
                 'weight' => 12,
                 'tone' => 'warning',
                 'concern' => 'send_film',
                 'action_label' => 'Request film',
             ];
+        }
+
+        $renewalAt = $this->renewalAt($user);
+        if ($isRecurring && $renewalAt) {
+            $cancelAtPeriodEnd = (bool) data_get($billing?->registration_meta, 'stripe.cancel_at_period_end', false);
+            $daysUntilRenewal = now()->startOfDay()->diffInDays($renewalAt->copy()->startOfDay(), false);
+
+            if (! $cancelAtPeriodEnd && $daysUntilRenewal >= 0 && $daysUntilRenewal <= 7) {
+                $flags[] = [
+                    'key' => 'renewal',
+                    'label' => 'Renews in ' . $daysUntilRenewal . 'd',
+                    'detail' => 'Stripe current period ends ' . $renewalAt->format('M j, Y') . '.',
+                    'weight' => 8,
+                    'tone' => 'info',
+                    'concern' => 'renewal_coming_up',
+                    'action_label' => 'Send renewal reminder',
+                ];
+            }
         }
 
         if ($isRecurring && Schema::hasTable('coach_database_email_messages')) {
@@ -380,6 +397,85 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
         return $flags;
     }
 
+    protected function hasPlayerUploadedPhoto(User $user): bool
+    {
+        $raw = $user->raw_player_images ?? [];
+
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            $raw = is_array($decoded) ? $decoded : [$raw];
+        }
+
+        return collect(is_array($raw) ? $raw : [])
+            ->map(fn ($path): string => trim((string) $path))
+            ->filter()
+            ->isNotEmpty();
+    }
+
+    protected function hasYoutubeFilmLink(User $user): bool
+    {
+        $candidates = collect([
+            $user->yt_url ?? null,
+            $user->featured_video_url ?? null,
+        ]);
+
+        $extra = $user->featured_video_urls ?? null;
+
+        if (is_array($extra)) {
+            $candidates = $candidates->concat($extra);
+        } elseif (is_string($extra) && trim($extra) !== '') {
+            $decoded = json_decode($extra, true);
+
+            if (is_array($decoded)) {
+                $candidates = $candidates->concat($decoded);
+            } else {
+                $candidates = $candidates->concat(
+                    preg_split('/[\r\n,]+/', $extra) ?: []
+                );
+            }
+        }
+
+        return $candidates
+            ->map(fn ($value): string => trim((string) $value))
+            ->filter()
+            ->contains(function (string $url): bool {
+                $normalized = Str::lower($url);
+
+                return Str::contains($normalized, [
+                    'youtube.com/',
+                    'www.youtube.com/',
+                    'm.youtube.com/',
+                    'youtu.be/',
+                    'youtube-nocookie.com/',
+                ]);
+            });
+    }
+
+    protected function renewalAt(User $user): ?\Illuminate\Support\Carbon
+    {
+        $billing = $user->billingInformation;
+
+        if (! $billing) {
+            return null;
+        }
+
+        $raw = data_get($billing->registration_meta, 'stripe.current_period_end');
+
+        if (! filled($raw)) {
+            return null;
+        }
+
+        try {
+            if (is_numeric($raw)) {
+                return \Illuminate\Support\Carbon::createFromTimestamp((int) $raw);
+            }
+
+            return \Illuminate\Support\Carbon::parse((string) $raw);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     protected function reminderConcernForFlag(?array $flag): string
     {
         return match ((string) ($flag['key'] ?? '')) {
@@ -388,6 +484,7 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
             'photo' => 'send_photo',
             'film' => 'send_film',
             'outreach' => 'start_outreach',
+            'renewal' => 'renewal_coming_up',
             default => 'custom',
         };
     }
