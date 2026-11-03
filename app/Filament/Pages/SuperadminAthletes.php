@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\SuperadminAthletesControlCenterWidget;
 use App\Filament\Widgets\SuperadminControlCenterWidget;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -14,7 +15,7 @@ class SuperadminAthletes extends Page
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
     protected static ?int $navigationSort = 2;
 
-    protected static string $controlCenterSection = 'athletes';
+    protected static string $controlCenterWidgetClass = SuperadminAthletesControlCenterWidget::class;
 
     public static function canAccess(): bool
     {
@@ -44,9 +45,7 @@ class SuperadminAthletes extends Page
     protected function getHeaderWidgets(): array
     {
         return [
-            SuperadminControlCenterWidget::make([
-                'initialTab' => static::$controlCenterSection,
-            ]),
+            static::$controlCenterWidgetClass,
         ];
     }
 
