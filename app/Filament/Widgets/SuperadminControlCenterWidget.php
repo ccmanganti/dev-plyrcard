@@ -49,7 +49,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
     public function getViewData(): array
     {
         return Cache::remember(
-            'superadmin:control-center:v2',
+            'superadmin:control-center:v3',
             now()->addSeconds(45),
             function (): array {
                 $base = parent::getViewData();
