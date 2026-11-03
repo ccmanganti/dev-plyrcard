@@ -2,7 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\SuperadminOverviewControlCenterWidget;
+use App\Support\SuperadminWidgets\SuperadminOverviewControlCenterWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class SuperadminDashboard extends BaseDashboard
