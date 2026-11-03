@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
+use App\Filament\Widgets\SuperadminFollowUpsControlCenterWidget;
 
 class SuperadminFollowUps extends SuperadminAthletes
 {
@@ -16,7 +17,7 @@ class SuperadminFollowUps extends SuperadminAthletes
 
     protected static ?int $navigationSort = 3;
 
-    protected static string $controlCenterSection = 'followups';
+    protected static string $controlCenterWidgetClass = SuperadminFollowUpsControlCenterWidget::class;
 
     public static function getNavigationBadge(): ?string
     {
