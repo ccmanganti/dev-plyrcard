@@ -427,11 +427,11 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
         $has = static fn (string $name): bool => $roles->contains(fn (string $role): bool => strcasecmp($role, $name) === 0);
 
         if ($has('Amplify')) {
-            return $has('My Journey') ? 'My Journey + Amplify' : 'Amplify';
+            return 'Amplify';
         }
 
         if ($has('Jumpstart')) {
-            return $has('My Journey') ? 'My Journey + Jumpstart' : 'Jumpstart';
+            return 'Jumpstart';
         }
 
         if ($has('My Journey')) {
