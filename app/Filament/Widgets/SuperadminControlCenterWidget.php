@@ -25,6 +25,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
     protected static ?int $sort = 1;
 
+    public string $initialTab = 'overview';
+
     public static function navigationMetrics(): array
     {
         try {
