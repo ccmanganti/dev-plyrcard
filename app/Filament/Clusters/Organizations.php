@@ -13,7 +13,7 @@ class Organizations extends Cluster
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::BuildingOffice2;
     protected static ?string $navigationLabel = 'Organizations';
     protected static ?string $slug = 'organizations';
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 10;
     protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function shouldRegisterNavigation(): bool
