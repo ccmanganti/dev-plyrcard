@@ -2,7 +2,7 @@
 <div
     class="pc-admin"
     x-data="{
-        tab: @js($initialTab ?? (request()->is('admin/athletes') ? 'athletes' : (request()->is('admin/follow-ups') ? 'followups' : (request()->is('admin/superadmin-billing') ? 'billing' : 'dashboard')))),
+        tab: @js($initialTab ?? (request()->is('admin/athletes') ? 'athletes' : (request()->is('admin/follow-ups') ? 'followups' : (request()->is('admin/subscriptions') ? 'subscriptions' : (request()->is('admin/amplify-credits') ? 'amplify' : 'overview'))))),
         athleteDrawer: null,
         activityDrawer: null,
         search: @js((string) request()->query('q', '')),
@@ -12,10 +12,11 @@
         state: @js((string) request()->query('state', 'all')),
         openTab(name) {
             const routes = {
-                dashboard: @js(url('/admin')),
+                overview: @js(url('/admin')),
                 athletes: @js(url('/admin/athletes')),
                 followups: @js(url('/admin/follow-ups')),
-                billing: @js(url('/admin/superadmin-billing')),
+                subscriptions: @js(url('/admin/subscriptions')),
+                amplify: @js(url('/admin/amplify-credits')),
             };
             if (routes[name]) {
                 window.location.href = routes[name];
@@ -43,12 +44,12 @@
     }"
     x-on:keydown.escape.window="closeOverlays()"
 >
-    <section x-show="tab === 'dashboard'" x-cloak class="pc-view">
+    <section x-show="tab === 'overview'" x-cloak class="pc-view">
         <div class="pc-view-head">
             <div>
                 <span class="pc-kicker">SUPERADMIN</span>
-                <h2>Dashboard</h2>
-                <p>Every athlete, plan, request, payment, and loose end in one place.</p>
+                <h2>Overview</h2>
+                <p>Every athlete, every plan, every loose end in one place.</p>
             </div>
             <span class="pc-updated">Updated {{ $last_updated }}</span>
         </div>
@@ -60,7 +61,7 @@
                 <strong>{{ number_format($stats['athletes']['value']) }}</strong>
                 <span>{{ $stats['athletes']['sub'] }}</span>
             </button>
-            <button type="button" class="pc-stat" x-on:click="openTab('billing')">
+            <button type="button" class="pc-stat" x-on:click="openTab('subscriptions')">
                 <span class="pc-stat-icon is-green">↗</span>
                 <small>Monthly recurring</small>
                 <strong>{{ $stats['mrr']['value'] }}</strong>
@@ -72,18 +73,18 @@
                 <strong>{{ number_format($stats['follow_up']['value']) }}</strong>
                 <span>{{ $stats['follow_up']['sub'] }}</span>
             </button>
-            <button type="button" class="pc-stat" x-on:click="activityDrawer = 'services'; document.body.style.overflow='hidden'">
-                <span class="pc-stat-icon is-violet">◇</span>
-                <small>Open service requests</small>
-                <strong>{{ number_format($service_activity['open']) }}</strong>
-                <span>{{ number_format($service_activity['week']) }} submitted in the last 7 days</span>
+            <button type="button" class="pc-stat" x-on:click="openTab('amplify')">
+                <span class="pc-stat-icon is-violet">ϟ</span>
+                <small>Amplify packages</small>
+                <strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong>
+                <span>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }} PLYR Points currently available</span>
             </button>
-            <button type="button" class="pc-stat" x-on:click="activityDrawer = 'payments'; document.body.style.overflow='hidden'">
-                <span class="pc-stat-icon is-blue">$</span>
-                <small>Payments this week</small>
-                <strong>{{ $payment_activity['week_amount'] }}</strong>
-                <span>{{ number_format($payment_activity['week_count']) }} successful payment{{ $payment_activity['week_count'] === 1 ? '' : 's' }}</span>
-            </button>
+            <div class="pc-stat">
+                <span class="pc-stat-icon is-blue">→</span>
+                <small>Coach outreach sent</small>
+                <strong>{{ number_format($coach_outreach_sent ?? 0) }}</strong>
+                <span>all time, all athletes</span>
+            </div>
         </div>
 
         <div class="pc-dashboard-grid">
@@ -380,9 +381,9 @@
         </div>
     </section>
 
-    <section x-show="tab === 'billing'" x-cloak class="pc-view">
+    <section x-show="tab === 'subscriptions'" x-cloak class="pc-view">
         <div class="pc-view-head">
-            <div><span class="pc-kicker">REVENUE & ACCOUNT HEALTH</span><h2>Billing</h2><p>Recurring revenue, conversion, payment risk, cancellations, and recent purchases.</p></div>
+            <div><span class="pc-kicker">REVENUE & ACCOUNT HEALTH</span><h2>Subscriptions</h2><p>Recurring revenue, conversion, and anything about to break.</p></div>
             @if($users_url)<a href="{{ $users_url }}" class="pc-btn">Manage Users & Billing</a>@endif
         </div>
         <div class="pc-stat-grid pc-stat-grid-four">
@@ -399,7 +400,7 @@
         </div>
 
         <section class="pc-panel">
-            <header class="pc-panel-head"><div><h3>Billing accounts</h3><p>Past due first, then active and inactive accounts.</p></div></header>
+            <header class="pc-panel-head"><div><h3>Subscriptions</h3><p>Past due first, then active and inactive accounts.</p></div></header>
             <div class="pc-table-wrap">
                 <table class="pc-table">
                     <thead><tr><th>Athlete</th><th>Plan</th><th>Rate</th><th>Provider</th><th>Payment</th><th>Subscription</th><th>Action</th></tr></thead>
