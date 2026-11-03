@@ -6,8 +6,6 @@ use BackedEnum;
 
 class SuperadminFollowUps extends SuperadminAthletes
 {
-    protected static bool $isDiscovered = false;
-
     protected static ?string $slug = 'follow-ups';
 
     protected static ?string $navigationLabel = 'Follow-ups';
