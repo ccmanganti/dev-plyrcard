@@ -7,7 +7,7 @@ use BackedEnum;
 class SuperadminBilling extends SuperadminDashboard
 {
     protected static bool $isDiscovered = false;
-    protected static ?string $slug = 'billing';
+    protected static ?string $slug = 'superadmin-billing';
 
     protected static ?string $navigationLabel = 'Billing';
 
