@@ -25,4 +25,9 @@ class SuperadminBilling extends SuperadminAthletes
     {
         return number_format(\App\Filament\Widgets\SuperadminControlCenterWidget::navigationMetrics()['billing'] ?? 0);
     }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'gray';
+    }
 }
