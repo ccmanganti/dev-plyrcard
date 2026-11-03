@@ -435,6 +435,228 @@
             <header class="pc-panel-head"><div><h3>Subscriptions</h3><p>Past due first, then active and inactive accounts.</p></div></header>
             <div class="pc-table-wrap">
                 <table class="pc-table">
+                    <thead><tr><th>Athlete</th><th>Plan</th><th>Rate</th><th>Started</th><th>Last payment</th><th>Payment state</th><th>Subscription</th><th>Action</th></tr></thead>
+                    <tbody>
+                    @forelse($billing_rows as $athlete)
+                        @php
+                            $billingReminder = $athlete['reminders']['payment_attention'] ?? null;
+                        @endphp
+                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int)$athlete['id'] }}; document.body.style.overflow='hidden'">
+                            <td><div class="pc-person"><span class="pc-avatar">{{ $athlete['initials'] }}</span><span><b>{{ $athlete['name'] }}</b><small>{{ $athlete['sport'] }} · {{ $athlete['billing']['provider'] }}</small></span></div></td>
+                            <td><span class="pc-plan is-{{ $athlete['plan_key'] }}">{{ $athlete['plan'] }}</span></td>
+                            <td class="pc-mono">{{ $athlete['billing']['recurring_cents'] > 0 ? '
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head"><div><h3>Recent payments & purchases</h3><p>Latest successful transactions recorded by PLYRCARD.</p></div><button type="button" class="pc-btn is-small" x-on:click="activityDrawer='payments'; document.body.style.overflow='hidden'">Expand</button></header>
+            <div class="pc-mini-list">
+                @forelse(array_slice($payment_activity['items'],0,8) as $payment)
+                    <a href="{{ $payment['url'] ?: '#' }}"><span class="pc-avatar">{{ $payment['initials'] }}</span><span><b>{{ $payment['player'] }}</b><small>{{ $payment['source'] }} · {{ $payment['provider'] }} · {{ $payment['when'] }}</small></span><strong class="pc-money">{{ $payment['amount'] }}</strong></a>
+                @empty
+                    <div class="pc-empty">No successful payments recorded yet.</div>
+                @endforelse
+            </div>
+        </section>
+    </section>
+
+    <section x-show="tab === 'amplify'" x-cloak class="pc-view">
+        <div class="pc-view-head">
+            <div>
+                <span class="pc-kicker">PACKAGE DELIVERY</span>
+                <h2>Amplify credits</h2>
+                <p>What families paid for and what we still owe them through PLYR Points and service delivery.</p>
+            </div>
+            @if($credit_requests_url)<a href="{{ $credit_requests_url }}" class="pc-btn">Open Credit Requests</a>@endif
+        </div>
+
+        <div class="pc-stat-grid pc-stat-grid-four">
+            <div class="pc-stat"><span class="pc-stat-icon is-violet">ϟ</span><small>Package athletes</small><strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong><span>Amplify and Jumpstart package accounts</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-blue">+</span><small>Package points granted</small><strong>{{ number_format($amplify_credit_stats['points_granted'] ?? 0) }}</strong><span>recorded package-purchase grants</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-amber">◷</span><small>Points available</small><strong>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }}</strong><span>current PLYR Points balance across package athletes</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-green">✓</span><small>Service points redeemed</small><strong>{{ number_format($amplify_credit_stats['points_redeemed'] ?? 0) }}</strong><span>net points consumed by package service requests</span></div>
+        </div>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div><h3>Delivery across every package</h3><p>Real service requests grouped by the four package service categories.</p></div>
+            </header>
+            <div class="pc-credit-service-grid">
+                @foreach($amplify_credit_services as $service)
+                    <div class="pc-credit-service">
+                        <small>{{ $service['label'] }}</small>
+                        <strong>{{ number_format($service['requests']) }}</strong>
+                        <span>{{ number_format($service['points']) }} pts redeemed</span>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div><h3>Credit ledger</h3><p>Package accounts with current balance and service usage. Highest idle balance is prioritized.</p></div>
+            </header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
+                    <thead>
+                        <tr>
+                            <th>Athlete</th>
+                            <th>Package</th>
+                            <th>Granted</th>
+                            <th>Available</th>
+                            <th>Outreach</th>
+                            <th>Reels</th>
+                            <th>Graphics</th>
+                            <th>Rep hours</th>
+                            <th>Used</th>
+                            <th>Last activity</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($amplify_credit_rows as $credit)
+                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int) $credit['id'] }}; document.body.style.overflow='hidden'">
+                            <td>
+                                <div class="pc-person">
+                                    <span class="pc-avatar">{{ $credit['initials'] }}</span>
+                                    <span><b>{{ $credit['name'] }}</b><small>{{ $credit['sport'] }}</small></span>
+                                </div>
+                            </td>
+                            <td><span class="pc-plan is-{{ $credit['package_key'] }}">{{ $credit['package'] }}</span></td>
+                            <td class="pc-mono">{{ number_format($credit['granted_points']) }}</td>
+                            <td class="pc-mono">{{ number_format($credit['points_available']) }}</td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['outreach']['qty']) }}<small>{{ number_format($credit['usage']['outreach']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['reel']['qty']) }}<small>{{ number_format($credit['usage']['reel']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['graphic']['qty']) }}<small>{{ number_format($credit['usage']['graphic']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['production_hour']['qty']) }}<small>{{ number_format($credit['usage']['production_hour']['points']) }} pts</small></td>
+                            <td>
+                                @if($credit['usage_percent'] !== null)
+                                    <div class="pc-health is-{{ $credit['usage_percent'] >= 75 ? 'good' : ($credit['usage_percent'] >= 30 ? 'mid' : 'bad') }}"><span><i style="width:{{ max(3,(int)$credit['usage_percent']) }}%"></i></span><small>{{ $credit['usage_percent'] }}%</small></div>
+                                @else
+                                    <span class="pc-muted-value">—</span>
+                                @endif
+                            </td>
+                            <td><span class="{{ $credit['idle'] ? 'pc-idle' : '' }}">{{ $credit['last_activity'] }}</span></td>
+                            <td x-on:click.stop>
+                                <span class="pc-quick-actions">
+                                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$credit['id'] }}, concern: 'amplify_credits' })">Remind</button>
+                                    <span class="pc-impersonate-quick" title="Impersonate {{ $credit['name'] }}">
+                                        {{ ($this->impersonateAction)(['userId' => (int) $credit['id']]) }}
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="11"><div class="pc-empty">No Amplify or Jumpstart package-credit records are available yet.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="pc-note">Package points are read from the existing PLYR Points ledger. The current database does not store a separate package-expiration date, so this view does not invent one.</div>
+    </section>
+
+    <div x-cloak x-show="athleteDrawer || activityDrawer" x-transition.opacity class="pc-scrim" x-on:click="closeOverlays()"></div>
+
+    @foreach($athletes as $athlete)
+        <aside x-cloak x-show="athleteDrawer === {{ (int)$athlete['id'] }}" x-transition:enter="pc-slide-in" x-transition:leave="pc-slide-out" class="pc-drawer">
+            <header class="pc-drawer-head">
+                <span class="pc-avatar is-large">{{ $athlete['initials'] }}</span>
+                <div><h3>{{ $athlete['name'] }}</h3><p>{{ $athlete['sport'] }} · {{ $athlete['position'] }} · {{ $athlete['year'] ?: 'Grad year not set' }} · {{ $athlete['club'] }}</p><div class="pc-chip-row"><span class="pc-plan is-{{ $athlete['plan_key'] }}">{{ $athlete['plan'] }}</span><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['state'])->replace('_',' ')->headline() }}</span></div></div>
+                <button type="button" class="pc-close" x-on:click="closeOverlays()">×</button>
+            </header>
+            @if(count($athlete['flags']))
+                <section class="pc-drawer-section"><h4>NEEDS ATTENTION</h4>
+                    @foreach($athlete['flags'] as $flag)
+                        <div class="pc-flag-row"><div><span class="pc-pill is-{{ $flag['tone'] ?? 'warning' }}">{{ $flag['label'] }}</span><p>{{ $flag['detail'] ?? '' }}</p></div><button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $flag['concern'] ?? 'custom' }}' })">Message</button></div>
+                    @endforeach
+                </section>
+            @endif
+            <section class="pc-drawer-section"><h4>ACCOUNT</h4>
+                <div class="pc-kv"><span>Health score</span><b>{{ $athlete['health'] }} / 100</b></div>
+                <div class="pc-kv"><span>Profile completion</span><b>{{ $athlete['profile_completion'] }}%</b></div>
+                <div class="pc-kv"><span>Plan</span><b>{{ $athlete['plan'] }}</b></div>
+                <div class="pc-kv"><span>Payment</span><b>{{ str($athlete['billing']['payment_status'])->headline() }}</b></div>
+                <div class="pc-kv"><span>Subscription</span><b>{{ str($athlete['billing']['subscription_status'])->headline() }}</b></div>
+                <div class="pc-kv"><span>Joined</span><b>{{ $athlete['joined'] }}</b></div>
+                <div class="pc-kv"><span>Last login</span><b>{{ $athlete['last_login'] }}</b></div>
+                <div class="pc-kv"><span>Last outreach</span><b>{{ $athlete['last_outreach'] }}</b></div>
+            </section>
+            <section class="pc-drawer-section"><h4>WEBSITE</h4>
+                <div class="pc-kv"><span>Website</span><b>{{ $athlete['website']['exists'] ? 'Created' : 'Not created' }}</b></div>
+                <div class="pc-kv"><span>Published</span><b>{{ $athlete['website']['published'] ? 'Yes' : 'No' }}</b></div>
+                <div class="pc-kv"><span>Domain / slug</span><b>{{ $athlete['website']['domain'] ?: ($athlete['website']['slug'] ?: 'Not set') }}</b></div>
+            </section>
+            <footer class="pc-drawer-actions">
+                <button type="button" class="pc-btn is-primary" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $athlete['reminder_concern'] }}' })">Open Support Messenger</button>
+                @if($athlete['user_url'])<a href="{{ $athlete['user_url'] }}" class="pc-btn">View player details</a>@endif
+                <span class="pc-impersonate">{{ ($this->impersonateAction)(['userId' => (int)$athlete['id']]) }}</span>
+            </footer>
+        </aside>
+    @endforeach
+
+    <aside x-cloak x-show="activityDrawer === 'services'" class="pc-drawer">
+        <header class="pc-drawer-head"><div><span class="pc-kicker">PLYR POINTS</span><h3>Recent service requests</h3><p>Review the latest service requests, then jump into the full Credit Requests system.</p></div><button type="button" class="pc-close" x-on:click="closeOverlays()">×</button></header>
+        <div class="pc-drawer-list">
+            @forelse($service_activity['items'] as $request)
+                <div class="pc-drawer-list-row">
+                    <a href="{{ $request['url'] ?: '#' }}" class="pc-person"><span class="pc-avatar">{{ $request['initials'] }}</span><span><b>{{ $request['service'] }}{{ $request['quantity'] > 1 ? ' × '.$request['quantity'] : '' }}</b><small>{{ $request['player'] }} · {{ number_format($request['points']) }} pts · {{ $request['when'] }}</small></span></a>
+                    <span class="pc-pill">{{ $request['rush'] ? 'Rush · ' : '' }}{{ $request['status'] }}</span>
+                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-credit-request-follow-up', { requestId: {{ (int)$request['id'] }} })">Support</button>
+                </div>
+            @empty<div class="pc-empty">No service requests available.</div>@endforelse
+        </div>
+        <footer class="pc-drawer-actions">@if($credit_requests_url)<a href="{{ $credit_requests_url }}" class="pc-btn is-primary">Open Credit Requests</a>@endif</footer>
+    </aside>
+
+    <aside x-cloak x-show="activityDrawer === 'payments'" class="pc-drawer">
+        <header class="pc-drawer-head"><div><span class="pc-kicker">BILLING ACTIVITY</span><h3>Recent payments & purchases</h3><p>Successful transactions recorded across subscriptions and purchases.</p></div><button type="button" class="pc-close" x-on:click="closeOverlays()">×</button></header>
+        <div class="pc-drawer-list">
+            @forelse($payment_activity['items'] as $payment)
+                <div class="pc-drawer-list-row">
+                    <a href="{{ $payment['url'] ?: '#' }}" class="pc-person"><span class="pc-avatar">{{ $payment['initials'] }}</span><span><b>{{ $payment['player'] }}</b><small>{{ $payment['source'] }} · {{ $payment['provider'] }} · {{ $payment['when'] }}</small></span></a>
+                    <strong class="pc-money">{{ $payment['amount'] }}</strong>
+                    @if($payment['user_id'] > 0)<button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$payment['user_id'] }}, concern: 'payment_attention' })">Support</button>@endif
+                </div>
+            @empty<div class="pc-empty">No successful payments recorded yet.</div>@endforelse
+        </div>
+        <footer class="pc-drawer-actions">@if($users_url)<a href="{{ $users_url }}" class="pc-btn is-primary">Manage Users & Billing</a>@endif</footer>
+    </aside>
+
+    <x-filament-actions::modals />
+
+<style>
+.pc-admin{--pc-bg:#f3f5f7;--pc-panel:#fff;--pc-panel2:#f7f9fb;--pc-line:#e4e8ed;--pc-line2:#d6dbe2;--pc-text:#12151a;--pc-muted:#69727e;--pc-dim:#8b94a0;--pc-coral:#ff6448;--pc-green:#16a377;--pc-amber:#d68d18;--pc-red:#dc4b46;--pc-blue:#3979e6;--pc-violet:#8065dd;display:flex;flex-direction:column;gap:1rem;color:var(--pc-text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .pc-admin{--pc-bg:#0c0e11;--pc-panel:#14171c;--pc-panel2:#1a1e24;--pc-line:#242932;--pc-line2:#2e343e;--pc-text:#e9ecf1;--pc-muted:#8a93a0;--pc-dim:#5f6874}
+
+.pc-view{display:flex;flex-direction:column;gap:1rem}.pc-view-head,.pc-section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}.pc-view-head h2,.pc-section-title h3{margin:.1rem 0 0;font-size:1.08rem;font-weight:800;letter-spacing:-.025em}.pc-view-head p,.pc-section-title p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.72rem}.pc-kicker{color:var(--pc-coral);font-size:.58rem;font-weight:850;letter-spacing:.13em}.pc-updated{color:var(--pc-dim);font-size:.64rem}
+.pc-stat-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.75rem}.pc-stat-grid-four{grid-template-columns:repeat(4,minmax(0,1fr))}.pc-stat{min-width:0;min-height:8.6rem;padding:.88rem;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel);color:inherit;text-align:left}.pc-stat button&{cursor:pointer}.pc-stat:hover{border-color:var(--pc-line2)}.pc-stat-icon{width:1.85rem;height:1.85rem;display:grid;place-items:center;margin-bottom:.7rem;border-radius:.5rem;background:var(--pc-panel2);font-weight:900}.pc-stat-icon.is-coral{background:rgba(255,100,72,.11);color:var(--pc-coral)}.pc-stat-icon.is-green{background:rgba(34,192,138,.11);color:var(--pc-green)}.pc-stat-icon.is-amber{background:rgba(240,169,59,.12);color:var(--pc-amber)}.pc-stat-icon.is-red{background:rgba(242,86,79,.11);color:var(--pc-red)}.pc-stat-icon.is-blue{background:rgba(76,141,255,.11);color:var(--pc-blue)}.pc-stat-icon.is-violet{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-stat small{display:block;color:var(--pc-muted);font-size:.66rem;font-weight:700}.pc-stat strong{display:block;margin-top:.25rem;font-size:1.55rem;letter-spacing:-.045em}.pc-stat>span:last-child{display:block;margin-top:.6rem;color:var(--pc-dim);font-size:.64rem;line-height:1.35}
+.pc-dashboard-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(18rem,.7fr);gap:.85rem}.pc-side-stack{display:flex;flex-direction:column;gap:.85rem}.pc-panel,.pc-queue{overflow:hidden;border:1px solid var(--pc-line);border-radius:.72rem;background:var(--pc-panel)}.pc-panel-head{min-height:3.5rem;padding:.78rem .88rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;border-bottom:1px solid var(--pc-line)}.pc-panel-head h3{margin:0;font-size:.78rem;font-weight:800}.pc-panel-head p{margin:.13rem 0 0;color:var(--pc-dim);font-size:.63rem}.pc-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.42rem .62rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem;font-weight:750;text-decoration:none;cursor:pointer;white-space:nowrap}.pc-btn:hover{background:var(--pc-panel2)}.pc-btn.is-primary{background:var(--pc-coral);border-color:var(--pc-coral);color:#fff}.pc-btn.is-small{padding:.32rem .48rem;font-size:.61rem}
+.pc-table-wrap{overflow:auto}.pc-table{width:100%;border-collapse:collapse}.pc-table th{padding:.58rem .72rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel2);color:var(--pc-dim);font-size:.59rem;font-weight:800;letter-spacing:.08em;text-align:left;text-transform:uppercase;white-space:nowrap}.pc-table td{padding:.64rem .72rem;border-bottom:1px solid var(--pc-line);font-size:.68rem;vertical-align:middle}.pc-table tbody tr:last-child td{border-bottom:0}.pc-click-row{cursor:pointer}.pc-click-row:hover{background:var(--pc-panel2)}.pc-action-cell{text-align:right}.pc-quick-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:.35rem}.pc-impersonate-quick{display:inline-flex;align-items:center;justify-content:center}.pc-impersonate-quick .fi-icon-btn{width:1.9rem;height:1.9rem;min-width:1.9rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-muted)}.pc-impersonate-quick .fi-icon-btn:hover{border-color:rgba(255,100,72,.38);background:rgba(255,100,72,.08);color:var(--pc-coral)}.pc-person{min-width:0;display:flex;align-items:center;gap:.55rem;color:inherit;text-decoration:none}.pc-person.is-button{border:0;background:transparent;text-align:left;cursor:pointer}.pc-person>span:last-child{min-width:0}.pc-person b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.69rem}.pc-person small{display:block;margin-top:.11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pc-dim);font-size:.59rem}.pc-avatar{width:1.9rem;height:1.9rem;display:grid;place-items:center;flex:0 0 1.9rem;border:1px solid var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2);font-size:.59rem;font-weight:800}.pc-avatar.is-large{width:2.7rem;height:2.7rem;flex-basis:2.7rem;font-size:.75rem}
+.pc-pill,.pc-plan,.pc-state{display:inline-flex;align-items:center;padding:.25rem .42rem;border:1px solid var(--pc-line);border-radius:999px;background:var(--pc-panel2);color:var(--pc-muted);font-size:.58rem;font-weight:800;white-space:nowrap}.pc-pill.is-danger,.pc-state.is-past_due,.pc-state.is-at_risk{color:var(--pc-red);border-color:rgba(242,86,79,.3);background:rgba(242,86,79,.08)}.pc-pill.is-warning,.pc-state.is-needs_push{color:var(--pc-amber);border-color:rgba(240,169,59,.3);background:rgba(240,169,59,.08)}.pc-state.is-active{color:var(--pc-green);border-color:rgba(34,192,138,.3);background:rgba(34,192,138,.08)}.pc-state.is-churned{color:var(--pc-muted)}.pc-plan.is-free-plyr{color:var(--pc-muted);border-color:var(--pc-line2);background:var(--pc-panel2)}.pc-plan.is-my-journey{color:var(--pc-blue);border-color:rgba(76,141,255,.34);background:rgba(76,141,255,.10)}.pc-plan.is-jumpstart{color:var(--pc-violet);border-color:rgba(156,123,255,.34);background:rgba(156,123,255,.10)}.pc-plan.is-amplify{color:var(--pc-coral);border-color:rgba(255,100,72,.34);background:rgba(255,100,72,.10)}
+.pc-health{display:flex;align-items:center;gap:.35rem;min-width:5rem}.pc-health>span{height:.27rem;min-width:2.5rem;flex:1;overflow:hidden;border-radius:999px;background:var(--pc-line)}.pc-health i{display:block;height:100%;border-radius:inherit;background:var(--pc-coral)}.pc-health.is-good i{background:var(--pc-green)}.pc-health.is-mid i{background:var(--pc-amber)}.pc-health.is-bad i{background:var(--pc-red)}.pc-health small{width:2rem;color:var(--pc-muted);font-size:.58rem;text-align:right}
+.pc-sports{padding:.75rem .85rem}.pc-sport{width:100%;display:grid;grid-template-columns:6rem 1fr 1.5rem;align-items:center;gap:.55rem;padding:.34rem 0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.pc-sport b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65rem}.pc-sport>span{height:.25rem;overflow:hidden;border-radius:999px;background:var(--pc-line)}.pc-sport i{display:block;height:100%;background:var(--pc-coral)}.pc-sport small{text-align:right;color:var(--pc-muted);font-size:.6rem}.pc-timeline{padding:.7rem .85rem}.pc-timeline>div{display:grid;grid-template-columns:.45rem 1fr;gap:.55rem;padding:.48rem 0;border-bottom:1px solid var(--pc-line)}.pc-timeline>div:last-child{border-bottom:0}.pc-timeline i{width:.4rem;height:.4rem;margin-top:.22rem;border-radius:999px;background:var(--pc-coral)}.pc-timeline i.ok{background:var(--pc-green)}.pc-timeline i.bad{background:var(--pc-red)}.pc-timeline b{display:block;font-size:.63rem}.pc-timeline small{display:block;margin-top:.1rem;color:var(--pc-dim);font-size:.58rem}
+.pc-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.pc-mini-list{display:flex;flex-direction:column}.pc-mini-list>a,.pc-mini-list>button{display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.58rem .75rem;border:0;border-bottom:1px solid var(--pc-line);background:transparent;color:inherit;text-align:left;text-decoration:none;cursor:pointer}.pc-mini-player-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--pc-line)}.pc-mini-player-row:last-child{border-bottom:0}.pc-mini-player-row:hover{background:var(--pc-panel2)}.pc-mini-player-main{min-width:0;display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.58rem .45rem .58rem .75rem;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.pc-mini-player-row>.pc-impersonate-quick{padding-right:.65rem}.pc-mini-list>a:last-child,.pc-mini-list>button:last-child{border-bottom:0}.pc-mini-list>a:hover,.pc-mini-list>button:hover{background:var(--pc-panel2)}.pc-mini-list b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem}.pc-mini-list small{display:block;margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pc-dim);font-size:.57rem}.pc-money{color:var(--pc-green);font-size:.7rem}.pc-empty{padding:1rem;color:var(--pc-dim);font-size:.68rem}
+.pc-view-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}.pc-search-box{min-width:15.5rem;min-height:2.25rem;display:flex;align-items:center;gap:.4rem;padding:0 .6rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.66rem}.pc-search-box input{width:100%;border:0;outline:0;background:transparent;color:inherit;font:inherit}.pc-state-select{min-height:2.25rem;padding:.35rem .55rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem}.pc-filter-panel{overflow:hidden;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel2)}.pc-filter-row{display:flex;align-items:flex-start;gap:.75rem;padding:.65rem .85rem;border-bottom:1px solid var(--pc-line)}.pc-filter-row:last-of-type{border-bottom:0}.pc-filter-label{width:3.5rem;flex:0 0 3.5rem;padding-top:.32rem;color:var(--pc-dim);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.58rem;font-weight:800;letter-spacing:.09em}.pc-filter-chips{display:flex;align-items:center;gap:.38rem;flex-wrap:wrap;min-width:0}.pc-filter-chip{display:inline-flex;align-items:center;gap:.22rem;padding:.34rem .62rem;border:1px solid var(--pc-line);border-radius:999px;background:var(--pc-panel);color:var(--pc-muted);font-size:.63rem;font-weight:750;cursor:pointer;transition:background .12s,border-color .12s,color .12s}.pc-filter-chip:hover{border-color:var(--pc-line2);color:var(--pc-text)}.pc-filter-chip.is-active{border-color:var(--pc-coral);background:var(--pc-coral);color:#fff}.pc-filter-chip span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.56rem;opacity:.68}.pc-filter-divider{width:1px;height:1.25rem;margin:0 .15rem;background:var(--pc-line2)}.pc-filter-clear-row{display:flex;justify-content:flex-end;padding:.48rem .85rem;border-top:1px solid var(--pc-line);background:var(--pc-panel)}.pc-note{padding:.65rem .8rem;border:1px dashed var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:.63rem}
+.pc-queue-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.pc-queue>header{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;padding:.72rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue>header h3{margin:0;font-size:.72rem}.pc-queue>header p{margin:.12rem 0 0;color:var(--pc-dim);font-size:.6rem;line-height:1.35}.pc-queue>header>strong{font-size:1.25rem}.pc-queue-mark{width:1.8rem;height:1.8rem;display:grid;place-items:center;border-radius:.5rem;background:rgba(240,169,59,.1);color:var(--pc-amber);font-size:.68rem;font-weight:900}.pc-queue-mark.is-billing{background:rgba(242,86,79,.1);color:var(--pc-red)}.pc-queue-mark.is-amplify_credits{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-queue-list{max-height:17rem;overflow:auto}.pc-queue-list>div{display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.48rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue-list>div:last-child{border-bottom:0}.pc-queue footer{padding:.55rem .78rem;border-top:1px solid var(--pc-line);color:var(--pc-dim);font-size:.59rem}
+.pc-plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.65rem}.pc-plan-card{padding:.75rem}.pc-plan-card>strong{display:block;margin-top:.5rem;font-size:1.35rem}.pc-plan-card>small{display:block;margin-top:.2rem;color:var(--pc-dim);font-size:.6rem}.pc-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.pc-credit-service-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem;padding:.75rem}.pc-credit-service{padding:.72rem;border:1px solid var(--pc-line);border-radius:.6rem;background:var(--pc-panel2)}.pc-credit-service small{display:block;color:var(--pc-muted);font-size:.61rem;font-weight:750}.pc-credit-service strong{display:block;margin-top:.35rem;font-size:1.25rem}.pc-credit-service span{display:block;margin-top:.18rem;color:var(--pc-dim);font-size:.58rem}.pc-credit-cell{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:750}.pc-credit-cell small{display:block;margin-top:.08rem;color:var(--pc-dim);font-size:.54rem;font-weight:500}.pc-idle{color:var(--pc-red);font-weight:750}.pc-muted-value{color:var(--pc-dim)}
+.pc-scrim{position:fixed;inset:0;z-index:10080;background:rgba(5,8,12,.58);backdrop-filter:blur(2px)}.pc-drawer{position:fixed;top:0;right:0;z-index:10090;width:min(560px,100vw);height:100dvh;overflow-y:auto;border-left:1px solid var(--pc-line);background:var(--pc-panel);box-shadow:-22px 0 55px rgba(0,0,0,.22)}.pc-drawer-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;gap:.7rem;padding:.9rem 1rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel)}.pc-drawer-head>div{min-width:0;flex:1}.pc-drawer-head h3{margin:.12rem 0 0;font-size:1rem}.pc-drawer-head p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.65rem;line-height:1.4}.pc-close{width:2rem;height:2rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:1.1rem;cursor:pointer}.pc-chip-row{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.45rem}.pc-drawer-section{padding:.85rem 1rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-section h4{margin:0 0 .55rem;color:var(--pc-dim);font-size:.57rem;letter-spacing:.12em}.pc-flag-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.65rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--pc-line)}.pc-flag-row:last-child{border-bottom:0}.pc-flag-row p{margin:.16rem 0 0;color:var(--pc-muted);font-size:.61rem;line-height:1.4}.pc-kv{display:flex;justify-content:space-between;gap:1rem;padding:.4rem 0;border-bottom:1px solid var(--pc-line);font-size:.65rem}.pc-kv:last-child{border-bottom:0}.pc-kv span{color:var(--pc-muted)}.pc-kv b{text-align:right}.pc-drawer-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.78rem 1rem;background:var(--pc-panel2)}.pc-impersonate{margin-left:auto}.pc-drawer-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.55rem;align-items:center;padding:.58rem .8rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-list-row:last-child{border-bottom:0}.pc-slide-in{transition:transform .18s ease}.pc-slide-out{transition:transform .14s ease}[x-cloak]{display:none!important}
+@media(max-width:1250px){.pc-credit-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pc-dashboard-grid{grid-template-columns:1fr}.pc-side-stack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.pc-quick-grid{grid-template-columns:1fr}.pc-queue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr 1fr}.pc-queue-grid{grid-template-columns:1fr}.pc-side-stack{grid-template-columns:1fr}.pc-view-head{align-items:flex-start;flex-direction:column}.pc-view-actions{width:100%;justify-content:flex-start}.pc-search-box{min-width:0;flex:1 1 14rem}.pc-athlete-table th:nth-child(4),.pc-athlete-table td:nth-child(4),.pc-athlete-table th:nth-child(6),.pc-athlete-table td:nth-child(6){display:none}.pc-filter-row{align-items:flex-start}.pc-filter-label{width:3rem;flex-basis:3rem}}
+@media(max-width:520px){.pc-credit-service-grid{grid-template-columns:1fr}.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr}.pc-view-actions{display:grid;grid-template-columns:1fr;width:100%}.pc-search-box,.pc-state-select,.pc-view-actions .pc-btn{width:100%}.pc-filter-row{display:block}.pc-filter-label{display:block;width:auto;margin-bottom:.35rem;padding-top:0}.pc-filter-divider{display:none}.pc-athlete-table th:nth-child(2),.pc-athlete-table td:nth-child(2),.pc-athlete-table th:nth-child(5),.pc-athlete-table td:nth-child(5),.pc-athlete-table th:nth-child(8),.pc-athlete-table td:nth-child(8){display:none}.pc-drawer-list-row{grid-template-columns:minmax(0,1fr) auto}.pc-drawer-list-row .pc-btn{grid-column:2}}
+</style>
+</div>
+</x-filament-widgets::widget>.number_format($plan['recurring_cents']/100,2).'/mo recurring' : 'no active recurring revenue' }}
+                        @if(($plan['setup_cents'] ?? 0) > 0) · setup {{ '
+            @endforeach
+        </div>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head"><div><h3>Subscriptions</h3><p>Past due first, then active and inactive accounts.</p></div></header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
                     <thead><tr><th>Athlete</th><th>Plan</th><th>Rate</th><th>Provider</th><th>Payment</th><th>Subscription</th><th>Action</th></tr></thead>
                     <tbody>
                     @forelse($billing_rows as $athlete)
@@ -456,6 +678,463 @@
                         </tr>
                     @empty
                         <tr><td colspan="7"><div class="pc-empty">No subscription records are available yet.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head"><div><h3>Recent payments & purchases</h3><p>Latest successful transactions recorded by PLYRCARD.</p></div><button type="button" class="pc-btn is-small" x-on:click="activityDrawer='payments'; document.body.style.overflow='hidden'">Expand</button></header>
+            <div class="pc-mini-list">
+                @forelse(array_slice($payment_activity['items'],0,8) as $payment)
+                    <a href="{{ $payment['url'] ?: '#' }}"><span class="pc-avatar">{{ $payment['initials'] }}</span><span><b>{{ $payment['player'] }}</b><small>{{ $payment['source'] }} · {{ $payment['provider'] }} · {{ $payment['when'] }}</small></span><strong class="pc-money">{{ $payment['amount'] }}</strong></a>
+                @empty
+                    <div class="pc-empty">No successful payments recorded yet.</div>
+                @endforelse
+            </div>
+        </section>
+    </section>
+
+    <section x-show="tab === 'amplify'" x-cloak class="pc-view">
+        <div class="pc-view-head">
+            <div>
+                <span class="pc-kicker">PACKAGE DELIVERY</span>
+                <h2>Amplify credits</h2>
+                <p>What families paid for and what we still owe them through PLYR Points and service delivery.</p>
+            </div>
+            @if($credit_requests_url)<a href="{{ $credit_requests_url }}" class="pc-btn">Open Credit Requests</a>@endif
+        </div>
+
+        <div class="pc-stat-grid pc-stat-grid-four">
+            <div class="pc-stat"><span class="pc-stat-icon is-violet">ϟ</span><small>Package athletes</small><strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong><span>Amplify and Jumpstart package accounts</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-blue">+</span><small>Package points granted</small><strong>{{ number_format($amplify_credit_stats['points_granted'] ?? 0) }}</strong><span>recorded package-purchase grants</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-amber">◷</span><small>Points available</small><strong>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }}</strong><span>current PLYR Points balance across package athletes</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-green">✓</span><small>Service points redeemed</small><strong>{{ number_format($amplify_credit_stats['points_redeemed'] ?? 0) }}</strong><span>net points consumed by package service requests</span></div>
+        </div>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div><h3>Delivery across every package</h3><p>Real service requests grouped by the four package service categories.</p></div>
+            </header>
+            <div class="pc-credit-service-grid">
+                @foreach($amplify_credit_services as $service)
+                    <div class="pc-credit-service">
+                        <small>{{ $service['label'] }}</small>
+                        <strong>{{ number_format($service['requests']) }}</strong>
+                        <span>{{ number_format($service['points']) }} pts redeemed</span>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div><h3>Credit ledger</h3><p>Package accounts with current balance and service usage. Highest idle balance is prioritized.</p></div>
+            </header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
+                    <thead>
+                        <tr>
+                            <th>Athlete</th>
+                            <th>Package</th>
+                            <th>Granted</th>
+                            <th>Available</th>
+                            <th>Outreach</th>
+                            <th>Reels</th>
+                            <th>Graphics</th>
+                            <th>Rep hours</th>
+                            <th>Used</th>
+                            <th>Last activity</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($amplify_credit_rows as $credit)
+                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int) $credit['id'] }}; document.body.style.overflow='hidden'">
+                            <td>
+                                <div class="pc-person">
+                                    <span class="pc-avatar">{{ $credit['initials'] }}</span>
+                                    <span><b>{{ $credit['name'] }}</b><small>{{ $credit['sport'] }}</small></span>
+                                </div>
+                            </td>
+                            <td><span class="pc-plan is-{{ $credit['package_key'] }}">{{ $credit['package'] }}</span></td>
+                            <td class="pc-mono">{{ number_format($credit['granted_points']) }}</td>
+                            <td class="pc-mono">{{ number_format($credit['points_available']) }}</td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['outreach']['qty']) }}<small>{{ number_format($credit['usage']['outreach']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['reel']['qty']) }}<small>{{ number_format($credit['usage']['reel']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['graphic']['qty']) }}<small>{{ number_format($credit['usage']['graphic']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['production_hour']['qty']) }}<small>{{ number_format($credit['usage']['production_hour']['points']) }} pts</small></td>
+                            <td>
+                                @if($credit['usage_percent'] !== null)
+                                    <div class="pc-health is-{{ $credit['usage_percent'] >= 75 ? 'good' : ($credit['usage_percent'] >= 30 ? 'mid' : 'bad') }}"><span><i style="width:{{ max(3,(int)$credit['usage_percent']) }}%"></i></span><small>{{ $credit['usage_percent'] }}%</small></div>
+                                @else
+                                    <span class="pc-muted-value">—</span>
+                                @endif
+                            </td>
+                            <td><span class="{{ $credit['idle'] ? 'pc-idle' : '' }}">{{ $credit['last_activity'] }}</span></td>
+                            <td x-on:click.stop>
+                                <span class="pc-quick-actions">
+                                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$credit['id'] }}, concern: 'amplify_credits' })">Remind</button>
+                                    <span class="pc-impersonate-quick" title="Impersonate {{ $credit['name'] }}">
+                                        {{ ($this->impersonateAction)(['userId' => (int) $credit['id']]) }}
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="11"><div class="pc-empty">No Amplify or Jumpstart package-credit records are available yet.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="pc-note">Package points are read from the existing PLYR Points ledger. The current database does not store a separate package-expiration date, so this view does not invent one.</div>
+    </section>
+
+    <div x-cloak x-show="athleteDrawer || activityDrawer" x-transition.opacity class="pc-scrim" x-on:click="closeOverlays()"></div>
+
+    @foreach($athletes as $athlete)
+        <aside x-cloak x-show="athleteDrawer === {{ (int)$athlete['id'] }}" x-transition:enter="pc-slide-in" x-transition:leave="pc-slide-out" class="pc-drawer">
+            <header class="pc-drawer-head">
+                <span class="pc-avatar is-large">{{ $athlete['initials'] }}</span>
+                <div><h3>{{ $athlete['name'] }}</h3><p>{{ $athlete['sport'] }} · {{ $athlete['position'] }} · {{ $athlete['year'] ?: 'Grad year not set' }} · {{ $athlete['club'] }}</p><div class="pc-chip-row"><span class="pc-plan is-{{ $athlete['plan_key'] }}">{{ $athlete['plan'] }}</span><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['state'])->replace('_',' ')->headline() }}</span></div></div>
+                <button type="button" class="pc-close" x-on:click="closeOverlays()">×</button>
+            </header>
+            @if(count($athlete['flags']))
+                <section class="pc-drawer-section"><h4>NEEDS ATTENTION</h4>
+                    @foreach($athlete['flags'] as $flag)
+                        <div class="pc-flag-row"><div><span class="pc-pill is-{{ $flag['tone'] ?? 'warning' }}">{{ $flag['label'] }}</span><p>{{ $flag['detail'] ?? '' }}</p></div><button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $flag['concern'] ?? 'custom' }}' })">Message</button></div>
+                    @endforeach
+                </section>
+            @endif
+            <section class="pc-drawer-section"><h4>ACCOUNT</h4>
+                <div class="pc-kv"><span>Health score</span><b>{{ $athlete['health'] }} / 100</b></div>
+                <div class="pc-kv"><span>Profile completion</span><b>{{ $athlete['profile_completion'] }}%</b></div>
+                <div class="pc-kv"><span>Plan</span><b>{{ $athlete['plan'] }}</b></div>
+                <div class="pc-kv"><span>Payment</span><b>{{ str($athlete['billing']['payment_status'])->headline() }}</b></div>
+                <div class="pc-kv"><span>Subscription</span><b>{{ str($athlete['billing']['subscription_status'])->headline() }}</b></div>
+                <div class="pc-kv"><span>Joined</span><b>{{ $athlete['joined'] }}</b></div>
+                <div class="pc-kv"><span>Last login</span><b>{{ $athlete['last_login'] }}</b></div>
+                <div class="pc-kv"><span>Last outreach</span><b>{{ $athlete['last_outreach'] }}</b></div>
+            </section>
+            <section class="pc-drawer-section"><h4>WEBSITE</h4>
+                <div class="pc-kv"><span>Website</span><b>{{ $athlete['website']['exists'] ? 'Created' : 'Not created' }}</b></div>
+                <div class="pc-kv"><span>Published</span><b>{{ $athlete['website']['published'] ? 'Yes' : 'No' }}</b></div>
+                <div class="pc-kv"><span>Domain / slug</span><b>{{ $athlete['website']['domain'] ?: ($athlete['website']['slug'] ?: 'Not set') }}</b></div>
+            </section>
+            <footer class="pc-drawer-actions">
+                <button type="button" class="pc-btn is-primary" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $athlete['reminder_concern'] }}' })">Open Support Messenger</button>
+                @if($athlete['user_url'])<a href="{{ $athlete['user_url'] }}" class="pc-btn">View player details</a>@endif
+                <span class="pc-impersonate">{{ ($this->impersonateAction)(['userId' => (int)$athlete['id']]) }}</span>
+            </footer>
+        </aside>
+    @endforeach
+
+    <aside x-cloak x-show="activityDrawer === 'services'" class="pc-drawer">
+        <header class="pc-drawer-head"><div><span class="pc-kicker">PLYR POINTS</span><h3>Recent service requests</h3><p>Review the latest service requests, then jump into the full Credit Requests system.</p></div><button type="button" class="pc-close" x-on:click="closeOverlays()">×</button></header>
+        <div class="pc-drawer-list">
+            @forelse($service_activity['items'] as $request)
+                <div class="pc-drawer-list-row">
+                    <a href="{{ $request['url'] ?: '#' }}" class="pc-person"><span class="pc-avatar">{{ $request['initials'] }}</span><span><b>{{ $request['service'] }}{{ $request['quantity'] > 1 ? ' × '.$request['quantity'] : '' }}</b><small>{{ $request['player'] }} · {{ number_format($request['points']) }} pts · {{ $request['when'] }}</small></span></a>
+                    <span class="pc-pill">{{ $request['rush'] ? 'Rush · ' : '' }}{{ $request['status'] }}</span>
+                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-credit-request-follow-up', { requestId: {{ (int)$request['id'] }} })">Support</button>
+                </div>
+            @empty<div class="pc-empty">No service requests available.</div>@endforelse
+        </div>
+        <footer class="pc-drawer-actions">@if($credit_requests_url)<a href="{{ $credit_requests_url }}" class="pc-btn is-primary">Open Credit Requests</a>@endif</footer>
+    </aside>
+
+    <aside x-cloak x-show="activityDrawer === 'payments'" class="pc-drawer">
+        <header class="pc-drawer-head"><div><span class="pc-kicker">BILLING ACTIVITY</span><h3>Recent payments & purchases</h3><p>Successful transactions recorded across subscriptions and purchases.</p></div><button type="button" class="pc-close" x-on:click="closeOverlays()">×</button></header>
+        <div class="pc-drawer-list">
+            @forelse($payment_activity['items'] as $payment)
+                <div class="pc-drawer-list-row">
+                    <a href="{{ $payment['url'] ?: '#' }}" class="pc-person"><span class="pc-avatar">{{ $payment['initials'] }}</span><span><b>{{ $payment['player'] }}</b><small>{{ $payment['source'] }} · {{ $payment['provider'] }} · {{ $payment['when'] }}</small></span></a>
+                    <strong class="pc-money">{{ $payment['amount'] }}</strong>
+                    @if($payment['user_id'] > 0)<button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$payment['user_id'] }}, concern: 'payment_attention' })">Support</button>@endif
+                </div>
+            @empty<div class="pc-empty">No successful payments recorded yet.</div>@endforelse
+        </div>
+        <footer class="pc-drawer-actions">@if($users_url)<a href="{{ $users_url }}" class="pc-btn is-primary">Manage Users & Billing</a>@endif</footer>
+    </aside>
+
+    <x-filament-actions::modals />
+
+<style>
+.pc-admin{--pc-bg:#f3f5f7;--pc-panel:#fff;--pc-panel2:#f7f9fb;--pc-line:#e4e8ed;--pc-line2:#d6dbe2;--pc-text:#12151a;--pc-muted:#69727e;--pc-dim:#8b94a0;--pc-coral:#ff6448;--pc-green:#16a377;--pc-amber:#d68d18;--pc-red:#dc4b46;--pc-blue:#3979e6;--pc-violet:#8065dd;display:flex;flex-direction:column;gap:1rem;color:var(--pc-text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .pc-admin{--pc-bg:#0c0e11;--pc-panel:#14171c;--pc-panel2:#1a1e24;--pc-line:#242932;--pc-line2:#2e343e;--pc-text:#e9ecf1;--pc-muted:#8a93a0;--pc-dim:#5f6874}
+
+.pc-view{display:flex;flex-direction:column;gap:1rem}.pc-view-head,.pc-section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}.pc-view-head h2,.pc-section-title h3{margin:.1rem 0 0;font-size:1.08rem;font-weight:800;letter-spacing:-.025em}.pc-view-head p,.pc-section-title p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.72rem}.pc-kicker{color:var(--pc-coral);font-size:.58rem;font-weight:850;letter-spacing:.13em}.pc-updated{color:var(--pc-dim);font-size:.64rem}
+.pc-stat-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.75rem}.pc-stat-grid-four{grid-template-columns:repeat(4,minmax(0,1fr))}.pc-stat{min-width:0;min-height:8.6rem;padding:.88rem;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel);color:inherit;text-align:left}.pc-stat button&{cursor:pointer}.pc-stat:hover{border-color:var(--pc-line2)}.pc-stat-icon{width:1.85rem;height:1.85rem;display:grid;place-items:center;margin-bottom:.7rem;border-radius:.5rem;background:var(--pc-panel2);font-weight:900}.pc-stat-icon.is-coral{background:rgba(255,100,72,.11);color:var(--pc-coral)}.pc-stat-icon.is-green{background:rgba(34,192,138,.11);color:var(--pc-green)}.pc-stat-icon.is-amber{background:rgba(240,169,59,.12);color:var(--pc-amber)}.pc-stat-icon.is-red{background:rgba(242,86,79,.11);color:var(--pc-red)}.pc-stat-icon.is-blue{background:rgba(76,141,255,.11);color:var(--pc-blue)}.pc-stat-icon.is-violet{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-stat small{display:block;color:var(--pc-muted);font-size:.66rem;font-weight:700}.pc-stat strong{display:block;margin-top:.25rem;font-size:1.55rem;letter-spacing:-.045em}.pc-stat>span:last-child{display:block;margin-top:.6rem;color:var(--pc-dim);font-size:.64rem;line-height:1.35}
+.pc-dashboard-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(18rem,.7fr);gap:.85rem}.pc-side-stack{display:flex;flex-direction:column;gap:.85rem}.pc-panel,.pc-queue{overflow:hidden;border:1px solid var(--pc-line);border-radius:.72rem;background:var(--pc-panel)}.pc-panel-head{min-height:3.5rem;padding:.78rem .88rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;border-bottom:1px solid var(--pc-line)}.pc-panel-head h3{margin:0;font-size:.78rem;font-weight:800}.pc-panel-head p{margin:.13rem 0 0;color:var(--pc-dim);font-size:.63rem}.pc-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.42rem .62rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem;font-weight:750;text-decoration:none;cursor:pointer;white-space:nowrap}.pc-btn:hover{background:var(--pc-panel2)}.pc-btn.is-primary{background:var(--pc-coral);border-color:var(--pc-coral);color:#fff}.pc-btn.is-small{padding:.32rem .48rem;font-size:.61rem}
+.pc-table-wrap{overflow:auto}.pc-table{width:100%;border-collapse:collapse}.pc-table th{padding:.58rem .72rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel2);color:var(--pc-dim);font-size:.59rem;font-weight:800;letter-spacing:.08em;text-align:left;text-transform:uppercase;white-space:nowrap}.pc-table td{padding:.64rem .72rem;border-bottom:1px solid var(--pc-line);font-size:.68rem;vertical-align:middle}.pc-table tbody tr:last-child td{border-bottom:0}.pc-click-row{cursor:pointer}.pc-click-row:hover{background:var(--pc-panel2)}.pc-action-cell{text-align:right}.pc-quick-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:.35rem}.pc-impersonate-quick{display:inline-flex;align-items:center;justify-content:center}.pc-impersonate-quick .fi-icon-btn{width:1.9rem;height:1.9rem;min-width:1.9rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-muted)}.pc-impersonate-quick .fi-icon-btn:hover{border-color:rgba(255,100,72,.38);background:rgba(255,100,72,.08);color:var(--pc-coral)}.pc-person{min-width:0;display:flex;align-items:center;gap:.55rem;color:inherit;text-decoration:none}.pc-person.is-button{border:0;background:transparent;text-align:left;cursor:pointer}.pc-person>span:last-child{min-width:0}.pc-person b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.69rem}.pc-person small{display:block;margin-top:.11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pc-dim);font-size:.59rem}.pc-avatar{width:1.9rem;height:1.9rem;display:grid;place-items:center;flex:0 0 1.9rem;border:1px solid var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2);font-size:.59rem;font-weight:800}.pc-avatar.is-large{width:2.7rem;height:2.7rem;flex-basis:2.7rem;font-size:.75rem}
+.pc-pill,.pc-plan,.pc-state{display:inline-flex;align-items:center;padding:.25rem .42rem;border:1px solid var(--pc-line);border-radius:999px;background:var(--pc-panel2);color:var(--pc-muted);font-size:.58rem;font-weight:800;white-space:nowrap}.pc-pill.is-danger,.pc-state.is-past_due,.pc-state.is-at_risk{color:var(--pc-red);border-color:rgba(242,86,79,.3);background:rgba(242,86,79,.08)}.pc-pill.is-warning,.pc-state.is-needs_push{color:var(--pc-amber);border-color:rgba(240,169,59,.3);background:rgba(240,169,59,.08)}.pc-state.is-active{color:var(--pc-green);border-color:rgba(34,192,138,.3);background:rgba(34,192,138,.08)}.pc-state.is-churned{color:var(--pc-muted)}.pc-plan.is-free-plyr{color:var(--pc-muted);border-color:var(--pc-line2);background:var(--pc-panel2)}.pc-plan.is-my-journey{color:var(--pc-blue);border-color:rgba(76,141,255,.34);background:rgba(76,141,255,.10)}.pc-plan.is-jumpstart{color:var(--pc-violet);border-color:rgba(156,123,255,.34);background:rgba(156,123,255,.10)}.pc-plan.is-amplify{color:var(--pc-coral);border-color:rgba(255,100,72,.34);background:rgba(255,100,72,.10)}
+.pc-health{display:flex;align-items:center;gap:.35rem;min-width:5rem}.pc-health>span{height:.27rem;min-width:2.5rem;flex:1;overflow:hidden;border-radius:999px;background:var(--pc-line)}.pc-health i{display:block;height:100%;border-radius:inherit;background:var(--pc-coral)}.pc-health.is-good i{background:var(--pc-green)}.pc-health.is-mid i{background:var(--pc-amber)}.pc-health.is-bad i{background:var(--pc-red)}.pc-health small{width:2rem;color:var(--pc-muted);font-size:.58rem;text-align:right}
+.pc-sports{padding:.75rem .85rem}.pc-sport{width:100%;display:grid;grid-template-columns:6rem 1fr 1.5rem;align-items:center;gap:.55rem;padding:.34rem 0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.pc-sport b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65rem}.pc-sport>span{height:.25rem;overflow:hidden;border-radius:999px;background:var(--pc-line)}.pc-sport i{display:block;height:100%;background:var(--pc-coral)}.pc-sport small{text-align:right;color:var(--pc-muted);font-size:.6rem}.pc-timeline{padding:.7rem .85rem}.pc-timeline>div{display:grid;grid-template-columns:.45rem 1fr;gap:.55rem;padding:.48rem 0;border-bottom:1px solid var(--pc-line)}.pc-timeline>div:last-child{border-bottom:0}.pc-timeline i{width:.4rem;height:.4rem;margin-top:.22rem;border-radius:999px;background:var(--pc-coral)}.pc-timeline i.ok{background:var(--pc-green)}.pc-timeline i.bad{background:var(--pc-red)}.pc-timeline b{display:block;font-size:.63rem}.pc-timeline small{display:block;margin-top:.1rem;color:var(--pc-dim);font-size:.58rem}
+.pc-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.pc-mini-list{display:flex;flex-direction:column}.pc-mini-list>a,.pc-mini-list>button{display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.58rem .75rem;border:0;border-bottom:1px solid var(--pc-line);background:transparent;color:inherit;text-align:left;text-decoration:none;cursor:pointer}.pc-mini-player-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--pc-line)}.pc-mini-player-row:last-child{border-bottom:0}.pc-mini-player-row:hover{background:var(--pc-panel2)}.pc-mini-player-main{min-width:0;display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.58rem .45rem .58rem .75rem;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.pc-mini-player-row>.pc-impersonate-quick{padding-right:.65rem}.pc-mini-list>a:last-child,.pc-mini-list>button:last-child{border-bottom:0}.pc-mini-list>a:hover,.pc-mini-list>button:hover{background:var(--pc-panel2)}.pc-mini-list b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem}.pc-mini-list small{display:block;margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pc-dim);font-size:.57rem}.pc-money{color:var(--pc-green);font-size:.7rem}.pc-empty{padding:1rem;color:var(--pc-dim);font-size:.68rem}
+.pc-view-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}.pc-search-box{min-width:15.5rem;min-height:2.25rem;display:flex;align-items:center;gap:.4rem;padding:0 .6rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.66rem}.pc-search-box input{width:100%;border:0;outline:0;background:transparent;color:inherit;font:inherit}.pc-state-select{min-height:2.25rem;padding:.35rem .55rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem}.pc-filter-panel{overflow:hidden;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel2)}.pc-filter-row{display:flex;align-items:flex-start;gap:.75rem;padding:.65rem .85rem;border-bottom:1px solid var(--pc-line)}.pc-filter-row:last-of-type{border-bottom:0}.pc-filter-label{width:3.5rem;flex:0 0 3.5rem;padding-top:.32rem;color:var(--pc-dim);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.58rem;font-weight:800;letter-spacing:.09em}.pc-filter-chips{display:flex;align-items:center;gap:.38rem;flex-wrap:wrap;min-width:0}.pc-filter-chip{display:inline-flex;align-items:center;gap:.22rem;padding:.34rem .62rem;border:1px solid var(--pc-line);border-radius:999px;background:var(--pc-panel);color:var(--pc-muted);font-size:.63rem;font-weight:750;cursor:pointer;transition:background .12s,border-color .12s,color .12s}.pc-filter-chip:hover{border-color:var(--pc-line2);color:var(--pc-text)}.pc-filter-chip.is-active{border-color:var(--pc-coral);background:var(--pc-coral);color:#fff}.pc-filter-chip span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.56rem;opacity:.68}.pc-filter-divider{width:1px;height:1.25rem;margin:0 .15rem;background:var(--pc-line2)}.pc-filter-clear-row{display:flex;justify-content:flex-end;padding:.48rem .85rem;border-top:1px solid var(--pc-line);background:var(--pc-panel)}.pc-note{padding:.65rem .8rem;border:1px dashed var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:.63rem}
+.pc-queue-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.pc-queue>header{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;padding:.72rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue>header h3{margin:0;font-size:.72rem}.pc-queue>header p{margin:.12rem 0 0;color:var(--pc-dim);font-size:.6rem;line-height:1.35}.pc-queue>header>strong{font-size:1.25rem}.pc-queue-mark{width:1.8rem;height:1.8rem;display:grid;place-items:center;border-radius:.5rem;background:rgba(240,169,59,.1);color:var(--pc-amber);font-size:.68rem;font-weight:900}.pc-queue-mark.is-billing{background:rgba(242,86,79,.1);color:var(--pc-red)}.pc-queue-mark.is-amplify_credits{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-queue-list{max-height:17rem;overflow:auto}.pc-queue-list>div{display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.48rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue-list>div:last-child{border-bottom:0}.pc-queue footer{padding:.55rem .78rem;border-top:1px solid var(--pc-line);color:var(--pc-dim);font-size:.59rem}
+.pc-plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.65rem}.pc-plan-card{padding:.75rem}.pc-plan-card>strong{display:block;margin-top:.5rem;font-size:1.35rem}.pc-plan-card>small{display:block;margin-top:.2rem;color:var(--pc-dim);font-size:.6rem}.pc-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.pc-credit-service-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem;padding:.75rem}.pc-credit-service{padding:.72rem;border:1px solid var(--pc-line);border-radius:.6rem;background:var(--pc-panel2)}.pc-credit-service small{display:block;color:var(--pc-muted);font-size:.61rem;font-weight:750}.pc-credit-service strong{display:block;margin-top:.35rem;font-size:1.25rem}.pc-credit-service span{display:block;margin-top:.18rem;color:var(--pc-dim);font-size:.58rem}.pc-credit-cell{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:750}.pc-credit-cell small{display:block;margin-top:.08rem;color:var(--pc-dim);font-size:.54rem;font-weight:500}.pc-idle{color:var(--pc-red);font-weight:750}.pc-muted-value{color:var(--pc-dim)}
+.pc-scrim{position:fixed;inset:0;z-index:10080;background:rgba(5,8,12,.58);backdrop-filter:blur(2px)}.pc-drawer{position:fixed;top:0;right:0;z-index:10090;width:min(560px,100vw);height:100dvh;overflow-y:auto;border-left:1px solid var(--pc-line);background:var(--pc-panel);box-shadow:-22px 0 55px rgba(0,0,0,.22)}.pc-drawer-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;gap:.7rem;padding:.9rem 1rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel)}.pc-drawer-head>div{min-width:0;flex:1}.pc-drawer-head h3{margin:.12rem 0 0;font-size:1rem}.pc-drawer-head p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.65rem;line-height:1.4}.pc-close{width:2rem;height:2rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:1.1rem;cursor:pointer}.pc-chip-row{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.45rem}.pc-drawer-section{padding:.85rem 1rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-section h4{margin:0 0 .55rem;color:var(--pc-dim);font-size:.57rem;letter-spacing:.12em}.pc-flag-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.65rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--pc-line)}.pc-flag-row:last-child{border-bottom:0}.pc-flag-row p{margin:.16rem 0 0;color:var(--pc-muted);font-size:.61rem;line-height:1.4}.pc-kv{display:flex;justify-content:space-between;gap:1rem;padding:.4rem 0;border-bottom:1px solid var(--pc-line);font-size:.65rem}.pc-kv:last-child{border-bottom:0}.pc-kv span{color:var(--pc-muted)}.pc-kv b{text-align:right}.pc-drawer-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.78rem 1rem;background:var(--pc-panel2)}.pc-impersonate{margin-left:auto}.pc-drawer-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.55rem;align-items:center;padding:.58rem .8rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-list-row:last-child{border-bottom:0}.pc-slide-in{transition:transform .18s ease}.pc-slide-out{transition:transform .14s ease}[x-cloak]{display:none!important}
+@media(max-width:1250px){.pc-credit-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pc-dashboard-grid{grid-template-columns:1fr}.pc-side-stack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.pc-quick-grid{grid-template-columns:1fr}.pc-queue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr 1fr}.pc-queue-grid{grid-template-columns:1fr}.pc-side-stack{grid-template-columns:1fr}.pc-view-head{align-items:flex-start;flex-direction:column}.pc-view-actions{width:100%;justify-content:flex-start}.pc-search-box{min-width:0;flex:1 1 14rem}.pc-athlete-table th:nth-child(4),.pc-athlete-table td:nth-child(4),.pc-athlete-table th:nth-child(6),.pc-athlete-table td:nth-child(6){display:none}.pc-filter-row{align-items:flex-start}.pc-filter-label{width:3rem;flex-basis:3rem}}
+@media(max-width:520px){.pc-credit-service-grid{grid-template-columns:1fr}.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr}.pc-view-actions{display:grid;grid-template-columns:1fr;width:100%}.pc-search-box,.pc-state-select,.pc-view-actions .pc-btn{width:100%}.pc-filter-row{display:block}.pc-filter-label{display:block;width:auto;margin-bottom:.35rem;padding-top:0}.pc-filter-divider{display:none}.pc-athlete-table th:nth-child(2),.pc-athlete-table td:nth-child(2),.pc-athlete-table th:nth-child(5),.pc-athlete-table td:nth-child(5),.pc-athlete-table th:nth-child(8),.pc-athlete-table td:nth-child(8){display:none}.pc-drawer-list-row{grid-template-columns:minmax(0,1fr) auto}.pc-drawer-list-row .pc-btn{grid-column:2}}
+</style>
+</div>
+</x-filament-widgets::widget>.number_format($plan['setup_cents']/100,2) }} recorded @endif
+                    </small>
+                </div>
+            @endforeach
+        </div>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head"><div><h3>Subscriptions</h3><p>Past due first, then active and inactive accounts.</p></div></header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
+                    <thead><tr><th>Athlete</th><th>Plan</th><th>Rate</th><th>Provider</th><th>Payment</th><th>Subscription</th><th>Action</th></tr></thead>
+                    <tbody>
+                    @forelse($billing_rows as $athlete)
+                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int)$athlete['id'] }}; document.body.style.overflow='hidden'">
+                            <td><div class="pc-person"><span class="pc-avatar">{{ $athlete['initials'] }}</span><span><b>{{ $athlete['name'] }}</b><small>{{ $athlete['sport'] }} · joined {{ $athlete['joined'] }}</small></span></div></td>
+                            <td><span class="pc-plan">{{ $athlete['plan'] }}</span></td>
+                            <td class="pc-mono">{{ $athlete['billing']['recurring_cents'] > 0 ? '$'.number_format($athlete['billing']['recurring_cents']/100,2).'/mo' : '—' }}</td>
+                            <td>{{ str($athlete['billing']['provider'])->headline() }}</td>
+                            <td><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['billing']['payment_status'])->headline() }}</span></td>
+                            <td>{{ str($athlete['billing']['subscription_status'])->headline() }}</td>
+                            <td x-on:click.stop>
+                                <span class="pc-quick-actions">
+                                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: 'payment_attention' })">Support</button>
+                                    <span class="pc-impersonate-quick" title="Impersonate {{ $athlete['name'] }}">
+                                        {{ ($this->impersonateAction)(['userId' => (int) $athlete['id']]) }}
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7"><div class="pc-empty">No subscription records are available yet.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head"><div><h3>Recent payments & purchases</h3><p>Latest successful transactions recorded by PLYRCARD.</p></div><button type="button" class="pc-btn is-small" x-on:click="activityDrawer='payments'; document.body.style.overflow='hidden'">Expand</button></header>
+            <div class="pc-mini-list">
+                @forelse(array_slice($payment_activity['items'],0,8) as $payment)
+                    <a href="{{ $payment['url'] ?: '#' }}"><span class="pc-avatar">{{ $payment['initials'] }}</span><span><b>{{ $payment['player'] }}</b><small>{{ $payment['source'] }} · {{ $payment['provider'] }} · {{ $payment['when'] }}</small></span><strong class="pc-money">{{ $payment['amount'] }}</strong></a>
+                @empty
+                    <div class="pc-empty">No successful payments recorded yet.</div>
+                @endforelse
+            </div>
+        </section>
+    </section>
+
+    <section x-show="tab === 'amplify'" x-cloak class="pc-view">
+        <div class="pc-view-head">
+            <div>
+                <span class="pc-kicker">PACKAGE DELIVERY</span>
+                <h2>Amplify credits</h2>
+                <p>What families paid for and what we still owe them through PLYR Points and service delivery.</p>
+            </div>
+            @if($credit_requests_url)<a href="{{ $credit_requests_url }}" class="pc-btn">Open Credit Requests</a>@endif
+        </div>
+
+        <div class="pc-stat-grid pc-stat-grid-four">
+            <div class="pc-stat"><span class="pc-stat-icon is-violet">ϟ</span><small>Package athletes</small><strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong><span>Amplify and Jumpstart package accounts</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-blue">+</span><small>Package points granted</small><strong>{{ number_format($amplify_credit_stats['points_granted'] ?? 0) }}</strong><span>recorded package-purchase grants</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-amber">◷</span><small>Points available</small><strong>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }}</strong><span>current PLYR Points balance across package athletes</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-green">✓</span><small>Service points redeemed</small><strong>{{ number_format($amplify_credit_stats['points_redeemed'] ?? 0) }}</strong><span>net points consumed by package service requests</span></div>
+        </div>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div><h3>Delivery across every package</h3><p>Real service requests grouped by the four package service categories.</p></div>
+            </header>
+            <div class="pc-credit-service-grid">
+                @foreach($amplify_credit_services as $service)
+                    <div class="pc-credit-service">
+                        <small>{{ $service['label'] }}</small>
+                        <strong>{{ number_format($service['requests']) }}</strong>
+                        <span>{{ number_format($service['points']) }} pts redeemed</span>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div><h3>Credit ledger</h3><p>Package accounts with current balance and service usage. Highest idle balance is prioritized.</p></div>
+            </header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
+                    <thead>
+                        <tr>
+                            <th>Athlete</th>
+                            <th>Package</th>
+                            <th>Granted</th>
+                            <th>Available</th>
+                            <th>Outreach</th>
+                            <th>Reels</th>
+                            <th>Graphics</th>
+                            <th>Rep hours</th>
+                            <th>Used</th>
+                            <th>Last activity</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($amplify_credit_rows as $credit)
+                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int) $credit['id'] }}; document.body.style.overflow='hidden'">
+                            <td>
+                                <div class="pc-person">
+                                    <span class="pc-avatar">{{ $credit['initials'] }}</span>
+                                    <span><b>{{ $credit['name'] }}</b><small>{{ $credit['sport'] }}</small></span>
+                                </div>
+                            </td>
+                            <td><span class="pc-plan is-{{ $credit['package_key'] }}">{{ $credit['package'] }}</span></td>
+                            <td class="pc-mono">{{ number_format($credit['granted_points']) }}</td>
+                            <td class="pc-mono">{{ number_format($credit['points_available']) }}</td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['outreach']['qty']) }}<small>{{ number_format($credit['usage']['outreach']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['reel']['qty']) }}<small>{{ number_format($credit['usage']['reel']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['graphic']['qty']) }}<small>{{ number_format($credit['usage']['graphic']['points']) }} pts</small></td>
+                            <td class="pc-credit-cell">{{ number_format($credit['usage']['production_hour']['qty']) }}<small>{{ number_format($credit['usage']['production_hour']['points']) }} pts</small></td>
+                            <td>
+                                @if($credit['usage_percent'] !== null)
+                                    <div class="pc-health is-{{ $credit['usage_percent'] >= 75 ? 'good' : ($credit['usage_percent'] >= 30 ? 'mid' : 'bad') }}"><span><i style="width:{{ max(3,(int)$credit['usage_percent']) }}%"></i></span><small>{{ $credit['usage_percent'] }}%</small></div>
+                                @else
+                                    <span class="pc-muted-value">—</span>
+                                @endif
+                            </td>
+                            <td><span class="{{ $credit['idle'] ? 'pc-idle' : '' }}">{{ $credit['last_activity'] }}</span></td>
+                            <td x-on:click.stop>
+                                <span class="pc-quick-actions">
+                                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$credit['id'] }}, concern: 'amplify_credits' })">Remind</button>
+                                    <span class="pc-impersonate-quick" title="Impersonate {{ $credit['name'] }}">
+                                        {{ ($this->impersonateAction)(['userId' => (int) $credit['id']]) }}
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="11"><div class="pc-empty">No Amplify or Jumpstart package-credit records are available yet.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="pc-note">Package points are read from the existing PLYR Points ledger. The current database does not store a separate package-expiration date, so this view does not invent one.</div>
+    </section>
+
+    <div x-cloak x-show="athleteDrawer || activityDrawer" x-transition.opacity class="pc-scrim" x-on:click="closeOverlays()"></div>
+
+    @foreach($athletes as $athlete)
+        <aside x-cloak x-show="athleteDrawer === {{ (int)$athlete['id'] }}" x-transition:enter="pc-slide-in" x-transition:leave="pc-slide-out" class="pc-drawer">
+            <header class="pc-drawer-head">
+                <span class="pc-avatar is-large">{{ $athlete['initials'] }}</span>
+                <div><h3>{{ $athlete['name'] }}</h3><p>{{ $athlete['sport'] }} · {{ $athlete['position'] }} · {{ $athlete['year'] ?: 'Grad year not set' }} · {{ $athlete['club'] }}</p><div class="pc-chip-row"><span class="pc-plan is-{{ $athlete['plan_key'] }}">{{ $athlete['plan'] }}</span><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['state'])->replace('_',' ')->headline() }}</span></div></div>
+                <button type="button" class="pc-close" x-on:click="closeOverlays()">×</button>
+            </header>
+            @if(count($athlete['flags']))
+                <section class="pc-drawer-section"><h4>NEEDS ATTENTION</h4>
+                    @foreach($athlete['flags'] as $flag)
+                        <div class="pc-flag-row"><div><span class="pc-pill is-{{ $flag['tone'] ?? 'warning' }}">{{ $flag['label'] }}</span><p>{{ $flag['detail'] ?? '' }}</p></div><button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $flag['concern'] ?? 'custom' }}' })">Message</button></div>
+                    @endforeach
+                </section>
+            @endif
+            <section class="pc-drawer-section"><h4>ACCOUNT</h4>
+                <div class="pc-kv"><span>Health score</span><b>{{ $athlete['health'] }} / 100</b></div>
+                <div class="pc-kv"><span>Profile completion</span><b>{{ $athlete['profile_completion'] }}%</b></div>
+                <div class="pc-kv"><span>Plan</span><b>{{ $athlete['plan'] }}</b></div>
+                <div class="pc-kv"><span>Payment</span><b>{{ str($athlete['billing']['payment_status'])->headline() }}</b></div>
+                <div class="pc-kv"><span>Subscription</span><b>{{ str($athlete['billing']['subscription_status'])->headline() }}</b></div>
+                <div class="pc-kv"><span>Joined</span><b>{{ $athlete['joined'] }}</b></div>
+                <div class="pc-kv"><span>Last login</span><b>{{ $athlete['last_login'] }}</b></div>
+                <div class="pc-kv"><span>Last outreach</span><b>{{ $athlete['last_outreach'] }}</b></div>
+            </section>
+            <section class="pc-drawer-section"><h4>WEBSITE</h4>
+                <div class="pc-kv"><span>Website</span><b>{{ $athlete['website']['exists'] ? 'Created' : 'Not created' }}</b></div>
+                <div class="pc-kv"><span>Published</span><b>{{ $athlete['website']['published'] ? 'Yes' : 'No' }}</b></div>
+                <div class="pc-kv"><span>Domain / slug</span><b>{{ $athlete['website']['domain'] ?: ($athlete['website']['slug'] ?: 'Not set') }}</b></div>
+            </section>
+            <footer class="pc-drawer-actions">
+                <button type="button" class="pc-btn is-primary" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $athlete['reminder_concern'] }}' })">Open Support Messenger</button>
+                @if($athlete['user_url'])<a href="{{ $athlete['user_url'] }}" class="pc-btn">View player details</a>@endif
+                <span class="pc-impersonate">{{ ($this->impersonateAction)(['userId' => (int)$athlete['id']]) }}</span>
+            </footer>
+        </aside>
+    @endforeach
+
+    <aside x-cloak x-show="activityDrawer === 'services'" class="pc-drawer">
+        <header class="pc-drawer-head"><div><span class="pc-kicker">PLYR POINTS</span><h3>Recent service requests</h3><p>Review the latest service requests, then jump into the full Credit Requests system.</p></div><button type="button" class="pc-close" x-on:click="closeOverlays()">×</button></header>
+        <div class="pc-drawer-list">
+            @forelse($service_activity['items'] as $request)
+                <div class="pc-drawer-list-row">
+                    <a href="{{ $request['url'] ?: '#' }}" class="pc-person"><span class="pc-avatar">{{ $request['initials'] }}</span><span><b>{{ $request['service'] }}{{ $request['quantity'] > 1 ? ' × '.$request['quantity'] : '' }}</b><small>{{ $request['player'] }} · {{ number_format($request['points']) }} pts · {{ $request['when'] }}</small></span></a>
+                    <span class="pc-pill">{{ $request['rush'] ? 'Rush · ' : '' }}{{ $request['status'] }}</span>
+                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-credit-request-follow-up', { requestId: {{ (int)$request['id'] }} })">Support</button>
+                </div>
+            @empty<div class="pc-empty">No service requests available.</div>@endforelse
+        </div>
+        <footer class="pc-drawer-actions">@if($credit_requests_url)<a href="{{ $credit_requests_url }}" class="pc-btn is-primary">Open Credit Requests</a>@endif</footer>
+    </aside>
+
+    <aside x-cloak x-show="activityDrawer === 'payments'" class="pc-drawer">
+        <header class="pc-drawer-head"><div><span class="pc-kicker">BILLING ACTIVITY</span><h3>Recent payments & purchases</h3><p>Successful transactions recorded across subscriptions and purchases.</p></div><button type="button" class="pc-close" x-on:click="closeOverlays()">×</button></header>
+        <div class="pc-drawer-list">
+            @forelse($payment_activity['items'] as $payment)
+                <div class="pc-drawer-list-row">
+                    <a href="{{ $payment['url'] ?: '#' }}" class="pc-person"><span class="pc-avatar">{{ $payment['initials'] }}</span><span><b>{{ $payment['player'] }}</b><small>{{ $payment['source'] }} · {{ $payment['provider'] }} · {{ $payment['when'] }}</small></span></a>
+                    <strong class="pc-money">{{ $payment['amount'] }}</strong>
+                    @if($payment['user_id'] > 0)<button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$payment['user_id'] }}, concern: 'payment_attention' })">Support</button>@endif
+                </div>
+            @empty<div class="pc-empty">No successful payments recorded yet.</div>@endforelse
+        </div>
+        <footer class="pc-drawer-actions">@if($users_url)<a href="{{ $users_url }}" class="pc-btn is-primary">Manage Users & Billing</a>@endif</footer>
+    </aside>
+
+    <x-filament-actions::modals />
+
+<style>
+.pc-admin{--pc-bg:#f3f5f7;--pc-panel:#fff;--pc-panel2:#f7f9fb;--pc-line:#e4e8ed;--pc-line2:#d6dbe2;--pc-text:#12151a;--pc-muted:#69727e;--pc-dim:#8b94a0;--pc-coral:#ff6448;--pc-green:#16a377;--pc-amber:#d68d18;--pc-red:#dc4b46;--pc-blue:#3979e6;--pc-violet:#8065dd;display:flex;flex-direction:column;gap:1rem;color:var(--pc-text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .pc-admin{--pc-bg:#0c0e11;--pc-panel:#14171c;--pc-panel2:#1a1e24;--pc-line:#242932;--pc-line2:#2e343e;--pc-text:#e9ecf1;--pc-muted:#8a93a0;--pc-dim:#5f6874}
+
+.pc-view{display:flex;flex-direction:column;gap:1rem}.pc-view-head,.pc-section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}.pc-view-head h2,.pc-section-title h3{margin:.1rem 0 0;font-size:1.08rem;font-weight:800;letter-spacing:-.025em}.pc-view-head p,.pc-section-title p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.72rem}.pc-kicker{color:var(--pc-coral);font-size:.58rem;font-weight:850;letter-spacing:.13em}.pc-updated{color:var(--pc-dim);font-size:.64rem}
+.pc-stat-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.75rem}.pc-stat-grid-four{grid-template-columns:repeat(4,minmax(0,1fr))}.pc-stat{min-width:0;min-height:8.6rem;padding:.88rem;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel);color:inherit;text-align:left}.pc-stat button&{cursor:pointer}.pc-stat:hover{border-color:var(--pc-line2)}.pc-stat-icon{width:1.85rem;height:1.85rem;display:grid;place-items:center;margin-bottom:.7rem;border-radius:.5rem;background:var(--pc-panel2);font-weight:900}.pc-stat-icon.is-coral{background:rgba(255,100,72,.11);color:var(--pc-coral)}.pc-stat-icon.is-green{background:rgba(34,192,138,.11);color:var(--pc-green)}.pc-stat-icon.is-amber{background:rgba(240,169,59,.12);color:var(--pc-amber)}.pc-stat-icon.is-red{background:rgba(242,86,79,.11);color:var(--pc-red)}.pc-stat-icon.is-blue{background:rgba(76,141,255,.11);color:var(--pc-blue)}.pc-stat-icon.is-violet{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-stat small{display:block;color:var(--pc-muted);font-size:.66rem;font-weight:700}.pc-stat strong{display:block;margin-top:.25rem;font-size:1.55rem;letter-spacing:-.045em}.pc-stat>span:last-child{display:block;margin-top:.6rem;color:var(--pc-dim);font-size:.64rem;line-height:1.35}
+.pc-dashboard-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(18rem,.7fr);gap:.85rem}.pc-side-stack{display:flex;flex-direction:column;gap:.85rem}.pc-panel,.pc-queue{overflow:hidden;border:1px solid var(--pc-line);border-radius:.72rem;background:var(--pc-panel)}.pc-panel-head{min-height:3.5rem;padding:.78rem .88rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;border-bottom:1px solid var(--pc-line)}.pc-panel-head h3{margin:0;font-size:.78rem;font-weight:800}.pc-panel-head p{margin:.13rem 0 0;color:var(--pc-dim);font-size:.63rem}.pc-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.42rem .62rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem;font-weight:750;text-decoration:none;cursor:pointer;white-space:nowrap}.pc-btn:hover{background:var(--pc-panel2)}.pc-btn.is-primary{background:var(--pc-coral);border-color:var(--pc-coral);color:#fff}.pc-btn.is-small{padding:.32rem .48rem;font-size:.61rem}
+.pc-table-wrap{overflow:auto}.pc-table{width:100%;border-collapse:collapse}.pc-table th{padding:.58rem .72rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel2);color:var(--pc-dim);font-size:.59rem;font-weight:800;letter-spacing:.08em;text-align:left;text-transform:uppercase;white-space:nowrap}.pc-table td{padding:.64rem .72rem;border-bottom:1px solid var(--pc-line);font-size:.68rem;vertical-align:middle}.pc-table tbody tr:last-child td{border-bottom:0}.pc-click-row{cursor:pointer}.pc-click-row:hover{background:var(--pc-panel2)}.pc-action-cell{text-align:right}.pc-quick-actions{display:inline-flex;align-items:center;justify-content:flex-end;gap:.35rem}.pc-impersonate-quick{display:inline-flex;align-items:center;justify-content:center}.pc-impersonate-quick .fi-icon-btn{width:1.9rem;height:1.9rem;min-width:1.9rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-muted)}.pc-impersonate-quick .fi-icon-btn:hover{border-color:rgba(255,100,72,.38);background:rgba(255,100,72,.08);color:var(--pc-coral)}.pc-person{min-width:0;display:flex;align-items:center;gap:.55rem;color:inherit;text-decoration:none}.pc-person.is-button{border:0;background:transparent;text-align:left;cursor:pointer}.pc-person>span:last-child{min-width:0}.pc-person b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.69rem}.pc-person small{display:block;margin-top:.11rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pc-dim);font-size:.59rem}.pc-avatar{width:1.9rem;height:1.9rem;display:grid;place-items:center;flex:0 0 1.9rem;border:1px solid var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2);font-size:.59rem;font-weight:800}.pc-avatar.is-large{width:2.7rem;height:2.7rem;flex-basis:2.7rem;font-size:.75rem}
+.pc-pill,.pc-plan,.pc-state{display:inline-flex;align-items:center;padding:.25rem .42rem;border:1px solid var(--pc-line);border-radius:999px;background:var(--pc-panel2);color:var(--pc-muted);font-size:.58rem;font-weight:800;white-space:nowrap}.pc-pill.is-danger,.pc-state.is-past_due,.pc-state.is-at_risk{color:var(--pc-red);border-color:rgba(242,86,79,.3);background:rgba(242,86,79,.08)}.pc-pill.is-warning,.pc-state.is-needs_push{color:var(--pc-amber);border-color:rgba(240,169,59,.3);background:rgba(240,169,59,.08)}.pc-state.is-active{color:var(--pc-green);border-color:rgba(34,192,138,.3);background:rgba(34,192,138,.08)}.pc-state.is-churned{color:var(--pc-muted)}.pc-plan.is-free-plyr{color:var(--pc-muted);border-color:var(--pc-line2);background:var(--pc-panel2)}.pc-plan.is-my-journey{color:var(--pc-blue);border-color:rgba(76,141,255,.34);background:rgba(76,141,255,.10)}.pc-plan.is-jumpstart{color:var(--pc-violet);border-color:rgba(156,123,255,.34);background:rgba(156,123,255,.10)}.pc-plan.is-amplify{color:var(--pc-coral);border-color:rgba(255,100,72,.34);background:rgba(255,100,72,.10)}
+.pc-health{display:flex;align-items:center;gap:.35rem;min-width:5rem}.pc-health>span{height:.27rem;min-width:2.5rem;flex:1;overflow:hidden;border-radius:999px;background:var(--pc-line)}.pc-health i{display:block;height:100%;border-radius:inherit;background:var(--pc-coral)}.pc-health.is-good i{background:var(--pc-green)}.pc-health.is-mid i{background:var(--pc-amber)}.pc-health.is-bad i{background:var(--pc-red)}.pc-health small{width:2rem;color:var(--pc-muted);font-size:.58rem;text-align:right}
+.pc-sports{padding:.75rem .85rem}.pc-sport{width:100%;display:grid;grid-template-columns:6rem 1fr 1.5rem;align-items:center;gap:.55rem;padding:.34rem 0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.pc-sport b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.65rem}.pc-sport>span{height:.25rem;overflow:hidden;border-radius:999px;background:var(--pc-line)}.pc-sport i{display:block;height:100%;background:var(--pc-coral)}.pc-sport small{text-align:right;color:var(--pc-muted);font-size:.6rem}.pc-timeline{padding:.7rem .85rem}.pc-timeline>div{display:grid;grid-template-columns:.45rem 1fr;gap:.55rem;padding:.48rem 0;border-bottom:1px solid var(--pc-line)}.pc-timeline>div:last-child{border-bottom:0}.pc-timeline i{width:.4rem;height:.4rem;margin-top:.22rem;border-radius:999px;background:var(--pc-coral)}.pc-timeline i.ok{background:var(--pc-green)}.pc-timeline i.bad{background:var(--pc-red)}.pc-timeline b{display:block;font-size:.63rem}.pc-timeline small{display:block;margin-top:.1rem;color:var(--pc-dim);font-size:.58rem}
+.pc-quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.pc-mini-list{display:flex;flex-direction:column}.pc-mini-list>a,.pc-mini-list>button{display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.58rem .75rem;border:0;border-bottom:1px solid var(--pc-line);background:transparent;color:inherit;text-align:left;text-decoration:none;cursor:pointer}.pc-mini-player-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;border-bottom:1px solid var(--pc-line)}.pc-mini-player-row:last-child{border-bottom:0}.pc-mini-player-row:hover{background:var(--pc-panel2)}.pc-mini-player-main{min-width:0;display:grid;grid-template-columns:1.9rem minmax(0,1fr) auto;align-items:center;gap:.55rem;padding:.58rem .45rem .58rem .75rem;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.pc-mini-player-row>.pc-impersonate-quick{padding-right:.65rem}.pc-mini-list>a:last-child,.pc-mini-list>button:last-child{border-bottom:0}.pc-mini-list>a:hover,.pc-mini-list>button:hover{background:var(--pc-panel2)}.pc-mini-list b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.66rem}.pc-mini-list small{display:block;margin-top:.1rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--pc-dim);font-size:.57rem}.pc-money{color:var(--pc-green);font-size:.7rem}.pc-empty{padding:1rem;color:var(--pc-dim);font-size:.68rem}
+.pc-view-actions{display:flex;align-items:center;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}.pc-search-box{min-width:15.5rem;min-height:2.25rem;display:flex;align-items:center;gap:.4rem;padding:0 .6rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.66rem}.pc-search-box input{width:100%;border:0;outline:0;background:transparent;color:inherit;font:inherit}.pc-state-select{min-height:2.25rem;padding:.35rem .55rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem}.pc-filter-panel{overflow:hidden;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel2)}.pc-filter-row{display:flex;align-items:flex-start;gap:.75rem;padding:.65rem .85rem;border-bottom:1px solid var(--pc-line)}.pc-filter-row:last-of-type{border-bottom:0}.pc-filter-label{width:3.5rem;flex:0 0 3.5rem;padding-top:.32rem;color:var(--pc-dim);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.58rem;font-weight:800;letter-spacing:.09em}.pc-filter-chips{display:flex;align-items:center;gap:.38rem;flex-wrap:wrap;min-width:0}.pc-filter-chip{display:inline-flex;align-items:center;gap:.22rem;padding:.34rem .62rem;border:1px solid var(--pc-line);border-radius:999px;background:var(--pc-panel);color:var(--pc-muted);font-size:.63rem;font-weight:750;cursor:pointer;transition:background .12s,border-color .12s,color .12s}.pc-filter-chip:hover{border-color:var(--pc-line2);color:var(--pc-text)}.pc-filter-chip.is-active{border-color:var(--pc-coral);background:var(--pc-coral);color:#fff}.pc-filter-chip span{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.56rem;opacity:.68}.pc-filter-divider{width:1px;height:1.25rem;margin:0 .15rem;background:var(--pc-line2)}.pc-filter-clear-row{display:flex;justify-content:flex-end;padding:.48rem .85rem;border-top:1px solid var(--pc-line);background:var(--pc-panel)}.pc-note{padding:.65rem .8rem;border:1px dashed var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:.63rem}
+.pc-queue-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}.pc-queue>header{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;padding:.72rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue>header h3{margin:0;font-size:.72rem}.pc-queue>header p{margin:.12rem 0 0;color:var(--pc-dim);font-size:.6rem;line-height:1.35}.pc-queue>header>strong{font-size:1.25rem}.pc-queue-mark{width:1.8rem;height:1.8rem;display:grid;place-items:center;border-radius:.5rem;background:rgba(240,169,59,.1);color:var(--pc-amber);font-size:.68rem;font-weight:900}.pc-queue-mark.is-billing{background:rgba(242,86,79,.1);color:var(--pc-red)}.pc-queue-mark.is-amplify_credits{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-queue-list{max-height:17rem;overflow:auto}.pc-queue-list>div{display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.48rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue-list>div:last-child{border-bottom:0}.pc-queue footer{padding:.55rem .78rem;border-top:1px solid var(--pc-line);color:var(--pc-dim);font-size:.59rem}
+.pc-plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.65rem}.pc-plan-card{padding:.75rem}.pc-plan-card>strong{display:block;margin-top:.5rem;font-size:1.35rem}.pc-plan-card>small{display:block;margin-top:.2rem;color:var(--pc-dim);font-size:.6rem}.pc-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.pc-credit-service-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.65rem;padding:.75rem}.pc-credit-service{padding:.72rem;border:1px solid var(--pc-line);border-radius:.6rem;background:var(--pc-panel2)}.pc-credit-service small{display:block;color:var(--pc-muted);font-size:.61rem;font-weight:750}.pc-credit-service strong{display:block;margin-top:.35rem;font-size:1.25rem}.pc-credit-service span{display:block;margin-top:.18rem;color:var(--pc-dim);font-size:.58rem}.pc-credit-cell{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:750}.pc-credit-cell small{display:block;margin-top:.08rem;color:var(--pc-dim);font-size:.54rem;font-weight:500}.pc-idle{color:var(--pc-red);font-weight:750}.pc-muted-value{color:var(--pc-dim)}
+.pc-scrim{position:fixed;inset:0;z-index:10080;background:rgba(5,8,12,.58);backdrop-filter:blur(2px)}.pc-drawer{position:fixed;top:0;right:0;z-index:10090;width:min(560px,100vw);height:100dvh;overflow-y:auto;border-left:1px solid var(--pc-line);background:var(--pc-panel);box-shadow:-22px 0 55px rgba(0,0,0,.22)}.pc-drawer-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;gap:.7rem;padding:.9rem 1rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel)}.pc-drawer-head>div{min-width:0;flex:1}.pc-drawer-head h3{margin:.12rem 0 0;font-size:1rem}.pc-drawer-head p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.65rem;line-height:1.4}.pc-close{width:2rem;height:2rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:1.1rem;cursor:pointer}.pc-chip-row{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.45rem}.pc-drawer-section{padding:.85rem 1rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-section h4{margin:0 0 .55rem;color:var(--pc-dim);font-size:.57rem;letter-spacing:.12em}.pc-flag-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.65rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--pc-line)}.pc-flag-row:last-child{border-bottom:0}.pc-flag-row p{margin:.16rem 0 0;color:var(--pc-muted);font-size:.61rem;line-height:1.4}.pc-kv{display:flex;justify-content:space-between;gap:1rem;padding:.4rem 0;border-bottom:1px solid var(--pc-line);font-size:.65rem}.pc-kv:last-child{border-bottom:0}.pc-kv span{color:var(--pc-muted)}.pc-kv b{text-align:right}.pc-drawer-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.78rem 1rem;background:var(--pc-panel2)}.pc-impersonate{margin-left:auto}.pc-drawer-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.55rem;align-items:center;padding:.58rem .8rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-list-row:last-child{border-bottom:0}.pc-slide-in{transition:transform .18s ease}.pc-slide-out{transition:transform .14s ease}[x-cloak]{display:none!important}
+@media(max-width:1250px){.pc-credit-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pc-dashboard-grid{grid-template-columns:1fr}.pc-side-stack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.pc-quick-grid{grid-template-columns:1fr}.pc-queue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:780px){.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr 1fr}.pc-queue-grid{grid-template-columns:1fr}.pc-side-stack{grid-template-columns:1fr}.pc-view-head{align-items:flex-start;flex-direction:column}.pc-view-actions{width:100%;justify-content:flex-start}.pc-search-box{min-width:0;flex:1 1 14rem}.pc-athlete-table th:nth-child(4),.pc-athlete-table td:nth-child(4),.pc-athlete-table th:nth-child(6),.pc-athlete-table td:nth-child(6){display:none}.pc-filter-row{align-items:flex-start}.pc-filter-label{width:3rem;flex-basis:3rem}}
+@media(max-width:520px){.pc-credit-service-grid{grid-template-columns:1fr}.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr}.pc-view-actions{display:grid;grid-template-columns:1fr;width:100%}.pc-search-box,.pc-state-select,.pc-view-actions .pc-btn{width:100%}.pc-filter-row{display:block}.pc-filter-label{display:block;width:auto;margin-bottom:.35rem;padding-top:0}.pc-filter-divider{display:none}.pc-athlete-table th:nth-child(2),.pc-athlete-table td:nth-child(2),.pc-athlete-table th:nth-child(5),.pc-athlete-table td:nth-child(5),.pc-athlete-table th:nth-child(8),.pc-athlete-table td:nth-child(8){display:none}.pc-drawer-list-row{grid-template-columns:minmax(0,1fr) auto}.pc-drawer-list-row .pc-btn{grid-column:2}}
+</style>
+</div>
+</x-filament-widgets::widget>.number_format($athlete['billing']['recurring_cents']/100,2).'/mo' : '—' }}</td>
+                            <td>{{ $athlete['billing']['started'] }}</td>
+                            <td><div class="pc-payment-cell"><b>{{ $athlete['billing']['last_payment_amount'] }}</b><small>{{ $athlete['billing']['last_payment'] }}</small></div></td>
+                            <td><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['billing']['payment_status'])->headline() }}</span></td>
+                            <td>{{ str($athlete['billing']['subscription_status'])->headline() }}</td>
+                            <td x-on:click.stop>
+                                <span class="pc-quick-actions">
+                                    <button type="button" class="pc-btn is-small {{ ($billingReminder['week_count'] ?? 0) > 0 ? 'pc-reminder-sent' : '' }}" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: 'payment_attention' })">
+                                        {{ ($billingReminder['week_count'] ?? 0) > 0 ? '✓ Sent '.($billingReminder['when'] ?? '') : 'Remind' }}
+                                    </button>
+                                    <span class="pc-impersonate-quick" title="Impersonate {{ $athlete['name'] }}">
+                                        {{ ($this->impersonateAction)(['userId' => (int) $athlete['id']]) }}
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="8"><div class="pc-empty">No subscription records are available yet.</div></td></tr>
                     @endforelse
                     </tbody>
                 </table>
