@@ -16,6 +16,8 @@ class SuperadminBilling extends SuperadminAthletes
 
     protected static ?int $navigationSort = 4;
 
+    protected static string $controlCenterSection = 'subscriptions';
+
     public static function shouldRegisterNavigation(): bool
     {
         return static::canAccess();
