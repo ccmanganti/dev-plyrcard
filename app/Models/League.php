@@ -23,6 +23,35 @@ class League extends Model
         'genders' => 'array',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (League $league): void {
+            $genders = collect($league->genders ?? [])
+                ->map(fn ($gender) => ClubLeague::normalizeGender($gender))
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($genders->isNotEmpty()) {
+                $league->genders = $genders->all();
+
+                // Keep the required legacy single-gender column populated while the
+                // application uses the newer multi-gender JSON field.
+                $league->gender = $genders->contains('coed') || $genders->count() > 1
+                    ? 'coed'
+                    : (string) $genders->first();
+
+                return;
+            }
+
+            // Older import/update paths may still provide only the legacy field.
+            // Normalize it without forcing a value when neither field was supplied.
+            if (filled($league->gender)) {
+                $league->gender = ClubLeague::normalizeGender($league->gender) ?? $league->gender;
+            }
+        });
+    }
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
