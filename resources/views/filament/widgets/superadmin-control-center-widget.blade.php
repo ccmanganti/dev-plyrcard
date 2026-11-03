@@ -2,7 +2,7 @@
 <div
     class="pc-admin"
     x-data="{
-        tab: 'dashboard',
+        tab: @js($initialTab ?? 'dashboard'),
         athleteDrawer: null,
         activityDrawer: null,
         search: '',
@@ -32,31 +32,6 @@
     }"
     x-on:keydown.escape.window="closeOverlays()"
 >
-    <div class="pc-control-layout">
-        <aside class="pc-tabs" aria-label="Superadmin dashboard sections">
-            <div class="pc-tabs-label">CONTROL CENTER</div>
-            <button type="button" :class="{ 'is-active': tab === 'dashboard' }" x-on:click="openTab('dashboard')">
-                <span class="pc-tab-icon">▦</span>
-                <span class="pc-tab-label">Dashboard</span>
-            </button>
-            <button type="button" :class="{ 'is-active': tab === 'athletes' }" x-on:click="openTab('athletes')">
-                <span class="pc-tab-icon">◎</span>
-                <span class="pc-tab-label">Athletes</span>
-                <span class="pc-tab-count">{{ number_format($athlete_count) }}</span>
-            </button>
-            <button type="button" :class="{ 'is-active': tab === 'followups' }" x-on:click="openTab('followups')">
-                <span class="pc-tab-icon">!</span>
-                <span class="pc-tab-label">Follow-ups</span>
-                <span class="pc-tab-count is-hot">{{ number_format(count($attention_all)) }}</span>
-            </button>
-            <button type="button" :class="{ 'is-active': tab === 'billing' }" x-on:click="openTab('billing')">
-                <span class="pc-tab-icon">▤</span>
-                <span class="pc-tab-label">Billing</span>
-                <span class="pc-tab-count">{{ number_format($billing_stats['active']) }}</span>
-            </button>
-        </aside>
-
-        <main class="pc-control-content">
     <section x-show="tab === 'dashboard'" x-cloak class="pc-view">
         <div class="pc-view-head">
             <div>
@@ -378,9 +353,6 @@
             </div>
         </section>
     </section>
-        </main>
-    </div>
-
     <div x-cloak x-show="athleteDrawer || activityDrawer" x-transition.opacity class="pc-scrim" x-on:click="closeOverlays()"></div>
 
     @foreach($athletes as $athlete)
@@ -452,7 +424,7 @@
 
 <style>
 .pc-admin{--pc-bg:#f3f5f7;--pc-panel:#fff;--pc-panel2:#f7f9fb;--pc-line:#e4e8ed;--pc-line2:#d6dbe2;--pc-text:#12151a;--pc-muted:#69727e;--pc-dim:#8b94a0;--pc-coral:#ff6448;--pc-green:#16a377;--pc-amber:#d68d18;--pc-red:#dc4b46;--pc-blue:#3979e6;--pc-violet:#8065dd;display:flex;flex-direction:column;gap:1rem;color:var(--pc-text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.dark .pc-admin{--pc-bg:#0c0e11;--pc-panel:#14171c;--pc-panel2:#1a1e24;--pc-line:#242932;--pc-line2:#2e343e;--pc-text:#e9ecf1;--pc-muted:#8a93a0;--pc-dim:#5f6874}
-.pc-control-layout{display:grid;grid-template-columns:12.5rem minmax(0,1fr);gap:1rem;align-items:start}.pc-control-content{min-width:0}.pc-tabs{position:sticky;top:1rem;display:flex;flex-direction:column;gap:.25rem;padding:.55rem;border:1px solid var(--pc-line);border-radius:.75rem;background:var(--pc-panel)}.pc-tabs-label{padding:.35rem .55rem .5rem;color:var(--pc-dim);font-size:.56rem;font-weight:850;letter-spacing:.13em}.pc-tabs button{width:100%;display:grid;grid-template-columns:1.2rem minmax(0,1fr) auto;align-items:center;gap:.5rem;min-height:2.55rem;padding:.48rem .58rem;border:0;border-radius:.55rem;background:transparent;color:var(--pc-muted);font-size:.73rem;font-weight:700;cursor:pointer;text-align:left}.pc-tabs button:hover{background:var(--pc-panel2);color:var(--pc-text)}.pc-tabs button.is-active{background:var(--pc-panel2);color:var(--pc-text);box-shadow:inset 2px 0 0 var(--pc-coral)}.pc-tab-icon{width:1.15rem;text-align:center}.pc-tab-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pc-tab-count{justify-self:end;margin-left:.12rem;padding:.08rem .35rem;border:1px solid var(--pc-line);border-radius:.35rem;background:var(--pc-bg);font-size:.61rem}.pc-tab-count.is-hot{color:var(--pc-coral);border-color:rgba(255,100,72,.35)}
+
 .pc-view{display:flex;flex-direction:column;gap:1rem}.pc-view-head,.pc-section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem}.pc-view-head h2,.pc-section-title h3{margin:.1rem 0 0;font-size:1.08rem;font-weight:800;letter-spacing:-.025em}.pc-view-head p,.pc-section-title p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.72rem}.pc-kicker{color:var(--pc-coral);font-size:.58rem;font-weight:850;letter-spacing:.13em}.pc-updated{color:var(--pc-dim);font-size:.64rem}
 .pc-stat-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.75rem}.pc-stat-grid-four{grid-template-columns:repeat(4,minmax(0,1fr))}.pc-stat{min-width:0;min-height:8.6rem;padding:.88rem;border:1px solid var(--pc-line);border-radius:.7rem;background:var(--pc-panel);color:inherit;text-align:left}.pc-stat button&{cursor:pointer}.pc-stat:hover{border-color:var(--pc-line2)}.pc-stat-icon{width:1.85rem;height:1.85rem;display:grid;place-items:center;margin-bottom:.7rem;border-radius:.5rem;background:var(--pc-panel2);font-weight:900}.pc-stat-icon.is-coral{background:rgba(255,100,72,.11);color:var(--pc-coral)}.pc-stat-icon.is-green{background:rgba(34,192,138,.11);color:var(--pc-green)}.pc-stat-icon.is-amber{background:rgba(240,169,59,.12);color:var(--pc-amber)}.pc-stat-icon.is-red{background:rgba(242,86,79,.11);color:var(--pc-red)}.pc-stat-icon.is-blue{background:rgba(76,141,255,.11);color:var(--pc-blue)}.pc-stat-icon.is-violet{background:rgba(156,123,255,.11);color:var(--pc-violet)}.pc-stat small{display:block;color:var(--pc-muted);font-size:.66rem;font-weight:700}.pc-stat strong{display:block;margin-top:.25rem;font-size:1.55rem;letter-spacing:-.045em}.pc-stat>span:last-child{display:block;margin-top:.6rem;color:var(--pc-dim);font-size:.64rem;line-height:1.35}
 .pc-dashboard-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(18rem,.7fr);gap:.85rem}.pc-side-stack{display:flex;flex-direction:column;gap:.85rem}.pc-panel,.pc-queue{overflow:hidden;border:1px solid var(--pc-line);border-radius:.72rem;background:var(--pc-panel)}.pc-panel-head{min-height:3.5rem;padding:.78rem .88rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;border-bottom:1px solid var(--pc-line)}.pc-panel-head h3{margin:0;font-size:.78rem;font-weight:800}.pc-panel-head p{margin:.13rem 0 0;color:var(--pc-dim);font-size:.63rem}.pc-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.42rem .62rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);font-size:.65rem;font-weight:750;text-decoration:none;cursor:pointer;white-space:nowrap}.pc-btn:hover{background:var(--pc-panel2)}.pc-btn.is-primary{background:var(--pc-coral);border-color:var(--pc-coral);color:#fff}.pc-btn.is-small{padding:.32rem .48rem;font-size:.61rem}
@@ -465,8 +437,8 @@
 .pc-queue-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.pc-queue>header{display:grid;grid-template-columns:2rem minmax(0,1fr) auto;gap:.6rem;align-items:start;padding:.72rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue>header h3{margin:0;font-size:.72rem}.pc-queue>header p{margin:.12rem 0 0;color:var(--pc-dim);font-size:.6rem;line-height:1.35}.pc-queue>header>strong{font-size:1.25rem}.pc-queue-mark{width:1.8rem;height:1.8rem;display:grid;place-items:center;border-radius:.5rem;background:rgba(240,169,59,.1);color:var(--pc-amber);font-size:.68rem;font-weight:900}.pc-queue-mark.is-billing{background:rgba(242,86,79,.1);color:var(--pc-red)}.pc-queue-list>div{display:flex;align-items:center;justify-content:space-between;gap:.65rem;padding:.48rem .78rem;border-bottom:1px solid var(--pc-line)}.pc-queue-list>div:last-child{border-bottom:0}.pc-queue footer{padding:.55rem .78rem;border-top:1px solid var(--pc-line);color:var(--pc-dim);font-size:.59rem}
 .pc-plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.65rem}.pc-plan-card{padding:.75rem}.pc-plan-card>strong{display:block;margin-top:.5rem;font-size:1.35rem}.pc-plan-card>small{display:block;margin-top:.2rem;color:var(--pc-dim);font-size:.6rem}.pc-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .pc-scrim{position:fixed;inset:0;z-index:10080;background:rgba(5,8,12,.58);backdrop-filter:blur(2px)}.pc-drawer{position:fixed;top:0;right:0;z-index:10090;width:min(560px,100vw);height:100dvh;overflow-y:auto;border-left:1px solid var(--pc-line);background:var(--pc-panel);box-shadow:-22px 0 55px rgba(0,0,0,.22)}.pc-drawer-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;gap:.7rem;padding:.9rem 1rem;border-bottom:1px solid var(--pc-line);background:var(--pc-panel)}.pc-drawer-head>div{min-width:0;flex:1}.pc-drawer-head h3{margin:.12rem 0 0;font-size:1rem}.pc-drawer-head p{margin:.18rem 0 0;color:var(--pc-muted);font-size:.65rem;line-height:1.4}.pc-close{width:2rem;height:2rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel2);color:var(--pc-muted);font-size:1.1rem;cursor:pointer}.pc-chip-row{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.45rem}.pc-drawer-section{padding:.85rem 1rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-section h4{margin:0 0 .55rem;color:var(--pc-dim);font-size:.57rem;letter-spacing:.12em}.pc-flag-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.65rem;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--pc-line)}.pc-flag-row:last-child{border-bottom:0}.pc-flag-row p{margin:.16rem 0 0;color:var(--pc-muted);font-size:.61rem;line-height:1.4}.pc-kv{display:flex;justify-content:space-between;gap:1rem;padding:.4rem 0;border-bottom:1px solid var(--pc-line);font-size:.65rem}.pc-kv:last-child{border-bottom:0}.pc-kv span{color:var(--pc-muted)}.pc-kv b{text-align:right}.pc-drawer-actions{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.78rem 1rem;background:var(--pc-panel2)}.pc-impersonate{margin-left:auto}.pc-drawer-list-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.55rem;align-items:center;padding:.58rem .8rem;border-bottom:1px solid var(--pc-line)}.pc-drawer-list-row:last-child{border-bottom:0}.pc-slide-in{transition:transform .18s ease}.pc-slide-out{transition:transform .14s ease}[x-cloak]{display:none!important}
-@media(max-width:1250px){.pc-control-layout{grid-template-columns:10.5rem minmax(0,1fr)}.pc-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pc-dashboard-grid{grid-template-columns:1fr}.pc-side-stack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.pc-quick-grid{grid-template-columns:1fr}.pc-queue-grid{grid-template-columns:1fr}}
-@media(max-width:900px){.pc-control-layout{grid-template-columns:1fr}.pc-tabs{position:static;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));overflow-x:auto}.pc-tabs-label{display:none}.pc-tabs button{grid-template-columns:1.2rem minmax(0,1fr) auto;min-width:8.5rem}.pc-tabs button.is-active{box-shadow:inset 0 -2px 0 var(--pc-coral)}}@media(max-width:780px){.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr 1fr}.pc-side-stack{grid-template-columns:1fr}.pc-view-head{align-items:flex-start;flex-direction:column}.pc-athlete-table th:nth-child(4),.pc-athlete-table td:nth-child(4),.pc-athlete-table th:nth-child(6),.pc-athlete-table td:nth-child(6){display:none}.pc-filters{display:grid;grid-template-columns:1fr 1fr}.pc-search-box{grid-column:1/-1;min-width:0}}
+@media(max-width:1250px){.pc-stat-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.pc-dashboard-grid{grid-template-columns:1fr}.pc-side-stack{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.pc-quick-grid{grid-template-columns:1fr}.pc-queue-grid{grid-template-columns:1fr}}
+@media(max-width:780px){.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr 1fr}.pc-side-stack{grid-template-columns:1fr}.pc-view-head{align-items:flex-start;flex-direction:column}.pc-athlete-table th:nth-child(4),.pc-athlete-table td:nth-child(4),.pc-athlete-table th:nth-child(6),.pc-athlete-table td:nth-child(6){display:none}.pc-filters{display:grid;grid-template-columns:1fr 1fr}.pc-search-box{grid-column:1/-1;min-width:0}}
 @media(max-width:520px){.pc-stat-grid,.pc-stat-grid-four{grid-template-columns:1fr}.pc-filters{grid-template-columns:1fr}.pc-athlete-table th:nth-child(2),.pc-athlete-table td:nth-child(2),.pc-athlete-table th:nth-child(5),.pc-athlete-table td:nth-child(5),.pc-athlete-table th:nth-child(8),.pc-athlete-table td:nth-child(8){display:none}.pc-drawer-list-row{grid-template-columns:minmax(0,1fr) auto}.pc-drawer-list-row .pc-btn{grid-column:2}}
 </style>
 </div>
