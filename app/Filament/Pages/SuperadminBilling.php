@@ -15,4 +15,9 @@ class SuperadminBilling extends SuperadminDashboard
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
     protected static ?int $navigationSort = 4;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }
