@@ -133,7 +133,8 @@
                     <header class="pc-panel-head"><div><h3>Athletes by sport</h3><p>Current platform distribution</p></div></header>
                     <div class="pc-sports">
                         @forelse($sports as $sport)
-                            <button type="button" x-on:click="window.location.href = @js(url('/admin/athletes')) + '?sport=' + encodeURIComponent(@js(strtolower($sport['sport'])))" class="pc-sport">
+                            @php($dashboardSportKey = (string) (collect($athletes)->firstWhere('sport', $sport['sport'])['sport_key'] ?? strtolower($sport['sport'])))
+                            <button type="button" x-on:click="window.location.href = @js(url('/admin/athletes')) + '?sport=' + encodeURIComponent(@js($dashboardSportKey))" class="pc-sport">
                                 <b>{{ $sport['sport'] }}</b><span><i style="width:{{ $sport['percent'] }}%"></i></span><small>{{ $sport['count'] }}</small>
                             </button>
                         @empty
