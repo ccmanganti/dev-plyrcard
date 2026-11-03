@@ -604,6 +604,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'rows' => $fallbackRows,
                 'stats' => [
                     'athletes' => count($fallbackRows),
+                    'amplify' => collect($fallbackRows)->where('package_key', 'amplify')->count(),
+                    'jumpstart' => collect($fallbackRows)->where('package_key', 'jumpstart')->count(),
+                    'idle' => collect($fallbackRows)->where('idle', true)->count(),
                     'points_granted' => 0,
                     'points_available' => collect($fallbackRows)->sum('points_available'),
                     'points_redeemed' => 0,
@@ -735,6 +738,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'rows' => $creditRows->all(),
                 'stats' => [
                     'athletes' => $creditRows->count(),
+                    'amplify' => $creditRows->where('package_key', 'amplify')->count(),
+                    'jumpstart' => $creditRows->where('package_key', 'jumpstart')->count(),
+                    'idle' => $creditRows->where('idle', true)->count(),
                     'points_granted' => $creditRows->sum('granted_points'),
                     'points_available' => $creditRows->sum('points_available'),
                     'points_redeemed' => $creditRows->sum('points_redeemed'),
@@ -746,6 +752,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'rows' => [],
                 'stats' => [
                     'athletes' => 0,
+                    'amplify' => 0,
+                    'jumpstart' => 0,
+                    'idle' => 0,
                     'points_granted' => 0,
                     'points_available' => 0,
                     'points_redeemed' => 0,
