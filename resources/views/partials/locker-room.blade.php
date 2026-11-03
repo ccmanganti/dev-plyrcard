@@ -1719,7 +1719,7 @@
             return;
         }
         if (pendingCount > 0) {
-            status.textContent = `${pendingCount} new image${pendingCount === 1 ? '' : 's'} ready to upload · ${total}/20 total after saving.`;
+            status.textContent = `${pendingCount} image${pendingCount === 1 ? '' : 's'} selected and ready — click Save Quick Profile to upload · ${total}/20 total after saving.`;
             status.classList.add('is-ready');
         } else if (existingCount > 0) {
             status.textContent = `${existingCount} image${existingCount === 1 ? '' : 's'} uploaded and saved.`;
@@ -2187,7 +2187,7 @@
         const accepted = selected.slice(0, available);
         pendingRawFiles.push(...accepted);
         input.value = '';
-        rawUploadStatusMessage = accepted.length < selected.length ? `Added ${accepted.length}. The 20-image limit has been reached.` : '';
+        rawUploadStatusMessage = accepted.length < selected.length ? `Added ${accepted.length}. The 20-image limit has been reached. Click Save Quick Profile to upload the selected images.` : '';
         rawUploadStatusTone = accepted.length < selected.length ? 'ready' : '';
         renderMedia();
     });
