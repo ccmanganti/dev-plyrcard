@@ -1,8 +1,9 @@
 <x-filament-widgets::widget>
 <div
     class="pc-admin"
+    wire:key="superadmin-control-center-{{ $initialTab }}"
     x-data="{
-        tab: @js($initialTab ?? (request()->is('admin/athletes') ? 'athletes' : (request()->is('admin/follow-ups') ? 'followups' : (request()->is('admin/subscriptions') ? 'subscriptions' : (request()->is('admin/amplify-credits') ? 'amplify' : 'overview'))))),
+        tab: @js($initialTab),
         athleteDrawer: null,
         activityDrawer: null,
         search: @js((string) request()->query('q', '')),
