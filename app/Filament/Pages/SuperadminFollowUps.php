@@ -22,7 +22,7 @@ class SuperadminFollowUps extends SuperadminAthletes
         return number_format(\App\Filament\Widgets\SuperadminControlCenterWidget::navigationMetrics()['followups'] ?? 0);
     }
 
-    public static function getNavigationBadgeColor(): string|array|null
+    public static function getNavigationBadgeColor(): ?string
     {
         return 'danger';
     }
