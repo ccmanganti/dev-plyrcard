@@ -400,6 +400,155 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         ];
     }
 
+    protected function outreachStatsByAthlete(array $athleteIds): array
+    {
+        if (
+            $athleteIds === []
+            || ! class_exists(CoachDatabaseEmailMessage::class)
+            || ! Schema::hasTable('coach_database_email_messages')
+        ) {
+            return [];
+        }
+
+        try {
+            return CoachDatabaseEmailMessage::query()
+                ->whereIn('athlete_user_id', $athleteIds)
+                ->whereNotNull('sent_at')
+                ->selectRaw('athlete_user_id, COUNT(*) as sent_count, MAX(sent_at) as last_sent_at')
+                ->groupBy('athlete_user_id')
+                ->get()
+                ->mapWithKeys(fn ($row): array => [
+                    (int) $row->athlete_user_id => [
+                        'sent' => (int) $row->sent_count,
+                        'last_sent_at' => $row->last_sent_at,
+                    ],
+                ])
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    protected function reminderHistoryByAthlete(array $athleteIds): array
+    {
+        if (
+            $athleteIds === []
+            || ! class_exists(AdminSupportMessage::class)
+            || ! Schema::hasTable('admin_support_messages')
+        ) {
+            return [];
+        }
+
+        try {
+            return AdminSupportMessage::query()
+                ->whereIn('user_id', $athleteIds)
+                ->whereNotNull('sent_at')
+                ->latest('sent_at')
+                ->get()
+                ->groupBy('user_id')
+                ->map(function (Collection $messages): array {
+                    return $messages
+                        ->groupBy(fn (AdminSupportMessage $message): string => (string) ($message->concern ?: 'custom'))
+                        ->map(function (Collection $concernMessages): array {
+                            /** @var AdminSupportMessage|null $latest */
+                            $latest = $concernMessages->first();
+
+                            return [
+                                'count' => $concernMessages->count(),
+                                'week_count' => $concernMessages->filter(
+                                    fn (AdminSupportMessage $message): bool => (bool) $message->sent_at?->gte(now()->subDays(7))
+                                )->count(),
+                                'when' => $latest?->sent_at?->diffForHumans(),
+                                'sent_at' => $latest?->sent_at?->toIso8601String(),
+                                'channel' => trim((string) ($latest?->channel ?? '')),
+                            ];
+                        })
+                        ->all();
+                })
+                ->mapWithKeys(fn ($value, $userId): array => [(int) $userId => $value])
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    protected function recentReminderActivity(array $athleteIds): array
+    {
+        if (
+            $athleteIds === []
+            || ! class_exists(AdminSupportMessage::class)
+            || ! Schema::hasTable('admin_support_messages')
+        ) {
+            return [];
+        }
+
+        try {
+            return AdminSupportMessage::query()
+                ->with('user:id,first_name,last_name,email,personal_email')
+                ->whereIn('user_id', $athleteIds)
+                ->whereNotNull('sent_at')
+                ->where('sent_at', '>=', now()->subDays(7))
+                ->latest('sent_at')
+                ->limit(8)
+                ->get()
+                ->map(function (AdminSupportMessage $message): array {
+                    $concern = (string) ($message->concern ?: 'custom');
+
+                    return [
+                        'player' => $this->userName($message->user),
+                        'initials' => $message->user ? $this->initials($message->user) : 'P',
+                        'label' => (string) config(
+                            'plyrcard-admin-support.concerns.' . $concern . '.label',
+                            Str::headline($concern)
+                        ),
+                        'when' => $message->sent_at?->diffForHumans() ?? '',
+                        'channel' => trim((string) ($message->channel ?? '')),
+                        'email_status' => trim((string) ($message->email_status ?? '')),
+                        'sms_status' => trim((string) ($message->sms_status ?? '')),
+                    ];
+                })
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    protected function paymentSummaryByAthlete(array $athleteIds): array
+    {
+        if (
+            $athleteIds === []
+            || ! class_exists(PaymentTransaction::class)
+            || ! Schema::hasTable('payment_transactions')
+        ) {
+            return [];
+        }
+
+        try {
+            return PaymentTransaction::query()
+                ->whereIn('user_id', $athleteIds)
+                ->where('amount_cents', '>', 0)
+                ->whereIn('status', ['paid', 'succeeded', 'success', 'completed', 'complete'])
+                ->orderByDesc('paid_at')
+                ->orderByDesc('id')
+                ->get()
+                ->groupBy('user_id')
+                ->map(function (Collection $payments): array {
+                    /** @var PaymentTransaction|null $latest */
+                    $latest = $payments->first();
+                    $at = $latest?->paid_at ?: $latest?->created_at;
+
+                    return [
+                        'when' => $at?->diffForHumans() ?? 'No successful payment recorded',
+                        'amount' => $latest ? $this->money((int) $latest->amount_cents) : '—',
+                    ];
+                })
+                ->mapWithKeys(fn ($value, $userId): array => [(int) $userId => $value])
+                ->all();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
     protected function amplifyCreditsData(Collection $rows, array $athleteIds): array
     {
         $serviceDefinitions = [
