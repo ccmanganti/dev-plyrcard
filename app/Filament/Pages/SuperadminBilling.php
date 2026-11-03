@@ -3,7 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
-use App\Filament\Widgets\SuperadminSubscriptionsControlCenterWidget;
+use App\Support\SuperadminWidgets\SuperadminSubscriptionsControlCenterWidget;
 
 class SuperadminBilling extends SuperadminAthletes
 {
