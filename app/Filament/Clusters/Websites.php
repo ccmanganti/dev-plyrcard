@@ -13,7 +13,7 @@ class Websites extends Cluster
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::GlobeAlt;
     protected static ?string $navigationLabel = 'Websites';
     protected static ?string $slug = 'websites';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 11;
     protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function shouldRegisterNavigation(): bool
