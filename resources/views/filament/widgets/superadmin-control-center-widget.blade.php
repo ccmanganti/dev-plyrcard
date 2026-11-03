@@ -76,8 +76,8 @@
             <button type="button" class="pc-stat" x-on:click="openTab('amplify')">
                 <span class="pc-stat-icon is-violet">ϟ</span>
                 <small>Amplify packages</small>
-                <strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong>
-                <span>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }} PLYR Points currently available</span>
+                <strong>{{ number_format($amplify_credit_stats['amplify'] ?? 0) }}</strong>
+                <span>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }} package PLYR Points currently available</span>
             </button>
             <div class="pc-stat">
                 <span class="pc-stat-icon is-blue">→</span>
