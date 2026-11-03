@@ -14,6 +14,8 @@ class SuperadminAthletes extends Page
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
     protected static ?int $navigationSort = 2;
 
+    protected static string $controlCenterSection = 'athletes';
+
     public static function canAccess(): bool
     {
         return SuperadminDashboard::shouldRegisterNavigation();
@@ -41,7 +43,11 @@ class SuperadminAthletes extends Page
 
     protected function getHeaderWidgets(): array
     {
-        return [SuperadminControlCenterWidget::class];
+        return [
+            SuperadminControlCenterWidget::make([
+                'initialTab' => static::$controlCenterSection,
+            ]),
+        ];
     }
 
     public function getHeaderWidgetsColumns(): int|array
