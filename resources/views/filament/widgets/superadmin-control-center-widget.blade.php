@@ -231,6 +231,9 @@
         </div>
     </section>
 
+    @endif
+
+    @if($initialTab === 'athletes')
     @php
         $athleteCollection = collect($athletes);
         $sportFilterCounts = $athleteCollection
@@ -258,10 +261,6 @@
         $needsFollowUpCount = $athleteCollection->filter(fn ($row) => ! empty($row['flags'] ?? []))->count();
         $allGoodCount = $athleteCollection->filter(fn ($row) => (int) ($row['health'] ?? 0) >= 80)->count();
     @endphp
-
-    @endif
-
-    @if($initialTab === 'athletes')
     <section class="pc-view">
         <div class="pc-view-head">
             <div><span class="pc-kicker">PLAYER OPERATIONS</span><h2>Athletes</h2><p>Filter by sport, plan, or grad year. Click a row for the full record.</p></div>
