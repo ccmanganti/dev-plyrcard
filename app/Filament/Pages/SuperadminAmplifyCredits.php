@@ -16,6 +16,8 @@ class SuperadminAmplifyCredits extends SuperadminAthletes
 
     protected static ?int $navigationSort = 5;
 
+    protected static string $controlCenterSection = 'amplify';
+
     public static function getNavigationBadge(): ?string
     {
         return number_format(
