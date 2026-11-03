@@ -188,7 +188,6 @@ class MyJourney extends Page
                     ['text' => 'Your own personalized domain', 'included' => true],
                     ['text' => 'Your own email — sends from you, not a third party', 'included' => true],
                     ['text' => 'Coach engagement tracking tool', 'included' => true],
-                    ['text' => 'Outreach templates', 'included' => true],
                     ['text' => 'Coach database access — weekly verifications', 'included' => true],
                     ['text' => '1-on-1 onboarding', 'included' => true],
                 ],
