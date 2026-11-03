@@ -17,6 +17,16 @@ class SuperadminFollowUps extends SuperadminAthletes
 
     protected static ?int $navigationSort = 3;
 
+    public static function getNavigationBadge(): ?string
+    {
+        return number_format(\App\Filament\Widgets\SuperadminControlCenterWidget::navigationMetrics()['followups'] ?? 0);
+    }
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        return 'danger';
+    }
+
     /*
     public static function shouldRegisterNavigation(): bool
     {
