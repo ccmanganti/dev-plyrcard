@@ -319,7 +319,7 @@
                             <td>{{ $athlete['last_login'] }}</td>
                             <td>{{ $athlete['last_outreach'] }}</td>
                             <td><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['state'])->replace('_',' ')->headline() }}</span></td>
-                            <td><div class="pc-health"><span><i style="width:{{ max(3,(int)$athlete['health']) }}%"></i></span><small>{{ $athlete['health'] }}%</small></div></td>
+                            <td><div class="pc-health is-{{ $athlete['health'] >= 80 ? 'good' : ($athlete['health'] >= 55 ? 'mid' : 'bad') }}"><span><i style="width:{{ max(3,(int)$athlete['health']) }}%"></i></span><small>{{ $athlete['health'] }}%</small></div></td>
                             <td class="pc-action-cell" x-on:click.stop>
                                 <span class="pc-quick-actions">
                                     <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int) $athlete['id'] }}, concern: '{{ $athlete['reminder_concern'] }}' })">Support</button>
