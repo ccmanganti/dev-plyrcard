@@ -25,6 +25,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
     protected static ?int $sort = 1;
 
+    protected const LOGIN_TRACKING_STARTED_AT = '2026-11-03 00:00:00';
+
     public string $initialTab = 'overview';
 
     public static function navigationMetrics(): array
@@ -106,15 +108,24 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     $lastLogin = $user->getAttribute('last_login_at');
 
                     if (blank($lastLogin)) {
-                        $flags[] = [
-                            'key' => 'getting_started',
-                            'label' => 'Never logged in',
-                            'detail' => 'The account exists, but no login has been recorded yet.',
-                            'weight' => 30,
-                            'tone' => 'danger',
-                            'concern' => 'getting_started',
-                            'action_label' => 'Send login reminder',
-                        ];
+                        $trackingStartedAt = Carbon::parse(static::LOGIN_TRACKING_STARTED_AT);
+                        $createdAt = $user->created_at instanceof \DateTimeInterface
+                            ? Carbon::instance($user->created_at)
+                            : null;
+
+                        if ($createdAt && $createdAt->gte($trackingStartedAt)) {
+                            $flags[] = [
+                                'key' => 'getting_started',
+                                'label' => 'Never logged in',
+                                'detail' => 'No login has been recorded since this account was created.',
+                                'weight' => 30,
+                                'tone' => 'danger',
+                                'concern' => 'getting_started',
+                                'action_label' => 'Send login reminder',
+                            ];
+                        } else {
+                            $lastLoginLabel = 'Historical login not tracked';
+                        }
                     } else {
                         try {
                             $lastLoginAt = $lastLogin instanceof \DateTimeInterface
@@ -128,7 +139,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                                 $flags[] = [
                                     'key' => 'getting_started',
                                     'label' => 'Dormant ' . number_format($days) . 'd',
-                                    'detail' => 'The player has not logged in for ' . number_format($days) . ' days.',
+                                    'detail' => 'Last recorded login was ' . number_format($days) . ' days ago.',
                                     'weight' => 18,
                                     'tone' => 'warning',
                                     'concern' => 'getting_started',
@@ -136,7 +147,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                                 ];
                             }
                         } catch (Throwable) {
-                            // Ignore malformed legacy timestamps.
+                            $lastLoginLabel = 'Login timestamp invalid';
                         }
                     }
                 }
