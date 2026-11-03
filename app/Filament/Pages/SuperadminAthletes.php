@@ -15,4 +15,9 @@ class SuperadminAthletes extends SuperadminDashboard
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
 
     protected static ?int $navigationSort = 2;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }
