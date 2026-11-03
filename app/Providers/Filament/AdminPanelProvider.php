@@ -1827,11 +1827,11 @@ class AdminPanelProvider extends PanelProvider
                                             ♕ My Journey
                                         </span>
                                         <strong><span data-plyr-upgrade-feature>This</span> is a My Journey feature</strong>
-                                        <p>Your Free plan includes Athlete Profile and Settings. Upgrade to My Journey to unlock everything you need to get recruited.</p>
+                                        <p>Your Free plan includes Athlete Profile, My Photos, My Schedule, PLYR Points, Support, and Settings. Upgrade to My Journey for coach recruiting workflows.</p>
                                     </div>
 
                                     <div class="plyr-free-upgrade-body">
-                                        <div class="plyr-free-upgrade-item"><span class="plyr-free-upgrade-check">✓</span><span>Discover Schools, Favorites, Lists, Compose Email, Inbox, Schedule, Amplify, and Analytics are locked on Free.</span></div>
+                                        <div class="plyr-free-upgrade-item"><span class="plyr-free-upgrade-check">✓</span><span>Discover Schools, Favorites, Lists, Compose Email, Inbox, campaigns, and advanced recruiting workflows are locked on Free.</span></div>
                                         <div class="plyr-free-upgrade-item"><span class="plyr-free-upgrade-check">✓</span><span>My Journey unlocks all recruiting workflows and coach outreach tools.</span></div>
 
                                         <div class="plyr-free-upgrade-actions">
@@ -1919,7 +1919,7 @@ class AdminPanelProvider extends PanelProvider
                                         document.body.classList.remove('plyr-free-upgrade-open');
                                     };
 
-                                    const allowedLabel = (text) => ['Athlete Profile', 'Settings'].includes(String(text || '').trim());
+                                    const allowedLabel = (text) => ['Athlete Profile', 'My Photos', 'My Schedule', 'PLYR Points', 'Support', 'Settings'].includes(String(text || '').trim());
 
                                     const applyFreeLocks = () => {
                                         document.querySelectorAll('[data-plyr-free-close]').forEach((button) => {
@@ -1957,6 +1957,10 @@ class AdminPanelProvider extends PanelProvider
                                             const label = (labelNode ? labelNode.textContent : '').trim();
                                             const hrefPath = pathOf(link.href);
                                             const allowed = allowedLabel(label)
+                                                || hrefPath.includes('/coach-database/photos')
+                                                || hrefPath.includes('/coach-database/schedule')
+                                                || hrefPath.includes('/coach-database/services')
+                                                || hrefPath.includes('/coach-database/support')
                                                 || hrefPath === profilePath
                                                 || hrefPath.startsWith(profilePath + '/')
                                                 || hrefPath === settingsPath
