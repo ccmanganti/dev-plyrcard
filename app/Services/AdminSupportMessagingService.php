@@ -348,6 +348,20 @@ class AdminSupportMessagingService
             return 'soon';
         }
 
+        $stripePeriodEnd = data_get($billing->registration_meta, 'stripe.current_period_end');
+
+        if (filled($stripePeriodEnd)) {
+            try {
+                $date = is_numeric($stripePeriodEnd)
+                    ? Carbon::createFromTimestamp((int) $stripePeriodEnd)
+                    : Carbon::parse((string) $stripePeriodEnd);
+
+                return 'on ' . $date->format('M j, Y');
+            } catch (\Throwable) {
+                // Fall through to legacy fields below.
+            }
+        }
+
         foreach ([
             'subscription_current_period_end',
             'current_period_end',
