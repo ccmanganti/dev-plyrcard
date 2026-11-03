@@ -45,7 +45,8 @@
     }"
     x-on:keydown.escape.window="closeOverlays()"
 >
-    <section x-show="tab === 'overview'" x-cloak class="pc-view">
+    @if($initialTab === 'overview')
+    <section class="pc-view">
         <div class="pc-view-head">
             <div>
                 <span class="pc-kicker">SUPERADMIN</span>
@@ -258,7 +259,10 @@
         $allGoodCount = $athleteCollection->filter(fn ($row) => (int) ($row['health'] ?? 0) >= 80)->count();
     @endphp
 
-    <section x-show="tab === 'athletes'" x-cloak class="pc-view">
+    @endif
+
+    @if($initialTab === 'athletes')
+    <section class="pc-view">
         <div class="pc-view-head">
             <div><span class="pc-kicker">PLAYER OPERATIONS</span><h2>Athletes</h2><p>Filter by sport, plan, or grad year. Click a row for the full record.</p></div>
             <div class="pc-view-actions">
@@ -360,7 +364,10 @@
         @if(!$login_tracking_available)<div class="pc-note">Login activity is not stored on this environment yet, so login-based follow-up flags are intentionally not fabricated.</div>@endif
     </section>
 
-    <section x-show="tab === 'followups'" x-cloak class="pc-view">
+    @endif
+
+    @if($initialTab === 'followups')
+    <section class="pc-view">
         <div class="pc-view-head">
             <div><span class="pc-kicker">ACTION QUEUES</span><h2>Follow-ups</h2><p>Queues are built from what is actually blocking each player. Every action opens the existing Admin Support Messenger with the player and concern preselected.</p></div>
         </div>
@@ -412,7 +419,10 @@
         </div>
     </section>
 
-    <section x-show="tab === 'subscriptions'" x-cloak class="pc-view">
+    @endif
+
+    @if($initialTab === 'subscriptions')
+    <section class="pc-view">
         <div class="pc-view-head">
             <div><span class="pc-kicker">REVENUE & ACCOUNT HEALTH</span><h2>Subscriptions</h2><p>Recurring revenue, conversion, and anything about to break.</p></div>
             @if($users_url)<a href="{{ $users_url }}" class="pc-btn">Manage subscription accounts</a>@endif
@@ -525,7 +535,10 @@
         </section>
     </section>
 
-    <section x-show="tab === 'amplify'" x-cloak class="pc-view">
+    @endif
+
+    @if($initialTab === 'amplify')
+    <section class="pc-view">
         <div class="pc-view-head">
             <div>
                 <span class="pc-kicker">PACKAGE DELIVERY</span>
@@ -619,6 +632,8 @@
 
         <div class="pc-note">Package points are read from the existing PLYR Points ledger. The current database does not store a separate package-expiration date, so this view does not invent one.</div>
     </section>
+
+    @endif
 
     <div x-cloak x-show="athleteDrawer || activityDrawer" x-transition.opacity class="pc-scrim" x-on:click="closeOverlays()"></div>
 
