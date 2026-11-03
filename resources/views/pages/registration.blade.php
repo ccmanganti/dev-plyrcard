@@ -113,6 +113,7 @@ body.plyrcard-registration-page #mobile-nav.plyrcard-mobile-nav{background:#000!
 @endforeach
 <input type="hidden" name="gender" id="genderHidden">
 <input type="hidden" name="requested_domain" id="domainHidden">
+<input type="hidden" name="requested_handle" id="handleHidden">
 <div id="dynamicInputs"></div>
 
 @if($isPaid)
@@ -284,7 +285,7 @@ function collectCache(){
     if(el.type==='hidden'||el.name==='_token')return;
     fields[el.id]=el.type==='checkbox'?!!el.checked:el.value;
   });
-  return {version:23,plan:PLAN,step:cur,division,pickedPositions:[...pickedPositions],chosenDomain,leagueChoice:$('#league')?.value||'',clubChoice:$('#club')?.value||'',teamChoice:$('#team')?.value||'',fields};
+  return {version:24,plan:PLAN,step:cur,division,pickedPositions:[...pickedPositions],chosenDomain,claimedHandle:$('#handleHidden')?.value||$('#preview')?.textContent||'',leagueChoice:$('#league')?.value||'',clubChoice:$('#club')?.value||'',teamChoice:$('#team')?.value||'',fields};
 }
 function saveFormCache(){if(!cacheSafe()||registrationSubmitted)return;clearTimeout(cacheTimer);cacheTimer=setTimeout(()=>{try{sessionStorage.setItem(CACHE_KEY,JSON.stringify(collectCache()))}catch(e){}},120)}
 function loadFormCache(){if(!cacheSafe())return null;try{const raw=sessionStorage.getItem(CACHE_KEY);return raw?JSON.parse(raw):null}catch(e){return null}}
@@ -401,7 +402,7 @@ if(PAID&&DOMAIN_REQUIRED){
  const search=async()=>{const raw=$('#dq').value.trim().toLowerCase();if(raw.length<2)return;applyChosenDomain('');$('#bbody').classList.remove('live');const looksLikeDomain=raw.includes('.');const exact=looksLikeDomain?raw.replace(/^https?:\/\//,'').replace(/\/.*$/,'').replace(/:\d+$/,'').replace(/^\.+|\.+$/g,''):'';const base=slug(raw,false),hy=slug(raw,true);const candidates=(looksLikeDomain?[exact]:[base+'.com',hy+'.com',base+'athlete.com',base+'.net',base+'.co']).filter((v,i,a)=>v.length>3&&a.indexOf(v)===i).slice(0,5);$('#dres').classList.remove('show');$('#dload').classList.add('show');const results=await Promise.all(candidates.map(d=>verifiedDomainCheck(d)));$('#dload').classList.remove('show');const box=$('#dres');box.innerHTML='';results.forEach(res=>{const status=res.available?'Available':res.status==='registered'?'Registered':res.status==='invalid'?'Invalid':res.status==='reserved_locally'?'Reserved':res.status==='unknown'?'Could not verify':'Unavailable';const tagClass=res.available?'ok':res.status==='unknown'?'warn':'no';const b=document.createElement('button');b.type='button';b.className='dom'+(res.available?'':' dead');b.setAttribute('aria-pressed','false');b.title=res.message||status;b.innerHTML='<span class="n">'+res.domain+'</span><span class="tag '+tagClass+'">'+status+'</span>';if(res.available)b.addEventListener('click',()=>{$$('#dres .dom').forEach(x=>{x.setAttribute('aria-pressed','false');const t=x.querySelector('.tag');if(!x.classList.contains('dead')){t.className='tag ok';t.textContent='Available'}});b.setAttribute('aria-pressed','true');b.querySelector('.tag').className='tag sel';b.querySelector('.tag').textContent='Selected';applyChosenDomain(res.domain)});box.appendChild(b)});box.classList.add('show');saveFormCache()};
  $('#dgo').addEventListener('click',search);$('#dq').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();search()}});
 }else{
- const updateAutoLink=()=>{const value=slug((($('#fn')?.value||'')+' '+($('#ln')?.value||'')).trim(),true)||'first-last-name';if($('#preview'))$('#preview').textContent=value;saveFormCache()};$('#fn')?.addEventListener('input',updateAutoLink);$('#ln')?.addEventListener('input',updateAutoLink);updateAutoLink();
+ const updateAutoLink=()=>{const value=slug((($('#fn')?.value||'')+' '+($('#ln')?.value||'')).trim(),true)||'first-last-name';if($('#preview'))$('#preview').textContent=value;if($('#handleHidden'))$('#handleHidden').value=value;saveFormCache()};$('#fn')?.addEventListener('input',updateAutoLink);$('#ln')?.addEventListener('input',updateAutoLink);updateAutoLink();
 }
 function rebuildDynamicInputs(){const box=$('#dynamicInputs');box.innerHTML='';const add=(name,value)=>{const i=document.createElement('input');i.type='hidden';i.name=name;i.value=value;box.appendChild(i)};pickedPositions.forEach(v=>add('position[]',v))}
 function updateCsrf(token){
@@ -531,7 +532,19 @@ async function submitRegistration(){
   try{
     const r=await fetch(form.action,{method:'POST',body:fd,headers:{Accept:'application/json','X-Requested-With':'XMLHttpRequest'}});
     const data=await r.json().catch(()=>({}));
-    if(!r.ok){const errors=data.errors||{};const first=Object.values(errors).flat()[0]||data.message||'Registration could not be completed.';showAlert(first);return}
+    if(!r.ok){
+      const errors=data.errors||{};
+      const first=Object.values(errors).flat()[0]||data.message||'Registration could not be completed.';
+      saveFormCache();
+      if(errors.email){
+        bad($('#em'),true);
+        goto(PAID?2:1);
+        showAlert('That email is already registered. Use a different email or log in to the existing account. Your claimed PLYRSITE link and the rest of your registration have been preserved.');
+      }else{
+        showAlert(first);
+      }
+      return
+    }
     registrationSubmitted=true;updateCsrf(data.csrf_token);clearFormCache();
     if(PAID){
       if(data.payment_status==='paid'){applyPaidStatus({paid:true});return}
@@ -556,6 +569,10 @@ function restoreCache(){
   const fields=saved.fields||{};
   Object.entries(fields).forEach(([id,value])=>{if(['sport','league','club','team'].includes(id))return;const el=$('#'+id);if(!el||el.type==='password')return;if(el.type==='checkbox')el.checked=!!value;else el.value=value??''});
   if($('#minor'))$('#guardian')?.classList.toggle('open',$('#minor').checked);
+  if(!PAID&&saved.claimedHandle){
+    if($('#preview'))$('#preview').textContent=saved.claimedHandle;
+    if($('#handleHidden'))$('#handleHidden').value=saved.claimedHandle;
+  }
   if(saved.division)setDivision(saved.division,false);
   const sport=$('#sport');if(sport&&saved.division){sport.disabled=false;sport.value=fields.sport||'';refreshSuggestSelect(sport);buildPositions(sport.value,Array.isArray(saved.pickedPositions)?saved.pickedPositions:[]);renderLeagues()}
   const league=$('#league');if(league&&saved.leagueChoice&&Array.from(league.options).some(o=>o.value===String(saved.leagueChoice))){league.value=String(saved.leagueChoice);refreshSuggestSelect(league);renderClubs()}
