@@ -15,4 +15,9 @@ class SuperadminFollowUps extends SuperadminDashboard
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bell-alert';
 
     protected static ?int $navigationSort = 3;
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }
