@@ -116,7 +116,9 @@
                                 </td>
                                 <td class="pc-action-cell" x-on:click.stop>
                                     <span class="pc-quick-actions">
-                                        <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int) $athlete['id'] }}, concern: '{{ $athlete['reminder_concern'] }}' })">Support</button>
+                                        <button type="button" class="pc-btn is-small {{ ($athleteReminder['week_count'] ?? 0) > 0 ? 'pc-reminder-sent' : '' }}" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int) $athlete['id'] }}, concern: '{{ $athlete['reminder_concern'] }}' })">
+                                        {{ ($athleteReminder['week_count'] ?? 0) > 0 ? '✓ Sent '.($athleteReminder['when'] ?? '') : 'Remind' }}
+                                    </button>
                                         <span class="pc-impersonate-quick" title="Impersonate {{ $athlete['name'] }}">
                                             {{ ($this->impersonateAction)(['userId' => (int) $athlete['id']]) }}
                                         </span>
@@ -313,9 +315,12 @@
         <section class="pc-panel">
             <div class="pc-table-wrap">
                 <table class="pc-table pc-athlete-table">
-                    <thead><tr><th>Athlete</th><th>Sport</th><th>Plan</th><th>Profile</th><th>Last login</th><th>Last outreach</th><th>Status</th><th>Health</th><th></th></tr></thead>
+                    <thead><tr><th>Athlete</th><th>Sport</th><th>Plan</th><th>Profile</th><th>Last login</th><th>Outreach</th><th>Status</th><th>Health</th><th>Reminder</th></tr></thead>
                     <tbody>
                     @foreach($athletes as $athlete)
+                        @php
+                            $athleteReminder = $athlete['reminders'][$athlete['reminder_concern']] ?? null;
+                        @endphp
                         <tr
                             x-show="matches(@js(['name'=>$athlete['name'],'sport'=>$athlete['sport'],'sport_key'=>$athlete['sport_key'],'plan'=>$athlete['plan'],'plan_key'=>$athlete['plan_key'],'club'=>$athlete['club'],'year'=>$athlete['year'],'email'=>$athlete['email'],'state'=>$athlete['state'],'health'=>$athlete['health'],'has_followup'=>!empty($athlete['flags'])]))"
                             class="pc-click-row"
@@ -326,7 +331,12 @@
                             <td><span class="pc-plan is-{{ $athlete['plan_key'] }}">{{ $athlete['plan'] }}</span></td>
                             <td><div class="pc-health is-{{ $athlete['profile_completion'] >= 80 ? 'good' : ($athlete['profile_completion'] >= 55 ? 'mid' : 'bad') }}"><span><i style="width:{{ max(3,(int)$athlete['profile_completion']) }}%"></i></span><small>{{ $athlete['profile_completion'] }}%</small></div></td>
                             <td>{{ $athlete['last_login'] }}</td>
-                            <td>{{ $athlete['last_outreach'] }}</td>
+                            <td>
+                                <div class="pc-outreach">
+                                    <b>{{ number_format($athlete['outreach_sent']) }} sent</b>
+                                    <small>{{ $athlete['last_outreach'] }}</small>
+                                </div>
+                            </td>
                             <td><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['state'])->replace('_',' ')->headline() }}</span></td>
                             <td><div class="pc-health is-{{ $athlete['health'] >= 80 ? 'good' : ($athlete['health'] >= 55 ? 'mid' : 'bad') }}"><span><i style="width:{{ max(3,(int)$athlete['health']) }}%"></i></span><small>{{ $athlete['health'] }}%</small></div></td>
                             <td class="pc-action-cell" x-on:click.stop>
@@ -352,6 +362,14 @@
         </div>
         <div class="pc-queue-grid">
             @foreach($follow_up_queues as $queue)
+                @php
+                    $queueConcern = (string) ($queue['concern'] ?? 'custom');
+                    $queueItems = collect($queue['items']);
+                    $queueRemindedWeek = $queueItems->filter(
+                        fn ($athlete) => (int) data_get($athlete, 'reminders.'.$queueConcern.'.week_count', 0) > 0
+                    )->count();
+                    $queuePending = max(0, (int) $queue['count'] - $queueRemindedWeek);
+                @endphp
                 <section class="pc-queue">
                     <header>
                         <div><span class="pc-queue-mark is-{{ $queue['key'] }}">{{ strtoupper(substr($queue['title'],0,1)) }}</span></div>
@@ -360,12 +378,17 @@
                     </header>
                     <div class="pc-queue-list">
                         @forelse(array_slice($queue['items'],0,8) as $athlete)
+                            @php
+                                $queueReminder = $athlete['reminders'][$queueConcern] ?? null;
+                            @endphp
                             <div>
                                 <button type="button" class="pc-person is-button" x-on:click="athleteDrawer={{ (int)$athlete['id'] }}; document.body.style.overflow='hidden'">
                                     <span class="pc-avatar">{{ $athlete['initials'] }}</span><span><b>{{ $athlete['name'] }}</b><small>{{ $athlete['sport'] }} · {{ $athlete['plan'] }}</small></span>
                                 </button>
                                 <span class="pc-quick-actions">
-                                    <button type="button" class="pc-btn is-small" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $queue['concern'] }}' })">Message</button>
+                                    <button type="button" class="pc-btn is-small {{ ($queueReminder['week_count'] ?? 0) > 0 ? 'pc-reminder-sent' : '' }}" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int)$athlete['id'] }}, concern: '{{ $queueConcern }}' })">
+                                        {{ ($queueReminder['week_count'] ?? 0) > 0 ? '✓ Sent '.($queueReminder['when'] ?? '') : 'Remind' }}
+                                    </button>
                                     <span class="pc-impersonate-quick" title="Impersonate {{ $athlete['name'] }}">
                                         {{ ($this->impersonateAction)(['userId' => (int) $athlete['id']]) }}
                                     </span>
@@ -375,7 +398,11 @@
                             <div class="pc-empty">Queue is clear.</div>
                         @endforelse
                     </div>
-                    @if($queue['count'] > 8)<footer>{{ number_format($queue['count'] - 8) }} more player{{ ($queue['count'] - 8) === 1 ? '' : 's' }} in this queue</footer>@endif
+                    <footer>
+                        <b>{{ number_format($queuePending) }} not contacted</b>
+                        @if($queueRemindedWeek > 0)<span>{{ number_format($queueRemindedWeek) }} reminded this week</span>@endif
+                        @if($queue['count'] > 8)<span>{{ number_format($queue['count'] - 8) }} more in queue</span>@endif
+                    </footer>
                 </section>
             @endforeach
         </div>
