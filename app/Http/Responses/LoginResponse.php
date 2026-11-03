@@ -18,6 +18,14 @@ class LoginResponse implements LoginResponseContract
             return redirect()->to('/admin');
         }
 
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'last_login_at')) {
+            try {
+                $user->forceFill(['last_login_at' => now()])->saveQuietly();
+            } catch (\Throwable) {
+                // Login must never fail because activity tracking could not be written.
+            }
+        }
+
         $website = Website::query()
             ->where('user_id', $user->id)
             ->where('is_active', true)
