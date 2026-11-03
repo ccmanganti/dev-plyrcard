@@ -9,7 +9,7 @@ class SuperadminDashboard extends BaseDashboard
 {
     protected static ?string $slug = '/';
 
-    protected static ?string $navigationLabel = 'Dashboard';
+    protected static ?string $navigationLabel = 'Overview';
 
     protected static ?string $title = 'Overview';
 
