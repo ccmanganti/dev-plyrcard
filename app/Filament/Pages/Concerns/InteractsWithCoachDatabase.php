@@ -306,7 +306,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','photos','support','schedule','settings','profile'];
+        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','photos','support','schedule','services','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -533,7 +533,7 @@ trait InteractsWithCoachDatabase
         $allowedSections = [
             'dashboard', 'schools', 'coaches', 'favorites', 'lists',
             'conversations', 'campaigns', 'compose', 'photos', 'support',
-            'schedule', 'settings', 'profile',
+            'schedule', 'services', 'settings', 'profile',
         ];
 
         $section = strtolower(trim($section));
@@ -760,7 +760,7 @@ trait InteractsWithCoachDatabase
 
     protected function canFreeRoleAccessCoachDatabaseSection(string $section): bool
     {
-        return in_array($section, ['profile', 'photos', 'settings'], true);
+        return in_array($section, ['profile', 'photos', 'schedule', 'services', 'support', 'settings'], true);
     }
 
     /**
