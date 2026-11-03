@@ -4374,6 +4374,55 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
+        // Preserve the current visible thread across the background poll. The Inbox can
+        // be rendered from persistent/browser-warmed cache before the first quiet refresh;
+        // make sure the server-side Livewire state is hydrated before any morph occurs.
+        $selectedBefore = trim((string) ($this->selectedConversationId ?? ''));
+        if ($selectedBefore !== '' && empty($this->messages)) {
+            $this->hydrateCachedConversationMessages($selectedBefore);
+        }
+
+        $messagesBefore = $this->messages;
+        $messageLastIdBefore = $this->messageLastId;
+        $hasMoreMessagesBefore = $this->hasMoreMessages;
+
+        $conversationFingerprint = static function (array $rows): string {
+            $payload = collect($rows)
+                ->filter(fn ($row): bool => is_array($row))
+                ->map(fn (array $row): array => [
+                    'id' => (string) ($row['id'] ?? ''),
+                    'last_message_at' => (string) ($row['last_message_at'] ?? $row['updated_at'] ?? ''),
+                    'last_message' => (string) ($row['last_message'] ?? $row['snippet'] ?? ''),
+                    'unread_count' => (int) ($row['unread_count'] ?? 0),
+                    'awaiting_reply' => (bool) ($row['awaiting_reply'] ?? false),
+                    'starred' => (bool) ($row['starred'] ?? $row['is_starred'] ?? false),
+                ])
+                ->values()
+                ->all();
+
+            return sha1(json_encode($payload) ?: '[]');
+        };
+
+        $messageFingerprint = static function (array $rows): string {
+            $payload = collect($rows)
+                ->filter(fn ($row): bool => is_array($row))
+                ->map(fn (array $row): array => [
+                    'id' => (string) ($row['id'] ?? ''),
+                    'created_at' => (string) ($row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? ''),
+                    'direction' => (string) ($row['direction'] ?? ''),
+                    'status' => (string) ($row['status'] ?? ''),
+                    'body_hash' => sha1((string) ($row['_livewire_body_gzip'] ?? $row['_body_text'] ?? '')),
+                    'attachments' => count(is_array($row['attachments'] ?? null) ? $row['attachments'] : []),
+                ])
+                ->values()
+                ->all();
+
+            return sha1(json_encode($payload) ?: '[]');
+        };
+
+        $conversationsBeforeFingerprint = $conversationFingerprint($this->conversations ?? []);
+        $messagesBeforeFingerprint = $messageFingerprint($messagesBefore);
+
         /*
          * v10.114: quiet Inbox refresh.
          *
@@ -4463,10 +4512,31 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             }
         }
 
+        // A background refresh is never allowed to replace a visible thread with
+        // an empty result. Keep the last known-good messages/cursor and let the next poll
+        // retry naturally. This leaves manual refresh behavior unchanged.
+        if (! empty($messagesBefore) && empty($this->messages)) {
+            $this->messages = $messagesBefore;
+            $this->messageLastId = $messageLastIdBefore;
+            $this->hasMoreMessages = $hasMoreMessagesBefore;
+        }
+
+        // The quiet poll should not morph the entire Inbox when nothing changed. Besides
+        // avoiding unnecessary DOM work, this preserves client-only maximize/minimize and
+        // scroll state. Real new/changed conversations or messages still render normally.
+        $selectedAfter = trim((string) ($this->selectedConversationId ?? ''));
+        $conversationsChanged = $conversationFingerprint($this->conversations ?? []) !== $conversationsBeforeFingerprint;
+        $messagesChanged = $messageFingerprint($this->messages ?? []) !== $messagesBeforeFingerprint;
+        $selectionChanged = $selectedAfter !== $selectedBefore;
+
         $this->isLoadingConversations = false;
         $this->isLoadingConversationMessages = false;
         $this->isRefreshingRemoteData = false;
         $this->activeUiOperation = null;
+
+        if (! $conversationsChanged && ! $messagesChanged && ! $selectionChanged && method_exists($this, 'skipRender')) {
+            $this->skipRender();
+        }
     }
 
 
