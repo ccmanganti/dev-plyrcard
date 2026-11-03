@@ -3,7 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
-use App\Filament\Widgets\SuperadminAmplifyCreditsControlCenterWidget;
+use App\Support\SuperadminWidgets\SuperadminAmplifyCreditsControlCenterWidget;
 
 class SuperadminAmplifyCredits extends SuperadminAthletes
 {
