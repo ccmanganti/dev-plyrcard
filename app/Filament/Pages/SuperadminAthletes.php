@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Widgets\SuperadminControlCenterWidget;
 use BackedEnum;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages\Page;
 
 class SuperadminAthletes extends Page
