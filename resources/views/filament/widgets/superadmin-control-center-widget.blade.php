@@ -219,18 +219,86 @@
         </div>
     </section>
 
+    @php
+        $athleteCollection = collect($athletes);
+        $sportFilterCounts = $athleteCollection
+            ->groupBy('sport_key')
+            ->map(fn ($rows) => [
+                'label' => (string) ($rows->first()['sport'] ?? 'Not set'),
+                'count' => $rows->count(),
+            ])
+            ->sortByDesc('count');
+        $planFilterCounts = $athleteCollection
+            ->groupBy('plan_key')
+            ->map(fn ($rows) => [
+                'label' => (string) ($rows->first()['plan'] ?? 'Athlete'),
+                'count' => $rows->count(),
+            ]);
+        $planFilterOrder = collect(['free-plyr', 'my-journey', 'jumpstart', 'amplify', 'plyr'])
+            ->filter(fn ($key) => $planFilterCounts->has($key))
+            ->merge($planFilterCounts->keys()->diff(['free-plyr', 'my-journey', 'jumpstart', 'amplify', 'plyr']))
+            ->values();
+        $gradFilterCounts = $athleteCollection
+            ->filter(fn ($row) => filled($row['year'] ?? null))
+            ->groupBy(fn ($row) => (string) $row['year'])
+            ->map(fn ($rows) => $rows->count())
+            ->sortKeys();
+        $needsFollowUpCount = $athleteCollection->filter(fn ($row) => ! empty($row['flags'] ?? []))->count();
+        $allGoodCount = $athleteCollection->filter(fn ($row) => (int) ($row['health'] ?? 0) >= 80)->count();
+    @endphp
+
     <section x-show="tab === 'athletes'" x-cloak class="pc-view">
         <div class="pc-view-head">
-            <div><span class="pc-kicker">PLAYER OPERATIONS</span><h2>Athletes</h2><p>Search, filter, review account health, and contact a player without leaving the dashboard.</p></div>
-            @if($users_url)<a href="{{ $users_url }}" class="pc-btn">Open full Users admin</a>@endif
+            <div><span class="pc-kicker">PLAYER OPERATIONS</span><h2>Athletes</h2><p>Filter by sport, plan, or grad year. Click a row for the full record.</p></div>
+            <div class="pc-view-actions">
+                <div class="pc-search-box"><span>⌕</span><input type="search" x-model="search" placeholder="Search athletes, clubs, plans, email"></div>
+                <select class="pc-state-select" x-model="state" aria-label="Account state">
+                    <option value="all">All states</option>
+                    <option value="active">Active</option>
+                    <option value="needs_push">Needs push</option>
+                    <option value="at_risk">At risk</option>
+                    <option value="past_due">Past due</option>
+                    <option value="churned">Churned</option>
+                </select>
+                @if($users_url)<a href="{{ $users_url }}" class="pc-btn">Open full Users admin</a>@endif
+            </div>
         </div>
 
-        <div class="pc-filters">
-            <div class="pc-search-box"><span>⌕</span><input type="search" x-model="search" placeholder="Search athletes, clubs, plans, email"></div>
-            <select x-model="sport"><option value="all">All sports</option>@foreach(collect($athletes)->pluck('sport_key')->filter()->unique()->sort() as $sportKey)<option value="{{ $sportKey }}">{{ str($sportKey)->headline() }}</option>@endforeach</select>
-            <select x-model="plan"><option value="all">All plans</option>@foreach(collect($athletes)->pluck('plan_key')->filter()->unique()->sort() as $planKey)<option value="{{ $planKey }}">{{ str($planKey)->replace('-',' ')->headline() }}</option>@endforeach</select>
-            <select x-model="state"><option value="all">All states</option><option value="active">Active</option><option value="needs_push">Needs push</option><option value="at_risk">At risk</option><option value="past_due">Past due</option><option value="churned">Churned</option></select>
-            <button type="button" class="pc-btn" x-on:click="search='';sport='all';plan='all';state='all'">Clear</button>
+        <div class="pc-filter-panel">
+            <div class="pc-filter-row">
+                <span class="pc-filter-label">SPORT</span>
+                <div class="pc-filter-chips">
+                    <button type="button" class="pc-filter-chip" :class="{ 'is-active': sport === 'all' }" x-on:click="sport='all'">All sports <span>{{ number_format($athleteCollection->count()) }}</span></button>
+                    @foreach($sportFilterCounts as $sportKey => $sportData)
+                        <button type="button" class="pc-filter-chip" :class="{ 'is-active': sport === @js((string) $sportKey) }" x-on:click="sport=@js((string) $sportKey)">{{ $sportData['label'] }} <span>{{ number_format($sportData['count']) }}</span></button>
+                    @endforeach
+                </div>
+            </div>
+            <div class="pc-filter-row">
+                <span class="pc-filter-label">PLAN</span>
+                <div class="pc-filter-chips">
+                    <button type="button" class="pc-filter-chip" :class="{ 'is-active': plan === 'all' }" x-on:click="plan='all'">All</button>
+                    @foreach($planFilterOrder as $planKey)
+                        @php($planData = $planFilterCounts->get($planKey))
+                        <button type="button" class="pc-filter-chip" :class="{ 'is-active': plan === @js((string) $planKey) }" x-on:click="plan=@js((string) $planKey)">{{ $planData['label'] }} <span>{{ number_format($planData['count']) }}</span></button>
+                    @endforeach
+                    <span class="pc-filter-divider"></span>
+                    <button type="button" class="pc-filter-chip" :class="{ 'is-active': state === 'attention' }" x-on:click="state = state === 'attention' ? 'all' : 'attention'">Needs follow-up <span>{{ number_format($needsFollowUpCount) }}</span></button>
+                    <button type="button" class="pc-filter-chip" :class="{ 'is-active': state === 'healthy' }" x-on:click="state = state === 'healthy' ? 'all' : 'healthy'">All good <span>{{ number_format($allGoodCount) }}</span></button>
+                </div>
+            </div>
+            <div class="pc-filter-row">
+                <span class="pc-filter-label">GRAD</span>
+                <div class="pc-filter-chips">
+                    <button type="button" class="pc-filter-chip" :class="{ 'is-active': grad === 'all' }" x-on:click="grad='all'">All</button>
+                    @foreach($gradFilterCounts as $gradYear => $gradCount)
+                        <button type="button" class="pc-filter-chip" :class="{ 'is-active': grad === @js((string) $gradYear) }" x-on:click="grad=@js((string) $gradYear)">{{ $gradYear }} <span>{{ number_format($gradCount) }}</span></button>
+                    @endforeach
+                </div>
+            </div>
+            <div class="pc-filter-clear-row" x-show="search || sport !== 'all' || plan !== 'all' || grad !== 'all' || state !== 'all'" x-cloak>
+                <button type="button" class="pc-btn is-small" x-on:click="search='';sport='all';plan='all';grad='all';state='all'">Clear filters</button>
+            </div>
         </div>
 
         <section class="pc-panel">
@@ -240,7 +308,7 @@
                     <tbody>
                     @foreach($athletes as $athlete)
                         <tr
-                            x-show="matches(@js(['name'=>$athlete['name'],'sport'=>$athlete['sport'],'sport_key'=>$athlete['sport_key'],'plan'=>$athlete['plan'],'plan_key'=>$athlete['plan_key'],'club'=>$athlete['club'],'year'=>$athlete['year'],'email'=>$athlete['email'],'state'=>$athlete['state']]))"
+                            x-show="matches(@js(['name'=>$athlete['name'],'sport'=>$athlete['sport'],'sport_key'=>$athlete['sport_key'],'plan'=>$athlete['plan'],'plan_key'=>$athlete['plan_key'],'club'=>$athlete['club'],'year'=>$athlete['year'],'email'=>$athlete['email'],'state'=>$athlete['state'],'health'=>$athlete['health'],'has_followup'=>!empty($athlete['flags'])]))"
                             class="pc-click-row"
                             x-on:click="athleteDrawer={{ (int) $athlete['id'] }}; document.body.style.overflow='hidden'"
                         >
