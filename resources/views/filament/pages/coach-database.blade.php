@@ -16906,15 +16906,15 @@ body.rc-account-preparing .rc-account-impersonation-bar {
                 <button type="button" class="rc-free-plan-gate-close-v129" x-on:click="closeFreeGate()" aria-label="Close">×</button>
                 <span class="rc-free-plan-gate-badge-v129">My Journey</span>
                 <h2 id="rc-free-plan-gate-title-v130"><span x-text="freeGateNames[freeGateSection] || 'This feature'"></span> is a My Journey feature</h2>
-                <p>Your Free plan includes Edit Profile, My Photos, and Settings. Upgrade to My Journey to unlock the recruiting workspace and outreach tools.</p>
+                <p>Your Free plan includes Edit Profile, My Photos, My Schedule, PLYR Points, Support, and Settings. Upgrade to My Journey to unlock the recruiting workspace and outreach tools.</p>
             </header>
             <div class="rc-free-plan-gate-body-v129">
-                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>Discover Schools, Favorites, Lists, Compose Email, Inbox, Schedule, outreach, and analytics are available with My Journey.</span></div>
-                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>You can keep editing your athlete profile, managing My Photos, and changing account settings on Free at any time.</span></div>
+                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>Dashboard, Discover Schools, Coach Database, Favorites, Lists, Templates, Compose Email, Inbox, outreach, and recruiting analytics are available with My Journey.</span></div>
+                <div class="rc-free-plan-gate-point-v129"><span class="rc-free-plan-gate-check-v129">✓</span><span>You can keep editing your athlete profile, managing photos and schedule, using PLYR Points, contacting Support, and changing account settings on Free.</span></div>
             </div>
             <footer class="rc-free-plan-gate-footer-v129">
                 <button type="button" class="rc-free-plan-gate-secondary-v129" x-on:click="closeFreeGate()">Not now</button>
-                <button type="button" class="rc-free-plan-gate-primary-v129" data-plyrcard-amplify-open>Upgrade to Amplify</button>
+                <button type="button" class="rc-free-plan-gate-primary-v129" data-plyrcard-my-journey-open>Upgrade to My Journey</button>
             </footer>
         </section>
     </div>
@@ -17291,7 +17291,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         }
     };
     const currentRoot = () => document.querySelector('.rc-livewire-root');
-    const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','support','services','schedule']);
+    const freePlanLockedSections = new Set(['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose']);
     const isFreePlan = () => currentRoot()?.dataset?.rcFreePlan === '1';
     let pendingSection = null;
     let pendingTimer = null;
@@ -17343,6 +17343,20 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
             if (item) item.dataset.rcSection = candidate;
             button.dataset.rcSection = candidate;
             anchor.dataset.rcSection = candidate;
+            const freeLocked = isFreePlan() && freePlanLockedSections.has(candidate);
+            if (item) {
+                if (freeLocked) item.dataset.rcFreeLocked = 'true';
+                else item.removeAttribute('data-rc-free-locked');
+            }
+            if (freeLocked) {
+                button.dataset.rcFreeLocked = 'true';
+                anchor.dataset.rcFreeLocked = 'true';
+                button.setAttribute('title', `${sectionLabels[candidate] || 'This feature'} is available with My Journey`);
+            } else {
+                button.removeAttribute('data-rc-free-locked');
+                anchor.removeAttribute('data-rc-free-locked');
+                if ((button.getAttribute('title') || '').includes('available with My Journey')) button.removeAttribute('title');
+            }
             item?.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active');
             item?.removeAttribute('data-rc-active');
             button.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active', 'rc-fast-active');
@@ -17618,6 +17632,24 @@ body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true
 body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-active="true"] svg,
 body.rc-recruiting-center-page .fi-sidebar a.rc-fast-active svg {
     color:#ff6338 !important;
+}
+
+/* Free-plan recruiting items remain visible, but clearly identify which ones require My Journey. */
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-free-locked="true"] .fi-sidebar-item-button {
+    opacity:.72;
+}
+body.rc-recruiting-center-page .fi-sidebar .fi-sidebar-item[data-rc-free-locked="true"] .fi-sidebar-item-button::after {
+    content:"My Journey";
+    margin-left:auto;
+    padding:.18rem .38rem;
+    border:1px solid rgba(255,99,56,.24);
+    border-radius:999px;
+    background:rgba(255,99,56,.08);
+    color:#ff6338;
+    font-size:.52rem;
+    font-weight:850;
+    line-height:1;
+    white-space:nowrap;
 }
 </style>
         <div class="rc-cancel-plan-modal-v59" data-rc-cancel-modal hidden>
