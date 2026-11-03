@@ -4,7 +4,7 @@ namespace App\Filament\Pages;
 
 use BackedEnum;
 
-class SuperadminBilling extends SuperadminDashboard
+class SuperadminBilling extends SuperadminAthletes
 {
     protected static bool $isDiscovered = false;
     protected static ?string $slug = 'superadmin-billing';
