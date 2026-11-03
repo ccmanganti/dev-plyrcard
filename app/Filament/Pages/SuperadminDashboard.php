@@ -39,6 +39,18 @@ class SuperadminDashboard extends BaseDashboard
         return 1;
     }
 
+    public function getWidgetData(): array
+    {
+        return [
+            'initialTab' => match (static::class) {
+                \App\Filament\Pages\SuperadminAthletes::class => 'athletes',
+                \App\Filament\Pages\SuperadminFollowUps::class => 'followups',
+                \App\Filament\Pages\SuperadminBilling::class => 'billing',
+                default => 'dashboard',
+            },
+        ];
+    }
+
     /**
      * Keep the Superadmin dashboard isolated from the player-facing widgets that
      * are registered globally on the Admin panel.
