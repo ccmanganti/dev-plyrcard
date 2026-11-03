@@ -4,6 +4,7 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\CreditServiceRequests\CreditServiceRequestResource;
 use App\Filament\Resources\Users\UserResource;
+use App\Models\AdminSupportMessage;
 use App\Models\CreditPointTransaction;
 use App\Models\CreditServiceRequest;
 use App\Models\CoachDatabaseEmailMessage;
@@ -80,9 +81,12 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             ->all();
 
         $lastOutreach = $this->lastOutreachByAthlete($athleteIds);
+        $outreachStats = $this->outreachStatsByAthlete($athleteIds);
+        $reminderHistory = $this->reminderHistoryByAthlete($athleteIds);
+        $paymentSummary = $this->paymentSummaryByAthlete($athleteIds);
 
         $rows = $athletes
-            ->map(function (User $user) use ($profileService, $loginTracking, $lastOutreach): array {
+            ->map(function (User $user) use ($profileService, $loginTracking, $lastOutreach, $outreachStats, $reminderHistory, $paymentSummary): array {
                 $billing = $user->billingInformation;
                 $profileCompletion = $this->profileCompletion($profileService, $user);
                 $isRecurring = $this->isCurrentRecurring($user);
@@ -174,6 +178,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 };
 
                 $website = $user->activeWebsite;
+                $userOutreach = (array) ($outreachStats[(int) $user->getKey()] ?? []);
+                $userReminders = (array) ($reminderHistory[(int) $user->getKey()] ?? []);
+                $userPayment = (array) ($paymentSummary[(int) $user->getKey()] ?? []);
 
                 return [
                     'id' => (int) $user->getKey(),
@@ -192,11 +199,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'joined_sort' => $user->created_at?->timestamp ?? 0,
                     'last_login' => $lastLoginLabel,
                     'last_outreach' => $lastOutreachLabel,
+                    'outreach_sent' => max(0, (int) ($userOutreach['sent'] ?? 0)),
                     'health' => $health,
                     'state' => $state,
                     'flags' => $flags,
                     'top_flag' => $topFlag,
                     'reminder_concern' => (string) ($topFlag['concern'] ?? $this->reminderConcernForFlag($topFlag)),
+                    'reminders' => $userReminders,
                     'is_recurring' => $isRecurring,
                     'points_available' => max(0, (int) ($user->points_available ?? 0)),
                     'billing' => [
@@ -206,6 +215,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'recurring_cents' => max(0, (int) ($billing?->recurring_amount_cents ?? 0)),
                         'setup_cents' => max(0, (int) ($billing?->setup_fee_cents ?? 0)),
                         'provider' => trim((string) ($billing?->payment_provider ?? '')) ?: 'Not set',
+                        'started' => $billing?->created_at?->format('M j, Y') ?? $user->created_at?->format('M j, Y') ?? 'Unknown',
+                        'last_payment' => (string) ($userPayment['when'] ?? 'No successful payment recorded'),
+                        'last_payment_amount' => (string) ($userPayment['amount'] ?? '—'),
                     ],
                     'website' => [
                         'exists' => (bool) $website,
@@ -262,6 +274,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         $pastDueRows = $rows->where('state', 'past_due');
         $atRiskCents = $pastDueRows->sum(fn (array $row): int => (int) $row['billing']['recurring_cents']);
         $churnedCount = $rows->where('state', 'churned')->count();
+        $setupFeesCents = $rows->sum(fn (array $row): int => (int) ($row['billing']['setup_cents'] ?? 0));
         $conversion = $rows->count() > 0
             ? (int) round((($rows->count() - $freeCount) / $rows->count()) * 100)
             : 0;
@@ -371,11 +384,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'at_risk' => $this->money($atRiskCents),
                 'past_due' => $pastDueRows->count(),
                 'churned' => $churnedCount,
+                'setup_fees' => $this->money($setupFeesCents),
             ],
             'amplify_credit_rows' => $amplifyCredits['rows'],
             'amplify_credit_stats' => $amplifyCredits['stats'],
             'amplify_credit_services' => $amplifyCredits['services'],
             'coach_outreach_sent' => $coachOutreachSent,
+            'reminders_this_week' => $this->recentReminderActivity($athleteIds),
             'service_activity' => $serviceActivity,
             'payment_activity' => $paymentActivity,
             'new_signups' => $newSignups,
