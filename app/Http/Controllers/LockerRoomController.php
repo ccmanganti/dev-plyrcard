@@ -15,6 +15,7 @@ use App\Services\GoHighLevelService;
 use App\Services\BillingProfileService;
 use App\Services\LockerRoomDataService;
 use App\Services\LockerRoomReferralEmailService;
+use App\Services\SupportAlertService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -292,6 +293,24 @@ class LockerRoomController extends Controller
         }
         $user->forceFill($data)->save();
         $user->refresh();
+
+        if ($newRawFiles->isNotEmpty()) {
+            try {
+                app(SupportAlertService::class)->sendPlayerPhotosUploaded(
+                    $user,
+                    $newRawFiles->count(),
+                    'Quick Profile',
+                );
+            } catch (\Throwable $exception) {
+                \Illuminate\Support\Facades\Log::warning('PLYRCARD player photo upload admin alert failed.', [
+                    'user_id' => $user->getKey(),
+                    'photo_count' => $newRawFiles->count(),
+                    'source' => 'Quick Profile',
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         return $this->success($request, 'Profile saved.', [
             'data' => $dataService->snapshot($user),
         ]);
@@ -319,6 +338,23 @@ class LockerRoomController extends Controller
             $paths->push($photo->store($directory, 'public'));
         }
         $this->saveLockerRoomPhotoPaths($user, $category, $paths->all());
+
+        if ($category === 'player') {
+            try {
+                app(SupportAlertService::class)->sendPlayerPhotosUploaded(
+                    $user->fresh() ?? $user,
+                    count($data['photos']),
+                    'My Photos',
+                );
+            } catch (\Throwable $exception) {
+                \Illuminate\Support\Facades\Log::warning('PLYRCARD My Photos admin alert failed.', [
+                    'user_id' => $user->getKey(),
+                    'photo_count' => count($data['photos']),
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         return $this->success($request, 'Photos uploaded.', [
             'data' => $dataService->snapshot($user->fresh()),
         ]);
