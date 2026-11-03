@@ -22,6 +22,25 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
     protected static ?int $sort = 1;
 
+    public static function navigationMetrics(): array
+    {
+        try {
+            $data = app(static::class)->getViewData();
+
+            return [
+                'athletes' => (int) ($data['athlete_count'] ?? 0),
+                'followups' => count((array) ($data['attention_all'] ?? [])),
+                'billing' => (int) ($data['billing_stats']['active'] ?? 0),
+            ];
+        } catch (Throwable) {
+            return [
+                'athletes' => 0,
+                'followups' => 0,
+                'billing' => 0,
+            ];
+        }
+    }
+
     public function getViewData(): array
     {
         return Cache::remember(
