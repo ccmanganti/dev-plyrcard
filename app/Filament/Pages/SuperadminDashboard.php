@@ -39,19 +39,6 @@ class SuperadminDashboard extends BaseDashboard
         return 1;
     }
 
-    public function getWidgetData(): array
-    {
-        $section = (string) request()->query('section', 'overview');
-
-        if (! in_array($section, ['overview', 'athletes', 'followups', 'subscriptions', 'amplify'], true)) {
-            $section = 'overview';
-        }
-
-        return [
-            'initialTab' => $section,
-        ];
-    }
-
     /**
      * Keep the Superadmin dashboard isolated from the player-facing widgets that
      * are registered globally on the Admin panel.
@@ -59,7 +46,9 @@ class SuperadminDashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            SuperadminControlCenterWidget::class,
+            SuperadminControlCenterWidget::make([
+                'initialTab' => 'overview',
+            ]),
         ];
     }
 
