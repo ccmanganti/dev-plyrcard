@@ -17282,6 +17282,8 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         return null;
     };
     const sectionFromAnchor = (anchor) => {
+        const tagged = String(anchor?.dataset?.rcSection || '').trim();
+        if (tagged) return tagged;
         try {
             const url = new URL(anchor.href, window.location.href);
             if (url.origin !== window.location.origin) return null;
@@ -17352,10 +17354,27 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
                 button.dataset.rcFreeLocked = 'true';
                 anchor.dataset.rcFreeLocked = 'true';
                 button.setAttribute('title', `${sectionLabels[candidate] || 'This feature'} is available with My Journey`);
+
+                // A locked Free-plan item is a client-only upgrade trigger. Neutralize
+                // Filament/Livewire navigation on the anchor itself so no deferred
+                // navigate request can fire after the My Journey gate opens.
+                if (!anchor.dataset.rcLockedHref) {
+                    anchor.dataset.rcLockedHref = anchor.getAttribute('href') || '';
+                }
+                anchor.setAttribute('href', '#');
+                anchor.removeAttribute('wire:navigate');
+                anchor.removeAttribute('wire:navigate.hover');
+                anchor.removeAttribute('data-navigate');
             } else {
                 button.removeAttribute('data-rc-free-locked');
                 anchor.removeAttribute('data-rc-free-locked');
                 if ((button.getAttribute('title') || '').includes('available with My Journey')) button.removeAttribute('title');
+
+                const originalHref = String(anchor.dataset.rcLockedHref || '').trim();
+                if (originalHref) {
+                    anchor.setAttribute('href', originalHref);
+                    delete anchor.dataset.rcLockedHref;
+                }
             }
             item?.classList.remove('fi-active', 'fi-sidebar-item-active', 'plyr-sidebar-item-active');
             item?.removeAttribute('data-rc-active');
@@ -17479,7 +17498,11 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         if (!anchor || !currentRoot()) return;
         const section = sectionFromAnchor(anchor);
         if (!section) return;
-        if (isFreePlan() && freePlanLockedSections.has(section)) return;
+        if (isFreePlan() && freePlanLockedSections.has(section)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            return;
+        }
         if (!renderedSectionPanel(section)) return;
         setSidebarActive(section);
     }, true);
@@ -17491,7 +17514,7 @@ window.rcSaveCoachDatabaseTemplate = async function ($wire) {
         if (!section || !currentRoot()) return;
         if (openFreePlanGate(section)) {
             event.preventDefault();
-            event.stopPropagation();
+            event.stopImmediatePropagation();
             return;
         }
         // Settings contains server-rendered billing/payment state and normal POST
