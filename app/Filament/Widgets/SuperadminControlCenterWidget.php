@@ -385,6 +385,212 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         ];
     }
 
+    protected function amplifyCreditsData(Collection $rows, array $athleteIds): array
+    {
+        $serviceDefinitions = [
+            'outreach' => 'Coach outreach campaigns',
+            'reel' => 'Highlight reels',
+            'graphic' => 'Custom graphics',
+            'production_hour' => 'Rep hours',
+        ];
+
+        $emptyServices = collect($serviceDefinitions)
+            ->map(fn (string $label, string $key): array => [
+                'key' => $key,
+                'label' => $label,
+                'requests' => 0,
+                'points' => 0,
+            ])
+            ->values()
+            ->all();
+
+        $packagePlanRows = $rows->filter(
+            fn (array $row): bool => in_array($row['plan_key'] ?? '', ['amplify', 'jumpstart'], true)
+        );
+
+        if ($athleteIds === [] || ! Schema::hasTable('credit_point_transactions')) {
+            $fallbackRows = $packagePlanRows
+                ->map(function (array $row): array {
+                    return [
+                        'id' => $row['id'],
+                        'name' => $row['name'],
+                        'initials' => $row['initials'],
+                        'sport' => $row['sport'],
+                        'package' => $row['plan'],
+                        'package_key' => $row['plan_key'],
+                        'granted_points' => 0,
+                        'points_available' => (int) ($row['points_available'] ?? 0),
+                        'points_redeemed' => 0,
+                        'usage_percent' => null,
+                        'usage' => [
+                            'outreach' => ['qty' => 0, 'points' => 0],
+                            'reel' => ['qty' => 0, 'points' => 0],
+                            'graphic' => ['qty' => 0, 'points' => 0],
+                            'production_hour' => ['qty' => 0, 'points' => 0],
+                        ],
+                        'last_activity' => 'No service activity',
+                        'idle' => (int) ($row['points_available'] ?? 0) > 0,
+                        'user_url' => $row['user_url'],
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return [
+                'rows' => $fallbackRows,
+                'stats' => [
+                    'athletes' => count($fallbackRows),
+                    'points_granted' => 0,
+                    'points_available' => collect($fallbackRows)->sum('points_available'),
+                    'points_redeemed' => 0,
+                ],
+                'services' => $emptyServices,
+            ];
+        }
+
+        try {
+            $transactions = CreditPointTransaction::query()
+                ->whereIn('user_id', $athleteIds)
+                ->whereIn('source_type', ['package_purchase', 'service_request'])
+                ->get();
+
+            $packageGrants = $transactions
+                ->filter(fn (CreditPointTransaction $row): bool => $row->type === 'grant' && $row->source_type === 'package_purchase')
+                ->groupBy('user_id');
+
+            $packageIds = $packagePlanRows
+                ->pluck('id')
+                ->merge($packageGrants->keys()->map(fn ($id): int => (int) $id))
+                ->unique()
+                ->values();
+
+            $requests = collect();
+
+            if (Schema::hasTable('credit_service_requests')) {
+                $requests = CreditServiceRequest::query()
+                    ->whereIn('user_id', $packageIds->all())
+                    ->whereIn('item_key', array_keys($serviceDefinitions))
+                    ->get();
+            }
+
+            $requestsByUser = $requests->groupBy('user_id');
+
+            $creditRows = $rows
+                ->filter(fn (array $row): bool => $packageIds->contains((int) $row['id']))
+                ->map(function (array $row) use ($packageGrants, $requestsByUser, $serviceDefinitions): array {
+                    $userId = (int) $row['id'];
+                    $grants = collect($packageGrants->get($userId, collect()));
+                    $latestGrant = $grants->sortByDesc('id')->first();
+                    $meta = (array) ($latestGrant?->meta ?? []);
+                    $packageKey = Str::lower(trim((string) ($meta['package'] ?? '')));
+
+                    if (! in_array($packageKey, ['amplify', 'jumpstart'], true)) {
+                        $packageKey = in_array($row['plan_key'] ?? '', ['amplify', 'jumpstart'], true)
+                            ? (string) $row['plan_key']
+                            : '';
+                    }
+
+                    $packageLabel = match ($packageKey) {
+                        'amplify' => 'Amplify',
+                        'jumpstart' => 'Jumpstart',
+                        default => $row['plan'] ?: 'Package',
+                    };
+
+                    $grantedPoints = (int) $grants->sum(fn (CreditPointTransaction $grant): int => max(0, (int) $grant->points));
+                    $userRequests = collect($requestsByUser->get($userId, collect()));
+
+                    $usage = [];
+                    $pointsRedeemed = 0;
+
+                    foreach ($serviceDefinitions as $key => $label) {
+                        $serviceRequests = $userRequests->where('item_key', $key);
+                        $qty = (int) $serviceRequests->sum(fn (CreditServiceRequest $request): int => max(1, (int) $request->quantity));
+                        $points = (int) $serviceRequests->sum(
+                            fn (CreditServiceRequest $request): int => max(0, (int) $request->points_spent - (int) $request->credits_returned)
+                        );
+
+                        $usage[$key] = [
+                            'qty' => $qty,
+                            'points' => $points,
+                        ];
+
+                        $pointsRedeemed += $points;
+                    }
+
+                    $lastRequest = $userRequests->sortByDesc('created_at')->first();
+                    $lastActivityDays = null;
+                    $lastActivity = 'No service activity';
+
+                    if ($lastRequest?->created_at) {
+                        $lastActivityDays = max(0, now()->diffInDays($lastRequest->created_at));
+                        $lastActivity = $lastRequest->created_at->diffForHumans();
+                    }
+
+                    $available = max(0, (int) ($row['points_available'] ?? 0));
+                    $usagePercent = $grantedPoints > 0
+                        ? min(100, (int) round(($pointsRedeemed / $grantedPoints) * 100))
+                        : null;
+
+                    return [
+                        'id' => $userId,
+                        'name' => $row['name'],
+                        'initials' => $row['initials'],
+                        'sport' => $row['sport'],
+                        'package' => $packageLabel,
+                        'package_key' => $packageKey,
+                        'granted_points' => $grantedPoints,
+                        'points_available' => $available,
+                        'points_redeemed' => $pointsRedeemed,
+                        'usage_percent' => $usagePercent,
+                        'usage' => $usage,
+                        'last_activity' => $lastActivity,
+                        'idle' => $available > 0 && ($lastActivityDays === null || $lastActivityDays > 30),
+                        'user_url' => $row['user_url'],
+                    ];
+                })
+                ->sortBy([
+                    ['idle', 'desc'],
+                    ['points_available', 'desc'],
+                    ['name', 'asc'],
+                ])
+                ->values();
+
+            $serviceTotals = collect($serviceDefinitions)
+                ->map(function (string $label, string $key) use ($creditRows): array {
+                    return [
+                        'key' => $key,
+                        'label' => $label,
+                        'requests' => $creditRows->sum(fn (array $row): int => (int) ($row['usage'][$key]['qty'] ?? 0)),
+                        'points' => $creditRows->sum(fn (array $row): int => (int) ($row['usage'][$key]['points'] ?? 0)),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            return [
+                'rows' => $creditRows->all(),
+                'stats' => [
+                    'athletes' => $creditRows->count(),
+                    'points_granted' => $creditRows->sum('granted_points'),
+                    'points_available' => $creditRows->sum('points_available'),
+                    'points_redeemed' => $creditRows->sum('points_redeemed'),
+                ],
+                'services' => $serviceTotals,
+            ];
+        } catch (Throwable) {
+            return [
+                'rows' => [],
+                'stats' => [
+                    'athletes' => 0,
+                    'points_granted' => 0,
+                    'points_available' => 0,
+                    'points_redeemed' => 0,
+                ],
+                'services' => $emptyServices,
+            ];
+        }
+    }
+
     protected function serviceActivity(): array
     {
         if (! class_exists(CreditServiceRequest::class) || ! Schema::hasTable('credit_service_requests')) {
