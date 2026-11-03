@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
+use Filament\Navigation\NavigationItem;
 
 class SuperadminFollowUps extends SuperadminAthletes
 {
