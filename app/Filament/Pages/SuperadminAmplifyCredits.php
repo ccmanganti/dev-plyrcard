@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
+use App\Filament\Widgets\SuperadminAmplifyCreditsControlCenterWidget;
 
 class SuperadminAmplifyCredits extends SuperadminAthletes
 {
@@ -16,7 +17,7 @@ class SuperadminAmplifyCredits extends SuperadminAthletes
 
     protected static ?int $navigationSort = 5;
 
-    protected static string $controlCenterSection = 'amplify';
+    protected static string $controlCenterWidgetClass = SuperadminAmplifyCreditsControlCenterWidget::class;
 
     public static function getNavigationBadge(): ?string
     {
