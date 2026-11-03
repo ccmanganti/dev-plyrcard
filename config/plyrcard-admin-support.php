@@ -19,7 +19,7 @@ Hey {{first_name}} — your PLYRCARD account is ready. Log in and take the first
 
 {{login_link}}
 
-If you run into anything, reply to this message and we’ll help.
+If you run into anything, open PLYRCARD Support from your account and we’ll help.
 
 — {{admin_name}}
 TEXT,
@@ -43,7 +43,11 @@ TEXT,
             'message' => <<<'TEXT'
 Hey {{first_name}} — we still need a strong photo for your PLYRCARD. A clear action or profile photo helps your page feel complete and gives coaches a better first impression.
 
-Upload your photos here: {{photos_link}}
+Open My Photos: {{photos_link}}
+
+Choose your images and make sure they appear as selected/ready before saving. Once the upload is complete, the PLYRCARD team will be notified automatically.
+
+If you need help, use PLYRCARD Support from your account.
 
 — {{admin_name}}
 TEXT,
@@ -95,7 +99,7 @@ Hey {{first_name}} — you’re on {{plan}}, and we want to make sure you’re g
 
 Open your Locker Room: {{locker_room_link}}
 
-Reply and tell us what you want to work on next.
+Open PLYRCARD Support and tell us what you want to work on next.
 
 — {{admin_name}}
 TEXT,
@@ -109,7 +113,7 @@ Hey {{first_name}} — a quick heads-up that your PLYRCARD renewal is coming up 
 
 {{billing_link}}
 
-Questions? Reply here and we’ll help.
+Questions? Open PLYRCARD Support from your account and we’ll help.
 
 — {{admin_name}}
 TEXT,
