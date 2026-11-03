@@ -10859,6 +10859,7 @@ CSS;
                                                     <div class="rc-email-direct-v11320" aria-label="Email message">
                                                         <div
                                                             class="rc-email-direct-body-v11320"
+                                                            wire:ignore
                                                             x-ref="body"
                                                             data-email-body-b64="{{ base64_encode($emailBodyForInline) }}"
                                                             x-init="
