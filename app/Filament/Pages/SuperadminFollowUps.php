@@ -1,0 +1,18 @@
+<?php
+
+namespace App\Filament\Pages;
+
+use BackedEnum;
+
+class SuperadminFollowUps extends SuperadminDashboard
+{
+    protected static ?string $slug = 'follow-ups';
+
+    protected static ?string $navigationLabel = 'Follow-ups';
+
+    protected static ?string $title = 'Follow-ups';
+
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bell-alert';
+
+    protected static ?int $navigationSort = 3;
+}
