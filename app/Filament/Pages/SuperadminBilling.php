@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
+use App\Filament\Widgets\SuperadminSubscriptionsControlCenterWidget;
 
 class SuperadminBilling extends SuperadminAthletes
 {
@@ -16,7 +17,7 @@ class SuperadminBilling extends SuperadminAthletes
 
     protected static ?int $navigationSort = 4;
 
-    protected static string $controlCenterSection = 'subscriptions';
+    protected static string $controlCenterWidgetClass = SuperadminSubscriptionsControlCenterWidget::class;
 
     public static function shouldRegisterNavigation(): bool
     {
