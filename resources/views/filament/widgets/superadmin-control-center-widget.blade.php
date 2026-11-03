@@ -473,10 +473,10 @@
         </div>
 
         <div class="pc-stat-grid pc-stat-grid-four">
-            <div class="pc-stat"><span class="pc-stat-icon is-violet">ϟ</span><small>Package athletes</small><strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong><span>Amplify and Jumpstart package accounts</span></div>
-            <div class="pc-stat"><span class="pc-stat-icon is-blue">+</span><small>Package points granted</small><strong>{{ number_format($amplify_credit_stats['points_granted'] ?? 0) }}</strong><span>recorded package-purchase grants</span></div>
-            <div class="pc-stat"><span class="pc-stat-icon is-amber">◷</span><small>Points available</small><strong>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }}</strong><span>current PLYR Points balance across package athletes</span></div>
-            <div class="pc-stat"><span class="pc-stat-icon is-green">✓</span><small>Service points redeemed</small><strong>{{ number_format($amplify_credit_stats['points_redeemed'] ?? 0) }}</strong><span>net points consumed by package service requests</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-violet">ϟ</span><small>Amplify athletes</small><strong>{{ number_format($amplify_credit_stats['athletes'] ?? 0) }}</strong><span>{{ number_format($amplify_credit_stats['jumpstart'] ?? 0) }} of them Jumpstart</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-green">✓</span><small>Credits delivered</small><strong>{{ number_format($amplify_credit_stats['points_redeemed'] ?? 0) }}</strong><span>of {{ number_format($amplify_credit_stats['points_granted'] ?? 0) }} package points granted</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-amber">◷</span><small>Credits outstanding</small><strong>{{ number_format($amplify_credit_stats['points_available'] ?? 0) }}</strong><span>PLYR Points still available to use</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-red">!</span><small>Idle 30+ days</small><strong>{{ number_format($amplify_credit_stats['idle'] ?? 0) }}</strong><span>package balances needing follow-up</span></div>
         </div>
 
         <section class="pc-panel">
@@ -504,13 +504,12 @@
                         <tr>
                             <th>Athlete</th>
                             <th>Package</th>
-                            <th>Granted</th>
-                            <th>Available</th>
                             <th>Outreach</th>
                             <th>Reels</th>
                             <th>Graphics</th>
                             <th>Rep hours</th>
                             <th>Used</th>
+                            <th>Available</th>
                             <th>Last activity</th>
                             <th>Action</th>
                         </tr>
@@ -525,8 +524,6 @@
                                 </div>
                             </td>
                             <td><span class="pc-plan is-{{ $credit['package_key'] }}">{{ $credit['package'] }}</span></td>
-                            <td class="pc-mono">{{ number_format($credit['granted_points']) }}</td>
-                            <td class="pc-mono">{{ number_format($credit['points_available']) }}</td>
                             <td class="pc-credit-cell">{{ number_format($credit['usage']['outreach']['qty']) }}<small>{{ number_format($credit['usage']['outreach']['points']) }} pts</small></td>
                             <td class="pc-credit-cell">{{ number_format($credit['usage']['reel']['qty']) }}<small>{{ number_format($credit['usage']['reel']['points']) }} pts</small></td>
                             <td class="pc-credit-cell">{{ number_format($credit['usage']['graphic']['qty']) }}<small>{{ number_format($credit['usage']['graphic']['points']) }} pts</small></td>
@@ -538,6 +535,7 @@
                                     <span class="pc-muted-value">—</span>
                                 @endif
                             </td>
+                            <td class="pc-mono">{{ number_format($credit['points_available']) }}</td>
                             <td><span class="{{ $credit['idle'] ? 'pc-idle' : '' }}">{{ $credit['last_activity'] }}</span></td>
                             <td x-on:click.stop>
                                 <span class="pc-quick-actions">
@@ -549,7 +547,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="11"><div class="pc-empty">No Amplify or Jumpstart package-credit records are available yet.</div></td></tr>
+                        <tr><td colspan="10"><div class="pc-empty">No Amplify or Jumpstart package-credit records are available yet.</div></td></tr>
                     @endforelse
                     </tbody>
                 </table>
