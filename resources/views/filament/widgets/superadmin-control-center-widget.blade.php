@@ -413,11 +413,12 @@
             <div><span class="pc-kicker">REVENUE & ACCOUNT HEALTH</span><h2>Subscriptions</h2><p>Recurring revenue, conversion, and anything about to break.</p></div>
             @if($users_url)<a href="{{ $users_url }}" class="pc-btn">Manage subscription accounts</a>@endif
         </div>
-        <div class="pc-stat-grid pc-stat-grid-four">
+        <div class="pc-stat-grid">
             <div class="pc-stat"><span class="pc-stat-icon is-green">↗</span><small>Monthly recurring</small><strong>{{ $billing_stats['mrr'] }}</strong><span>{{ number_format($billing_stats['active']) }} active subscriptions</span></div>
             <div class="pc-stat"><span class="pc-stat-icon is-coral">%</span><small>Free to paid</small><strong>{{ $billing_stats['conversion'] }}%</strong><span>{{ number_format($billing_stats['free']) }} still on free</span></div>
             <div class="pc-stat"><span class="pc-stat-icon is-red">!</span><small>Revenue at risk</small><strong>{{ $billing_stats['at_risk'] }}</strong><span>{{ number_format($billing_stats['past_due']) }} past due</span></div>
             <div class="pc-stat"><span class="pc-stat-icon">×</span><small>Churned</small><strong>{{ number_format($billing_stats['churned']) }}</strong><span>canceled / expired accounts</span></div>
+            <div class="pc-stat"><span class="pc-stat-icon is-violet">▣</span><small>Setup fees recorded</small><strong>{{ $billing_stats['setup_fees'] }}</strong><span>configured one-time setup value on billing records</span></div>
         </div>
 
         <div class="pc-plan-grid">
