@@ -41,13 +41,14 @@ class SuperadminDashboard extends BaseDashboard
 
     public function getWidgetData(): array
     {
+        $section = (string) request()->query('section', 'dashboard');
+
+        if (! in_array($section, ['dashboard', 'athletes', 'followups', 'billing'], true)) {
+            $section = 'dashboard';
+        }
+
         return [
-            'initialTab' => match (static::class) {
-                \App\Filament\Pages\SuperadminAthletes::class => 'athletes',
-                \App\Filament\Pages\SuperadminFollowUps::class => 'followups',
-                \App\Filament\Pages\SuperadminBilling::class => 'billing',
-                default => 'dashboard',
-            },
+            'initialTab' => $section,
         ];
     }
 
