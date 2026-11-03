@@ -299,7 +299,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         $queues = collect([
             'getting_started' => [
                 'title' => 'Never logged in / dormant',
-                'description' => 'New or dormant accounts that need a push back into PLYRCARD.',
+                'description' => 'Based on the recorded last_login_at value only.',
                 'concern' => 'getting_started',
             ],
             'billing' => [
@@ -313,25 +313,40 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'concern' => 'finish_profile',
             ],
             'film' => [
-                'title' => 'No film uploaded',
-                'description' => 'Players with no current highlight or match film.',
+                'title' => 'No YouTube film',
+                'description' => 'No YouTube/Youtu.be URL saved in the player link fields.',
                 'concern' => 'send_film',
             ],
             'photo' => [
-                'title' => 'No photo on file',
-                'description' => 'Players missing a profile or action image.',
+                'title' => 'No player-uploaded photo',
+                'description' => 'No image exists in the player-uploaded My Photos / Quick Profile gallery.',
                 'concern' => 'send_photo',
             ],
             'outreach' => [
                 'title' => 'Quiet 30+ days',
-                'description' => 'Paying athletes with no outreach or 30+ days of silence.',
+                'description' => 'Recurring athletes with no coach outreach or 30+ days since the last sent outreach.',
                 'concern' => 'start_outreach',
+            ],
+            'renewal' => [
+                'title' => 'Renews within 7 days',
+                'description' => 'Recurring Stripe subscriptions whose stored current period end is within 7 days.',
+                'concern' => 'renewal_coming_up',
             ],
         ])->map(function (array $config, string $key) use ($rows): array {
             $items = $rows
                 ->filter(fn (array $row): bool => collect($row['flags'])->contains(
                     fn (array $flag): bool => ($flag['key'] ?? '') === $key
                 ))
+                ->map(function (array $row) use ($key): array {
+                    $flag = collect($row['flags'])->first(
+                        fn (array $candidate): bool => ($candidate['key'] ?? '') === $key
+                    );
+
+                    $row['queue_detail'] = trim((string) ($flag['detail'] ?? ''));
+                    $row['queue_label'] = trim((string) ($flag['label'] ?? ''));
+
+                    return $row;
+                })
                 ->sortBy('health')
                 ->values()
                 ->all();
@@ -346,7 +361,16 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         $idleCreditItems = collect($amplifyCredits['rows'] ?? [])
             ->filter(fn (array $row): bool => (bool) ($row['idle'] ?? false))
             ->map(function (array $creditRow) use ($rows): array {
-                return $rows->firstWhere('id', $creditRow['id']) ?? [];
+                $row = $rows->firstWhere('id', $creditRow['id']) ?? [];
+
+                if ($row !== []) {
+                    $row['queue_label'] = 'Credits idle';
+                    $row['queue_detail'] = number_format((int) ($creditRow['points_available'] ?? 0))
+                        . ' PLYR Points available · last service activity '
+                        . ($creditRow['last_activity'] ?? 'not recorded');
+                }
+
+                return $row;
             })
             ->filter()
             ->values()
