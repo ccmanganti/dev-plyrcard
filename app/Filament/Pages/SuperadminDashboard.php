@@ -41,10 +41,10 @@ class SuperadminDashboard extends BaseDashboard
 
     public function getWidgetData(): array
     {
-        $section = (string) request()->query('section', 'dashboard');
+        $section = (string) request()->query('section', 'overview');
 
-        if (! in_array($section, ['dashboard', 'athletes', 'followups', 'billing'], true)) {
-            $section = 'dashboard';
+        if (! in_array($section, ['overview', 'athletes', 'followups', 'subscriptions', 'amplify'], true)) {
+            $section = 'overview';
         }
 
         return [
