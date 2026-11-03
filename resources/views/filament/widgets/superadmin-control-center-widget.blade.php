@@ -99,7 +99,9 @@
                     <table class="pc-table">
                         <tbody>
                         @forelse(array_slice($attention_all, 0, 7) as $athlete)
-                            @php($flag = $athlete['top_flag'] ?? null)
+                            @php
+                                $flag = $athlete['top_flag'] ?? null;
+                            @endphp
                             <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int) $athlete['id'] }}; document.body.style.overflow='hidden'">
                                 <td>
                                     <div class="pc-person">
@@ -133,7 +135,10 @@
                     <header class="pc-panel-head"><div><h3>Athletes by sport</h3><p>Current platform distribution</p></div></header>
                     <div class="pc-sports">
                         @forelse($sports as $sport)
-                            @php($dashboardSportKey = (string) (collect($athletes)->firstWhere('sport', $sport['sport'])['sport_key'] ?? strtolower($sport['sport'])))
+                            @php
+                                $dashboardSportRow = collect($athletes)->firstWhere('sport', $sport['sport']);
+                                $dashboardSportKey = (string) ($dashboardSportRow['sport_key'] ?? strtolower($sport['sport']));
+                            @endphp
                             <button type="button" x-on:click="window.location.href = @js(url('/admin/athletes')) + '?sport=' + encodeURIComponent(@js($dashboardSportKey))" class="pc-sport">
                                 <b>{{ $sport['sport'] }}</b><span><i style="width:{{ $sport['percent'] }}%"></i></span><small>{{ $sport['count'] }}</small>
                             </button>
@@ -280,7 +285,9 @@
                 <div class="pc-filter-chips">
                     <button type="button" class="pc-filter-chip" :class="{ 'is-active': plan === 'all' }" x-on:click="plan='all'">All</button>
                     @foreach($planFilterOrder as $planKey)
-                        @php($planData = $planFilterCounts->get($planKey))
+                        @php
+                            $planData = $planFilterCounts->get($planKey);
+                        @endphp
                         <button type="button" class="pc-filter-chip" :class="{ 'is-active': plan === @js((string) $planKey) }" x-on:click="plan=@js((string) $planKey)">{{ $planData['label'] }} <span>{{ number_format($planData['count']) }}</span></button>
                     @endforeach
                     <span class="pc-filter-divider"></span>
