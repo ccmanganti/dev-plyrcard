@@ -2,7 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\SuperadminControlCenterWidget;
+use App\Filament\Widgets\SuperadminOverviewControlCenterWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class SuperadminDashboard extends BaseDashboard
@@ -46,9 +46,7 @@ class SuperadminDashboard extends BaseDashboard
     public function getWidgets(): array
     {
         return [
-            SuperadminControlCenterWidget::make([
-                'initialTab' => 'overview',
-            ]),
+            SuperadminOverviewControlCenterWidget::class,
         ];
     }
 
