@@ -18,6 +18,11 @@ class SuperadminBilling extends SuperadminAthletes
 
     public static function shouldRegisterNavigation(): bool
     {
-        return false;
+        return static::canAccess();
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return number_format(\App\Filament\Widgets\SuperadminControlCenterWidget::navigationMetrics()['billing'] ?? 0);
     }
 }
