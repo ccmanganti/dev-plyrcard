@@ -13,7 +13,7 @@ class Users extends Cluster
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::UserGroup;
     protected static ?string $navigationLabel = 'Users';
     protected static ?string $slug = 'users';
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 12;
     protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function shouldRegisterNavigation(): bool
