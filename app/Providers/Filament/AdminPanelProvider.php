@@ -1869,6 +1869,10 @@ class AdminPanelProvider extends PanelProvider
                                             || current.startsWith(settingsPath + '/')
                                             || current === managePlanPath
                                             || current.startsWith(managePlanPath + '/')
+                                            || current.includes('/coach-database/photos')
+                                            || current.includes('/coach-database/schedule')
+                                            || current.includes('/coach-database/services')
+                                            || current.includes('/coach-database/support')
                                             || current.includes('/profile')
                                             || current.includes('/settings')
                                             || current.includes('/my-journey');
