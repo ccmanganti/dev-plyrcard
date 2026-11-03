@@ -6,11 +6,11 @@ use BackedEnum;
 
 class SuperadminBilling extends SuperadminAthletes
 {
-    protected static ?string $slug = 'superadmin-billing';
+    protected static ?string $slug = 'subscriptions';
 
-    protected static ?string $navigationLabel = 'Billing';
+    protected static ?string $navigationLabel = 'Subscriptions';
 
-    protected static ?string $title = 'Billing';
+    protected static ?string $title = 'Subscriptions';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
@@ -23,7 +23,7 @@ class SuperadminBilling extends SuperadminAthletes
 
     public static function getNavigationBadge(): ?string
     {
-        return number_format(\App\Filament\Widgets\SuperadminControlCenterWidget::navigationMetrics()['billing'] ?? 0);
+        return number_format(\App\Filament\Widgets\SuperadminControlCenterWidget::navigationMetrics()['subscriptions'] ?? 0);
     }
 
     public static function getNavigationBadgeColor(): ?string
