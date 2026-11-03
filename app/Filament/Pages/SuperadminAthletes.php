@@ -30,6 +30,11 @@ class SuperadminAthletes extends Page
         return number_format(SuperadminControlCenterWidget::navigationMetrics()['athletes'] ?? 0);
     }
 
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'gray';
+    }
+
     public function getHeading(): string
     {
         return '';
