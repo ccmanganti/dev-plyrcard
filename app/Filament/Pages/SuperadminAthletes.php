@@ -25,6 +25,11 @@ class SuperadminAthletes extends Page
         return static::canAccess();
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        return number_format(SuperadminControlCenterWidget::navigationMetrics()['athletes'] ?? 0);
+    }
+
     public function getHeading(): string
     {
         return '';
