@@ -246,6 +246,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'recurring_cents' => $items->sum(fn (array $row): int => $row['is_recurring']
                     ? (int) $row['billing']['recurring_cents']
                     : 0),
+                'setup_cents' => $items->sum(fn (array $row): int => (int) ($row['billing']['setup_cents'] ?? 0)),
             ])
             ->sortByDesc('count')
             ->values()
