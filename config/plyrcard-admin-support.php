@@ -37,19 +37,32 @@ Complete your profile: {{profile_link}}
 TEXT,
         ],
         'send_photo' => [
-            'label' => 'Send us a photo',
-            'hint' => 'No strong action/profile photo is on file.',
+            'label' => 'Request for Image',
+            'hint' => 'No player-uploaded photo is on file.',
             'subject' => 'Let’s add a strong photo to your PLYRCARD',
             'message' => <<<'TEXT'
-Hey {{first_name}} — we still need a strong photo for your PLYRCARD. A clear action or profile photo helps your page feel complete and gives coaches a better first impression.
+Hi {{first_name}},
 
-Open My Photos: {{photos_link}}
+We’re getting your PLYRCARD ready, and we just need two great photos to help your profile stand out!
 
-Choose your images and make sure they appear as selected/ready before saving. Once the upload is complete, the PLYRCARD team will be notified automatically.
+Here’s what we need from you:
 
-If you need help, use PLYRCARD Support from your account.
+1. Profile Photo: A clear, high-quality photo of you wearing your team jersey. This will be your main profile photo, so pick one that represents you best!
+2. Action or Secondary Photo: One of your favorite action shots from a game, or another great photo you'd like featured on your PLYRCARD.
 
-— {{admin_name}}
+Your PLYRCARD is your opportunity to make a strong first impression with college coaches, so let's make sure it showcases you at your best!
+
+Ready to send your photos?
+
+You can upload them directly using the link below or simply reply to this email with your photos attached.
+
+📸 Upload Your Photos Here: {{photos_link}}
+
+Let's get your profile looking its best!
+
+Don't Let Coaches Miss You.
+
+The PLYRCARD Team
 TEXT,
         ],
         'send_film' => [
