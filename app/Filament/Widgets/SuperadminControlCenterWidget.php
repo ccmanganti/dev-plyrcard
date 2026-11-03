@@ -198,6 +198,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'top_flag' => $topFlag,
                     'reminder_concern' => (string) ($topFlag['concern'] ?? $this->reminderConcernForFlag($topFlag)),
                     'is_recurring' => $isRecurring,
+                    'points_available' => max(0, (int) ($user->points_available ?? 0)),
                     'billing' => [
                         'plan_key' => trim((string) ($billing?->plan_key ?? '')),
                         'payment_status' => trim((string) ($billing?->payment_status ?? '')) ?: 'Not available',
@@ -265,6 +266,20 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             ? (int) round((($rows->count() - $freeCount) / $rows->count()) * 100)
             : 0;
 
+        $amplifyCredits = $this->amplifyCreditsData($rows, $athleteIds);
+        $coachOutreachSent = 0;
+
+        if (class_exists(CoachDatabaseEmailMessage::class) && Schema::hasTable('coach_database_email_messages')) {
+            try {
+                $coachOutreachSent = CoachDatabaseEmailMessage::query()
+                    ->whereIn('athlete_user_id', $athleteIds)
+                    ->whereNotNull('sent_at')
+                    ->count();
+            } catch (Throwable) {
+                $coachOutreachSent = 0;
+            }
+        }
+
         $queues = collect([
             'getting_started' => [
                 'title' => 'Login / onboarding',
@@ -310,7 +325,27 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'count' => count($items),
                 'items' => $items,
             ]);
-        })->values()->all();
+        })->values();
+
+        $idleCreditItems = collect($amplifyCredits['rows'] ?? [])
+            ->filter(fn (array $row): bool => (bool) ($row['idle'] ?? false))
+            ->map(function (array $creditRow) use ($rows): array {
+                return $rows->firstWhere('id', $creditRow['id']) ?? [];
+            })
+            ->filter()
+            ->values()
+            ->all();
+
+        $queues->splice(2, 0, [[
+            'key' => 'amplify_credits',
+            'title' => 'Amplify credits idle',
+            'description' => 'Package value is still available and has not been used recently.',
+            'concern' => 'amplify_credits',
+            'count' => count($idleCreditItems),
+            'items' => $idleCreditItems,
+        ]]);
+
+        $queues = $queues->values()->all();
 
         $serviceActivity = $this->serviceActivity();
         $paymentActivity = $this->paymentActivity();
@@ -337,6 +372,10 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'past_due' => $pastDueRows->count(),
                 'churned' => $churnedCount,
             ],
+            'amplify_credit_rows' => $amplifyCredits['rows'],
+            'amplify_credit_stats' => $amplifyCredits['stats'],
+            'amplify_credit_services' => $amplifyCredits['services'],
+            'coach_outreach_sent' => $coachOutreachSent,
             'service_activity' => $serviceActivity,
             'payment_activity' => $paymentActivity,
             'new_signups' => $newSignups,
