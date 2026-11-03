@@ -4,7 +4,7 @@ namespace App\Filament\Pages;
 
 use BackedEnum;
 
-class SuperadminFollowUps extends SuperadminDashboard
+class SuperadminFollowUps extends SuperadminAthletes
 {
     protected static bool $isDiscovered = false;
 
