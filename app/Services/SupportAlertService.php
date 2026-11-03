@@ -205,12 +205,33 @@ class SupportAlertService
             actionLabel: 'Open User Management',
             actionUrl: rtrim((string) config('app.url'), '/') . '/admin/users/users',
         );
+        // If a tester/player registers using an address that is also configured
+        // as an admin-alert recipient, do not deliver both the player welcome and the
+        // internal new-player alert to the same inbox.
+        $adminRecipients = collect($this->adminRecipients())
+            ->reject(fn (string $recipient): bool => $email !== null && strcasecmp($recipient, $email) === 0)
+            ->values()
+            ->all();
+
+        if ($adminRecipients === []) {
+            return [
+                'success' => true,
+                'all_success' => true,
+                'sent' => 0,
+                'recipients' => [],
+                'sent_recipients' => [],
+                'failed_recipients' => [],
+                'skipped_player_address' => true,
+            ];
+        }
+
         return $this->sendToAdmins(
             '[PLYRCARD New Player] ' . $name . ' - ' . $planLabel,
             $html,
             $email,
             'new_player_registration',
             ['user_id' => $user->getKey(), 'plan_key' => $planKey],
+            $adminRecipients,
         );
     }
 
