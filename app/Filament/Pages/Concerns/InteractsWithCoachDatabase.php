@@ -1319,13 +1319,20 @@ trait InteractsWithCoachDatabase
         if ($this->selectedConversationId) {
             $cached = Cache::get($this->deferredUiCacheKey('messages', $this->selectedConversationId), []);
             if (is_array($cached['rows'] ?? null)) {
-                $this->messages = collect($cached['rows'])
+                $cachedMessages = collect($cached['rows'])
                     ->filter(fn ($row): bool => is_array($row))
                     ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
                     ->values()
                     ->all();
-                $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
-                $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
+
+                // Background/deferred cache hydration must never blank a thread that is
+                // already visible. An empty cache can briefly exist while a worker refreshes
+                // or after cache invalidation; keep the last known-good Livewire state.
+                if (! empty($cachedMessages) || empty($this->messages)) {
+                    $this->messages = $cachedMessages;
+                    $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
+                    $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
+                }
             }
         }
 
@@ -6972,12 +6979,20 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return false;
     }
 
-    $this->messages = collect($cached['rows'])
+    $cachedMessages = collect($cached['rows'])
         ->filter(fn ($row): bool => is_array($row))
         ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($this->normalizeConversationMessageRow($row)))
         ->values()
         ->all();
 
+    // Never downgrade a currently visible, known-good thread to an empty cache result.
+    // This matters during quiet polling because cache invalidation and cache replacement
+    // are not guaranteed to be atomic across every backing store.
+    if (empty($cachedMessages) && ! empty($this->messages)) {
+        return false;
+    }
+
+    $this->messages = $cachedMessages;
     $this->messageLastId = $cached['last_message_id'] ?? $this->messageLastId;
     $this->hasMoreMessages = (bool) ($cached['has_more'] ?? $this->hasMoreMessages);
 
