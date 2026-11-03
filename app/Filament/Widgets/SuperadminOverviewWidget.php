@@ -430,7 +430,7 @@ class SuperadminOverviewWidget extends Widget implements HasActions, HasSchemas
                 $candidates = $candidates->concat($decoded);
             } else {
                 $candidates = $candidates->concat(
-                    preg_split('/[\r\n,]+/', $extra) ?: []
+                    preg_split('/[\r\n,;]+/', $extra) ?: []
                 );
             }
         }
