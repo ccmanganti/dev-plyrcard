@@ -427,24 +427,83 @@
                     <span class="pc-plan is-{{ str($plan['plan'])->slug() }}">{{ $plan['plan'] }}</span>
                     <strong>{{ number_format($plan['count']) }}</strong>
                     <small>
-                        {{ $plan['recurring_cents'] > 0 ? '
+                        @if($plan['recurring_cents'] > 0)
+                            &#36;{{ number_format($plan['recurring_cents'] / 100, 2) }}/mo recurring
+                        @else
+                            no active recurring revenue
+                        @endif
+                        @if(($plan['setup_cents'] ?? 0) > 0)
+                            · &#36;{{ number_format($plan['setup_cents'] / 100, 2) }} setup recorded
+                        @endif
+                    </small>
+                </div>
             @endforeach
         </div>
 
         <section class="pc-panel">
-            <header class="pc-panel-head"><div><h3>Subscriptions</h3><p>Past due first, then active and inactive accounts.</p></div></header>
+            <header class="pc-panel-head">
+                <div><h3>Subscriptions</h3><p>Past due first, then active and inactive accounts.</p></div>
+            </header>
             <div class="pc-table-wrap">
                 <table class="pc-table">
-                    <thead><tr><th>Athlete</th><th>Plan</th><th>Rate</th><th>Started</th><th>Last payment</th><th>Payment state</th><th>Subscription</th><th>Action</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th>Athlete</th>
+                            <th>Plan</th>
+                            <th>Rate</th>
+                            <th>Started</th>
+                            <th>Last payment</th>
+                            <th>Payment state</th>
+                            <th>Subscription</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
                     <tbody>
                     @forelse($billing_rows as $athlete)
                         @php
                             $billingReminder = $athlete['reminders']['payment_attention'] ?? null;
                         @endphp
-                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int)$athlete['id'] }}; document.body.style.overflow='hidden'">
-                            <td><div class="pc-person"><span class="pc-avatar">{{ $athlete['initials'] }}</span><span><b>{{ $athlete['name'] }}</b><small>{{ $athlete['sport'] }} · {{ $athlete['billing']['provider'] }}</small></span></div></td>
+                        <tr class="pc-click-row" x-on:click="athleteDrawer={{ (int) $athlete['id'] }}; document.body.style.overflow='hidden'">
+                            <td>
+                                <div class="pc-person">
+                                    <span class="pc-avatar">{{ $athlete['initials'] }}</span>
+                                    <span>
+                                        <b>{{ $athlete['name'] }}</b>
+                                        <small>{{ $athlete['sport'] }} · {{ $athlete['billing']['provider'] }}</small>
+                                    </span>
+                                </div>
+                            </td>
                             <td><span class="pc-plan is-{{ $athlete['plan_key'] }}">{{ $athlete['plan'] }}</span></td>
-                            <td class="pc-mono">{{ $athlete['billing']['recurring_cents'] > 0 ? '
+                            <td class="pc-mono">
+                                @if($athlete['billing']['recurring_cents'] > 0)
+                                    &#36;{{ number_format($athlete['billing']['recurring_cents'] / 100, 2) }}/mo
+                                @else
+                                    —
+                                @endif
+                            </td>
+                            <td>{{ $athlete['billing']['started'] }}</td>
+                            <td>
+                                <div class="pc-payment-cell">
+                                    <b>{{ $athlete['billing']['last_payment_amount'] }}</b>
+                                    <small>{{ $athlete['billing']['last_payment'] }}</small>
+                                </div>
+                            </td>
+                            <td><span class="pc-state is-{{ $athlete['state'] }}">{{ str($athlete['billing']['payment_status'])->headline() }}</span></td>
+                            <td>{{ str($athlete['billing']['subscription_status'])->headline() }}</td>
+                            <td x-on:click.stop>
+                                <span class="pc-quick-actions">
+                                    <button type="button" class="pc-btn is-small {{ ($billingReminder['week_count'] ?? 0) > 0 ? 'pc-reminder-sent' : '' }}" wire:click="$dispatch('open-admin-support-reminder', { userId: {{ (int) $athlete['id'] }}, concern: 'payment_attention' })">
+                                        {{ ($billingReminder['week_count'] ?? 0) > 0 ? '✓ Sent '.($billingReminder['when'] ?? '') : 'Remind' }}
+                                    </button>
+                                    <span class="pc-impersonate-quick" title="Impersonate {{ $athlete['name'] }}">
+                                        {{ ($this->impersonateAction)(['userId' => (int) $athlete['id']]) }}
+                                    </span>
+                                </span>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="8"><div class="pc-empty">No subscription records are available yet.</div></td></tr>
+                    @endforelse
                     </tbody>
                 </table>
             </div>
