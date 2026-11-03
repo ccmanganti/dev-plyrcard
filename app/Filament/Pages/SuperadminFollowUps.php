@@ -16,8 +16,10 @@ class SuperadminFollowUps extends SuperadminAthletes
 
     protected static ?int $navigationSort = 3;
 
+    /*
     public static function shouldRegisterNavigation(): bool
     {
         return false;
     }
+    */
 }
