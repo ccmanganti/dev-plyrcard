@@ -4,7 +4,9 @@ namespace App\Filament\Widgets;
 
 use App\Filament\Resources\CreditServiceRequests\CreditServiceRequestResource;
 use App\Filament\Resources\Users\UserResource;
+use App\Models\CreditPointTransaction;
 use App\Models\CreditServiceRequest;
+use App\Models\CoachDatabaseEmailMessage;
 use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Services\ProfileCompletionService;
@@ -30,13 +32,15 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             return [
                 'athletes' => (int) ($data['athlete_count'] ?? 0),
                 'followups' => count((array) ($data['attention_all'] ?? [])),
-                'billing' => (int) ($data['billing_stats']['active'] ?? 0),
+                'subscriptions' => (int) ($data['billing_stats']['active'] ?? 0),
+                'amplify' => (int) ($data['amplify_credit_stats']['athletes'] ?? 0),
             ];
         } catch (Throwable) {
             return [
                 'athletes' => 0,
                 'followups' => 0,
-                'billing' => 0,
+                'subscriptions' => 0,
+                'amplify' => 0,
             ];
         }
     }
