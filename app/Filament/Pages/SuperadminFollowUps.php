@@ -3,7 +3,7 @@
 namespace App\Filament\Pages;
 
 use BackedEnum;
-use App\Filament\Widgets\SuperadminFollowUpsControlCenterWidget;
+use App\Support\SuperadminWidgets\SuperadminFollowUpsControlCenterWidget;
 
 class SuperadminFollowUps extends SuperadminAthletes
 {
