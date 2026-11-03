@@ -5,15 +5,23 @@
         tab: @js($initialTab ?? (request()->is('admin/athletes') ? 'athletes' : (request()->is('admin/follow-ups') ? 'followups' : (request()->is('admin/superadmin-billing') ? 'billing' : 'dashboard')))),
         athleteDrawer: null,
         activityDrawer: null,
-        search: '',
-        sport: 'all',
-        plan: 'all',
-        state: 'all',
+        search: @js((string) request()->query('q', '')),
+        sport: @js((string) request()->query('sport', 'all')),
+        plan: @js((string) request()->query('plan', 'all')),
+        grad: @js((string) request()->query('grad', 'all')),
+        state: @js((string) request()->query('state', 'all')),
         openTab(name) {
+            const routes = {
+                dashboard: @js(url('/admin')),
+                athletes: @js(url('/admin/athletes')),
+                followups: @js(url('/admin/follow-ups')),
+                billing: @js(url('/admin/superadmin-billing')),
+            };
+            if (routes[name]) {
+                window.location.href = routes[name];
+                return;
+            }
             this.tab = name;
-            this.athleteDrawer = null;
-            this.activityDrawer = null;
-            document.body.style.overflow = '';
         },
         matches(row) {
             const q = this.search.trim().toLowerCase();
@@ -21,7 +29,10 @@
             if (q && !hay.includes(q)) return false;
             if (this.sport !== 'all' && row.sport_key !== this.sport) return false;
             if (this.plan !== 'all' && row.plan_key !== this.plan) return false;
-            if (this.state !== 'all' && row.state !== this.state) return false;
+            if (this.grad !== 'all' && String(row.year || '') !== this.grad) return false;
+            if (this.state === 'attention' && !row.has_followup) return false;
+            if (this.state === 'healthy' && Number(row.health || 0) < 80) return false;
+            if (!['all', 'attention', 'healthy'].includes(this.state) && row.state !== this.state) return false;
             return true;
         },
         closeOverlays() {
