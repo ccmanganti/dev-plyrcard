@@ -214,6 +214,41 @@ class SupportAlertService
         );
     }
 
+    public function sendPlayerPhotosUploaded(User $user, int $photoCount, string $source = 'My Photos'): array
+    {
+        $photoCount = max(1, $photoCount);
+        $name = trim(collect([$user->first_name, $user->last_name])->filter()->implode(' ')) ?: ($user->email ?: 'PLYRCARD player');
+        $email = $this->sanitizeEmail((string) ($user->personal_email ?: $user->email));
+        $adminUrl = rtrim((string) config('app.url'), '/') . '/admin/users/users/' . $user->getKey();
+
+        $html = $this->layout(
+            heading: 'Player photos uploaded',
+            intro: 'A PLYRCARD player uploaded new images that may need review or follow-up.',
+            rows: [
+                'Player' => $name,
+                'Email' => $email ?: 'Not available',
+                'Images uploaded' => number_format($photoCount),
+                'Source' => $source,
+                'Uploaded' => now()->format('M j, Y g:i A'),
+            ],
+            message: 'Open the player record to review the newly uploaded photos and continue any pending image or service request.',
+            actionLabel: 'Open Player',
+            actionUrl: $adminUrl,
+        );
+
+        return $this->sendToAdmins(
+            '[PLYRCARD Photo Upload] ' . $name . ' uploaded ' . number_format($photoCount) . ' image' . ($photoCount === 1 ? '' : 's'),
+            $html,
+            $email,
+            'player_photo_upload',
+            [
+                'user_id' => $user->getKey(),
+                'photo_count' => $photoCount,
+                'source' => $source,
+            ],
+        );
+    }
+
     public function sendUpgradeCompleted(User $user, string $upgrade, int $amountCents, array $context = []): array
     {
         $user->loadMissing('roles');
