@@ -282,12 +282,12 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
         $queues = collect([
             'getting_started' => [
-                'title' => 'Login / onboarding',
+                'title' => 'Never logged in / dormant',
                 'description' => 'New or dormant accounts that need a push back into PLYRCARD.',
                 'concern' => 'getting_started',
             ],
             'billing' => [
-                'title' => 'Payment needs attention',
+                'title' => 'Payment failed',
                 'description' => 'Failed, past-due, unpaid, or incomplete billing states.',
                 'concern' => 'payment_attention',
             ],
@@ -307,7 +307,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'concern' => 'send_photo',
             ],
             'outreach' => [
-                'title' => 'Outreach quiet',
+                'title' => 'Quiet 30+ days',
                 'description' => 'Paying athletes with no outreach or 30+ days of silence.',
                 'concern' => 'start_outreach',
             ],
