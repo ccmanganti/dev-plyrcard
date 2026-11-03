@@ -72,7 +72,7 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime','email_verification_sent_at' => 'datetime','password' => 'hashed','natl_team_exp' => 'boolean','position' => 'array','youtube_cached_videos' => 'array','youtube_cache_refreshed_at' => 'datetime','raw_player_images' => 'array','club_referral_id' => 'integer','utm_club_id' => 'integer','utm_league_id' => 'integer','total_emails_sent' => 'integer','must_change_password' => 'boolean','onboarding_completed_at' => 'datetime',
+            'email_verified_at' => 'datetime','email_verification_sent_at' => 'datetime','password' => 'hashed','natl_team_exp' => 'boolean','position' => 'array','youtube_cached_videos' => 'array','youtube_cache_refreshed_at' => 'datetime','raw_player_images' => 'array','club_referral_id' => 'integer','utm_club_id' => 'integer','utm_league_id' => 'integer','total_emails_sent' => 'integer','must_change_password' => 'boolean','onboarding_completed_at' => 'datetime','last_login_at' => 'datetime',
             'points_available' => 'integer',
         ];
     }
