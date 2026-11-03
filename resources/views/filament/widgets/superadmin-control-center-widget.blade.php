@@ -2,7 +2,7 @@
 <div
     class="pc-admin"
     x-data="{
-        tab: @js($initialTab ?? 'dashboard'),
+        tab: @js($initialTab ?? (request()->is('admin/athletes') ? 'athletes' : (request()->is('admin/follow-ups') ? 'followups' : (request()->is('admin/superadmin-billing') ? 'billing' : 'dashboard')))),
         athleteDrawer: null,
         activityDrawer: null,
         search: '',
