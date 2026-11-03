@@ -2,7 +2,7 @@
 
 namespace App\Filament\Pages;
 
-use App\Filament\Widgets\SuperadminAthletesControlCenterWidget;
+use App\Support\SuperadminWidgets\SuperadminAthletesControlCenterWidget;
 use App\Filament\Widgets\SuperadminControlCenterWidget;
 use BackedEnum;
 use Filament\Pages\Page;
