@@ -1965,7 +1965,12 @@ class AdminPanelProvider extends PanelProvider
 
                                             const labelNode = link.querySelector('.fi-sidebar-item-label') || link.querySelector('span');
                                             const label = (labelNode ? labelNode.textContent : '').trim();
-                                            const hrefPath = pathOf(link.href);
+
+                                            // Always classify the sidebar item by its real destination. Once a
+                                            // locked link is neutralized to "#", link.href resolves to the current
+                                            // page and can falsely look like an allowed Free route.
+                                            const sourceHref = String(link.dataset.plyrLockedHref || link.getAttribute('href') || link.href || '').trim();
+                                            const hrefPath = pathOf(sourceHref);
                                             const allowed = allowedLabel(label)
                                                 || hrefPath.includes('/coach-database/photos')
                                                 || hrefPath.includes('/coach-database/schedule')
@@ -2013,18 +2018,31 @@ class AdminPanelProvider extends PanelProvider
                                             link.removeAttribute('wire:navigate.hover');
                                             link.removeAttribute('data-navigate');
 
-                                            if (link.dataset.boundFreeLock === '1') {
+                                        });
+                                    };
+
+                                    // One delegated capture handler owns every locked sidebar click. This
+                                    // survives Livewire/Filament replacing individual sidebar anchors and keeps
+                                    // the upgrade prompt behavior consistent across all Free-access pages.
+                                    if (! document.documentElement.dataset.plyrFreeLockDelegateBound) {
+                                        document.documentElement.dataset.plyrFreeLockDelegateBound = '1';
+
+                                        document.addEventListener('click', (event) => {
+                                            const link = event.target?.closest?.('.fi-sidebar a.plyr-free-locked-link');
+
+                                            if (! link) {
                                                 return;
                                             }
 
-                                            link.dataset.boundFreeLock = '1';
-                                            link.addEventListener('click', (event) => {
-                                                event.preventDefault();
-                                                event.stopImmediatePropagation();
-                                                openModal(label || 'This');
-                                            }, true);
-                                        });
-                                    };
+                                            event.preventDefault();
+                                            event.stopImmediatePropagation();
+
+                                            const labelNode = link.querySelector('.fi-sidebar-item-label') || link.querySelector('span');
+                                            const label = (labelNode ? labelNode.textContent : '').trim();
+
+                                            openModal(label || 'This');
+                                        }, true);
+                                    }
 
                                     // Do not redirect Free users away from a locked route here. Locked
                                     // navigation is intercepted client-side and opens the upgrade drawer instead.
