@@ -1379,7 +1379,6 @@ class UserResource extends Resource
             'dominant_foot' => 'Dominant foot',
             'jersey_number' => 'Jersey number',
             'max_speed' => 'Max speed',
-            'max_speed_unit' => 'Max speed unit',
             'natl_team_exp' => 'National team experience',
             'national_team_id' => 'National team',
             'national_team_period' => 'National team period',
