@@ -13,6 +13,7 @@ class Organizations extends Cluster
     protected static string|BackedEnum|null $activeNavigationIcon = Heroicon::BuildingOffice2;
     protected static ?string $navigationLabel = 'Organizations';
     protected static ?string $slug = 'organizations';
+    protected static string | \UnitEnum | null $navigationGroup = 'Platform Management';
     protected static ?int $navigationSort = 10;
     protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
