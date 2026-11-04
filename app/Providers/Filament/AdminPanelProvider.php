@@ -83,6 +83,12 @@ class AdminPanelProvider extends PanelProvider
             ->darkModeBrandLogo(asset('logo.png'))
             ->brandLogoHeight('3rem')
             ->globalSearch(false)
+            ->navigationGroups([
+                'Dashboard',
+                'Platform Management',
+                'Operations & Support',
+                'Recruiting Center',
+            ])
             ->colors([
                 'primary' => '#ff6338',
             ])
@@ -1979,6 +1985,7 @@ class AdminPanelProvider extends PanelProvider
                                                 link.classList.remove('plyr-free-locked-link');
                                                 link.removeAttribute('aria-disabled');
                                                 link.removeAttribute('title');
+                                                link.querySelector('.plyr-free-lock-badge')?.remove();
                                                 const originalHref = String(link.dataset.plyrLockedHref || '').trim();
                                                 if (originalHref) {
                                                     link.setAttribute('href', originalHref);
