@@ -362,7 +362,19 @@ if($('#pw'))$('#pw').addEventListener('input',()=>{pwState();});
 if($('#peek'))$('#peek').addEventListener('click',function(){const pw=$('#pw'),on=pw.type==='password';pw.type=on?'text':'password';this.textContent=on?'Hide':'Show'});
 if($('#minor'))$('#minor').addEventListener('change',function(){$('#guardian')?.classList.toggle('open',this.checked);saveFormCache()});
 
-function goto(n,persist=true){$$('.panel').forEach(p=>p.classList.toggle('active',+p.dataset.step===n));$$('#steps li').forEach((li,i)=>{li.classList.toggle('on',i+1===n);li.classList.toggle('done',i+1<n);const d=li.querySelector('.dot');if(d)d.textContent=i+1<n?'✓':i+1});if($('#mbar'))$('#mbar').style.width=(Math.min(n,maxStep)/maxStep*100)+'%';cur=n;if(persist)saveFormCache();window.scrollTo({top:0,behavior:'smooth'})}
+function goto(n,persist=true){
+  if(!PAID&&n===4){
+    const handle=slug((($('#fn')?.value||'')+' '+($('#ln')?.value||'')).trim(),true)||($('#handleHidden')?.value||'').trim()||'first-last-name';
+    if($('#preview'))$('#preview').textContent=handle;
+    if($('#handleHidden'))$('#handleHidden').value=handle;
+  }
+  $('.panel').forEach(p=>p.classList.toggle('active',+p.dataset.step===n));
+  $('#steps li').forEach((li,i)=>{li.classList.toggle('on',i+1===n);li.classList.toggle('done',i+1<n);const d=li.querySelector('.dot');if(d)d.textContent=i+1<n?'✓':i+1});
+  if($('#mbar'))$('#mbar').style.width=(Math.min(n,maxStep)/maxStep*100)+'%';
+  cur=n;
+  if(persist)saveFormCache();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 function validateAccount(){let e=[];e.push(bad($('#fn'),!$('#fn')?.value.trim()));e.push(bad($('#ln'),!$('#ln')?.value.trim()));e.push(bad($('#em'),!mail($('#em')?.value||'')));if(PAID)e.push(bad($('#ph'),($('#ph')?.value||'').replace(/\D/g,'').length<7));e.push(bad($('#pw'),!pwState()));if($('#minor')?.checked){e.push(bad($('#gn'),!$('#gn')?.value.trim()));e.push(bad($('#ge'),!mail($('#ge')?.value||'')))}return !e.includes(true)}
 function validateAthleteDetails(){let e=[];e.push(bad($('#grad'),!$('#grad')?.value));return !e.includes(true)}
 function validateSportTeam(){let e=[];const dm=$('#divisionWrap .msg');if(dm)dm.classList.toggle('show',!division);e.push(!division);e.push(bad($('#sport'),!$('#sport')?.value));const pm=$('#positionWrap .msg');if(pm)pm.classList.toggle('show',pickedPositions.length===0);e.push(pickedPositions.length===0);e.push(bad($('#league'),!$('#league')?.value));e.push(bad($('#club'),!$('#club')?.value));if($('#club')?.value==='__other__')e.push(bad($('#clubOther'),!$('#clubOther')?.value.trim()));e.push(bad($('#team'),!$('#team')?.value));if($('#ce')?.value)e.push(bad($('#ce'),!mail($('#ce').value)));return !e.includes(true)}
