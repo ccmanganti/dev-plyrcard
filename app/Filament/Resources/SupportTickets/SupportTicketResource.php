@@ -28,6 +28,7 @@ class SupportTicketResource extends Resource
     protected static ?string $modelLabel = 'Support Ticket';
     protected static ?string $pluralModelLabel = 'Support Tickets';
     protected static ?string $slug = 'support-tickets';
+    protected static string | \UnitEnum | null $navigationGroup = 'Operations & Support';
     protected static ?int $navigationSort = 90;
     protected static ?string $recordTitleAttribute = 'ticket_number';
 
