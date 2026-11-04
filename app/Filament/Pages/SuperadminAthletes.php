@@ -13,6 +13,7 @@ class SuperadminAthletes extends Page
     protected static ?string $navigationLabel = 'Athletes';
     protected static ?string $title = 'Athletes';
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
+    protected static string | \UnitEnum | null $navigationGroup = 'Dashboard';
     protected static ?int $navigationSort = 2;
 
     protected static string $controlCenterWidgetClass = SuperadminAthletesControlCenterWidget::class;
