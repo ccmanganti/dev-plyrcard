@@ -11470,6 +11470,15 @@ CSS;
                 .rc-photos-upload-copy-v102{min-width:0}.rc-photos-upload-copy-v102 strong{display:block;color:var(--rc-text);font-size:.78rem}.rc-photos-upload-copy-v102 span{display:block;margin-top:.2rem;color:var(--rc-muted);font-size:.68rem;line-height:1.4}
                 .rc-photos-file-v102{position:relative;flex:0 0 auto}.rc-photos-file-v102 input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
                 .rc-photos-grid-v102{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}
+                .rc-photo-add-v103{position:relative;min-width:0;aspect-ratio:4/3;overflow:hidden;border:1px dashed #cbd5e1;border-radius:.9rem;background:#eef1f4;color:#667085;display:grid;place-items:center;cursor:pointer;transition:border-color .16s ease,background .16s ease,color .16s ease,transform .16s ease}
+                .dark .rc-photo-add-v103{background:#20242b;border-color:#3b4350;color:#a6afbb}
+                .rc-photo-add-v103:hover,.rc-photo-add-v103:focus-within{border-color:#ff6338;background:rgba(255,99,56,.08);color:#ff6338;transform:translateY(-1px)}
+                .rc-photo-add-v103 input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+                .rc-photo-add-inner-v103{display:grid;place-items:center;gap:.45rem;pointer-events:none;text-align:center}
+                .rc-photo-add-icon-v103{width:2.75rem;height:2.75rem;border-radius:999px;display:grid;place-items:center;background:rgba(255,255,255,.72);border:1px solid rgba(148,163,184,.28);font-size:1.65rem;font-weight:350;line-height:1}
+                .dark .rc-photo-add-icon-v103{background:#2a3038}
+                .rc-photo-add-inner-v103 strong{font-size:.75rem}.rc-photo-add-inner-v103 span{font-size:.62rem;color:var(--rc-muted)}
+                .rc-photo-add-loading-v103{display:inline-flex;align-items:center;gap:.4rem;font-size:.68rem;font-weight:800;color:#ff6338}
                 .rc-photo-card-v102{position:relative;min-width:0;aspect-ratio:4/3;overflow:hidden;border:1px solid var(--rc-border);border-radius:.9rem;background:var(--rc-soft);box-shadow:0 8px 20px rgba(15,23,42,.045)}
                 .dark .rc-photo-card-v102{box-shadow:none}
                 .rc-photo-card-v102 img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .22s ease,filter .22s ease}.rc-photo-card-v102:hover img,.rc-photo-card-v102:focus-within img{transform:scale(1.025);filter:brightness(.82)}
@@ -11499,16 +11508,18 @@ CSS;
                     <button type="button" class="rc-photos-tab-v102" :class="tab==='plyrcard' && 'is-active'" x-on:click="tab='plyrcard'">PLYRCARD Photos <span class="rc-photos-count-v102">{{ $plyrcardGallery->count() }}</span></button>
                 </div>
                 <div x-show="tab==='player'" style="display:grid;gap:1rem">
-                    <div class="rc-photos-upload-v102">
-                        <div class="rc-photos-upload-copy-v102"><strong>Add Player Photos</strong><span>Upload images you want available in your player gallery.</span></div>
-                        <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
-                            <div class="rc-photos-file-v102 rc-btn"><span>Choose Photos</span><input type="file" accept="image/*" multiple wire:model="playerPhotoUploads"></div>
-                            @if(! empty($playerPhotoUploads))
-                                <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlayerPhotos" wire:loading.attr="disabled" wire:target="uploadPlayerPhotos,playerPhotoUploads"><span wire:loading.remove wire:target="uploadPlayerPhotos">Upload</span><span wire:loading.flex wire:target="uploadPlayerPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
-                            @endif
-                        </div>
-                    </div>
                     <div class="rc-photos-grid-v102">
+                        <label class="rc-photo-add-v103" aria-label="Add player photos">
+                            <input type="file" accept="image/*" multiple wire:model.live="playerPhotoUploads">
+                            <span class="rc-photo-add-inner-v103" wire:loading.remove wire:target="playerPhotoUploads">
+                                <span class="rc-photo-add-icon-v103">+</span>
+                                <strong>Add photos</strong>
+                                <span>Select images to upload instantly</span>
+                            </span>
+                            <span class="rc-photo-add-loading-v103" wire:loading.flex wire:target="playerPhotoUploads">
+                                <span class="rc-spinner-mini"></span> Uploading…
+                            </span>
+                        </label>
                         @forelse($playerGallery as $photo)
                             @php $photoIndex = (int) ($photo['index'] ?? $loop->index); @endphp
                             <article class="rc-photo-card-v102" wire:key="player-photo-{{ md5((string) ($photo['path'] ?? $photoIndex)) }}">
@@ -11519,23 +11530,25 @@ CSS;
                                 </div>
                             </article>
                         @empty
-                            <div class="rc-photos-empty-v102"><div><strong>No player photos yet.</strong><span>Choose photos above to start your gallery.</span></div></div>
+                            <div class="rc-photos-empty-v102"><div><strong>No player photos yet.</strong><span>Use the + tile to upload your first photos.</span></div></div>
                         @endforelse
                     </div>
                 </div>
                 <div x-show="tab==='plyrcard'" x-cloak style="display:grid;gap:1rem">
-                    @if($canManagePlyrcardGallery)
-                        <div class="rc-photos-upload-v102">
-                            <div class="rc-photos-upload-copy-v102"><strong>Additional Photos</strong><span>Add more images to the PLYRCARD gallery.</span></div>
-                            <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
-                                <div class="rc-photos-file-v102 rc-btn"><span>Choose Photos</span><input type="file" accept="image/*" multiple wire:model="plyrcardPhotoUploads"></div>
-                                @if(! empty($plyrcardPhotoUploads))
-                                    <button type="button" class="rc-btn rc-btn-primary" wire:click="uploadPlyrcardPhotos" wire:loading.attr="disabled" wire:target="uploadPlyrcardPhotos,plyrcardPhotoUploads"><span wire:loading.remove wire:target="uploadPlyrcardPhotos">Upload</span><span wire:loading.flex wire:target="uploadPlyrcardPhotos" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Uploading</span></button>
-                                @endif
-                            </div>
-                        </div>
-                    @endif
                     <div class="rc-photos-grid-v102">
+                        @if($canManagePlyrcardGallery)
+                            <label class="rc-photo-add-v103" aria-label="Add PLYRCARD photos">
+                                <input type="file" accept="image/*" multiple wire:model.live="plyrcardPhotoUploads">
+                                <span class="rc-photo-add-inner-v103" wire:loading.remove wire:target="plyrcardPhotoUploads">
+                                    <span class="rc-photo-add-icon-v103">+</span>
+                                    <strong>Add photos</strong>
+                                    <span>Select images to upload instantly</span>
+                                </span>
+                                <span class="rc-photo-add-loading-v103" wire:loading.flex wire:target="plyrcardPhotoUploads">
+                                    <span class="rc-spinner-mini"></span> Uploading…
+                                </span>
+                            </label>
+                        @endif
                         @forelse($plyrcardGallery as $photo)
                             @php
                                 $photoIndex = (int) ($photo['index'] ?? 0);
