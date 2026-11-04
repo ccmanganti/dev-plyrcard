@@ -915,6 +915,22 @@ class UserResource extends Resource
                                         ->maxLength(255)
                                         ->placeholder('e.g. 185 lbs or 84 kg'),
 
+                                    TextInput::make('max_speed')
+                                        ->prefixIcon('heroicon-m-bolt')
+                                        ->label('Max Speed')
+                                        ->placeholder('e.g. 19.00')
+                                        ->numeric()
+                                        ->step('0.01'),
+
+                                    Select::make('max_speed_unit')
+                                        ->label('Max Speed Unit')
+                                        ->options([
+                                            'mph' => 'MPH',
+                                            'kph' => 'KPH',
+                                        ])
+                                        ->default('mph')
+                                        ->required(),
+
                                     Select::make('dominant_foot')
                                         ->prefixIcon('heroicon-m-hand-raised')
                                         ->label('Dominant Foot')
@@ -1363,6 +1379,7 @@ class UserResource extends Resource
             'dominant_foot' => 'Dominant foot',
             'jersey_number' => 'Jersey number',
             'max_speed' => 'Max speed',
+            'max_speed_unit' => 'Max speed unit',
             'natl_team_exp' => 'National team experience',
             'national_team_id' => 'National team',
             'national_team_period' => 'National team period',
@@ -1401,6 +1418,7 @@ class UserResource extends Resource
                     'jersey_number',
                     'ncaa_field_id',
                     'max_speed',
+                    'max_speed_unit',
                     'player_bio',
                 ],
             ],
