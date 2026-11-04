@@ -1977,6 +1977,13 @@ class AdminPanelProvider extends PanelProvider
 
                                             if (allowed) {
                                                 link.classList.remove('plyr-free-locked-link');
+                                                link.removeAttribute('aria-disabled');
+                                                link.removeAttribute('title');
+                                                const originalHref = String(link.dataset.plyrLockedHref || '').trim();
+                                                if (originalHref) {
+                                                    link.setAttribute('href', originalHref);
+                                                    delete link.dataset.plyrLockedHref;
+                                                }
                                                 return;
                                             }
 
@@ -1991,6 +1998,14 @@ class AdminPanelProvider extends PanelProvider
                                                 link.appendChild(badge);
                                             }
 
+                                            if (! link.dataset.plyrLockedHref) {
+                                                link.dataset.plyrLockedHref = link.getAttribute('href') || '';
+                                            }
+                                            link.setAttribute('href', '#');
+                                            link.removeAttribute('wire:navigate');
+                                            link.removeAttribute('wire:navigate.hover');
+                                            link.removeAttribute('data-navigate');
+
                                             if (link.dataset.boundFreeLock === '1') {
                                                 return;
                                             }
@@ -1998,16 +2013,15 @@ class AdminPanelProvider extends PanelProvider
                                             link.dataset.boundFreeLock = '1';
                                             link.addEventListener('click', (event) => {
                                                 event.preventDefault();
-                                                event.stopPropagation();
+                                                event.stopImmediatePropagation();
                                                 openModal(label || 'This');
                                             }, true);
                                         });
                                     };
 
-                                    if (! isAllowedPath()) {
-                                        window.location.replace(profileUrl);
-                                        return;
-                                    }
+                                    // Do not redirect Free users away from a locked route here. Locked
+                                    // navigation is intercepted client-side and opens the upgrade drawer instead.
+                                    // A hard location.replace() caused the drawer to disappear a few seconds later.
 
                                     document.addEventListener('DOMContentLoaded', () => { ensureUpgradeDrawerMountedToBody(); applyFreeLocks(); });
                                     document.addEventListener('livewire:navigated', () => { ensureUpgradeDrawerMountedToBody(); applyFreeLocks(); });
