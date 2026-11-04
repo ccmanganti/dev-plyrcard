@@ -210,10 +210,8 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
             <div class="pc-feature"><span class="pc-check">✓</span><span>Your own personalized domain</span></div>
             <div class="pc-feature"><span class="pc-check">✓</span><span>Your own email, sent from you</span></div>
             <div class="pc-feature"><span class="pc-check">✓</span><span>Coach engagement tracking</span></div>
-            <div class="pc-feature"><span class="pc-check">✓</span><span>Outreach templates</span></div>
             <div class="pc-feature"><span class="pc-check">✓</span><span>Coach database, verified weekly</span></div>
             <div class="pc-feature"><span class="pc-check">✓</span><span>1-on-1 onboarding</span></div>
-            <div class="pc-feature"><span class="pc-check">✓</span><span><strong>Unlocks PLYR Points</strong></span></div>
           </div>
         </div>
       </article>
@@ -358,9 +356,7 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
           <tr><td>Your own domain and email</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
           <tr><td>Coach engagement tracking</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
           <tr><td>Coach database, verified weekly</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
-          <tr><td>Outreach templates</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
           <tr><td>1-on-1 onboarding</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
-          <tr><td>Buy PLYR Points for reels, graphics, outreach and rep time</td><td class="pc-no">—</td><td class="pc-yes">✓</td></tr>
           <tr><td>Email support</td><td class="pc-yes">✓</td><td class="pc-yes">✓</td></tr>
         </tbody>
       </table>
