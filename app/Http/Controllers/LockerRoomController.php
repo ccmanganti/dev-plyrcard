@@ -187,6 +187,7 @@ class LockerRoomController extends Controller
             'dominant_foot' => ['nullable', Rule::in(['left', 'right', 'both'])],
             'ncaa_field_id' => ['nullable', 'string', 'max:255'],
             'max_speed' => ['nullable', 'numeric', 'min:0'],
+            'max_speed_unit' => ['nullable', Rule::in(['mph', 'kph'])],
             'school_id' => ['nullable', 'integer', Rule::exists('schools', 'id')],
             'league_id' => ['nullable', 'integer', Rule::exists('leagues', 'id')],
             'club_id' => ['nullable', 'integer', Rule::exists('clubs', 'id')],
