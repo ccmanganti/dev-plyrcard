@@ -31,6 +31,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\FusedGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -915,21 +916,23 @@ class UserResource extends Resource
                                         ->maxLength(255)
                                         ->placeholder('e.g. 185 lbs or 84 kg'),
 
-                                    TextInput::make('max_speed')
-                                        ->prefixIcon('heroicon-m-bolt')
-                                        ->label('Max Speed')
-                                        ->placeholder('e.g. 19.00')
-                                        ->numeric()
-                                        ->step('0.01'),
-
-                                    Select::make('max_speed_unit')
-                                        ->label('Max Speed Unit')
-                                        ->options([
-                                            'mph' => 'MPH',
-                                            'kph' => 'KPH',
-                                        ])
-                                        ->default('mph')
-                                        ->required(),
+                                    FusedGroup::make([
+                                        TextInput::make('max_speed')
+                                            ->hiddenLabel()
+                                            ->placeholder('e.g. 19.00')
+                                            ->numeric()
+                                            ->step('0.01'),
+                                        Select::make('max_speed_unit')
+                                            ->hiddenLabel()
+                                            ->options([
+                                                'mph' => 'MPH',
+                                                'kph' => 'KPH',
+                                            ])
+                                            ->default('mph')
+                                            ->required()
+                                            ->selectablePlaceholder(false),
+                                    ])
+                                        ->label('Max Speed'),
 
                                     Select::make('dominant_foot')
                                         ->prefixIcon('heroicon-m-hand-raised')
