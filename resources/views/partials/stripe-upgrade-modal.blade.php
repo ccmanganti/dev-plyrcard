@@ -299,7 +299,7 @@
         <div class="plyr-purchase-thank-you-kicker">Payment complete</div>
         <h2>Thank you!</h2>
         <p data-plyr-purchase-thank-you-copy></p>
-        <div class="plyr-purchase-thank-you-wait">Updating your PLYRCARD account…</div>
+        <div class="plyr-purchase-thank-you-wait">Your account has been updated. You can close this confirmation when you're ready.</div>
     </div>
 </div>
 
@@ -578,7 +578,8 @@
         showThankYou(message) {
             const overlay = this.thankYou();
             if (!overlay) {
-                window.location.reload();
+                this.setStatus(message || 'Payment complete.', 'success');
+                this.setTriggerBusy(this.activeTrigger, false);
                 return;
             }
 
@@ -590,7 +591,12 @@
 
             overlay.hidden = false;
             document.documentElement.style.overflow = 'hidden';
-            setTimeout(() => window.location.reload(), 2200);
+
+            // Keep completion client-side. Automatic reloads were closing the
+            // upgrade slider/confirmation after a couple of seconds.
+            window.dispatchEvent(new CustomEvent('plyrcard:checkout-completed', {
+                detail: { type: this.activeType, message }
+            }));
         },
 
         async mountPaymentElement(data, route) {
