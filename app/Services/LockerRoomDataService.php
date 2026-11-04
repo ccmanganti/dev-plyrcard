@@ -55,6 +55,7 @@ class LockerRoomDataService
         $isFree = $planKey === 'free';
         $isPremium = $planKey === 'my-journey';
         $workspaceReady = $this->workspaceReady($user);
+        $websitePublished = (bool) ($website?->is_published ?? false);
         return [
             'user' => $this->profilePayload($user, $isPremium),
             'plan' => [
@@ -63,7 +64,7 @@ class LockerRoomDataService
                 'is_free' => $isFree,
                 'is_premium' => $isPremium,
                 'workspace_ready' => $workspaceReady,
-                'show_preparing' => $isPremium && ! $workspaceReady,
+                'show_preparing' => $isPremium && ! $websitePublished,
                 'jumpstart_active' => $this->hasRole($user, 'Jumpstart'),
                 'amplify_active' => $this->hasRole($user, 'Amplify'),
             ],
@@ -159,6 +160,7 @@ class LockerRoomDataService
             'dominant_foot' => $user->dominant_foot,
             'ncaa_field_id' => $user->ncaa_field_id,
             'max_speed' => $user->max_speed,
+            'max_speed_unit' => $user->max_speed_unit ?: 'mph',
             'player_bio' => $user->player_bio,
             'academic_accolades' => $user->academic_accolades,
             'sports_accolades' => $user->sports_accolades,
