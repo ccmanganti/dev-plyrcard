@@ -16,6 +16,7 @@ class AdminSettings extends Page
     protected static ?string $navigationLabel = 'Admin Settings';
     protected static ?string $title = 'Admin Settings';
     protected static string | BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string | \UnitEnum | null $navigationGroup = 'Operations & Support';
     protected static ?int $navigationSort = 95;
 
     public array $enabledSports = [];
