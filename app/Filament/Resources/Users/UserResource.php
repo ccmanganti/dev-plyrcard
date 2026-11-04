@@ -917,21 +917,21 @@ class UserResource extends Resource
                                         ->placeholder('e.g. 185 lbs or 84 kg'),
 
                                     FusedGroup::make([
-                                        TextInput::make('max_speed')
-                                            ->hiddenLabel()
-                                            ->placeholder('e.g. 19.00')
-                                            ->numeric()
-                                            ->step('0.01'),
-                                        Select::make('max_speed_unit')
-                                            ->hiddenLabel()
-                                            ->options([
-                                                'mph' => 'MPH',
-                                                'kph' => 'KPH',
-                                            ])
-                                            ->default('mph')
-                                            ->required()
-                                            ->selectablePlaceholder(false),
-                                    ])
+                                            Select::make('max_speed_unit')
+                                                ->hiddenLabel()
+                                                ->options([
+                                                    'mph' => 'MPH',
+                                                    'kph' => 'KPH',
+                                                ])
+                                                ->default('mph')
+                                                ->required()
+                                                ->selectablePlaceholder(false),
+                                            TextInput::make('max_speed')
+                                                ->hiddenLabel()
+                                                ->placeholder('e.g. 19.00')
+                                                ->numeric()
+                                                ->step('0.01'),
+                                        ])
                                         ->label('Max Speed'),
 
                                     Select::make('dominant_foot')
