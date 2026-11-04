@@ -737,6 +737,15 @@ class EditProfile extends Page implements HasForms
                                             ->placeholder('e.g. 19.00')
                                             ->numeric()
                                             ->step('0.01'),
+
+                                        Select::make('max_speed_unit')
+                                            ->label('Max Speed Unit')
+                                            ->options([
+                                                'mph' => 'MPH',
+                                                'kph' => 'KPH',
+                                            ])
+                                            ->default('mph')
+                                            ->required(),
                                     ]),
 
                                 Section::make('Experience')
