@@ -733,22 +733,24 @@ class EditProfile extends Page implements HasForms
                                             ->required(fn (Get $get) => $get('sport') === 'soccer'),
 
                                         FusedGroup::make([
-                                                Select::make('max_speed_unit')
-                                                    ->hiddenLabel()
-                                                    ->options([
-                                                        'mph' => 'MPH',
-                                                        'kph' => 'KPH',
-                                                    ])
-                                                    ->default('mph')
-                                                    ->required()
-                                                    ->selectablePlaceholder(false),
-                                                TextInput::make('max_speed')
-                                                    ->hiddenLabel()
-                                                    ->placeholder('e.g. 19.00')
-                                                    ->numeric()
-                                                    ->step('0.01'),
+                                        TextInput::make('max_speed')
+                                            ->hiddenLabel()
+                                            ->placeholder('e.g. 19.00')
+                                            ->inputMode('decimal')
+                                            ->rules(['nullable', 'numeric', 'min:0'])
+                                            ->columnSpan(2),
+                                        Select::make('max_speed_unit')
+                                            ->hiddenLabel()
+                                            ->options([
+                                                'mph' => 'MPH',
+                                                'kph' => 'KPH',
                                             ])
-                                            ->label('Max Speed'),
+                                            ->default('mph')
+                                            ->required()
+                                            ->selectablePlaceholder(false),
+                                    ])
+                                        ->label('Max Speed')
+                                        ->columns(3),
                                     ]),
 
                                 Section::make('Experience')
