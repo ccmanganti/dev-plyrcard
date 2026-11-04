@@ -137,9 +137,9 @@
     .lr-view.is-active { display: block; }
     @keyframes lrFade { from { opacity:.45; transform: translateY(4px); } to { opacity:1; transform:none; } }
     .lr-speed-fused { display:grid;grid-template-columns:minmax(0,1fr) 7.25rem;gap:0; }
-    .lr-speed-fused .lr-speed-input { border-radius:10px 0 0 10px; }
-    .lr-speed-fused .lr-speed-unit { margin-left:-1px; }
-    .lr-speed-fused .lr-speed-unit .lr-select { border-radius:0 10px 10px 0; font-weight:800; text-transform:uppercase; }
+    .lr-speed-fused .lr-speed-input { border-radius:0 10px 10px 0; }
+    .lr-speed-fused .lr-speed-unit { margin-right:-1px; }
+    .lr-speed-fused .lr-speed-unit .lr-select { border-radius:10px 0 0 10px; font-weight:800; text-transform:uppercase; }
     .lr-menu-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
     .lr-menu-card { appearance: none; border: 1px solid #e5e7eb; background: #fff; color: #111827; border-radius: 16px; min-height: 88px; padding: 16px; display: flex; align-items: center; gap: 13px; text-align: left; cursor: pointer; box-shadow: 0 7px 20px rgba(15,23,42,.045); transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease; text-decoration: none; }
     .lr-menu-card:hover { transform: translateY(-1px); border-color: rgba(255,92,53,.38); box-shadow: 0 12px 25px rgba(15,23,42,.07); }
@@ -841,7 +841,7 @@
                                 <div class="lr-field"><label>Height</label><input class="lr-input" name="height" placeholder="6'2\""></div>
                                 <div class="lr-field"><label>Weight</label><input class="lr-input" name="weight" placeholder="185 lbs"></div>
                                 <div class="lr-field"><label>Dominant Foot</label><div class="lr-select-wrap"><select class="lr-select" name="dominant_foot"><option value="">Not set</option><option value="left">Left</option><option value="right">Right</option><option value="both">Both</option></select><i class="fa-solid fa-chevron-down"></i></div></div>
-                                <div class="lr-field"><label>Max Speed</label><div class="lr-speed-fused"><input class="lr-input lr-speed-input" type="number" step="0.01" min="0" name="max_speed" placeholder="e.g. 19.00"><div class="lr-select-wrap lr-speed-unit"><select class="lr-select" name="max_speed_unit"><option value="mph">MPH</option><option value="kph">KPH</option></select><i class="fa-solid fa-chevron-down"></i></div></div></div>
+                                <div class="lr-field"><label>Max Speed</label><div class="lr-speed-fused"><div class="lr-select-wrap lr-speed-unit"><select class="lr-select" name="max_speed_unit"><option value="mph">MPH</option><option value="kph">KPH</option></select><i class="fa-solid fa-chevron-down"></i></div><input class="lr-input lr-speed-input" type="number" step="0.01" min="0" name="max_speed" placeholder="e.g. 19.00"></div></div>
                             </div></div><div class="lr-form-subsection"><h5>School & Team</h5><div class="lr-form-grid">
                                 <div class="lr-field"><label>School</label><div class="lr-select-wrap"><select class="lr-select" name="school_id" data-lr-school><option value="">Loading schools...</option></select><i class="fa-solid fa-chevron-down"></i></div></div>
                                 <div class="lr-field"><label>League</label><div class="lr-select-wrap"><select class="lr-select" name="league_id" data-lr-league><option value="">Select sport and sex first</option></select><i class="fa-solid fa-chevron-down"></i></div></div>
