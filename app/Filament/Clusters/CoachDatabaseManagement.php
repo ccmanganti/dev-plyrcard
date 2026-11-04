@@ -11,6 +11,7 @@ class CoachDatabaseManagement extends Cluster
     protected static string | BackedEnum | null $navigationIcon = Heroicon::OutlinedCircleStack;
     protected static ?string $navigationLabel = 'Coach Database';
     protected static ?string $clusterBreadcrumb = 'Coach Database';
+    protected static string | \UnitEnum | null $navigationGroup = 'Platform Management';
     protected static ?int $navigationSort = 30;
 
     /**
