@@ -13,6 +13,8 @@ class SuperadminDashboard extends BaseDashboard
 
     protected static ?string $title = 'Overview';
 
+    protected static string | \UnitEnum | null $navigationGroup = 'Dashboard';
+
     protected static ?int $navigationSort = 1;
 
     public function mount(): void
