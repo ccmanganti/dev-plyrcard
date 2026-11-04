@@ -842,6 +842,20 @@ trait InteractsWithCoachDatabase
         ];
     }
 
+    public function updatedPlayerPhotoUploads(): void
+    {
+        if (! empty($this->playerPhotoUploads)) {
+            $this->uploadPlayerPhotos();
+        }
+    }
+
+    public function updatedPlyrcardPhotoUploads(): void
+    {
+        if (! empty($this->plyrcardPhotoUploads)) {
+            $this->uploadPlyrcardPhotos();
+        }
+    }
+
     public function uploadPlayerPhotos(): void
     {
         $user = Auth::user();
