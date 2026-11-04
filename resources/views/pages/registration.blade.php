@@ -368,8 +368,8 @@ function goto(n,persist=true){
     if($('#preview'))$('#preview').textContent=handle;
     if($('#handleHidden'))$('#handleHidden').value=handle;
   }
-  $('.panel').forEach(p=>p.classList.toggle('active',+p.dataset.step===n));
-  $('#steps li').forEach((li,i)=>{li.classList.toggle('on',i+1===n);li.classList.toggle('done',i+1<n);const d=li.querySelector('.dot');if(d)d.textContent=i+1<n?'✓':i+1});
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',+p.dataset.step===n));
+  document.querySelectorAll('#steps li').forEach((li,i)=>{li.classList.toggle('on',i+1===n);li.classList.toggle('done',i+1<n);const d=li.querySelector('.dot');if(d)d.textContent=i+1<n?'✓':i+1});
   if($('#mbar'))$('#mbar').style.width=(Math.min(n,maxStep)/maxStep*100)+'%';
   cur=n;
   if(persist)saveFormCache();
