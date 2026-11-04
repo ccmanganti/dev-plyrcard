@@ -917,22 +917,24 @@ class UserResource extends Resource
                                         ->placeholder('e.g. 185 lbs or 84 kg'),
 
                                     FusedGroup::make([
-                                            Select::make('max_speed_unit')
-                                                ->hiddenLabel()
-                                                ->options([
-                                                    'mph' => 'MPH',
-                                                    'kph' => 'KPH',
-                                                ])
-                                                ->default('mph')
-                                                ->required()
-                                                ->selectablePlaceholder(false),
-                                            TextInput::make('max_speed')
-                                                ->hiddenLabel()
-                                                ->placeholder('e.g. 19.00')
-                                                ->numeric()
-                                                ->step('0.01'),
-                                        ])
-                                        ->label('Max Speed'),
+                                        TextInput::make('max_speed')
+                                            ->hiddenLabel()
+                                            ->placeholder('e.g. 19.00')
+                                            ->inputMode('decimal')
+                                            ->rules(['nullable', 'numeric', 'min:0'])
+                                            ->columnSpan(2),
+                                        Select::make('max_speed_unit')
+                                            ->hiddenLabel()
+                                            ->options([
+                                                'mph' => 'MPH',
+                                                'kph' => 'KPH',
+                                            ])
+                                            ->default('mph')
+                                            ->required()
+                                            ->selectablePlaceholder(false),
+                                    ])
+                                        ->label('Max Speed')
+                                        ->columns(3),
 
                                     Select::make('dominant_foot')
                                         ->prefixIcon('heroicon-m-hand-raised')
