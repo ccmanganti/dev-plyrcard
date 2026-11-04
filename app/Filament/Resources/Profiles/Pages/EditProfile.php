@@ -25,6 +25,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\FusedGroup;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -731,21 +732,23 @@ class EditProfile extends Page implements HasForms
                                             ->visible(fn (Get $get) => $get('sport') === 'soccer')
                                             ->required(fn (Get $get) => $get('sport') === 'soccer'),
 
-                                        TextInput::make('max_speed')
-                                            ->prefixIcon('heroicon-m-bolt')
-                                            ->label('Max Speed')
-                                            ->placeholder('e.g. 19.00')
-                                            ->numeric()
-                                            ->step('0.01'),
-
-                                        Select::make('max_speed_unit')
-                                            ->label('Max Speed Unit')
-                                            ->options([
-                                                'mph' => 'MPH',
-                                                'kph' => 'KPH',
-                                            ])
-                                            ->default('mph')
-                                            ->required(),
+                                        FusedGroup::make([
+                                            TextInput::make('max_speed')
+                                                ->hiddenLabel()
+                                                ->placeholder('e.g. 19.00')
+                                                ->numeric()
+                                                ->step('0.01'),
+                                            Select::make('max_speed_unit')
+                                                ->hiddenLabel()
+                                                ->options([
+                                                    'mph' => 'MPH',
+                                                    'kph' => 'KPH',
+                                                ])
+                                                ->default('mph')
+                                                ->required()
+                                                ->selectablePlaceholder(false),
+                                        ])
+                                            ->label('Max Speed'),
                                     ]),
 
                                 Section::make('Experience')
