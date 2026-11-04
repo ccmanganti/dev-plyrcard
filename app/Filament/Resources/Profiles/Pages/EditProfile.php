@@ -733,21 +733,21 @@ class EditProfile extends Page implements HasForms
                                             ->required(fn (Get $get) => $get('sport') === 'soccer'),
 
                                         FusedGroup::make([
-                                            TextInput::make('max_speed')
-                                                ->hiddenLabel()
-                                                ->placeholder('e.g. 19.00')
-                                                ->numeric()
-                                                ->step('0.01'),
-                                            Select::make('max_speed_unit')
-                                                ->hiddenLabel()
-                                                ->options([
-                                                    'mph' => 'MPH',
-                                                    'kph' => 'KPH',
-                                                ])
-                                                ->default('mph')
-                                                ->required()
-                                                ->selectablePlaceholder(false),
-                                        ])
+                                                Select::make('max_speed_unit')
+                                                    ->hiddenLabel()
+                                                    ->options([
+                                                        'mph' => 'MPH',
+                                                        'kph' => 'KPH',
+                                                    ])
+                                                    ->default('mph')
+                                                    ->required()
+                                                    ->selectablePlaceholder(false),
+                                                TextInput::make('max_speed')
+                                                    ->hiddenLabel()
+                                                    ->placeholder('e.g. 19.00')
+                                                    ->numeric()
+                                                    ->step('0.01'),
+                                            ])
                                             ->label('Max Speed'),
                                     ]),
 
