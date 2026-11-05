@@ -414,11 +414,12 @@ HTML;
     |--------------------------------------------------------------------------
     | Profile Tabs Visibility
     |--------------------------------------------------------------------------
-    | Free-only players should only show the About Me section.
-    | Players with Plyr Plus or My Journey can see the full tabbed profile.
+    | All published player websites, including Free, show the core public tabs:
+    | About Me, Schedule, Highlights, and Accolades (when accolade data exists).
+    | Premium roles still control premium-only integrations/features elsewhere.
     */
-    $playerCanViewFullProfileTabs = $playerHasPlyrPlus || $playerHasMyJourney;
-    $playerIsFreeOnly = $playerHasFree && ! $playerCanViewFullProfileTabs;
+    $playerCanViewFullProfileTabs = true;
+    $playerIsFreeOnly = $playerHasFree && ! $playerHasPlyrPlus && ! $playerHasMyJourney;
 
     $articleSectionType = $playerHasMyJourney
         ? strtolower((string) ($website->article_section_type ?: 'follow_me'))
