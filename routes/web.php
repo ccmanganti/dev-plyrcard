@@ -3,6 +3,7 @@ use App\Http\Controllers\LockerRoomController;
 use App\Http\Controllers\SupportTicketController;
 use App\Http\Controllers\SupportTicketSettingsController;
 use App\Http\Controllers\LockerRoomSchoolActionController;
+use App\Http\Controllers\LockerRoomRecruitingController;
 use App\Http\Controllers\AmplifyUpgradeController;
 use App\Http\Controllers\JumpstartUpgradeController;
 use App\Http\Controllers\MyJourneyUpgradeController;
@@ -432,6 +433,33 @@ Route::middleware(['auth'])->group(function () {
         ->name('locker-room.dashboard.school.favorite');
     Route::post('/locker-room/dashboard/school/list', [LockerRoomSchoolActionController::class, 'list'])
         ->name('locker-room.dashboard.school.list');
+    Route::get('/locker-room/recruiting/schools', [LockerRoomRecruitingController::class, 'schools'])
+        ->name('locker-room.recruiting.schools');
+    Route::get('/locker-room/recruiting/coaches', [LockerRoomRecruitingController::class, 'coaches'])
+        ->name('locker-room.recruiting.coaches');
+    Route::get('/locker-room/recruiting/favorites', [LockerRoomRecruitingController::class, 'favorites'])
+        ->name('locker-room.recruiting.favorites');
+    Route::get('/locker-room/recruiting/lists', [LockerRoomRecruitingController::class, 'lists'])
+        ->name('locker-room.recruiting.lists');
+    Route::post('/locker-room/recruiting/lists', [LockerRoomRecruitingController::class, 'createList'])
+        ->name('locker-room.recruiting.lists.create');
+    Route::delete('/locker-room/recruiting/lists/{list}', [LockerRoomRecruitingController::class, 'deleteList'])
+        ->where('list', '[^/]+')
+        ->name('locker-room.recruiting.lists.delete');
+    Route::get('/locker-room/recruiting/conversations', [LockerRoomRecruitingController::class, 'conversations'])
+        ->name('locker-room.recruiting.conversations');
+    Route::get('/locker-room/recruiting/conversations/{conversation}', [LockerRoomRecruitingController::class, 'conversation'])
+        ->where('conversation', '[^/]+')
+        ->name('locker-room.recruiting.conversation');
+    Route::get('/locker-room/recruiting/templates', [LockerRoomRecruitingController::class, 'templates'])
+        ->name('locker-room.recruiting.templates');
+    Route::get('/locker-room/recruiting/templates/{template}', [LockerRoomRecruitingController::class, 'template'])
+        ->where('template', '[^/]+')
+        ->name('locker-room.recruiting.template');
+    Route::post('/locker-room/recruiting/email', [LockerRoomRecruitingController::class, 'sendEmail'])
+        ->name('locker-room.recruiting.email.send');
+    Route::get('/locker-room/points', [LockerRoomRecruitingController::class, 'points'])
+        ->name('locker-room.points');
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
         ->name('locker-room.profile.update');
     Route::post('/locker-room/schedule', [LockerRoomController::class, 'storeSchedule'])
