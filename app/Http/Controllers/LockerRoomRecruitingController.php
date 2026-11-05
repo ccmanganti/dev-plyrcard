@@ -1,0 +1,664 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\CoachDatabaseEmailTemplate;
+use App\Models\CreditServiceRequest;
+use App\Models\User;
+use App\Services\CoachDatabaseService;
+use App\Services\CreditPointService;
+use App\Services\LocalRecruitingDatabaseService;
+use App\Services\LocalTemplateMergeValueService;
+use App\Services\PlyrPointCatalogService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+
+class LockerRoomRecruitingController extends Controller
+{
+    public function schools(Request $request, LocalRecruitingDatabaseService $database): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+        $rows = collect($database->schoolRows($user));
+
+        $rows = $this->filterSchools($rows, $request);
+
+        return response()->json([
+            ...$this->paginateRows($rows, $request),
+            'lists' => $database->lists($user),
+        ]);
+    }
+
+    public function coaches(Request $request, LocalRecruitingDatabaseService $database): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+        $rows = collect($database->coachRows($user));
+        $search = strtolower(trim((string) $request->query('q', '')));
+
+        if ($search !== '') {
+            $rows = $rows->filter(function (array $row) use ($search): bool {
+                $haystack = strtolower(implode(' ', array_filter([
+                    $row['name'] ?? '',
+                    $row['email'] ?? '',
+                    $row['title'] ?? '',
+                    $row['school'] ?? $row['school_name'] ?? '',
+                    $row['conference'] ?? '',
+                    $row['division'] ?? '',
+                    $row['city'] ?? '',
+                    $row['state'] ?? '',
+                ])));
+
+                return str_contains($haystack, $search);
+            });
+        }
+
+        foreach (['division', 'conference', 'state'] as $filter) {
+            $value = strtolower(trim((string) $request->query($filter, '')));
+            if ($value !== '') {
+                $rows = $rows->filter(fn (array $row): bool => strtolower(trim((string) ($row[$filter] ?? ''))) === $value);
+            }
+        }
+
+        return response()->json($this->paginateRows($rows, $request));
+    }
+
+    public function favorites(Request $request, LocalRecruitingDatabaseService $database): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+        $rows = $this->filterSchools(collect($database->favoriteSchools($user)), $request);
+
+        return response()->json([
+            ...$this->paginateRows($rows, $request),
+            'lists' => $database->lists($user),
+        ]);
+    }
+
+    public function lists(Request $request, LocalRecruitingDatabaseService $database): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+
+        return response()->json([
+            'success' => true,
+            'items' => $database->lists($user),
+        ]);
+    }
+
+    public function createList(Request $request, LocalRecruitingDatabaseService $database): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+            'color' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        $database->createList(
+            $user,
+            trim((string) $data['name']),
+            trim((string) ($data['color'] ?? '#ff6338')),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'List created.',
+            'items' => $database->lists($user),
+        ]);
+    }
+
+    public function deleteList(Request $request, LocalRecruitingDatabaseService $database, string $list): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+
+        if (! $database->deleteList($user, $list)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That list could not be deleted.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'List deleted.',
+            'items' => $database->lists($user),
+        ]);
+    }
+
+    public function conversations(Request $request, CoachDatabaseService $recruiting): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+        $result = $recruiting->getConversationsForUser($user, [
+            'limit' => min(max((int) $request->query('limit', 50), 1), 100),
+            'search' => trim((string) $request->query('q', '')),
+            'status' => trim((string) $request->query('status', 'all')) ?: 'all',
+            'sortBy' => 'last_message_date',
+            'sort' => 'desc',
+            'fetch_all' => false,
+        ]);
+
+        return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
+    }
+
+    public function conversation(
+        Request $request,
+        CoachDatabaseService $recruiting,
+        string $conversation,
+    ): JsonResponse {
+        $user = $this->premiumUser($request);
+        $result = $recruiting->getConversationMessagesForUser(
+            $user,
+            trim($conversation),
+            $request->filled('last_message_id') ? trim((string) $request->query('last_message_id')) : null,
+            min(max((int) $request->query('limit', 50), 1), 100),
+        );
+
+        return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
+    }
+
+    public function templates(Request $request): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+
+        return response()->json([
+            'success' => true,
+            'items' => $this->emailTemplates($user),
+            'merge_values' => app(LocalTemplateMergeValueService::class)->availableValues(),
+        ]);
+    }
+
+    public function template(Request $request, string $template): JsonResponse
+    {
+        $user = $this->premiumUser($request);
+        $templateId = $this->templateDatabaseId($template);
+
+        if (! $templateId || ! Schema::hasTable('coach_database_email_templates')) {
+            return response()->json(['success' => false, 'message' => 'Template not found.'], 404);
+        }
+
+        $row = CoachDatabaseEmailTemplate::query()
+            ->whereKey($templateId)
+            ->where('is_active', true)
+            ->where(function ($query) use ($user): void {
+                $query->whereNull('user_id')->orWhere('user_id', $user->getKey());
+            })
+            ->first();
+
+        if (! $row) {
+            return response()->json(['success' => false, 'message' => 'Template not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'item' => $this->templateRow($row),
+        ]);
+    }
+
+    public function sendEmail(
+        Request $request,
+        LocalRecruitingDatabaseService $database,
+        CoachDatabaseService $recruiting,
+        LocalTemplateMergeValueService $mergeValues,
+    ): JsonResponse {
+        $user = $this->premiumUser($request);
+
+        $data = $request->validate([
+            'target_mode' => ['required', Rule::in(['coach', 'coaches', 'list', 'conversation'])],
+            'coach_id' => ['nullable', 'string', 'max:120'],
+            'coach_ids' => ['nullable', 'array', 'max:100'],
+            'coach_ids.*' => ['string', 'max:120'],
+            'list_key' => ['nullable', 'string', 'max:120'],
+            'conversation_id' => ['nullable', 'string', 'max:180'],
+            'subject' => ['required', 'string', 'max:250'],
+            'body' => ['required', 'string', 'max:100000'],
+        ]);
+
+        $recipients = $this->resolveRecipients(
+            user: $user,
+            data: $data,
+            database: $database,
+            recruiting: $recruiting,
+        );
+
+        if ($recipients->isEmpty()) {
+            throw ValidationException::withMessages([
+                'recipient' => 'Choose at least one coach with a valid email address.',
+            ]);
+        }
+
+        $subject = trim((string) $data['subject']);
+        $body = $this->sanitizeEmailHtml((string) $data['body']);
+
+        if (trim(strip_tags($body)) === '') {
+            throw ValidationException::withMessages(['body' => 'Enter an email message.']);
+        }
+
+        $sent = 0;
+        $failed = [];
+        $profileUrl = $mergeValues->profileUrlFor($user);
+
+        foreach ($recipients->take(100) as $coach) {
+            $personalizedSubject = $mergeValues->replace($subject, $user, $coach);
+            $personalizedBody = $mergeValues->replace($body, $user, $coach);
+            $personalizedBody = $this->appendPlayerSignature($personalizedBody, $user, $profileUrl);
+
+            $contactId = trim((string) (
+                $coach['contact_id']
+                ?? $coach['ghl_contact_id']
+                ?? ''
+            ));
+            $email = trim((string) ($coach['email'] ?? ''));
+
+            $trackingContext = [
+                'athlete_id' => $user->getKey(),
+                'athlete_email' => $user->email ?: $user->personal_email,
+                'contact_id' => $contactId,
+                'coach_contact_id' => $contactId,
+                'ghl_contact_id' => $contactId,
+                'coach_name' => $coach['name'] ?? null,
+                'coach_email' => $email,
+                'business_id' => $coach['business_id'] ?? $coach['company_id'] ?? null,
+                'ghl_business_id' => $coach['business_id'] ?? $coach['company_id'] ?? null,
+                'school' => $coach['school'] ?? $coach['school_name'] ?? null,
+                'school_name' => $coach['school'] ?? $coach['school_name'] ?? null,
+                'school_logo_url' => $coach['school_logo_url'] ?? $coach['logo_url'] ?? null,
+                'profile_url' => $profileUrl,
+                'email_subject' => $personalizedSubject,
+                'source' => 'locker_room_compose',
+                'message_uuid' => (string) Str::uuid(),
+            ];
+
+            $result = $recruiting->sendEmailMessageForUser($user, [
+                'contact_id' => $contactId !== '' ? $contactId : null,
+                'contactId' => $contactId !== '' ? $contactId : null,
+                'conversation_id' => $data['target_mode'] === 'conversation'
+                    ? trim((string) ($data['conversation_id'] ?? ''))
+                    : null,
+                'subject' => $personalizedSubject,
+                'body' => $personalizedBody,
+                'html' => $personalizedBody,
+                'text' => trim(strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $personalizedBody))),
+                'to' => $email,
+                'emailTo' => $email,
+                'fromName' => trim((string) ($user->name ?? 'PLYRCARD')),
+                'tracking_context' => $trackingContext,
+                'tracking_source' => 'locker_room_compose',
+                'source' => 'locker_room_compose',
+                'profile_url' => $profileUrl,
+                'public_profile_url' => $profileUrl,
+            ]);
+
+            if ($result['success'] ?? false) {
+                $sent++;
+                continue;
+            }
+
+            $failed[] = [
+                'name' => $coach['name'] ?? $email ?: 'Coach',
+                'email' => $email,
+                'error' => $result['error'] ?? 'Unable to send.',
+            ];
+        }
+
+        return response()->json([
+            'success' => $sent > 0 && $failed === [],
+            'partial' => $sent > 0 && $failed !== [],
+            'sent' => $sent,
+            'failed' => count($failed),
+            'failures' => $failed,
+            'message' => $failed === []
+                ? sprintf('Sent to %s coach%s.', number_format($sent), $sent === 1 ? '' : 'es')
+                : sprintf('Sent to %s coach%s. %s failed.', number_format($sent), $sent === 1 ? '' : 'es', number_format(count($failed))),
+        ], $sent > 0 ? 200 : 422);
+    }
+
+    public function points(
+        Request $request,
+        PlyrPointCatalogService $catalog,
+        CreditPointService $credits,
+    ): JsonResponse {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $packs = collect((array) config('plyrcard-points.point_packs', []))
+            ->map(function (array $pack, string $key): array {
+                return [
+                    'key' => $key,
+                    'label' => trim((string) ($pack['label'] ?? '')) ?: number_format((int) ($pack['points'] ?? 0)) . ' Point Pack',
+                    'points' => (int) ($pack['points'] ?? 0),
+                    'price_cents' => (int) ($pack['price_cents'] ?? 0),
+                    'enabled' => (bool) ($pack['enabled'] ?? true),
+                    'note' => trim((string) ($pack['note'] ?? '')),
+                ];
+            })
+            ->filter(fn (array $pack): bool => $pack['enabled'] && $pack['points'] > 0 && $pack['price_cents'] > 0)
+            ->values()
+            ->all();
+
+        $requests = [];
+        if (Schema::hasTable('credit_service_requests')) {
+            $requests = CreditServiceRequest::query()
+                ->where('user_id', $user->getKey())
+                ->latest('id')
+                ->limit(30)
+                ->get()
+                ->map(fn (CreditServiceRequest $row): array => [
+                    'id' => $row->getKey(),
+                    'item_key' => $row->item_key,
+                    'item_name' => $row->item_name,
+                    'quantity' => (int) $row->quantity,
+                    'points_spent' => (int) $row->points_spent,
+                    'credits_returned' => (int) $row->credits_returned,
+                    'status' => $row->status,
+                    'status_label' => $row->statusLabel(),
+                    'notes' => $row->notes,
+                    'admin_notes' => $row->admin_notes,
+                    'delivery_url' => $row->delivery_url,
+                    'delivery_notes' => $row->delivery_notes,
+                    'provided_at' => optional($row->provided_at)->toIso8601String(),
+                    'created_at' => optional($row->created_at)->toIso8601String(),
+                    'updated_at' => optional($row->updated_at)->toIso8601String(),
+                ])
+                ->all();
+        }
+
+        return response()->json([
+            'success' => true,
+            'balance' => (int) ($user->fresh()->points_available ?? 0),
+            'catalog' => array_values($catalog->catalog()),
+            'point_packs' => $packs,
+            'custom_purchase' => [
+                'enabled' => (bool) config('plyrcard-points.custom_point_purchase.enabled', true),
+                'min_points' => max(1, (int) config('plyrcard-points.custom_point_purchase.min_points', 1)),
+                'max_points' => max(1, (int) config('plyrcard-points.custom_point_purchase.max_points', 1000)),
+                'price_per_point_cents' => max(1, (int) config('plyrcard-points.custom_point_purchase.price_per_point_cents', 100)),
+            ],
+            'transactions' => $credits->recent($user, 30),
+            'requests' => $requests,
+            'can_buy_points' => $this->hasRole($user, 'My Journey'),
+        ]);
+    }
+
+    protected function premiumUser(Request $request): User
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        abort_unless(
+            $this->hasRole($user, 'My Journey'),
+            403,
+            'My Journey is required for this Recruiting Center feature.',
+        );
+
+        return $user;
+    }
+
+    protected function hasRole(User $user, string $role): bool
+    {
+        try {
+            if (method_exists($user, 'hasRole') && $user->hasRole($role)) {
+                return true;
+            }
+
+            if (method_exists($user, 'getRoleNames')) {
+                return $user->getRoleNames()
+                    ->contains(fn ($name): bool => strcasecmp(trim((string) $name), $role) === 0);
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
+    }
+
+    protected function filterSchools(Collection $rows, Request $request): Collection
+    {
+        $search = strtolower(trim((string) $request->query('q', '')));
+
+        if ($search !== '') {
+            $rows = $rows->filter(function (array $row) use ($search): bool {
+                $coachText = collect($row['coaches_preview'] ?? $row['coaches'] ?? [])
+                    ->filter(fn ($coach): bool => is_array($coach))
+                    ->map(fn (array $coach): string => implode(' ', array_filter([
+                        $coach['name'] ?? '',
+                        $coach['email'] ?? '',
+                        $coach['title'] ?? '',
+                    ])))
+                    ->implode(' ');
+
+                $haystack = strtolower(implode(' ', array_filter([
+                    $row['name'] ?? '',
+                    $row['conference'] ?? '',
+                    $row['division'] ?? '',
+                    $row['city'] ?? '',
+                    $row['state'] ?? '',
+                    $coachText,
+                ])));
+
+                return str_contains($haystack, $search);
+            });
+        }
+
+        foreach (['division', 'conference', 'state'] as $filter) {
+            $value = strtolower(trim((string) $request->query($filter, '')));
+            if ($value !== '') {
+                $rows = $rows->filter(fn (array $row): bool => strtolower(trim((string) ($row[$filter] ?? ''))) === $value);
+            }
+        }
+
+        $listKey = trim((string) $request->query('list', ''));
+        if ($listKey !== '') {
+            $rows = $rows->filter(fn (array $row): bool => in_array($listKey, (array) ($row['list_keys'] ?? []), true));
+        }
+
+        return $rows;
+    }
+
+    protected function paginateRows(Collection $rows, Request $request): array
+    {
+        $page = max(1, (int) $request->query('page', 1));
+        $perPage = min(max((int) $request->query('per_page', 30), 10), 60);
+        $rows = $rows->values();
+        $total = $rows->count();
+
+        return [
+            'success' => true,
+            'items' => $rows->slice(($page - 1) * $perPage, $perPage)->values()->all(),
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'last_page' => max(1, (int) ceil($total / $perPage)),
+        ];
+    }
+
+    protected function resolveRecipients(
+        User $user,
+        array $data,
+        LocalRecruitingDatabaseService $database,
+        CoachDatabaseService $recruiting,
+    ): Collection {
+        $mode = (string) $data['target_mode'];
+
+        if ($mode === 'conversation') {
+            $conversationId = trim((string) ($data['conversation_id'] ?? ''));
+            if ($conversationId === '') {
+                return collect();
+            }
+
+            $result = $recruiting->getConversationsForUser($user, [
+                'limit' => 100,
+                'status' => 'all',
+                'fetch_all' => false,
+            ]);
+
+            $conversation = collect((array) ($result['conversations'] ?? []))
+                ->first(fn ($row): bool => is_array($row) && (string) ($row['id'] ?? '') === $conversationId);
+
+            if (! is_array($conversation)) {
+                return collect();
+            }
+
+            return collect([[
+                'id' => $conversation['contact_id'] ?? '',
+                'contact_id' => $conversation['contact_id'] ?? '',
+                'ghl_contact_id' => $conversation['contact_id'] ?? '',
+                'name' => $conversation['contact_name'] ?? 'Coach',
+                'email' => $conversation['email'] ?? '',
+                'school' => $conversation['school'] ?? $conversation['company_name'] ?? '',
+                'school_name' => $conversation['school'] ?? $conversation['company_name'] ?? '',
+                'business_id' => $conversation['business_id'] ?? '',
+            ]])->filter(fn (array $row): bool => filter_var($row['email'] ?? '', FILTER_VALIDATE_EMAIL) || filled($row['contact_id'] ?? null));
+        }
+
+        $coaches = collect($database->coachRows($user))
+            ->filter(fn ($row): bool => is_array($row));
+
+        if ($mode === 'list') {
+            $listKey = trim((string) ($data['list_key'] ?? ''));
+            $list = collect($database->lists($user))->firstWhere('key', $listKey);
+            if (! is_array($list)) {
+                return collect();
+            }
+
+            $schoolIds = collect($list['schools'] ?? [])
+                ->map(fn ($school): string => is_array($school) ? (string) ($school['id'] ?? '') : '')
+                ->filter()
+                ->unique();
+
+            return $coaches
+                ->filter(fn (array $coach): bool => $schoolIds->contains((string) ($coach['school_id'] ?? '')))
+                ->filter(fn (array $coach): bool => filter_var($coach['email'] ?? '', FILTER_VALIDATE_EMAIL))
+                ->unique(fn (array $coach): string => strtolower((string) ($coach['contact_id'] ?? $coach['email'] ?? $coach['id'] ?? '')))
+                ->values();
+        }
+
+        $ids = collect($mode === 'coach'
+            ? [$data['coach_id'] ?? null]
+            : ($data['coach_ids'] ?? []))
+            ->map(fn ($id): string => trim((string) $id))
+            ->filter()
+            ->unique();
+
+        return $coaches
+            ->filter(function (array $coach) use ($ids): bool {
+                return $ids->contains((string) ($coach['id'] ?? ''))
+                    || $ids->contains((string) ($coach['local_id'] ?? ''))
+                    || $ids->contains((string) ($coach['contact_id'] ?? ''))
+                    || $ids->contains((string) ($coach['ghl_contact_id'] ?? ''));
+            })
+            ->filter(fn (array $coach): bool => filter_var($coach['email'] ?? '', FILTER_VALIDATE_EMAIL))
+            ->unique(fn (array $coach): string => strtolower((string) ($coach['contact_id'] ?? $coach['email'] ?? $coach['id'] ?? '')))
+            ->values();
+    }
+
+    protected function emailTemplates(User $user): array
+    {
+        if (! Schema::hasTable('coach_database_email_templates')) {
+            return [$this->fallbackTemplate()];
+        }
+
+        $rows = CoachDatabaseEmailTemplate::query()
+            ->where('is_active', true)
+            ->where(function ($query) use ($user): void {
+                $query->whereNull('user_id')->orWhere('user_id', $user->getKey());
+            })
+            ->orderBy('is_locked', 'desc')
+            ->orderBy('is_sample', 'desc')
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CoachDatabaseEmailTemplate $template): array => $this->templateRow($template))
+            ->values()
+            ->all();
+
+        return $rows !== [] ? $rows : [$this->fallbackTemplate()];
+    }
+
+    protected function templateRow(CoachDatabaseEmailTemplate $template): array
+    {
+        return [
+            'id' => 'local-template-' . $template->getKey(),
+            'local_id' => $template->getKey(),
+            'name' => (string) $template->name,
+            'subject' => (string) $template->subject,
+            'preview_text' => (string) ($template->preview_text ?? ''),
+            'body_html' => (string) $template->body_html,
+            'graphic_url' => $template->graphic_url,
+            'attachments' => is_array($template->attachments) ? $template->attachments : [],
+            'is_sample' => (bool) $template->is_sample,
+            'is_locked' => (bool) $template->is_locked,
+            'is_default' => (bool) ($template->is_locked && is_null($template->user_id)),
+        ];
+    }
+
+    protected function fallbackTemplate(): array
+    {
+        return [
+            'id' => 'locker-room-default',
+            'local_id' => null,
+            'name' => 'PLYRCARD Default Recruiting Email',
+            'subject' => '{{AthleteName}} - {{Position}} interested in {{SchoolName}}',
+            'preview_text' => 'Quick intro, profile, and recruiting links from {{AthleteName}}.',
+            'body_html' => '<p>Hi Coach {{CoachLastName}},</p><p>My name is {{AthleteName}}, and I am a {{GraduationYear}} {{Position}}. I wanted to introduce myself because I am very interested in {{SchoolName}}.</p><p>I would love for your staff to review my player profile, highlights, and recruiting information.</p><p><a href="{{ProfileLink}}">View My Player Profile</a></p><p>Thank you for your time.</p><p>Best,<br>{{AthleteName}}</p>',
+            'graphic_url' => null,
+            'attachments' => [],
+            'is_sample' => true,
+            'is_locked' => true,
+            'is_default' => true,
+        ];
+    }
+
+    protected function templateDatabaseId(string $template): ?int
+    {
+        $template = trim($template);
+
+        if (str_starts_with($template, 'local-template-')) {
+            $template = substr($template, strlen('local-template-'));
+        }
+
+        return ctype_digit($template) ? (int) $template : null;
+    }
+
+    protected function sanitizeEmailHtml(string $html): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '';
+        }
+
+        if (! preg_match('/<\s*(?:p|div|br|strong|b|em|i|u|ul|ol|li|a|blockquote|span|h[1-6]|table|tr|td|th|img)\b/i', $html)) {
+            return '<p>' . nl2br(e($html)) . '</p>';
+        }
+
+        $html = strip_tags($html, '<p><div><br><strong><b><em><i><u><ul><ol><li><a><blockquote><span><h1><h2><h3><h4><h5><h6><table><tbody><thead><tr><td><th><img>');
+        $html = preg_replace('/\son\w+\s*=\s*(["\']).*?\1/is', '', $html) ?? $html;
+        $html = preg_replace('/\son\w+\s*=\s*[^\s>]+/is', '', $html) ?? $html;
+        $html = preg_replace('/javascript\s*:/i', '', $html) ?? $html;
+
+        return trim($html);
+    }
+
+    protected function appendPlayerSignature(string $html, User $user, string $profileUrl): string
+    {
+        if (str_contains($html, 'data-plyrcard-signature')) {
+            return $html;
+        }
+
+        $name = e(trim((string) ($user->name ?: trim(($user->first_name ?? '') . ' ' . ($user->last_name ?? '')))));
+        $email = e(trim((string) ($user->email ?: $user->personal_email ?? '')));
+        $profile = e($profileUrl);
+
+        $profileLink = $profileUrl !== ''
+            ? '<a href="' . $profile . '" style="color:#111827;font-weight:700;text-decoration:none;">View my PLYRCARD</a>'
+            : '';
+
+        return trim($html)
+            . '<div data-plyrcard-signature="1" style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif;color:#111827;">'
+            . '<strong>' . $name . '</strong>'
+            . ($email !== '' ? '<div style="margin-top:4px;font-size:13px;color:#667085;">' . $email . '</div>' : '')
+            . ($profileLink !== '' ? '<div style="margin-top:8px;font-size:13px;">' . $profileLink . '</div>' : '')
+            . '</div>';
+    }
+}
