@@ -1,7 +1,9 @@
 @php
     $activePage = 'pricing';
     $plans = (array) config('plyrcard-registration.plans', []);
-    $catalog = (array) config('plyrcard-points.catalog', []);
+    // Use the same database-backed catalog as the PLYR Points dashboard so
+    // service samples uploaded by admins are also available on the public pricing page.
+    $catalog = app(\App\Services\PlyrPointCatalogService::class)->catalog();
     $pointPacks = collect((array) config('plyrcard-points.point_packs', []))
         ->filter(fn (array $pack): bool => (bool) ($pack['enabled'] ?? true))
         ->keyBy(fn (array $pack, string $key): string => $key);
@@ -22,24 +24,28 @@
             'points' => (int) data_get($catalog, 'outreach.points', 80),
             'description' => 'Cast a wide net. Reach coaches in every division from D1 to JUCO, nationwide or by state and region.',
             'icon' => 'send',
+            'samples' => (array) data_get($catalog, 'outreach.samples', []),
         ],
         'reel' => [
             'label' => data_get($catalog, 'reel.name', 'Highlight Reel'),
             'points' => (int) data_get($catalog, 'reel.points', 90),
             'description' => 'Just send us your timestamps. We cut your best moments from VEO or game film and do the rest.',
             'icon' => 'video',
+            'samples' => (array) data_get($catalog, 'reel.samples', []),
         ],
         'graphic' => [
             'label' => data_get($catalog, 'graphic.name', 'Custom Graphic'),
             'points' => (int) data_get($catalog, 'graphic.points', 50),
             'description' => 'Commitment posts, CV graphics, game day and stat cards. 100% custom, never AI generated.',
             'icon' => 'image',
+            'samples' => (array) data_get($catalog, 'graphic.samples', []),
         ],
         'production_hour' => [
             'label' => data_get($catalog, 'production_hour.name', 'Rep Hour'),
             'points' => (int) data_get($catalog, 'production_hour.points', 50),
             'description' => 'Have your rep review your profile, or hand off the work when you are short on time.',
             'icon' => 'clock',
+            'samples' => (array) data_get($catalog, 'production_hour.samples', []),
         ],
     ];
 
@@ -157,14 +163,14 @@ body.plyrcard-pricing-page button{font:inherit}
 .pc-faq{width:min(900px,calc(100% - 48px));margin-inline:auto;padding:30px 0 88px}.pc-faq .pc-section-head{text-align:center;align-items:center}
 .pc-faq details{background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:16px;margin-bottom:10px;padding:0 20px}.pc-faq summary{list-style:none;min-height:58px;display:flex;justify-content:space-between;align-items:center;gap:16px;cursor:pointer;font-weight:600;font-size:15px}.pc-faq summary::-webkit-details-marker{display:none}.pc-faq .plus{color:var(--pc-accent);font-size:24px;transition:.2s}.pc-faq details[open] .plus{transform:rotate(45deg)}.pc-faq details p{margin:0 0 18px;color:var(--pc-muted);font-size:14px;line-height:1.65}
 .pc-final{border-top:1px solid #1f1f21;text-align:center;padding:84px 24px}.pc-final h2{margin:8px auto 0;max-width:14ch;font-family:"Bebas Neue";font-size:clamp(50px,6vw,80px);font-weight:400;line-height:.95;text-transform:uppercase}.pc-final p{color:var(--pc-muted);margin:15px auto 0}.pc-final-actions{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-top:22px}.pc-final small{display:block;color:var(--pc-dim);margin-top:12px}
-.pc-dialog[hidden]{display:none}.pc-dialog{position:fixed;inset:0;z-index:999;display:grid;place-items:center;padding:24px;background:rgba(5,5,6,.8)}.pc-dialog-card{width:min(560px,100%);max-height:85vh;overflow:auto;padding:28px;background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:22px}.pc-dialog-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.pc-dialog-head h3{margin:4px 0 0;font-family:"Bebas Neue";font-size:38px;font-weight:400;text-transform:uppercase}.pc-dialog-close{width:40px;height:40px;border-radius:50%;border:1px solid var(--pc-line2);background:transparent;color:#fff;cursor:pointer}.pc-dialog-copy{color:var(--pc-muted);margin:18px 0 0}.pc-dialog-note{margin-top:16px;padding:14px;border-radius:12px;background:#111;color:#ccc;font-size:14px}
+.pc-dialog[hidden]{display:none}.pc-dialog{position:fixed;inset:0;z-index:999;display:grid;place-items:center;padding:24px;background:rgba(5,5,6,.8)}.pc-dialog-card{width:min(860px,100%);max-height:90vh;overflow:auto;padding:28px;background:var(--pc-panel);border:1px solid var(--pc-line);border-radius:22px}.pc-dialog-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.pc-dialog-head h3{margin:4px 0 0;font-family:"Bebas Neue";font-size:38px;font-weight:400;text-transform:uppercase}.pc-dialog-close{width:40px;height:40px;border-radius:50%;border:1px solid var(--pc-line2);background:transparent;color:#fff;cursor:pointer}.pc-dialog-copy{color:var(--pc-muted);margin:18px 0 0}.pc-dialog-media{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px;align-items:start}.pc-dialog-sample{overflow:hidden;border:1px solid var(--pc-line);border-radius:14px;background:#0d0d0e}.pc-dialog-sample img,.pc-dialog-sample video{display:block;width:100%;height:auto;max-height:65vh;object-fit:contain}.pc-dialog-sample iframe{display:block;width:100%;height:auto;aspect-ratio:16/9;border:0}.pc-dialog-sample-link{min-height:150px;display:grid;place-items:center;padding:20px;text-align:center}.pc-dialog-sample-link a{color:var(--pc-accent);font-weight:700}.pc-dialog-empty{grid-column:1/-1;padding:22px;border:1px dashed var(--pc-line2);border-radius:14px;text-align:center;color:var(--pc-muted)}.pc-dialog-note{margin-top:16px;padding:14px;border-radius:12px;background:#111;color:#ccc;font-size:14px}
 body.plyrcard-pricing-page #site-header.plyrcard-site-header{background:#0b0b0c!important;border-bottom-color:#1f1f21!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
 body.plyrcard-pricing-page #site-footer{border-top:1px solid #1f1f21;background:var(--pc-bg);padding:28px max(24px,calc((100vw - var(--pc-max))/2));color:var(--pc-dim)}
 body.plyrcard-pricing-page #site-footer .footer-logo{font-family:"Bebas Neue";font-size:26px;color:var(--pc-text)}body.plyrcard-pricing-page #site-footer .footer-logo span{color:var(--pc-accent)}
 body.plyrcard-pricing-page #site-footer .footer-nav{display:flex;gap:18px;flex-wrap:wrap;font-family:Oswald;font-size:13px;text-transform:uppercase}body.plyrcard-pricing-page #site-footer .footer-nav a.active{color:var(--pc-accent)}
 body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:12px;margin-top:18px}
 @media(max-width:900px){.pc-plan-grid,.pc-package-grid,.pc-calculator{grid-template-columns:1fr}.pc-service-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-how{grid-template-columns:1fr}.pc-rec .pc-btn{margin-top:10px}.pc-plan-card .desc{min-height:0}}
-@media(max-width:620px){.pc-wrap{width:min(100% - 28px,var(--pc-max))}.pc-hero{padding:118px 16px 42px}.pc-section{padding:58px 0}.pc-plan-card,.pc-package{padding:25px}.pc-feature-columns{grid-template-columns:1fr}.pc-points-head{align-items:flex-start;flex-direction:column}.pc-service-grid{grid-template-columns:1fr}.pc-calc-list{padding:8px 20px}.pc-calc-row{grid-template-columns:1fr auto;gap:10px}.pc-calc-sub{grid-column:2}.pc-topups{padding:18px}.pc-price strong{font-size:70px}.pc-faq{width:calc(100% - 28px)}}
+@media(max-width:620px){.pc-dialog-media{grid-template-columns:1fr}.pc-wrap{width:min(100% - 28px,var(--pc-max))}.pc-hero{padding:118px 16px 42px}.pc-section{padding:58px 0}.pc-plan-card,.pc-package{padding:25px}.pc-feature-columns{grid-template-columns:1fr}.pc-points-head{align-items:flex-start;flex-direction:column}.pc-service-grid{grid-template-columns:1fr}.pc-calc-list{padding:8px 20px}.pc-calc-row{grid-template-columns:1fr auto;gap:10px}.pc-calc-sub{grid-column:2}.pc-topups{padding:18px}.pc-price strong{font-size:70px}.pc-faq{width:calc(100% - 28px)}}
 </style>
 </head>
 <body class="plyrcard-pricing-page">
@@ -390,6 +396,7 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
   <div class="pc-dialog-card" role="dialog" aria-modal="true" aria-labelledby="pcSampleTitle">
     <div class="pc-dialog-head"><div><span class="pc-kicker">Service sample</span><h3 id="pcSampleTitle">PLYR service</h3></div><button class="pc-dialog-close" type="button" aria-label="Close sample">×</button></div>
     <p class="pc-dialog-copy" id="pcSampleCopy"></p>
+    <div class="pc-dialog-media" id="pcSampleMedia"></div>
     <div class="pc-dialog-note" id="pcSampleNote"></div>
   </div>
 </div>
@@ -485,6 +492,7 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
   });
   render();
 
+  var serviceSamples=@json(collect($services)->mapWithKeys(fn($service,$key)=>[$key=>array_values((array)($service['samples']??[]))])->all());
   var sampleInfo={
     outreach:{title:'Coach Outreach Program',copy:'Reach more coaches at once across divisions, conferences, states and regions.',note:'Your outreach is sent from your recruiting identity and directs coaches back to your PLYRSITE.'},
     reel:{title:'Highlight Reel',copy:'Send your game-film link and timestamps. Our team cuts the moments into a coach-ready reel.',note:'The final delivery is ready to share from your recruiting profile and outreach.'},
@@ -499,6 +507,19 @@ body.plyrcard-pricing-page #site-footer .footer-bottom{display:flex;justify-cont
       document.getElementById('pcSampleTitle').textContent=info.title||'PLYR service';
       document.getElementById('pcSampleCopy').textContent=info.copy||'See what this PLYR Points service can do for your recruiting.';
       document.getElementById('pcSampleNote').textContent=info.note||'Your completed work is delivered through your PLYRCARD account.';
+      var media=document.getElementById('pcSampleMedia');
+      var samples=Array.isArray(serviceSamples[button.dataset.sample])?serviceSamples[button.dataset.sample]:[];
+      media.innerHTML=samples.length?samples.map(function(sample){
+        var type=String(sample.type||'').toLowerCase();
+        var url=String(sample.url||'');
+        var embed=String(sample.embed_url||'');
+        var name=String(sample.name||info.title||'PLYR service sample');
+        if(type==='image'&&url)return '<div class="pc-dialog-sample"><img src="'+url.replaceAll('"','&quot;')+'" alt="'+name.replaceAll('"','&quot;')+'" loading="lazy"></div>';
+        if(type==='video'&&url)return '<div class="pc-dialog-sample"><video src="'+url.replaceAll('"','&quot;')+'" controls playsinline preload="metadata"></video></div>';
+        if(type==='youtube'&&embed)return '<div class="pc-dialog-sample"><iframe src="'+embed.replaceAll('"','&quot;')+'" title="'+name.replaceAll('"','&quot;')+'" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>';
+        if(type==='link'&&url)return '<div class="pc-dialog-sample pc-dialog-sample-link"><a href="'+url.replaceAll('"','&quot;')+'" target="_blank" rel="noopener">Open '+name.replaceAll('<','&lt;')+'</a></div>';
+        return '';
+      }).join(''):'<div class="pc-dialog-empty">No sample has been added for this service yet.</div>';
       dialog.hidden=false;
       document.documentElement.style.overflow='hidden';
     });
