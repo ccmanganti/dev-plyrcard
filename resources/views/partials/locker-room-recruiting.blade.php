@@ -238,6 +238,7 @@
             var enough=balance>=Number(s.points||0);
             return '<article style="padding:12px 0;border-top:1px solid #eef2f6;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><strong>'+esc(s.name)+'</strong><div class="lr-card-copy">'+esc(s.description||'')+'</div></div><strong>'+Number(s.points||0)+' pts</strong></div>' +
                 ((s.inclusions||[]).length?'<ul class="lr-plan-list">'+s.inclusions.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'') +
+                ((s.samples||[]).length?'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px;">'+s.samples.slice(0,6).map(function(sample){if(sample.type==='youtube')return '<a href="'+esc(sample.url||sample.embed_url||'#')+'" target="_blank" rel="noopener" style="aspect-ratio:1/1;border-radius:10px;background:#111827;color:#fff;display:grid;place-items:center;text-decoration:none;"><i class="fa-brands fa-youtube"></i></a>';if(sample.type==='image')return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener" style="border-radius:10px;overflow:hidden;background:#f3f4f6;display:block;"><img src="'+esc(sample.url||'')+'" alt="Service sample" style="width:100%;height:auto;max-height:130px;object-fit:contain;display:block;"></a>';return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener" class="lr-btn" style="min-height:60px;">View Sample</a>';}).join('')+'</div>':'') +
                 '<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lrm-service="'+esc(s.key)+'" data-points="'+Number(s.points||0)+'" '+(enough?'':'disabled')+'>'+(enough?esc(s.cta||'Request Service'):'Not enough points')+'</button></div></article>';
         }).join('')||'<div class="lr-detail-empty">No point services are currently enabled.</div>';
         var requests=q('[data-lrm-requests]');
@@ -316,6 +317,8 @@
         var service=event.target.closest('[data-lrm-service]');
         if(service&&drawer.contains(service)){event.preventDefault();var p2=data.points||{},cost=Number(service.dataset.points||0);if(Number(p2.balance||0)<cost){toast('You do not have enough points.',true);return;}if(!confirm('Use '+cost+' points for this service?'))return;var token='locker-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);api(drawer.dataset.creditUseUrl,{method:'POST',body:{request_token:token,confirm_spend:1,items:[{selected:1,item_key:service.dataset.lrmService,quantity:1,rush:0,notes:'Requested from Locker Room'}]}}).then(function(){loaded.points=false;loadPoints(true);toast('Service requested with PLYR Points.');}).catch(function(e){toast(e.message,true);});return;}
     },true);
+
+    document.addEventListener('plyrcard:points-refresh',function(){loaded.points=false;loadPoints(true);});
 
     document.addEventListener('input',function(event){
         if(event.target.matches('[data-lrm-school-search]'))renderSchools();
