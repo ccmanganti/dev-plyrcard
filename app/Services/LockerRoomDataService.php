@@ -76,7 +76,7 @@ class LockerRoomDataService
             'credits' => [
                 'available' => (int) ($user->points_available ?? 0),
                 'history' => class_exists(\App\Models\CreditPointTransaction::class) ? app(CreditPointService::class)->recent($user, 12) : [],
-                'catalog' => (array) config('plyrcard-points.catalog', []),
+                'catalog' => array_values(app(PlyrPointCatalogService::class)->catalog()),
             ],
             'website' => $this->websitePayload($website),
             'plans' => $this->plans($planKey, $user),
@@ -1770,6 +1770,8 @@ class LockerRoomDataService
         $amplifyActive = $this->hasRole($user, 'Amplify');
         $jumpstartActive = $this->hasRole($user, 'Jumpstart');
         $jumpstartCents = (int) data_get($configured, 'jumpstart.setup_fee_cents', 14900);
+        $jumpstartPoints = app(CreditPointService::class)->packagePoints('jumpstart');
+        $amplifyPoints = app(CreditPointService::class)->packagePoints('amplify');
         $jumpstartDue = $currentPlan === 'my-journey' ? $jumpstartCents : $jumpstartCents + $journeyRecurring;
         $money = static function (int $cents): string {
             $amount = $cents / 100;
@@ -1811,8 +1813,8 @@ class LockerRoomDataService
                 'description' => $currentPlan === 'my-journey'
                     ? 'A one-time recruiting service extension added to your active My Journey membership.'
                     : 'Start My Journey and add the one-time Jumpstart recruiting service in one checkout.',
-                'features' => ['100 pooled PLYRCARD credits', 'Spend across graphics, reels, outreach, production hours, and supported add-ons', 'Credits do not expire', 'Everything in My Journey'],
-                'action_label' => $jumpstartActive ? 'Buy 100 More Credits' : 'Get Jumpstart',
+                'features' => [$jumpstartPoints . ' pooled PLYRCARD credits', 'Spend across graphics, reels, outreach, production hours, and supported add-ons', 'Credits do not expire', 'Everything in My Journey'],
+                'action_label' => $jumpstartActive ? 'Buy ' . number_format($jumpstartPoints) . ' More Credits' : 'Get Jumpstart',
                 'action_url' => '#',
                 'action_kind' => 'jumpstart_checkout',
                 'active_addon' => $jumpstartActive,
@@ -1832,8 +1834,8 @@ class LockerRoomDataService
                 'description' => $currentPlan === 'my-journey'
                     ? 'A one-time done-for-you setup package added to your active My Journey membership.'
                     : 'Start My Journey and add the one-time Amplify done-for-you package in one checkout.',
-                'features' => ['600 pooled PLYRCARD credits', 'Spend across graphics, reels, outreach, production hours, and supported add-ons', 'Credits do not expire', 'Everything in My Journey', 'Full onboarding'],
-                'action_label' => $amplifyActive ? 'Buy 600 More Credits' : ($currentPlan === 'my-journey' ? 'Buy Amplify Credits' : 'Get Amplify'),
+                'features' => [$amplifyPoints . ' pooled PLYRCARD credits', 'Spend across graphics, reels, outreach, production hours, and supported add-ons', 'Credits do not expire', 'Everything in My Journey', 'Full onboarding'],
+                'action_label' => $amplifyActive ? 'Buy ' . number_format($amplifyPoints) . ' More Credits' : ($currentPlan === 'my-journey' ? 'Buy Amplify Credits' : 'Get Amplify'),
                 'action_url' => '#',
                 'action_kind' => 'amplify_checkout',
                 'active_addon' => $amplifyActive,
