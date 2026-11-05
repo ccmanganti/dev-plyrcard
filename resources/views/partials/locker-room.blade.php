@@ -102,19 +102,6 @@
     $lrSupportPhone = '+15718880852';
     $lrFacebookUrl = 'https://www.facebook.com/plyrcard';
     $lrMainShareUrl = rtrim((string) config('app.url', url('/')), '/');
-    // v10.107: desktop Locker Room navigation always points back to the main
-    // PLYRCARD Recruiting Center, even when the Locker Room is opened on a
-    // player's custom domain. Keep the CTA itself limited to the main app host.
-    $lrAppBaseUrl = rtrim((string) config('app.url', 'https://plyrcard.com'), '/');
-    if ($lrAppBaseUrl === '') {
-        $lrAppBaseUrl = 'https://plyrcard.com';
-    }
-    $lrRecruitingCenterUrl = $lrAppBaseUrl . '/admin/coach-database';
-    $lrCurrentHost = strtolower((string) request()->getHost());
-    $lrCurrentHost = preg_replace('/^www\./', '', $lrCurrentHost) ?: $lrCurrentHost;
-    $lrAppHost = strtolower((string) parse_url($lrAppBaseUrl, PHP_URL_HOST));
-    $lrAppHost = preg_replace('/^www\./', '', $lrAppHost) ?: $lrAppHost;
-    $lrOnMainPlyrcardHost = $lrCurrentHost !== '' && $lrCurrentHost === $lrAppHost;
     // v10.38: authenticated Locker Room is public-player-site only. The navigation
     // partial resolves ownership and passes $plyrShouldRenderPullup. Never allow a
     // direct include to make Locker Room appear inside Filament/Admin.
@@ -1164,7 +1151,6 @@
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value || '';
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
-    const isDesktopLockerRoom = () => window.matchMedia ? window.matchMedia('(min-width: 901px)').matches : window.innerWidth > 900;
     const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',schools:'Discover Schools',coaches:'Coaches',favorites:'Favorites',lists:'My Lists',inbox:'Inbox',compose:'Compose Email',points:'PLYR Points',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
     const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',schools:'Search recruiting programs',coaches:'Find coaches and start outreach',favorites:'Your saved schools',lists:'Organize recruiting targets',inbox:'Coach conversations',compose:'Send recruiting outreach',points:'Purchases, services and point activity',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
     function showToast(message, error = false) {
