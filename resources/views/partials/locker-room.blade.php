@@ -31,6 +31,17 @@
     $lrDashboardSchoolListUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.dashboard.school.list')
         ? route('locker-room.dashboard.school.list')
         : null;
+    $lrRecruitingSchoolsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.schools') ? route('locker-room.recruiting.schools') : null;
+    $lrRecruitingCoachesUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.coaches') ? route('locker-room.recruiting.coaches') : null;
+    $lrRecruitingFavoritesUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.favorites') ? route('locker-room.recruiting.favorites') : null;
+    $lrRecruitingListsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.lists') ? route('locker-room.recruiting.lists') : null;
+    $lrRecruitingConversationsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.conversations') ? route('locker-room.recruiting.conversations') : null;
+    $lrRecruitingTemplatesUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.templates') ? route('locker-room.recruiting.templates') : null;
+    $lrRecruitingEmailUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.email.send') ? route('locker-room.recruiting.email.send') : null;
+    $lrPointsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points') ? route('locker-room.points') : null;
+    $lrCreditUseUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('support.credits.store') ? route('support.credits.store') : null;
+    $lrPointPackStartBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/start') : null;
+    $lrPointPackStatusBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/status') : null;
     $lrScheduleStoreUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.schedule.store')
         ? route('locker-room.schedule.store')
         : null;
@@ -708,6 +719,17 @@
      data-dashboard-school-url="{{ $lrDashboardSchoolUrl }}"
      data-dashboard-school-favorite-url="{{ $lrDashboardSchoolFavoriteUrl }}"
      data-dashboard-school-list-url="{{ $lrDashboardSchoolListUrl }}"
+     data-recruiting-schools-url="{{ $lrRecruitingSchoolsUrl }}"
+     data-recruiting-coaches-url="{{ $lrRecruitingCoachesUrl }}"
+     data-recruiting-favorites-url="{{ $lrRecruitingFavoritesUrl }}"
+     data-recruiting-lists-url="{{ $lrRecruitingListsUrl }}"
+     data-recruiting-conversations-url="{{ $lrRecruitingConversationsUrl }}"
+     data-recruiting-templates-url="{{ $lrRecruitingTemplatesUrl }}"
+     data-recruiting-email-url="{{ $lrRecruitingEmailUrl }}"
+     data-points-url="{{ $lrPointsUrl }}"
+     data-credit-use-url="{{ $lrCreditUseUrl }}"
+     data-point-pack-start-base-url="{{ $lrPointPackStartBaseUrl }}"
+     data-point-pack-status-base-url="{{ $lrPointPackStatusBaseUrl }}"
      data-schedule-url="{{ $lrScheduleStoreUrl }}"
      data-schedule-base-url="{{ $lrScheduleBaseUrl }}"
      data-settings-url="{{ $lrSettingsUrl }}"
@@ -727,7 +749,6 @@
      data-password-reset-url="{{ $lrPasswordResetUrl }}"
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
      data-main-share-url="{{ $lrMainShareUrl }}"
-     data-recruiting-center-url="{{ $lrRecruitingCenterUrl }}"
      data-force-password="{{ $lrMustChangePassword ? '1' : '0' }}"
      data-authenticated="{{ $lrLoggedIn ? '1' : '0' }}">
     <button type="button" class="lr-scrim" data-lr-close aria-label="Close Locker Room"></button>
@@ -763,18 +784,19 @@
                         <div class="lr-preparing" data-lr-preparing hidden><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>We are preparing your PLYRCARD.</strong><span>Complete your profile while our team gets your public PLYRCARD and recruiting workspace ready.</span></div></div>
                         <div class="lr-home-section-head">
                             <div><strong>Quick Access</strong><span>Manage your PLYRCARD without leaving this screen.</span></div>
-                            @if($lrLoggedIn && $lrOnMainPlyrcardHost)
-                                <a class="lr-desktop-recruiting-link" href="{{ $lrRecruitingCenterUrl }}">
-                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                    <span>Go to Recruiting Center</span>
-                                </a>
-                            @endif
                         </div>
                         <div class="lr-menu-grid">
                             <button class="lr-menu-card" type="button" data-lr-nav="dashboard" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-chart-line"></i></span><span class="lr-menu-copy"><strong>Dashboard</strong><small>Recruiting stats and progress</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="schools" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-school"></i></span><span class="lr-menu-copy"><strong>Discover Schools</strong><small>Search recruiting programs</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="coaches" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-user-tie"></i></span><span class="lr-menu-copy"><strong>Coaches</strong><small>Find and contact coaches</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="favorites" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-star"></i></span><span class="lr-menu-copy"><strong>Favorites</strong><small>Your saved schools</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="lists" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-list"></i></span><span class="lr-menu-copy"><strong>My Lists</strong><small>Organize target schools</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="inbox" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-inbox"></i></span><span class="lr-menu-copy"><strong>Inbox</strong><small>Coach conversations</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="compose" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-paper-plane"></i></span><span class="lr-menu-copy"><strong>Compose Email</strong><small>Recruiting outreach</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="points"><span class="lr-menu-icon"><i class="fa-solid fa-coins"></i></span><span class="lr-menu-copy"><strong>PLYR Points</strong><small>Balance, purchases and services</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="profile"><span class="lr-menu-icon"><i class="fa-solid fa-user-pen"></i></span><span class="lr-menu-copy"><strong>Profile</strong><small>Quick athlete profile edit</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="photos"><span class="lr-menu-icon"><i class="fa-solid fa-images"></i></span><span class="lr-menu-copy"><strong>My Photos</strong><small>Manage your player gallery</small></span></button>
-                            <button class="lr-menu-card" type="button" data-lr-nav="schedule" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-calendar-days"></i></span><span class="lr-menu-copy"><strong>Schedule</strong><small>Create, view and edit games</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="schedule"><span class="lr-menu-icon"><i class="fa-solid fa-calendar-days"></i></span><span class="lr-menu-copy"><strong>Schedule</strong><small>Create, view and edit games</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="settings"><span class="lr-menu-icon"><i class="fa-solid fa-gear"></i></span><span class="lr-menu-copy"><strong>Settings</strong><small>Notifications and PLYRCARD display</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-visit-plyrcard><span class="lr-menu-icon"><i class="fa-solid fa-globe"></i></span><span class="lr-menu-copy"><strong>Visit My PLYRCARD</strong><small>Open your public player page</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="share"><span class="lr-menu-icon"><i class="fa-solid fa-share-nodes"></i></span><span class="lr-menu-copy"><strong>Share My PLYRCARD</strong><small>Copy or share your player link</small></span></button>
@@ -911,6 +933,7 @@
                         <div class="lr-muted" data-lr-photo-status aria-live="polite"></div>
                     </div>
                 </section>
+                @include('partials.locker-room-recruiting')
                 <section class="lr-view" data-lr-view="schedule">
                     <div class="lr-section">
                         <div class="lr-preparing" data-lr-preparing hidden><i class="fa-solid fa-wand-magic-sparkles"></i><div><strong>We are preparing your PLYRCARD.</strong><span>You can still manage your schedule while we finish preparing the rest of your recruiting workspace.</span></div></div>
@@ -1142,8 +1165,8 @@
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
     const isDesktopLockerRoom = () => window.matchMedia ? window.matchMedia('(min-width: 901px)').matches : window.innerWidth > 900;
-    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
-    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
+    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',schools:'Discover Schools',coaches:'Coaches',favorites:'Favorites',lists:'My Lists',inbox:'Inbox',compose:'Compose Email',points:'PLYR Points',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',share:'Share My PLYRCARD',upgrade:'Upgrade',checkout:'Service Checkout',services:'Additional Services',show:'PLYRCARD Show',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
+    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',schools:'Search recruiting programs',coaches:'Find coaches and start outreach',favorites:'Your saved schools',lists:'Organize recruiting targets',inbox:'Coach conversations',compose:'Send recruiting outreach',points:'Purchases, services and point activity',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',show:'Podcast and athlete stories',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
         el.textContent = message || (error ? 'Something went wrong.' : 'Saved.');
@@ -1188,7 +1211,7 @@
     }
     function closeDrawer() { stopLockerCheckoutPolling(); closeDashboardActivity(); drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
     function isFree() { return state?.plan?.is_free === true; }
-    function requiresPremium(view) { return ['dashboard','schedule'].includes(view); }
+    function requiresPremium(view) { return ['dashboard','schools','coaches','favorites','lists','inbox','compose'].includes(view); }
     function setView(view, push = true) {
         if (!view) return;
         closeDashboardActivity();
@@ -1997,10 +2020,10 @@
                 const detailBits = [];
                 if (billing.card_expiration) detailBits.push(`Expires ${esc(billing.card_expiration)}`);
                 if (billing.cardholder_name) detailBits.push(esc(billing.cardholder_name));
-                const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Change Payment Method</button><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
+                const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Change Payment Method</button></div>`;
                 method.innerHTML = `<div class="lr-payment-card"><div class="lr-payment-icon"><i class="fa-solid fa-credit-card"></i></div><div class="lr-payment-main"><strong>${esc(brand)} •••• ${esc(billing.card_last_four)}</strong><span>${detailBits.join(' · ') || 'Secure payment method on file'}</span></div></div>${changeButton}<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${billing.last_transaction_amount_cents ? money(billing.last_transaction_amount_cents) : (billing.amount_paid_cents ? money(billing.amount_paid_cents) : '—')}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div><p class="lr-card-copy" style="margin-top:10px;">For security, PLYRCARD only shows limited card metadata. Full card numbers and security codes are never displayed or stored here.</p>`;
             } else {
-                const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Add / Change Payment Method</button><a class="lr-btn" href="${esc(billing.admin_billing_url || '/admin/billing')}">Open Settings</a></div>`;
+                const changeButton = `<div class="lr-actions" style="margin-top:10px;"><button class="lr-btn lr-btn-primary" type="button" data-lr-card-update>Add / Change Payment Method</button></div>`;
                 method.innerHTML = `<div class="lr-preparing" style="border-color:#e5e7eb;background:#f8fafc;"><i class="fa-solid fa-shield-halved" style="color:#667085;"></i><div><strong>No saved payment method is available yet.</strong><span>Use the secure payment-method flow to add or replace the card used for future billing.</span></div></div>${changeButton}${billing.last_transaction_amount_cents ? `<div class="lr-billing-meta"><div><small>Last Payment</small><strong>${money(billing.last_transaction_amount_cents)}</strong></div><div><small>Transaction Status</small><strong>${esc(statusLabel(billing.last_transaction_status || billing.payment_status))}</strong></div><div><small>Payment Date</small><strong>${esc(paidAtLabel || '—')}</strong></div></div>` : ''}`;
             }
         }
@@ -2121,14 +2144,7 @@
         const nav = event.target.closest('[data-lr-nav]');
         if (nav && drawer.contains(nav)) {
             event.preventDefault();
-            // v10.107: on desktop, Dashboard is the full Recruiting Center in the
-            // main Admin panel. Phones/tablets keep the compact Locker Room dashboard.
-            if (authenticated && nav.dataset.lrNav === 'dashboard' && isDesktopLockerRoom()) {
-                const recruitingUrl = drawer.dataset.recruitingCenterUrl || '/admin/coach-database';
-                window.location.assign(recruitingUrl);
-                return;
-            }
-            setView(nav.dataset.lrNav);
+setView(nav.dataset.lrNav);
             return;
         }
         const photoTab = event.target.closest('[data-lr-photo-tab]'); if (photoTab && drawer.contains(photoTab)) { event.preventDefault(); photoGalleryCategory = photoTab.dataset.lrPhotoTab === 'plyrcard' ? 'plyrcard' : 'player'; setPhotoStatus(''); renderPhotos(); return; }
