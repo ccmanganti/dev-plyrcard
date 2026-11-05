@@ -269,7 +269,7 @@
             var convo=(data.conversations||[]).find(function(row){return String(row.id)===String(id);})||{};
             var messages=(j.messages||[]).map(function(m){
                 var outgoing=String(m.direction||'').toLowerCase()==='outbound';
-                return '<div style="padding:10px 12px;border-radius:12px;background:'+(outgoing?'#fff3ee':'#f8fafc')+';"><strong style="font-size:10px;text-transform:uppercase;">'+esc(m.direction||'message')+'</strong><div style="font-size:12px;margin-top:4px;">'+esc(m.body||m.message||m.text||'')+'</div></div>';
+                return '<div style="padding:10px 12px;border-radius:12px;background:'+(outgoing?'#fff3ee':'#f8fafc')+';"><strong style="font-size:10px;text-transform:uppercase;">'+esc(m.direction||'message')+'</strong><div style="font-size:12px;margin-top:4px;">'+esc(m.text_body||m.body||m.message||m.text||'')+'</div></div>';
             }).join('');
             thread.innerHTML='<div style="display:flex;justify-content:space-between;align-items:start;gap:10px;"><div><h3 class="lr-card-title">'+esc(convo.contact_name||convo.name||'Conversation')+'</h3><p class="lr-card-copy">'+esc(convo.school||convo.company_name||'')+'</p></div><button class="lr-btn lr-btn-primary" type="button" data-lrm-reply="'+esc(id)+'">Reply</button></div><div style="display:grid;gap:8px;margin-top:12px;">'+(messages||'<div class="lr-detail-empty">No messages in this thread.</div>')+'</div>';
             thread.scrollIntoView({behavior:'auto',block:'start'});
