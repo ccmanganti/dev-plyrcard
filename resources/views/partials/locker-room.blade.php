@@ -1840,6 +1840,13 @@
         [loading, success, error, billing, frame].forEach(el => { if (el) el.hidden = el !== part; });
     }
     function lockerCheckoutUrls(type) {
+        if (String(type || '').startsWith('point-pack:')) {
+            const pack = encodeURIComponent(String(type).slice('point-pack:'.length));
+            return {
+                start: (drawer.dataset.pointPackStartBaseUrl || '').replace('__PACK__', pack),
+                status: (drawer.dataset.pointPackStatusBaseUrl || '').replace('__PACK__', pack),
+            };
+        }
         if (type === 'amplify') {
             return {start: drawer.dataset.amplifyStartUrl || '', status: drawer.dataset.amplifyStatusUrl || ''};
         }
@@ -1849,23 +1856,30 @@
         return {start: drawer.dataset.myJourneyStartUrl || '', status: drawer.dataset.myJourneyStatusUrl || ''};
     }
     function configureLockerCheckout(type) {
+        const isPointPack = String(type || '').startsWith('point-pack:');
+        const pointPackKey = isPointPack ? String(type).slice('point-pack:'.length) : '';
+        const pointPackPoints = pointPackKey.startsWith('custom-') ? Number(pointPackKey.slice(7)) : 0;
         const isAmplify = type === 'amplify';
         const isJumpstart = type === 'jumpstart';
         const planKey = isAmplify ? 'amplify' : (isJumpstart ? 'jumpstart' : 'my-journey');
         const plan = (state.plans || []).find(row => row.key === planKey) || {};
-        q('[data-lr-checkout-eyebrow]').textContent = isAmplify ? 'Amplify' : (isJumpstart ? 'Jumpstart' : 'My Journey');
-        q('[data-lr-checkout-heading]').textContent = isAmplify ? 'Upgrade to Amplify' : (isJumpstart ? 'Get Jumpstart' : 'Upgrade to My Journey');
-        q('[data-lr-checkout-copy]').textContent = isAmplify
-            ? `Complete the ${plan.due_today || plan.price || ''} Stripe checkout below. Amplify adds 600 pooled credits that do not expire.`
-            : (isJumpstart
-                ? `Complete the ${plan.due_today || plan.price || '$149'} Stripe checkout below. Jumpstart adds 100 pooled credits that do not expire.`
-                : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`);
-        q('[data-lr-checkout-success-title]').textContent = isAmplify ? 'Amplify credits added' : (isJumpstart ? 'Jumpstart credits added' : 'My Journey is active');
-        q('[data-lr-checkout-success-copy]').textContent = isAmplify
-            ? 'Payment confirmed. 600 pooled PLYRCARD credits were added to your account and do not expire.'
-            : (isJumpstart
-                ? 'Payment confirmed. 100 pooled PLYRCARD credits were added to your account and do not expire.'
-                : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.');
+        q('[data-lr-checkout-eyebrow]').textContent = isPointPack ? 'PLYR Points' : (isAmplify ? 'Amplify' : (isJumpstart ? 'Jumpstart' : 'My Journey'));
+        q('[data-lr-checkout-heading]').textContent = isPointPack ? (pointPackPoints > 0 ? `Buy ${pointPackPoints.toLocaleString()} PLYR Points` : 'Buy PLYR Points') : (isAmplify ? 'Upgrade to Amplify' : (isJumpstart ? 'Get Jumpstart' : 'Upgrade to My Journey'));
+        q('[data-lr-checkout-copy]').textContent = isPointPack
+            ? 'Complete secure checkout below. Your PLYR Points balance updates automatically after Stripe confirms payment.'
+            : (isAmplify
+                ? `Complete the ${plan.due_today || plan.price || ''} Stripe checkout below. Your configured Amplify point package will be added automatically.`
+                : (isJumpstart
+                    ? `Complete the ${plan.due_today || plan.price || '$149'} Stripe checkout below. Your configured Jumpstart point package will be added automatically.`
+                    : `Complete the ${plan.price || ''}${plan.suffix || ''} checkout below. Your My Journey membership and billing information update automatically after payment is confirmed.`));
+        q('[data-lr-checkout-success-title]').textContent = isPointPack ? 'PLYR Points added' : (isAmplify ? 'Amplify credits added' : (isJumpstart ? 'Jumpstart credits added' : 'My Journey is active'));
+        q('[data-lr-checkout-success-copy]').textContent = isPointPack
+            ? 'Payment confirmed. Your PLYR Points balance has been updated.'
+            : (isAmplify
+                ? 'Payment confirmed. Your Amplify point package was added to your account.'
+                : (isJumpstart
+                    ? 'Payment confirmed. Your Jumpstart point package was added to your account.'
+                    : 'Your payment was confirmed. My Journey is now active on your PLYRCARD account.'));
     }
     async function pollLockerCheckout() {
         if (currentView !== 'checkout' || !lockerCheckoutType) return;
@@ -1915,7 +1929,7 @@
     }
     async function openLockerCheckout(type, retryAfterBilling = false) {
         if (lockerCheckoutStarting) return;
-        lockerCheckoutType = ['amplify', 'jumpstart'].includes(type) ? type : 'my-journey';
+        lockerCheckoutType = String(type || '').startsWith('point-pack:') ? String(type) : (['amplify', 'jumpstart'].includes(type) ? type : 'my-journey');
         configureLockerCheckout(lockerCheckoutType);
         stopLockerCheckoutPolling();
         setView('checkout', true);
@@ -1978,7 +1992,7 @@
                 || (isJumpstart && (plan.active_addon === true || jumpstartActive));
             let action = '';
             if (isAddonActive) {
-                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="${isJumpstart ? 'jumpstart' : 'amplify'}">${esc(plan.action_label || (isJumpstart ? 'Buy 100 More Credits' : 'Buy 600 More Credits'))}</button></div>`;
+                action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="${isJumpstart ? 'jumpstart' : 'amplify'}">${esc(plan.action_label || 'Buy More Credits')}</button></div>`;
             } else if (!plan.current) {
                 if (plan.action_kind === 'my_journey_checkout' || plan.key === 'my-journey') {
                     action = `<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-plan-checkout="my-journey">${esc(plan.action_label || 'Get My Journey')}</button></div>`;
@@ -2130,6 +2144,10 @@
         // No allow-top-navigation: confirmation/redirect remains inside the Locker Room instead of taking over the parent page.
         holder.innerHTML = `<iframe class="lr-embed" src="${esc(url)}" sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-modals" title="Book a PLYRCARD Call"></iframe>`;
     }
+    document.addEventListener('plyrcard:locker-point-pack', event => {
+        const pack = String(event.detail?.pack || '').trim();
+        if (pack) openLockerCheckout('point-pack:' + pack);
+    });
     document.addEventListener('click', event => {
         const open = event.target.closest('[data-plyrcard-open-drawer],[data-plyrcard-toggle-drawer]'); if (open) { event.preventDefault(); if (open.matches('[data-plyrcard-toggle-drawer]') && drawer.classList.contains('is-open')) closeDrawer(); else openDrawer(); return; }
         if (event.target.closest('[data-lr-close]')) { event.preventDefault(); closeDrawer(); return; }
