@@ -1896,6 +1896,9 @@
                 q('[data-lr-checkout-status]').textContent = 'Payment confirmed. Updating your Locker Room…';
                 await refreshData();
                 render();
+                if (String(lockerCheckoutType || '').startsWith('point-pack:')) {
+                    document.dispatchEvent(new CustomEvent('plyrcard:points-refresh'));
+                }
                 showLockerCheckoutPart(q('[data-lr-checkout-success]'));
                 return;
             }
@@ -2311,7 +2314,7 @@ setView(nav.dataset.lrNav);
         if (event.target.closest('[data-lr-checkout-retry]')) { if(lockerCheckoutType) openLockerCheckout(lockerCheckoutType); else openLockerCardUpdate().catch(err=>showToast(err.message,true)); return; }
         if (event.target.closest('[data-lr-card-update]')) { event.preventDefault(); openLockerCardUpdate().catch(err=>showToast(err.message,true)); return; }
         if (event.target.closest('[data-lr-stripe-confirm]')) { event.preventDefault(); (async()=>{ const btn=q('[data-lr-stripe-confirm]'); if(!lockerStripe||!lockerStripeElements||btn.disabled)return; btn.disabled=true; const old=btn.textContent; btn.textContent=lockerStripeMode==='setup'?'Saving…':'Processing…'; try { const result=lockerStripeMode==='setup' ? await lockerStripe.confirmSetup({elements:lockerStripeElements,redirect:'if_required'}) : await lockerStripe.confirmPayment({elements:lockerStripeElements,redirect:'if_required'}); if(result.error) throw result.error; if(lockerStripeMode==='setup'){ const setupIntentId=result.setupIntent?.id||''; if(!setupIntentId) throw new Error('Stripe confirmed the card but did not return the SetupIntent ID.'); if(!drawer.dataset.paymentMethodCompleteUrl) throw new Error('Payment method completion endpoint is unavailable.'); q('[data-lr-checkout-status]').textContent='Card confirmed. Updating your subscription…'; await request(drawer.dataset.paymentMethodCompleteUrl,{method:'POST',body:{setup_intent_id:setupIntentId}}); await refreshData(); render(); setView('billing',false); showToast('Payment method updated.'); btn.disabled=false; btn.textContent=old; } else { q('[data-lr-checkout-status]').textContent='Payment submitted. Confirming your account…'; btn.textContent='Confirmed'; lockerCheckoutStartedAt=Date.now(); pollLockerCheckout(); } } catch(err){ q('[data-lr-checkout-status]').textContent=err.message||'Stripe could not complete this request.'; btn.disabled=false; btn.textContent=old; } })(); return; }
-        if (event.target.closest('[data-lr-checkout-done]')) { stopLockerCheckoutPolling(); setView('upgrade', false); return; }
+        if (event.target.closest('[data-lr-checkout-done]')) { const wasPointPack=String(lockerCheckoutType||'').startsWith('point-pack:'); stopLockerCheckoutPolling(); setView(wasPointPack?'points':'upgrade', false); if(wasPointPack)document.dispatchEvent(new CustomEvent('plyrcard:points-refresh')); return; }
     });
     window.addEventListener('plyrcard:my-journey-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('My Journey is active.'); });
     window.addEventListener('plyrcard:jumpstart-upgraded', async () => { await refreshData(); setView('upgrade', false); showToast('Jumpstart is active.'); });
