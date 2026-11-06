@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class MyListSchool extends Model
+class MyListSchool extends Pivot
 {
+    protected $table = 'my_list_schools';
+
+    public $incrementing = true;
+
     protected $fillable = ['my_list_id', 'school_id'];
 
     public function list(): BelongsTo
