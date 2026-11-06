@@ -66,7 +66,7 @@
     #plyrcard-action-drawer .lrm-thread-main{min-width:0}
     #plyrcard-action-drawer .lrm-thread-name{font-size:11px;font-weight:900;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #plyrcard-action-drawer .lrm-thread-school{font-size:9px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-    #plyrcard-action-drawer .lrm-thread-preview{font-size:10px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:5px}
+    #plyrcard-action-drawer .lrm-thread-preview{font-size:10px;color:#667085;white-space:normal;overflow:hidden;text-overflow:ellipsis;margin-top:5px;overflow-wrap:anywhere;word-break:break-word}
     #plyrcard-action-drawer .lrm-thread-side{display:grid;justify-items:end;gap:6px;min-width:52px}
     #plyrcard-action-drawer .lrm-thread-date{font-size:8px;color:#98a2b3;white-space:nowrap}
     #plyrcard-action-drawer .lrm-unread-dot{width:7px;height:7px;border-radius:999px;background:#f0522b}
