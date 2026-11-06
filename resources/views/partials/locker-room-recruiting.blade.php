@@ -70,15 +70,16 @@
     #plyrcard-action-drawer .lrm-thread-side{display:grid;justify-items:end;gap:6px;min-width:52px}
     #plyrcard-action-drawer .lrm-thread-date{font-size:8px;color:#98a2b3;white-space:nowrap}
     #plyrcard-action-drawer .lrm-unread-dot{width:7px;height:7px;border-radius:999px;background:#f0522b}
-    #plyrcard-action-drawer .lrm-thread{min-height:360px;max-height:68vh;overflow:auto;padding-bottom:78px;position:relative}
-    #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{max-height:78vh;min-height:72vh}
-    #plyrcard-action-drawer .lrm-thread-header{position:sticky;top:-14px;z-index:5;background:#fff;border-bottom:1px solid #eef2f6;margin:-2px -2px 10px;padding:8px 2px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #plyrcard-action-drawer .lrm-thread{height:min(68vh,680px);min-height:420px;max-height:none;overflow:hidden;padding:0!important;position:relative;display:flex;flex-direction:column;background:#fff;isolation:isolate}
+    #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{height:calc(100vh - 210px);min-height:560px;max-height:820px}
+    #plyrcard-action-drawer .lrm-thread-header{position:relative;z-index:3;flex:0 0 auto;background:#fff;border-bottom:1px solid #eef2f6;margin:0;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
     #plyrcard-action-drawer .lrm-thread-contact{display:flex;align-items:center;gap:8px;min-width:0}
     #plyrcard-action-drawer .lrm-thread-contact-copy{min-width:0}
     #plyrcard-action-drawer .lrm-thread-contact-copy strong{display:block;font-size:12px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     #plyrcard-action-drawer .lrm-thread-contact-copy span{display:block;font-size:9px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    #plyrcard-action-drawer .lrm-load-older{display:flex;justify-content:center;position:sticky;top:48px;z-index:4;padding:7px;background:linear-gradient(#fff 75%,rgba(255,255,255,0))}
-    #plyrcard-action-drawer .lrm-reply-composer{position:sticky;bottom:-14px;z-index:6;margin:12px -2px -14px;padding:10px 2px 2px;background:#fff;border-top:1px solid #e5e7eb}
+    #plyrcard-action-drawer .lrm-message-scroll{position:relative;z-index:1;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 14px 14px;overscroll-behavior:contain}
+    #plyrcard-action-drawer .lrm-load-older{display:flex;justify-content:center;position:sticky;top:0;z-index:2;padding:9px 0 7px;background:linear-gradient(#fff 78%,rgba(255,255,255,0))}
+    #plyrcard-action-drawer .lrm-reply-composer{position:relative;z-index:4;flex:0 0 auto;margin:0;padding:10px 14px 12px;background:#fff;border-top:1px solid #e5e7eb}
     #plyrcard-action-drawer .lrm-reply-box{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:end;padding:8px;border:1px solid #d0d5dd;border-radius:13px;background:#fff;box-shadow:0 -8px 24px rgba(15,23,42,.06)}
     #plyrcard-action-drawer .lrm-reply-box textarea{border:0!important;box-shadow:none!important;resize:none;min-height:42px;max-height:110px;padding:7px!important;background:transparent!important}
     #plyrcard-action-drawer .lrm-inbox-action-row{display:flex;align-items:center;gap:6px}
@@ -90,11 +91,27 @@
     #plyrcard-action-drawer .lrm-message-body{min-width:0}
     #plyrcard-action-drawer .lrm-message.is-out .lrm-message-body{grid-column:1;grid-row:1}
     #plyrcard-action-drawer .lrm-msg-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:#98a2b3;font-size:9px}
-    #plyrcard-action-drawer .lrm-email-body{border:1px solid #eaecf0;border-radius:12px;background:#fff;padding:10px;overflow:auto;max-width:100%;font-size:11px;line-height:1.5;color:#344054;word-break:break-word}
-    #plyrcard-action-drawer .lrm-email-body *{max-width:100%!important;box-sizing:border-box}
-    #plyrcard-action-drawer .lrm-email-body img{height:auto!important;max-width:100%!important}
-    #plyrcard-action-drawer .lrm-email-body table{width:100%!important;table-layout:auto}
-    #plyrcard-action-drawer .lrm-email-body pre{white-space:pre-wrap;word-break:break-word}
+    #plyrcard-action-drawer .lrm-email-body{border:1px solid #eaecf0;border-radius:12px;background:#fff;padding:11px;overflow:hidden;max-width:100%;min-width:0;font-size:11px;line-height:1.5;color:#344054;word-break:normal;overflow-wrap:anywhere}
+    #plyrcard-action-drawer .lrm-email-body,
+    #plyrcard-action-drawer .lrm-email-body *{box-sizing:border-box!important;max-width:100%!important;min-width:0!important;overflow-wrap:anywhere!important;word-break:break-word!important}
+    #plyrcard-action-drawer .lrm-email-body div,
+    #plyrcard-action-drawer .lrm-email-body p,
+    #plyrcard-action-drawer .lrm-email-body span,
+    #plyrcard-action-drawer .lrm-email-body a,
+    #plyrcard-action-drawer .lrm-email-body blockquote{width:auto!important;white-space:normal!important}
+    #plyrcard-action-drawer .lrm-email-body img{width:auto!important;height:auto!important;max-width:100%!important;object-fit:contain}
+    #plyrcard-action-drawer .lrm-email-body table{width:100%!important;min-width:0!important;max-width:100%!important;table-layout:fixed!important;border-collapse:collapse!important}
+    #plyrcard-action-drawer .lrm-email-body tbody,
+    #plyrcard-action-drawer .lrm-email-body thead,
+    #plyrcard-action-drawer .lrm-email-body tr,
+    #plyrcard-action-drawer .lrm-email-body td,
+    #plyrcard-action-drawer .lrm-email-body th{max-width:100%!important;min-width:0!important;width:auto!important;white-space:normal!important;overflow-wrap:anywhere!important}
+    #plyrcard-action-drawer .lrm-email-body pre,
+    #plyrcard-action-drawer .lrm-email-body code{white-space:pre-wrap!important;overflow-wrap:anywhere!important;word-break:break-word!important}
+    #plyrcard-action-drawer .lrm-email-body iframe,
+    #plyrcard-action-drawer .lrm-email-body video{width:100%!important;max-width:100%!important;height:auto!important}
+    #plyrcard-action-drawer .lrm-email-body [style*="position: fixed"],
+    #plyrcard-action-drawer .lrm-email-body [style*="position:fixed"]{position:static!important}
     #plyrcard-action-drawer .lrm-compose-recipient{display:grid;gap:8px;padding:11px;border:1px solid #e5e7eb;border-radius:13px;background:#f8fafc}
     #plyrcard-action-drawer .lrm-compose-school-results{display:grid;gap:5px;max-height:180px;overflow:auto;margin-top:6px}
     #plyrcard-action-drawer .lrm-compose-school-result{width:100%;border:1px solid #e5e7eb;border-radius:9px;background:#fff;padding:8px;text-align:left;cursor:pointer}
@@ -128,8 +145,10 @@
         #plyrcard-action-drawer .lrm-nav-tiles{grid-template-columns:1fr 1fr}
         #plyrcard-action-drawer .lrm-school-list-row{grid-template-columns:minmax(130px,1fr) 80px 38px}
         #plyrcard-action-drawer .lrm-school-list-row .lrm-hide-mobile{display:none}
-        #plyrcard-action-drawer .lrm-thread{max-height:72vh}
-        #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{max-height:82vh;min-height:78vh}
+        #plyrcard-action-drawer .lrm-thread{height:70vh;min-height:430px;max-height:720px}
+        #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{height:calc(100vh - 175px);min-height:520px;max-height:none}
+        #plyrcard-action-drawer .lrm-reply-composer{padding:9px 10px 10px}
+        #plyrcard-action-drawer .lrm-message-scroll{padding:0 10px 10px}
     }
 </style>
 
@@ -406,7 +425,7 @@
         var latest=messages.length?messages[messages.length-1]:{},subject=String(latest.subject||'').trim();
         if(subject&&!/^re:/i.test(subject))subject='Re: '+subject;
         if(!subject)subject='Re: PLYRCARD Recruiting';
-        thread.innerHTML='<div class="lrm-thread-header"><div class="lrm-thread-contact"><span class="lrm-thread-logo">'+(logo?'<img src="'+esc(logo)+'" alt="">':esc(initials(title)))+'</span><span class="lrm-thread-contact-copy"><strong>'+esc(title)+'</strong><span>'+esc(school)+'</span></span></div><span class="lrm-pill">'+messages.length+' loaded</span></div>'+(threadState.hasMore?'<div class="lrm-load-older"><button class="lr-btn" type="button" data-lrm-load-older '+(threadState.loadingOlder?'disabled':'')+'>'+(threadState.loadingOlder?'Loading 10 older emails…':'Load 10 older emails')+'</button></div>':'')+'<div data-lrm-message-stack></div><form class="lrm-reply-composer" data-lrm-reply-form><input type="hidden" name="subject" value="'+esc(subject)+'"><div class="lrm-reply-box"><textarea class="lr-textarea" name="body" rows="2" maxlength="100000" placeholder="Reply to '+esc(title)+'..." required></textarea><button class="lr-btn lr-btn-primary" type="submit" aria-label="Send reply"><i class="fa-solid fa-paper-plane"></i></button></div></form>';
+        thread.innerHTML='<div class="lrm-thread-header"><div class="lrm-thread-contact"><span class="lrm-thread-logo">'+(logo?'<img src="'+esc(logo)+'" alt="">':esc(initials(title)))+'</span><span class="lrm-thread-contact-copy"><strong>'+esc(title)+'</strong><span>'+esc(school)+'</span></span></div><span class="lrm-pill">'+messages.length+' loaded</span></div><div class="lrm-message-scroll" data-lrm-message-scroll>'+(threadState.hasMore?'<div class="lrm-load-older"><button class="lr-btn" type="button" data-lrm-load-older '+(threadState.loadingOlder?'disabled':'')+'>'+(threadState.loadingOlder?'Loading 10 older emails…':'Load 10 older emails')+'</button></div>':'')+'<div data-lrm-message-stack></div></div><form class="lrm-reply-composer" data-lrm-reply-form><input type="hidden" name="subject" value="'+esc(subject)+'"><div class="lrm-reply-box"><textarea class="lr-textarea" name="body" rows="2" maxlength="100000" placeholder="Reply to '+esc(title)+'..." required></textarea><button class="lr-btn lr-btn-primary" type="submit" aria-label="Send reply"><i class="fa-solid fa-paper-plane"></i></button></div></form>';
         var stack=q('[data-lrm-message-stack]');
         messages.forEach(function(m){
             var direction=String(m.direction||'').toLowerCase(),out=direction.includes('out')||['sent','send','outgoing','out'].includes(direction);
@@ -423,6 +442,7 @@
     }
     async function loadOlderMessages(){
         if(!activeConversation||threadState.loadingOlder||!threadState.hasMore||!threadState.cursor)return;
+        var before=q('[data-lrm-message-scroll]'),oldHeight=before?before.scrollHeight:0,oldTop=before?before.scrollTop:0;
         threadState.loadingOlder=true;renderThread();
         try{
             var url=drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(activeConversation)+'?limit=10&last_message_id='+encodeURIComponent(threadState.cursor);
@@ -430,7 +450,10 @@
             threadState.messages=older.filter(function(m){return !seen.has(String(m.id||''))}).concat(threadState.messages||[]);
             threadState.cursor=j.last_message_id||threadState.cursor;threadState.hasMore=!!j.has_more;
         }catch(e){toast(e.message,true)}
-        finally{threadState.loadingOlder=false;renderThread()}
+        finally{
+            threadState.loadingOlder=false;renderThread();
+            requestAnimationFrame(function(){var stream=q('[data-lrm-message-scroll]');if(stream)stream.scrollTop=Math.max(0,stream.scrollHeight-oldHeight+oldTop)});
+        }
     }
     async function submitThreadReply(form){
         if(!activeConversation)return;
@@ -521,7 +544,7 @@
             var j=await api(drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(id)+'?limit=10'),convo=(data.conversations||[]).find(function(r){return String(r.id||'')===String(id)})||{id:id};
             threadState={conversation:convo,messages:Array.isArray(j.messages)?j.messages:[],cursor:j.last_message_id||null,hasMore:!!j.has_more,loadingOlder:false};
             renderThread();
-            requestAnimationFrame(function(){if(thread)thread.scrollTop=thread.scrollHeight});
+            requestAnimationFrame(function(){var stream=q('[data-lrm-message-scroll]');if(stream)stream.scrollTop=stream.scrollHeight});
         }catch(e){if(thread)thread.innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}
     }
     function onView(view){
