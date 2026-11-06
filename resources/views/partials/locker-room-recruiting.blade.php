@@ -50,6 +50,9 @@
     #plyrcard-action-drawer .lrm-nav-tile strong{font-size:12px;color:#101828}
     #plyrcard-action-drawer .lrm-nav-tile small{font-size:10px;color:#667085;line-height:1.4}
     #plyrcard-action-drawer .lrm-nav-tile .value{font-size:20px;font-weight:950;color:#c2410c}
+    #plyrcard-action-drawer .lrm-point-action-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #plyrcard-action-drawer .lrm-point-action-icon{width:34px;height:34px;border-radius:10px;background:#fff1eb;color:#c2410c;display:grid;place-items:center;font-size:13px}
+    #plyrcard-action-drawer .lrm-point-action-arrow{color:#98a2b3;font-size:10px}
     #plyrcard-action-drawer .lrm-collapsible-list.is-minimized>*:nth-child(n+4){display:none}
     #plyrcard-action-drawer .lrm-activity-toggle{border:0;background:transparent;color:#f0522b;font-size:10px;font-weight:850;cursor:pointer}
     #plyrcard-action-drawer .lrm-inbox-list{display:grid;gap:0;max-height:58vh;overflow:auto;border:1px solid #e5e7eb;border-radius:15px;background:#fff}
@@ -247,10 +250,10 @@
                 <p class="lr-card-copy">Spend points on recruiting services or add more when you need them.</p>
             </div>
             <div class="lrm-nav-tiles">
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="services"><span><strong>Use Points</strong><small>Browse enabled recruiting services and samples.</small></span><i class="fa-solid fa-chevron-right"></i></button>
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="buy"><span><strong>Buy Points</strong><small>Fixed point packs or a custom amount.</small></span><i class="fa-solid fa-chevron-right"></i></button>
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="requests"><span><strong>My Requests</strong><small>Track service requests, status and delivered work.</small></span><span class="value" data-lrm-request-count>0</span></button>
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="activity"><span><strong>Credit Points Tracking</strong><small>Purchases, rewards, usage, returns and adjustments.</small></span><span class="value" data-lrm-activity-count>0</span></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="services"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span><i class="fa-solid fa-chevron-right lrm-point-action-arrow"></i></span><span><strong>Use Points</strong><small>Recruiting graphics, editing, outreach and enabled services.</small></span></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="buy"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-plus"></i></span><i class="fa-solid fa-chevron-right lrm-point-action-arrow"></i></span><span><strong>Buy Points</strong><small>Reload with a point pack or choose a custom amount.</small></span></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="requests"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-list-check"></i></span><span class="value" data-lrm-request-count>0</span></span><span><strong>My Requests</strong><small>Track current work, status updates and delivered files.</small></span></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="activity"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-clock-rotate-left"></i></span><span class="value" data-lrm-activity-count>0</span></span><span><strong>Point Tracking</strong><small>See where every point was earned, purchased, used or returned.</small></span></button>
             </div>
             <div class="lr-card" style="margin-top:10px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
