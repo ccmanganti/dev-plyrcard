@@ -79,6 +79,7 @@ class LockerRoomDataService
                 'catalog' => array_values(app(PlyrPointCatalogService::class)->catalog()),
             ],
             'website' => $this->websitePayload($website),
+            'referral' => app(\App\Services\PlayerReferralService::class)->dashboardData($user),
             'plans' => $this->plans($planKey, $user),
             'integrations' => [
                 'support_form_url' => 'https://systems.plyrcard.com/widget/form/HDaBy0CDwdO7Fw54wi1K',
@@ -1753,6 +1754,11 @@ class LockerRoomDataService
             'exists' => (bool) $website,
             'is_published' => (bool) ($website?->is_published ?? false),
             'url' => $url,
+            'owner_visit_url' => $website
+                ? ((bool) ($website->is_published ?? false)
+                    ? $url
+                    : route('website.preview', $website))
+                : null,
             'domain' => $website?->domain,
             'slug' => $website?->slug,
         ];
