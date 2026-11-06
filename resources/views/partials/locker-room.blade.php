@@ -737,7 +737,7 @@
      data-password-update-url="{{ $lrPasswordUpdateUrl }}"
      data-main-share-url="{{ $lrMainShareUrl }}"
      data-force-password="{{ $lrMustChangePassword ? '1' : '0' }}"
-     data-authenticated="{{ $lrLoggedIn ? '1' : '0' }}">
+     data-authenticated="{{ $lrLoggedIn ? '1' : '0' }}" data-admin-url="{{ url('/admin') }}">
     <button type="button" class="lr-scrim" data-lr-close aria-label="Close Locker Room"></button>
     <section class="lr-panel" role="dialog" aria-modal="true" aria-label="Locker Room">
         <header class="lr-head">
@@ -1201,6 +1201,11 @@
         dashboardActivityLoading = false;
     }
     function closeDrawer() { stopLockerCheckoutPolling(); closeDashboardActivity(); drawer.classList.remove('is-open'); drawer.dataset.state = 'closed'; document.documentElement.classList.remove('lr-open'); document.querySelectorAll('[data-plyrcard-toggle-drawer]').forEach(el => el.setAttribute('aria-expanded','false')); }
+    function isDesktopLockerRoom() {
+        return window.matchMedia
+            ? window.matchMedia('(min-width: 901px)').matches
+            : window.innerWidth >= 901;
+    }
     function isFree() { return state?.plan?.is_free === true; }
     function requiresPremium(view) { return ['dashboard','schools','favorites','lists','inbox','compose'].includes(view); }
     function setView(view, push = true) {
@@ -2165,7 +2170,12 @@
         const nav = event.target.closest('[data-lr-nav]');
         if (nav && drawer.contains(nav)) {
             event.preventDefault();
-setView(nav.dataset.lrNav);
+            const targetView = String(nav.dataset.lrNav || '');
+            if (targetView === 'dashboard' && isDesktopLockerRoom()) {
+                window.location.assign(drawer.dataset.adminUrl || '/admin');
+                return;
+            }
+            setView(targetView);
             return;
         }
         const photoTab = event.target.closest('[data-lr-photo-tab]'); if (photoTab && drawer.contains(photoTab)) { event.preventDefault(); photoGalleryCategory = photoTab.dataset.lrPhotoTab === 'plyrcard' ? 'plyrcard' : 'player'; setPhotoStatus(''); renderPhotos(); return; }
