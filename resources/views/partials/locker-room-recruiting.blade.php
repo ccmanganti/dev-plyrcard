@@ -39,7 +39,18 @@
     #plyrcard-action-drawer .lrm-list-add-panel{margin-top:9px;padding:9px;border:1px dashed #d0d5dd;border-radius:11px;background:#fafafa}
     #plyrcard-action-drawer .lrm-list-search-results{display:grid;gap:5px;margin-top:7px;max-height:150px;overflow:auto}
     #plyrcard-action-drawer .lrm-list-result{width:100%;border:0;border-radius:9px;background:#fff;padding:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer}
-    #plyrcard-action-drawer .lrm-inbox-shell{display:grid;grid-template-columns:minmax(210px,.8fr) minmax(0,1.2fr);gap:10px;align-items:start}
+    #plyrcard-action-drawer .lrm-inbox-shell{display:block}
+    #plyrcard-action-drawer .lrm-nested-window{display:none}
+    #plyrcard-action-drawer .lrm-nested-window.is-active{display:block}
+    #plyrcard-action-drawer .lrm-nested-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+    #plyrcard-action-drawer .lrm-nested-back{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#344054;font-size:11px;font-weight:850;padding:5px 0;cursor:pointer}
+    #plyrcard-action-drawer .lrm-nav-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    #plyrcard-action-drawer .lrm-nav-tile{border:1px solid #e5e7eb;border-radius:13px;background:#fff;padding:12px;text-align:left;cursor:pointer;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+    #plyrcard-action-drawer .lrm-nav-tile strong{font-size:12px;color:#101828}
+    #plyrcard-action-drawer .lrm-nav-tile small{font-size:10px;color:#667085;line-height:1.4}
+    #plyrcard-action-drawer .lrm-nav-tile .value{font-size:20px;font-weight:950;color:#c2410c}
+    #plyrcard-action-drawer .lrm-collapsible-list.is-minimized>*:nth-child(n+4){display:none}
+    #plyrcard-action-drawer .lrm-activity-toggle{border:0;background:transparent;color:#f0522b;font-size:10px;font-weight:850;cursor:pointer}
     #plyrcard-action-drawer .lrm-inbox-list{display:grid;gap:7px;max-height:62vh;overflow:auto}
     #plyrcard-action-drawer .lrm-conversation{width:100%;border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:10px;text-align:left;cursor:pointer}
     #plyrcard-action-drawer .lrm-conversation.is-active{border-color:rgba(240,82,43,.4);background:#fff8f5}
@@ -62,7 +73,7 @@
     #plyrcard-action-drawer .lrm-recipient-tabs{display:flex;gap:5px;flex-wrap:wrap}
     #plyrcard-action-drawer .lrm-recipient-tab{border:1px solid #e5e7eb;border-radius:999px;background:#fff;color:#475467;padding:6px 10px;font-size:10px;font-weight:800;cursor:pointer}
     #plyrcard-action-drawer .lrm-recipient-tab.is-active{background:#f0522b;border-color:#f0522b;color:#fff}
-    #plyrcard-action-drawer .lrm-points-overview{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:11px}
+    #plyrcard-action-drawer .lrm-points-overview{display:grid;grid-template-columns:minmax(0,1fr);gap:11px}
     #plyrcard-action-drawer .lrm-points-balance{border:1px solid #e5e7eb;border-radius:16px;background:#fff;padding:15px}
     #plyrcard-action-drawer .lrm-balance-number{display:flex;align-items:flex-end;gap:7px;margin:14px 0}
     #plyrcard-action-drawer .lrm-balance-number strong{font-size:46px;line-height:.85;letter-spacing:-.06em;color:#c2410c;font-weight:950}
@@ -144,15 +155,20 @@
 
 <section class="lr-view" data-lr-view="inbox">
     <div class="lr-section">
-        <div class="lrm-toolbar">
-            <div class="lrm-toolbar-top">
-                <div><h3>Inbox</h3><p>Recruiting email conversations with coaches.</p></div>
-                <button class="lr-btn" type="button" data-lrm-inbox-refresh><i class="fa-solid fa-rotate"></i> Refresh</button>
+        <div class="lrm-nested-window is-active" data-lrm-inbox-window="list">
+            <div class="lrm-toolbar">
+                <div class="lrm-toolbar-top">
+                    <div><h3>Inbox</h3><p>Select a conversation to open it in a separate message window.</p></div>
+                    <button class="lr-btn" type="button" data-lrm-inbox-refresh><i class="fa-solid fa-rotate"></i> Refresh</button>
+                </div>
+                <input class="lr-input" type="search" data-lrm-inbox-search placeholder="Search coach or conversation">
             </div>
-            <input class="lr-input" type="search" data-lrm-inbox-search placeholder="Search coach or conversation">
-        </div>
-        <div class="lrm-inbox-shell">
             <div class="lrm-inbox-list" data-lrm-inbox-list><div class="lr-detail-empty">Loading conversations…</div></div>
+        </div>
+        <div class="lrm-nested-window" data-lrm-inbox-window="thread">
+            <div class="lrm-nested-head">
+                <button type="button" class="lrm-nested-back" data-lrm-inbox-back><i class="fa-solid fa-chevron-left"></i> Conversations</button>
+            </div>
             <div class="lr-card lrm-thread" data-lrm-thread><div class="lr-detail-empty">Choose a conversation to read the email thread.</div></div>
         </div>
     </div>
@@ -190,25 +206,47 @@
 
 <section class="lr-view" data-lr-view="points">
     <div class="lr-section">
-        <div class="lrm-toolbar">
-            <div class="lrm-toolbar-top"><div><h3>PLYR Points</h3><p>Use, purchase and track recruiting credits from one place.</p></div><span class="lrm-pill">PLAYER CREDITS</span></div>
-        </div>
-        <div class="lrm-points-overview">
+        <div class="lrm-nested-window is-active" data-lrm-points-window="home">
+            <div class="lrm-toolbar">
+                <div class="lrm-toolbar-top"><div><h3>PLYR Points</h3><p>Balance, point purchases, service usage and full credit tracking.</p></div><span class="lrm-pill">PLAYER CREDITS</span></div>
+            </div>
             <div class="lrm-points-balance">
                 <span class="lr-eyebrow">Available Balance</span>
                 <div class="lrm-balance-number"><strong data-lrm-points-balance>0</strong><span>PLYR Points</span></div>
-                <p class="lr-card-copy">Points can be used on enabled recruiting services and do not expire unless otherwise stated by the service.</p>
             </div>
-            <div class="lr-card">
-                <h3 class="lr-card-title">Services</h3>
-                <p class="lr-card-copy">Admin-managed services and samples.</p>
-                <div class="lrm-service-grid" data-lrm-services><div class="lr-detail-empty">Loading services…</div></div>
+            <div class="lrm-nav-tiles">
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="services"><span><strong>Use Points</strong><small>Browse enabled recruiting services and samples.</small></span><i class="fa-solid fa-chevron-right"></i></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="buy"><span><strong>Buy Points</strong><small>Fixed point packs or a custom amount.</small></span><i class="fa-solid fa-chevron-right"></i></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="requests"><span><strong>My Requests</strong><small>Track service requests, status and delivered work.</small></span><span class="value" data-lrm-request-count>0</span></button>
+                <button type="button" class="lrm-nav-tile" data-lrm-points-open="activity"><span><strong>Credit Points Tracking</strong><small>Purchases, rewards, usage, returns and adjustments.</small></span><span class="value" data-lrm-activity-count>0</span></button>
+            </div>
+            <div class="lr-card" style="margin-top:10px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <div><h3 class="lr-card-title">Recent Point Activity</h3><p class="lr-card-copy">A minimized preview of your credit ledger.</p></div>
+                    <button type="button" class="lrm-activity-toggle" data-lrm-activity-preview-toggle>Maximize</button>
+                </div>
+                <div class="lrm-collapsible-list is-minimized" data-lrm-activity-preview><div class="lr-detail-empty">Loading point activity…</div></div>
             </div>
         </div>
-        <div data-lrm-packs></div>
-        <div class="lrm-history-grid">
-            <div class="lr-card"><h3 class="lr-card-title">My Requests</h3><div data-lrm-requests><div class="lr-detail-empty">Loading requests…</div></div></div>
-            <div class="lr-card"><h3 class="lr-card-title">Point Activity</h3><div data-lrm-history><div class="lr-detail-empty">Loading point activity…</div></div></div>
+
+        <div class="lrm-nested-window" data-lrm-points-window="services">
+            <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
+            <div class="lr-card"><h3 class="lr-card-title">Use PLYR Points</h3><p class="lr-card-copy">Choose an enabled recruiting service.</p><div class="lrm-service-grid" data-lrm-services></div></div>
+        </div>
+
+        <div class="lrm-nested-window" data-lrm-points-window="buy">
+            <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
+            <div data-lrm-packs></div>
+        </div>
+
+        <div class="lrm-nested-window" data-lrm-points-window="requests">
+            <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
+            <div class="lr-card"><h3 class="lr-card-title">My Requests</h3><p class="lr-card-copy">Service status, spent points, returned points and delivery details.</p><div data-lrm-requests></div></div>
+        </div>
+
+        <div class="lrm-nested-window" data-lrm-points-window="activity">
+            <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
+            <div class="lr-card"><h3 class="lr-card-title">Credit Points Tracking</h3><p class="lr-card-copy">Complete point ledger including purchases, referral rewards, debits, refunds, returns and adjustments.</p><div data-lrm-history></div></div>
         </div>
     </div>
 </section>
@@ -219,7 +257,7 @@
     if(!drawer||drawer.dataset.lrmReady==='1')return;
     drawer.dataset.lrmReady='1';
 
-    var data={schools:[],favorites:[],lists:[],conversations:[],templates:[],points:null};
+    var data={schools:[],favorites:[],lists:[],conversations:[],templates:[],points:null,pointHistory:[]};
     var loaded={schools:false,favorites:false,lists:false,inbox:false,compose:false,points:false};
     var schoolView='grid', activeConversation='', selectedComposeSchool=null, inboxTimer=null;
 
@@ -354,22 +392,43 @@
         var rows=(data.schools||[]).filter(function(s){return [s.name,s.conference,s.division,s.city,s.state].join(' ').toLowerCase().includes(term)}).slice(0,15);
         holder.innerHTML=rows.length?rows.map(function(s){return '<button type="button" class="lrm-compose-school-result" data-lrm-choose-school="'+esc(s.id||'')+'"><strong style="font-size:11px">'+esc(s.name||'School')+'</strong><div class="lr-card-copy">'+esc([s.conference,s.division].filter(Boolean).join(' · '))+' · '+Number(s.coach_count||s.coaches_count||(s.coaches||[]).length||0)+' coaches</div></button>'}).join(''):'<div class="lr-card-copy">No schools found.</div>';
     }
+    function setPointsWindow(name){
+        qa('[data-lrm-points-window]').forEach(function(el){el.classList.toggle('is-active',el.dataset.lrmPointsWindow===name)});
+    }
+    function pointActivityRow(entry){
+        var points=Number(entry.points||0),positive=entry.positive===true||points>0;
+        return '<div style="padding:10px 0;border-top:1px solid #eef2f6;display:flex;justify-content:space-between;gap:10px;align-items:start"><div style="min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong style="font-size:10px">'+esc(entry.item||'PLYR Points activity')+'</strong><span class="lrm-pill">'+esc(entry.status||entry.type||'Activity')+'</span></div><div class="lr-card-copy">'+esc(entry.date_time||entry.date||'')+(entry.source?' · '+esc(entry.source):'')+'</div></div><strong style="font-size:12px;color:'+(positive?'#15803d':'#b42318')+';white-space:nowrap">'+esc(entry.amount||(points>0?'+':'')+points)+'</strong></div>';
+    }
     function renderPoints(){
-        var p=data.points||{},balance=Number(p.balance||0),balanceEl=q('[data-lrm-points-balance]');if(balanceEl)balanceEl.textContent=balance.toLocaleString();
+        var p=data.points||{},history=Array.isArray(data.pointHistory)?data.pointHistory:[],balance=Number(p.balance||0),balanceEl=q('[data-lrm-points-balance]');
+        if(balanceEl)balanceEl.textContent=balance.toLocaleString();
+        var requestCount=q('[data-lrm-request-count]');if(requestCount)requestCount.textContent=Number((p.requests||[]).length).toLocaleString();
+        var activityCount=q('[data-lrm-activity-count]');if(activityCount)activityCount.textContent=history.length.toLocaleString();
+
         var services=q('[data-lrm-services]');
         if(services)services.innerHTML=(p.catalog||[]).map(function(s){
             var enough=balance>=Number(s.points||0),samples=Array.isArray(s.samples)?s.samples:[];
             return '<article class="lrm-service-card"><div class="lrm-service-head"><strong>'+esc(s.name||'Service')+'</strong><span class="lrm-service-price">'+Number(s.points||0)+' <small>pts</small></span></div><p class="lr-card-copy" style="margin-top:5px;flex:1">'+esc(s.description||'')+'</p>'+(samples.length?'<div class="lrm-sample-grid">'+samples.slice(0,6).map(function(sample){if(sample.type==='image')return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener"><img src="'+esc(sample.url||'')+'" alt="Service sample"></a>';if(sample.type==='youtube')return '<a href="'+esc(sample.url||sample.embed_url||'#')+'" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i></a>';return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>'}).join('')+'</div>':'')+'<button class="lr-btn lr-btn-primary" style="margin-top:8px;width:100%" type="button" data-lrm-service="'+esc(s.key)+'" data-points="'+Number(s.points||0)+'" '+(enough?'':'disabled')+'>'+(enough?esc(s.cta||'Request Service'):'Not enough points')+'</button></article>';
         }).join('')||'<div class="lr-detail-empty">No point services are currently enabled.</div>';
+
         var packs=q('[data-lrm-packs]');
         if(packs){
             if(p.can_buy_points){
                 var rows=Array.isArray(p.point_packs)?p.point_packs:[];
-                packs.innerHTML='<div class="lr-card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:end"><div><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Recharge your balance without leaving Locker Room.</p></div></div><div class="lrm-pack-grid" style="margin-top:10px">'+rows.map(function(row){return '<article class="lrm-pack"><span class="lr-eyebrow">Point Pack</span><span class="points">'+Number(row.points||0).toLocaleString()+'</span><strong>'+money(row.price_cents)+'</strong><span class="lr-card-copy">'+esc(row.note||'Add points to your current balance.')+'</span><button class="lr-btn lr-btn-primary" type="button" data-lrm-point-pack="'+esc(row.key)+'">Buy Points</button></article>'}).join('')+'</div>'+(p.custom_purchase&&p.custom_purchase.enabled?'<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px dashed #d0d5dd;border-radius:12px"><div><label style="font-size:10px;font-weight:850">CUSTOM POINTS</label><input class="lr-input" type="number" data-lrm-custom-points min="'+Number(p.custom_purchase.min_points||1)+'" max="'+Number(p.custom_purchase.max_points||1000)+'" value="'+Number(p.custom_purchase.min_points||1)+'"></div><button class="lr-btn" type="button" data-lrm-custom-buy>Buy Custom</button></div>':'')+'</div>';
+                packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Recharge your balance without leaving Locker Room.</p><div class="lrm-pack-grid" style="margin-top:10px">'+rows.map(function(row){return '<article class="lrm-pack"><span class="lr-eyebrow">Point Pack</span><span class="points">'+Number(row.points||0).toLocaleString()+'</span><strong>'+money(row.price_cents)+'</strong><span class="lr-card-copy">'+esc(row.note||'Add points to your current balance.')+'</span><button class="lr-btn lr-btn-primary" type="button" data-lrm-point-pack="'+esc(row.key)+'">Buy Points</button></article>'}).join('')+'</div>'+(p.custom_purchase&&p.custom_purchase.enabled?'<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px dashed #d0d5dd;border-radius:12px"><div><label style="font-size:10px;font-weight:850">CUSTOM POINTS</label><input class="lr-input" type="number" data-lrm-custom-points min="'+Number(p.custom_purchase.min_points||1)+'" max="'+Number(p.custom_purchase.max_points||1000)+'" value="'+Number(p.custom_purchase.min_points||1)+'"></div><button class="lr-btn" type="button" data-lrm-custom-buy>Buy Custom</button></div>':'')+'</div>';
             }else packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Point packs are available with My Journey.</p><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="upgrade">Get My Journey</button></div></div>';
         }
-        var requests=q('[data-lrm-requests]');if(requests)requests.innerHTML=(p.requests||[]).map(function(r){return '<div style="padding:9px 0;border-top:1px solid #eef2f6"><div style="display:flex;justify-content:space-between;gap:8px"><strong style="font-size:10px">'+esc(r.item_name||'Service Request')+'</strong><span class="lrm-pill">'+esc(r.status_label||r.status||'Submitted')+'</span></div><div class="lr-card-copy">'+Number(r.points_spent||0)+' points'+(r.delivery_url?' · <a href="'+esc(r.delivery_url)+'" target="_blank" rel="noopener">Open delivery</a>':'')+'</div></div>'}).join('')||'<div class="lr-detail-empty">No service requests yet.</div>';
-        var history=q('[data-lrm-history]');if(history)history.innerHTML=(p.transactions||[]).map(function(r){var pts=Number(r.points||0);return '<div style="padding:9px 0;border-top:1px solid #eef2f6;display:flex;justify-content:space-between;gap:8px"><div><strong style="font-size:10px">'+esc(r.reason||r.type||'Point activity')+'</strong><div class="lr-card-copy">'+(r.created_at?esc(new Date(r.created_at).toLocaleDateString()):'')+'</div></div><strong style="font-size:11px;color:'+(pts<0?'#b42318':'#15803d')+'">'+(pts>0?'+':'')+pts+'</strong></div>'}).join('')||'<div class="lr-detail-empty">No point activity yet.</div>';
+
+        var requests=q('[data-lrm-requests]');
+        if(requests)requests.innerHTML=(p.requests||[]).map(function(r){
+            var returned=Number(r.credits_returned||0);
+            return '<div style="padding:10px 0;border-top:1px solid #eef2f6"><div style="display:flex;justify-content:space-between;gap:8px"><strong style="font-size:10px">'+esc(r.item_name||'Service Request')+'</strong><span class="lrm-pill">'+esc(r.status_label||r.status||'Submitted')+'</span></div><div class="lr-card-copy">'+Number(r.points_spent||0)+' points spent'+(returned>0?' · '+returned+' returned':'')+(r.delivery_url?' · <a href="'+esc(r.delivery_url)+'" target="_blank" rel="noopener">Open delivery</a>':'')+'</div>'+(r.delivery_notes?'<div class="lr-card-copy" style="margin-top:4px">'+esc(r.delivery_notes)+'</div>':'')+'</div>';
+        }).join('')||'<div class="lr-detail-empty">No service requests yet.</div>';
+
+        var historyHolder=q('[data-lrm-history]');
+        if(historyHolder)historyHolder.innerHTML=history.length?history.map(pointActivityRow).join(''):'<div class="lr-detail-empty">No point activity yet.</div>';
+        var preview=q('[data-lrm-activity-preview]');
+        if(preview)preview.innerHTML=history.length?history.slice(0,8).map(pointActivityRow).join(''):'<div class="lr-detail-empty">No point activity yet.</div>';
     }
 
     async function loadSchools(force){if(loaded.schools&&!force){renderSchools();return}try{var j=await api(drawer.dataset.recruitingSchoolsUrl+'?per_page=60');data.schools=j.items||[];data.lists=j.lists||data.lists;loaded.schools=true;renderSchools()}catch(e){q('[data-lrm-schools]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
@@ -377,10 +436,13 @@
     async function loadLists(force){if(loaded.lists&&!force){renderLists();return}try{var j=await api(drawer.dataset.recruitingListsUrl);data.lists=j.items||[];loaded.lists=true;if(!loaded.schools)await loadSchools(false);renderLists()}catch(e){q('[data-lrm-lists]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
     async function loadInbox(force){if(loaded.inbox&&!force){renderInbox();return}try{var term=encodeURIComponent(q('[data-lrm-inbox-search]')?.value||''),url=drawer.dataset.recruitingConversationsUrl+'?q='+term+'&limit=100'+(force?'&refresh=1':'');var j=await api(url);data.conversations=j.conversations||[];loaded.inbox=true;renderInbox()}catch(e){q('[data-lrm-inbox-list]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
     async function loadCompose(force){if(loaded.compose&&!force){renderCompose();return}try{if(!loaded.schools)await loadSchools(false);var t=await api(drawer.dataset.recruitingTemplatesUrl);data.templates=t.items||[];loaded.compose=true;renderCompose()}catch(e){toast(e.message,true)}}
-    async function loadPoints(force){if(loaded.points&&!force){renderPoints();return}try{data.points=await api(drawer.dataset.pointsUrl);loaded.points=true;renderPoints()}catch(e){toast(e.message,true)}}
+    async function loadPoints(force){if(loaded.points&&!force){renderPoints();return}try{var results=await Promise.all([api(drawer.dataset.pointsUrl),drawer.dataset.pointsHistoryUrl?api(drawer.dataset.pointsHistoryUrl):Promise.resolve({entries:[]})]);data.points=results[0];data.pointHistory=results[1].entries||[];if(results[1].balance!=null)data.points.balance=results[1].balance;loaded.points=true;renderPoints()}catch(e){toast(e.message,true)}}
 
+    function setInboxWindow(name){
+        qa('[data-lrm-inbox-window]').forEach(function(el){el.classList.toggle('is-active',el.dataset.lrmInboxWindow===name)});
+    }
     async function openConversation(id){
-        activeConversation=String(id||'');renderInbox();
+        activeConversation=String(id||'');renderInbox();setInboxWindow('thread');
         var thread=q('[data-lrm-thread]');if(thread)thread.innerHTML='<div class="lr-detail-empty">Loading email thread…</div>';
         try{var j=await api(drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(id)+'?limit=100'),convo=(data.conversations||[]).find(function(r){return String(r.id||'')===String(id)})||{id:id};renderThread(convo,j.messages||[])}catch(e){if(thread)thread.innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}
     }
@@ -388,13 +450,17 @@
         if(view==='schools')loadSchools(false);
         else if(view==='favorites')loadFavorites(false);
         else if(view==='lists')loadLists(false);
-        else if(view==='inbox')loadInbox(false);
+        else if(view==='inbox'){setInboxWindow('list');loadInbox(false);}
         else if(view==='compose')loadCompose(false);
-        else if(view==='points')loadPoints(false);
+        else if(view==='points'){setPointsWindow('home');loadPoints(false);}
     }
 
     document.addEventListener('click',function(event){
         var nav=event.target.closest('[data-lr-nav]');if(nav&&drawer.contains(nav))setTimeout(function(){onView(nav.dataset.lrNav)},0);
+        var inboxBack=event.target.closest('[data-lrm-inbox-back]');if(inboxBack&&drawer.contains(inboxBack)){setInboxWindow('list');return}
+        var pointsOpen=event.target.closest('[data-lrm-points-open]');if(pointsOpen&&drawer.contains(pointsOpen)){setPointsWindow(pointsOpen.dataset.lrmPointsOpen);return}
+        var pointsBack=event.target.closest('[data-lrm-points-back]');if(pointsBack&&drawer.contains(pointsBack)){setPointsWindow('home');return}
+        var activityToggle=event.target.closest('[data-lrm-activity-preview-toggle]');if(activityToggle&&drawer.contains(activityToggle)){var preview=q('[data-lrm-activity-preview]'),minimized=preview?.classList.toggle('is-minimized');activityToggle.textContent=minimized?'Maximize':'Minimize';return}
         var view=event.target.closest('[data-lrm-school-view]');if(view&&drawer.contains(view)){schoolView=view.dataset.lrmSchoolView==='list'?'list':'grid';renderSchools();return}
         var refreshSchools=event.target.closest('[data-lrm-schools-refresh]');if(refreshSchools&&drawer.contains(refreshSchools)){loaded.schools=false;loadSchools(true);return}
         var fav=event.target.closest('[data-lrm-favorite]');if(fav&&drawer.contains(fav)){event.preventDefault();event.stopPropagation();var want=fav.dataset.favorite!=='1';api(drawer.dataset.dashboardSchoolFavoriteUrl,{method:'POST',body:{school_id:fav.dataset.lrmFavorite,favorite:want}}).then(function(){loaded.schools=false;loaded.favorites=false;loadSchools(true);if(q('[data-lr-view="favorites"]')?.classList.contains('is-active'))loadFavorites(true);toast(want?'School favorited.':'Favorite removed.')}).catch(function(e){toast(e.message,true)});return}
