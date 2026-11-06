@@ -208,6 +208,29 @@
         return $gpa;
     };
 
+    $formatMaxSpeedDisplay = function ($value, $unit = null) use ($normalizeDisplayValue) {
+        $speed = trim($normalizeDisplayValue($value, ' '));
+
+        if ($speed === '') {
+            return '';
+        }
+
+        // Respect an explicitly entered unit in the hero override.
+        if (preg_match('/\b(?:mph|km\s*\/\s*h|kmh|kph)\b/i', $speed)) {
+            return strtoupper(preg_replace('/\b(?:kmh|kph)\b/i', 'KM/H', $speed));
+        }
+
+        $unit = strtolower(trim((string) $unit));
+
+        $unitLabel = match ($unit) {
+            'km/h', 'kmh', 'kph' => 'KM/H',
+            'mph' => 'MPH',
+            default => strtoupper($unit),
+        };
+
+        return strtoupper(trim($speed . ($unitLabel !== '' ? ' ' . $unitLabel : '')));
+    };
+
     $firstLine = function ($value) use ($normalizeDisplayValue) {
         $text = trim($normalizeDisplayValue($value, "\n"));
 
@@ -390,10 +413,10 @@
         ''
     );
 
-    $desktopMaxSpeed = strtoupper($normalizeDisplayValue(
+    $desktopMaxSpeed = $formatMaxSpeedDisplay(
         $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
-        ' '
-    ));
+        $user?->max_speed_unit ?? 'mph'
+    );
 
     $desktopDominantFoot = strtoupper($normalizeDisplayValue(
         $getHeroFieldValue('hero_stat_dominant_foot', $user?->dominant_foot ?? ''),
@@ -463,10 +486,10 @@
     $mobileDob = $formatDateDisplay($getHeroFieldValue('hero_stat_dob', $user?->birth ?? ''));
     $mobileHeight = strtoupper($normalizeDisplayValue($getHeroFieldValue('hero_stat_height', $user?->height ?? ''), ' '));
     $mobileWeight = strtoupper($normalizeDisplayValue($getHeroFieldValue('hero_stat_weight', $user?->weight ?? ''), ' '));
-    $mobileMaxSpeed = strtoupper($normalizeDisplayValue(
+    $mobileMaxSpeed = $formatMaxSpeedDisplay(
         $getHeroFieldValue('hero_stat_max_speed', $user?->max_speed ?? ''),
-        ' '
-    ));
+        $user?->max_speed_unit ?? 'mph'
+    );
     $mobileCoach = strtoupper(trim($normalizeDisplayValue(
         $getHeroFieldValue('hero_stat_coach', $user?->club_coach ?? ''),
         ' '
