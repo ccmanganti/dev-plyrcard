@@ -108,7 +108,11 @@ class WebsiteOwnerAccessController extends Controller
 
     protected function ensureWebsiteIsPublic(Website $website): void
     {
-        abort_unless((bool) $website->is_active && (bool) $website->is_published, 404);
+        // Locker Room owner access must work before publication too.
+        // After this bridge reaches the player's real website URL, the public
+        // website middleware decides whether to render the live PLYRCARD or
+        // the existing "We are preparing your PLYRCARD" experience.
+        abort_unless((bool) $website->is_active, 404);
     }
 
     protected function websiteUrl(Website $website, array $query = []): string
