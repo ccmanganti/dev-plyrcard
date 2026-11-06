@@ -782,6 +782,26 @@ class LockerRoomRecruitingController extends Controller
         $html = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $html) ?? $html;
         $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? $html;
         $html = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $html) ?? $html;
+
+        // Incoming email templates often carry desktop-only inline layout rules.
+        // Strip only properties that can escape or horizontally stretch Locker Room;
+        // keep normal typography, colors, spacing, and branding intact.
+        $html = preg_replace_callback(
+            '/\sstyle\s*=\s*(["\'])(.*?)\1/is',
+            static function (array $matches): string {
+                $style = (string) ($matches[2] ?? '');
+                $style = preg_replace(
+                    '/(?:^|;)\s*(?:position|z-index|left|right|top|bottom|transform|translate|float|clear|overflow(?:-x|-y)?|min-width|max-width|width|min-height|max-height)\s*:[^;]*/i',
+                    '',
+                    $style,
+                ) ?? $style;
+                $style = preg_replace('/;{2,}/', ';', $style) ?? $style;
+                $style = trim($style, " ;\t\n\r\0\x0B");
+
+                return $style !== '' ? ' style="' . e($style) . '"' : '';
+            },
+            $html,
+        ) ?? $html;
         $html = preg_replace('/<\/?(?:html|head|body|meta|title|link)\b[^>]*>/i', '', $html) ?? $html;
         $html = strip_tags($html, '<p><div><br><strong><b><em><i><u><ul><ol><li><a><blockquote><span><h1><h2><h3><h4><h5><h6><table><tbody><thead><tr><td><th><img>');
 
