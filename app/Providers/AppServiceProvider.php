@@ -5,9 +5,11 @@ namespace App\Providers;
 use App\Http\Controllers\PlyrPointServiceAdminController;
 use App\Http\Controllers\PlyrPointsHistoryController;
 use App\Models\BillingInformation;
+use App\Models\MyListSchool;
 use App\Models\User;
 use App\Models\Website;
 use App\Observers\UserObserver;
+use App\Observers\MyListSchoolObserver;
 use App\Observers\WebsiteObserver;
 use App\Http\Responses\LoginResponse as PlyrCardLoginResponse;
 use App\Services\PlayerReferralService;
@@ -32,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
 
         User::observe(UserObserver::class);
         Website::observe(WebsiteObserver::class);
+        MyListSchool::observe(MyListSchoolObserver::class);
 
         // Referral rewards are tied to a proven paid My Journey entitlement, not
         // to merely submitting a referral code. The service is idempotent, so
