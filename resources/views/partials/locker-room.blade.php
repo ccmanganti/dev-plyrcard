@@ -38,6 +38,7 @@
     $lrRecruitingTemplatesUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.templates') ? route('locker-room.recruiting.templates') : null;
     $lrRecruitingEmailUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.email.send') ? route('locker-room.recruiting.email.send') : null;
     $lrPointsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points') ? route('locker-room.points') : null;
+    $lrPointsHistoryUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points.history') ? route('locker-room.points.history') : null;
     $lrCreditUseUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('support.credits.store') ? route('support.credits.store') : null;
     $lrPointPackStartBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/start') : null;
     $lrPointPackStatusBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/status') : null;
@@ -712,6 +713,7 @@
      data-recruiting-templates-url="{{ $lrRecruitingTemplatesUrl }}"
      data-recruiting-email-url="{{ $lrRecruitingEmailUrl }}"
      data-points-url="{{ $lrPointsUrl }}"
+     data-points-history-url="{{ $lrPointsHistoryUrl }}"
      data-credit-use-url="{{ $lrCreditUseUrl }}"
      data-point-pack-start-base-url="{{ $lrPointPackStartBaseUrl }}"
      data-point-pack-status-base-url="{{ $lrPointPackStatusBaseUrl }}"
@@ -787,9 +789,7 @@
                             <button class="lr-menu-card is-disabled" type="button" disabled><span class="lr-menu-icon"><i class="fa-solid fa-shield-halved"></i></span><span class="lr-menu-copy"><strong>My Club</strong><span class="lr-coming">Coming Soon</span></span></button>
                             <button class="lr-menu-card is-disabled" type="button" disabled><span class="lr-menu-icon"><i class="fa-solid fa-people-group"></i></span><span class="lr-menu-copy"><strong>My Team</strong><span class="lr-coming">Coming Soon</span></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="upgrade"><span class="lr-menu-icon"><i class="fa-solid fa-arrow-trend-up"></i></span><span class="lr-menu-copy"><strong>Upgrade</strong><small>Plans and current pricing</small></span></button>
-                            <button class="lr-menu-card" type="button" data-lr-nav="services"><span class="lr-menu-icon"><i class="fa-solid fa-bag-shopping"></i></span><span class="lr-menu-copy"><strong>Additional Services</strong><small>Request extra PLYRCARD services</small></span></button>
-                            <button class="lr-menu-card" type="button" data-lr-nav="show"><span class="lr-menu-icon"><i class="fa-solid fa-podcast"></i></span><span class="lr-menu-copy"><strong>PLYRCARD Show</strong><small>Podcast and athlete stories</small></span></button>
-                            <button class="lr-menu-card" type="button" data-lr-nav="refer"><span class="lr-menu-icon"><i class="fa-solid fa-user-plus"></i></span><span class="lr-menu-copy"><strong>Refer a Friend</strong><small>Invite an athlete by email</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="refer"><span class="lr-menu-icon"><i class="fa-solid fa-user-plus"></i></span><span class="lr-menu-copy"><strong>Refer a Friend</strong><small>Share your code and earn PLYR Points</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="support"><span class="lr-menu-icon"><i class="fa-solid fa-headset"></i></span><span class="lr-menu-copy"><strong>Support</strong><small>Send a support request</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="book-call"><span class="lr-menu-icon"><i class="fa-solid fa-calendar-check"></i></span><span class="lr-menu-copy"><strong>Book a Call</strong><small>Schedule time with our team</small></span></button>
                             <form method="POST" action="{{ $lrLogoutUrl }}" style="display:contents;">@csrf<input type="hidden" name="redirect" value="{{ request()->getRequestUri() }}"><button class="lr-menu-card" type="submit"><span class="lr-menu-icon"><i class="fa-solid fa-right-from-bracket"></i></span><span class="lr-menu-copy"><strong>Sign Out</strong><small>Securely end this session</small></span></button></form>
@@ -978,27 +978,40 @@
                     </div>
                 </section>
                 <section class="lr-view" data-lr-view="share"><div class="lr-section"><div class="lr-card" data-lr-share-card></div></div></section>
-                <section class="lr-view" data-lr-view="services">
+                <section class="lr-view" data-lr-view="refer">
                     <div class="lr-section">
-                        <div class="lr-hero"><span class="lr-eyebrow">À La Carte</span><h3>Additional Services</h3><p class="lr-muted">Add individual recruiting support whenever you need it. Ordering is coming soon.</p></div>
-                        <div class="lr-plan-grid">
-                            @foreach([
-                                ['Rep Support', '$50', '/hour', 'One-on-one time with your dedicated rep.', 'fa-user'],
-                                ['VEO Highlight Reel', '$90', 'each', 'Pro-edited highlight reel from your game film.', 'fa-film'],
-                                ['Coach Outreach Campaign', '$80', 'each', 'Targeted email campaign to a set of coaches.', 'fa-paper-plane'],
-                                ['Custom Graphic', '$50', 'each', 'Branded graphic for socials or coach outreach.', 'fa-image'],
-                            ] as [$serviceName, $servicePrice, $serviceUnit, $serviceCopy, $serviceIcon])
-                                <article class="lr-plan-card">
-                                    <div style="display:flex;gap:11px;align-items:center;"><span class="lr-menu-icon" style="width:38px;height:38px;"><i class="fa-solid {{ $serviceIcon }}"></i></span><div><div class="lr-plan-name" style="font-size:18px;">{{ $serviceName }}</div><div class="lr-plan-price" style="font-size:25px;">{{ $servicePrice }} <small>{{ $serviceUnit }}</small></div></div></div>
-                                    <p class="lr-card-copy">{{ $serviceCopy }}</p>
-                                    <div class="lr-actions"><button class="lr-btn" type="button" disabled style="opacity:.58;cursor:not-allowed;">Coming Soon</button></div>
-                                </article>
-                            @endforeach
+                        <div class="lr-hero">
+                            <span class="lr-eyebrow">Refer a Friend</span>
+                            <h3>Earn PLYR Points together</h3>
+                            <p class="lr-muted">Share your referral link. Rewards are issued automatically after your referred player successfully activates a qualifying PLYRCARD plan.</p>
+                        </div>
+                        <div class="lr-stat-grid">
+                            <div class="lr-stat"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-user-plus"></i></span></div><div class="lr-stat-value" data-lr-referral-invited>0</div><div class="lr-stat-label">Invited</div></div>
+                            <div class="lr-stat"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-circle-check"></i></span></div><div class="lr-stat-value" data-lr-referral-qualified>0</div><div class="lr-stat-label">Qualified</div></div>
+                            <div class="lr-stat"><div class="lr-stat-top"><span class="lr-stat-icon"><i class="fa-solid fa-coins"></i></span></div><div class="lr-stat-value" data-lr-referral-points>0</div><div class="lr-stat-label">Points Earned</div></div>
+                        </div>
+                        <div class="lr-card">
+                            <h3 class="lr-card-title">Your Referral Code</h3>
+                            <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+                                <input class="lr-input" data-lr-referral-code readonly style="flex:1;min-width:180px;">
+                                <button class="lr-btn" type="button" data-lr-copy-referral-code><i class="fa-regular fa-copy"></i> Copy Code</button>
+                            </div>
+                            <div class="lr-field" style="margin-top:10px;">
+                                <label>Referral Link</label>
+                                <input class="lr-input" data-lr-referral-link readonly>
+                            </div>
+                            <div class="lr-actions">
+                                <button class="lr-btn lr-btn-primary" type="button" data-lr-share-referral><i class="fa-solid fa-share-nodes"></i> Share Referral Link</button>
+                                <button class="lr-btn" type="button" data-lr-copy-referral-link><i class="fa-regular fa-copy"></i> Copy Link</button>
+                            </div>
+                            <p class="lr-card-copy" style="margin-top:10px;">Points are not awarded just for entering the code. They are added automatically when the referred player completes a qualifying signup.</p>
+                        </div>
+                        <div class="lr-card">
+                            <h3 class="lr-card-title">Recent Referrals</h3>
+                            <div data-lr-referral-rows><div class="lr-detail-empty">No referrals yet.</div></div>
                         </div>
                     </div>
                 </section>
-                <section class="lr-view" data-lr-view="show"><div class="lr-section"><div class="lr-hero"><span class="lr-eyebrow">PLYRCARD Show</span><h3>Stories, Recruiting & The Game</h3><p class="lr-muted">Explore PLYRCARD conversations and athlete stories. Opening the show is an intentional external action, not Locker Room navigation.</p><div class="lr-actions"><a class="lr-btn lr-btn-primary" href="/podcast">Open PLYRCARD Show</a></div></div></div></section>
-                <section class="lr-view" data-lr-view="refer"><form class="lr-form" data-lr-referral-form><div class="lr-form-section"><h4>Refer a Friend</h4><p class="lr-card-copy">Invite another athlete to PLYRCARD. We only need their name and email.</p><div class="lr-form-grid" style="margin-top:12px;"><div class="lr-field"><label>Friend's Name</label><input class="lr-input" name="friend_name" placeholder="Friend's full name" required></div><div class="lr-field"><label>Friend's Email</label><input class="lr-input" type="email" name="friend_email" placeholder="friend@example.com" required></div><div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="message" placeholder="Optional message"></textarea></div></div></div><button class="lr-btn lr-btn-primary" type="submit">Send Invitation Email</button><div class="lr-upload-status" data-lr-referral-status>The invitation will be emailed directly to your friend.</div></form></section>
                 <section class="lr-view" data-lr-view="support">
                     <div class="lr-section">
                         <div class="lr-hero"><span class="lr-eyebrow">Support</span><h3>How can we help?</h3><p class="lr-muted">Send a request, track its status, and follow up without leaving Locker Room.</p></div>
@@ -1597,6 +1610,20 @@
             root?.classList.remove('lr-photo-busy');
         }
     }
+    function renderReferral() {
+        const referral = state?.referral || {};
+        const setText = (selector, value) => { const el=q(selector); if(el) el.textContent=String(value ?? ''); };
+        setText('[data-lr-referral-invited]', Number(referral.invited || 0).toLocaleString());
+        setText('[data-lr-referral-qualified]', Number(referral.qualified || 0).toLocaleString());
+        setText('[data-lr-referral-points]', Number(referral.points_earned || 0).toLocaleString());
+        const code=q('[data-lr-referral-code]'); if(code) code.value=referral.code || '';
+        const link=q('[data-lr-referral-link]'); if(link) link.value=referral.link || '';
+        const rows=q('[data-lr-referral-rows]');
+        if(rows){
+            const items=Array.isArray(referral.rows)?referral.rows:[];
+            rows.innerHTML=items.length?items.map(row=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid #eef2f6;"><div style="display:flex;align-items:center;gap:9px;min-width:0;"><span class="lr-menu-icon" style="width:34px;height:34px;flex:0 0 auto;">${esc(row.initials||'P')}</span><div style="min-width:0;"><strong style="font-size:11px;">${esc(row.name||'Player')}</strong><div class="lr-card-copy">${esc(row.detail||'')}</div></div></div><span class="lr-chip">${esc(row.badge||'Pending')}</span></div>`).join(''):'<div class="lr-detail-empty">No referrals yet.</div>';
+        }
+    }
     function render() {
         if (!authenticated || !state?.user) return;
         q('[data-lr-plan]') && (q('[data-lr-plan]').textContent = state.plan?.label || 'Free');
@@ -1610,7 +1637,7 @@
         if (nextBox) nextBox.innerHTML = next
             ? `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy"><strong>${esc(next.opponent || next.title || 'Game')}</strong><br>${esc(next.date_label || '')}${next.time_label ? ` · ${esc(next.time_label)}` : ''}${next.venue || next.location ? `<br>${esc(next.venue || next.location)}` : ''}</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`
             : `<h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div>`;
-        renderProfile(); renderPhotos(); renderSchedule(); renderSettings(); renderPlans(); renderBilling(); renderShare();
+        renderProfile(); renderPhotos(); renderSchedule(); renderSettings(); renderPlans(); renderBilling(); renderShare(); renderReferral();
         prefetchDashboardMetrics();
     }
     async function fetchProfileOptions(type, params = {}) {
@@ -2179,7 +2206,10 @@ setView(nav.dataset.lrNav);
         const removeRaw = event.target.closest('[data-lr-remove-raw]'); if (removeRaw && drawer.contains(removeRaw)) { event.preventDefault(); const index=Number(removeRaw.dataset.lrRemoveRaw); if(Array.isArray(state.user?.raw_player_images) && Number.isInteger(index)){ state.user.raw_player_images.splice(index,1); rawUploadStatusMessage='Image removed from this draft. Save Quick Profile to confirm.'; rawUploadStatusTone='ready'; renderMedia(); } return; }
         const removePendingRaw = event.target.closest('[data-lr-remove-pending-raw]'); if (removePendingRaw && drawer.contains(removePendingRaw)) { event.preventDefault(); const index=Number(removePendingRaw.dataset.lrRemovePendingRaw); if(Number.isInteger(index) && pendingRawFiles[index]){ pendingRawFiles.splice(index,1); rawUploadStatusMessage=''; rawUploadStatusTone=''; renderMedia(); } return; }
         const article = event.target.closest('[data-lr-article]'); if (article) { q('[data-lr-article-value]').value=article.dataset.lrArticle; qa('[data-lr-article]').forEach(x=>x.classList.toggle('is-active',x===article)); return; }
-        const visit = event.target.closest('[data-lr-visit-plyrcard]'); if (visit) { event.preventDefault(); const url=state.website?.url; if(url){ window.open(url,'_blank','noopener'); } else { setView('share'); } return; }
+        const copyReferralCode = event.target.closest('[data-lr-copy-referral-code]'); if(copyReferralCode){ const code=state.referral?.code||''; if(code) navigator.clipboard?.writeText(code).then(()=>showToast('Referral code copied.')); return; }
+        const copyReferralLink = event.target.closest('[data-lr-copy-referral-link]'); if(copyReferralLink){ const link=state.referral?.link||''; if(link) navigator.clipboard?.writeText(link).then(()=>showToast('Referral link copied.')); return; }
+        const shareReferral = event.target.closest('[data-lr-share-referral]'); if(shareReferral){ const link=state.referral?.link||''; if(link&&navigator.share){ navigator.share({title:'Join PLYRCARD',text:'Use my PLYRCARD referral link:',url:link}).catch(()=>{}); } else if(link){ navigator.clipboard?.writeText(link); showToast('Referral link copied.'); } return; }
+        const visit = event.target.closest('[data-lr-visit-plyrcard]'); if (visit) { event.preventDefault(); const url=state.website?.owner_visit_url || state.website?.url; if(url){ window.open(url,'_blank','noopener'); } else { showToast('Your PLYRCARD website is not available yet.', true); } return; }
         const copyLink = event.target.closest('[data-lr-copy-link]'); if (copyLink) { const url=state.website?.url || ''; if(url) navigator.clipboard?.writeText(url).then(()=>showToast('PLYRCARD link copied.')).catch(()=>showToast('Copy the link from the field above.')); return; }
         const nativeShare = event.target.closest('[data-lr-native-share]'); if(nativeShare){ const url=state.website?.url || ''; if(url && navigator.share){ navigator.share({title:'My PLYRCARD',url}).catch(()=>{}); } else if(url){ navigator.clipboard?.writeText(url); showToast('PLYRCARD link copied.'); } return; }
         const guestCopy = event.target.closest('[data-lr-guest-copy]'); if (guestCopy) { const url=drawer.dataset.mainShareUrl || ''; if(url) navigator.clipboard?.writeText(url).then(()=>showToast('PLYRCARD link copied.')).catch(()=>showToast('Copy the link from the field above.')); return; }
@@ -2242,12 +2272,7 @@ setView(nav.dataset.lrNav);
         try { await request(drawer.dataset.additionalServiceUrl,{method:'POST',body:new FormData(form)}); form.reset(); showToast('Service request sent.'); } catch(err){ showToast(err.message,true); }
     });
     q('[data-lr-support-ticket-form]')?.addEventListener('submit', async event => { event.preventDefault(); await submitLockerSupportTicket(event.currentTarget); });
-    q('[data-lr-referral-form]')?.addEventListener('submit', async event => {
-        event.preventDefault(); const form=event.currentTarget; const status=q('[data-lr-referral-status]'); const submit=form.querySelector('[type="submit"]');
-        if(status){ status.textContent='Sending invitation email...'; status.className='lr-upload-status is-ready'; }
-        if(submit) submit.disabled=true; setFormBusy(form,true,'Sending…');
-        try { const json=await request(drawer.dataset.referralUrl,{method:'POST',body:new FormData(form)}); form.reset(); if(status){ status.textContent=json.message || 'Invitation email sent.'; status.className='lr-upload-status is-success'; } showToast(json.message || 'Invitation email sent.'); } catch(err){ if(status){ status.textContent=err.message; status.className='lr-upload-status is-error'; } showToast(err.message,true); } finally { if(submit) submit.disabled=false; setFormBusy(form,false); }
-    });
+
     q('[data-lr-login-form]')?.addEventListener('submit', async event => {
         event.preventDefault(); const form=event.currentTarget; setFormBusy(form,true,'Signing in…');
         try { const json=await request(drawer.dataset.loginUrl,{method:'POST',body:new FormData(form)}); window.location.href=json.redirect_url || window.location.href; } catch(err){ showToast(err.message,true); setFormBusy(form,false); }
