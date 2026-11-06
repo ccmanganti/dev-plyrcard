@@ -45,16 +45,41 @@
     #plyrcard-action-drawer .lrm-nested-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
     #plyrcard-action-drawer .lrm-nested-back{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;color:#344054;font-size:11px;font-weight:850;padding:5px 0;cursor:pointer}
     #plyrcard-action-drawer .lrm-nav-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
-    #plyrcard-action-drawer .lrm-nav-tile{border:1px solid #e5e7eb;border-radius:13px;background:#fff;padding:12px;text-align:left;cursor:pointer;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;gap:8px}
+    #plyrcard-action-drawer .lrm-nav-tile{border:1px solid #e5e7eb;border-radius:15px;background:#fff;padding:13px;text-align:left;cursor:pointer;min-height:92px;display:flex;flex-direction:column;justify-content:space-between;gap:8px;box-shadow:0 6px 16px rgba(15,23,42,.035)}
+    #plyrcard-action-drawer .lrm-nav-tile:hover{border-color:rgba(240,82,43,.32);background:#fffaf8}
     #plyrcard-action-drawer .lrm-nav-tile strong{font-size:12px;color:#101828}
     #plyrcard-action-drawer .lrm-nav-tile small{font-size:10px;color:#667085;line-height:1.4}
     #plyrcard-action-drawer .lrm-nav-tile .value{font-size:20px;font-weight:950;color:#c2410c}
     #plyrcard-action-drawer .lrm-collapsible-list.is-minimized>*:nth-child(n+4){display:none}
     #plyrcard-action-drawer .lrm-activity-toggle{border:0;background:transparent;color:#f0522b;font-size:10px;font-weight:850;cursor:pointer}
-    #plyrcard-action-drawer .lrm-inbox-list{display:grid;gap:7px;max-height:62vh;overflow:auto}
-    #plyrcard-action-drawer .lrm-conversation{width:100%;border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:10px;text-align:left;cursor:pointer}
-    #plyrcard-action-drawer .lrm-conversation.is-active{border-color:rgba(240,82,43,.4);background:#fff8f5}
-    #plyrcard-action-drawer .lrm-thread{min-height:300px;max-height:66vh;overflow:auto}
+    #plyrcard-action-drawer .lrm-inbox-list{display:grid;gap:0;max-height:58vh;overflow:auto;border:1px solid #e5e7eb;border-radius:15px;background:#fff}
+    #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-inbox-list{max-height:76vh}
+    #plyrcard-action-drawer .lrm-conversation{width:100%;border:0;border-bottom:1px solid #eef2f6;background:#fff;padding:11px 12px;text-align:left;cursor:pointer;display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:9px;align-items:start}
+    #plyrcard-action-drawer .lrm-conversation:last-child{border-bottom:0}
+    #plyrcard-action-drawer .lrm-conversation:hover{background:#fff8f5}
+    #plyrcard-action-drawer .lrm-conversation.is-active{background:#fff3ed;box-shadow:inset 3px 0 #f0522b}
+    #plyrcard-action-drawer .lrm-thread-logo{width:38px;height:38px;border:1px solid #e5e7eb;border-radius:999px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#475467;font-size:10px;font-weight:900}
+    #plyrcard-action-drawer .lrm-thread-logo img{width:100%;height:100%;object-fit:contain;padding:4px}
+    #plyrcard-action-drawer .lrm-thread-main{min-width:0}
+    #plyrcard-action-drawer .lrm-thread-name{font-size:11px;font-weight:900;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-thread-school{font-size:9px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+    #plyrcard-action-drawer .lrm-thread-preview{font-size:10px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:5px}
+    #plyrcard-action-drawer .lrm-thread-side{display:grid;justify-items:end;gap:6px;min-width:52px}
+    #plyrcard-action-drawer .lrm-thread-date{font-size:8px;color:#98a2b3;white-space:nowrap}
+    #plyrcard-action-drawer .lrm-unread-dot{width:7px;height:7px;border-radius:999px;background:#f0522b}
+    #plyrcard-action-drawer .lrm-thread{min-height:360px;max-height:68vh;overflow:auto;padding-bottom:78px;position:relative}
+    #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{max-height:78vh;min-height:72vh}
+    #plyrcard-action-drawer .lrm-thread-header{position:sticky;top:-14px;z-index:5;background:#fff;border-bottom:1px solid #eef2f6;margin:-2px -2px 10px;padding:8px 2px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #plyrcard-action-drawer .lrm-thread-contact{display:flex;align-items:center;gap:8px;min-width:0}
+    #plyrcard-action-drawer .lrm-thread-contact-copy{min-width:0}
+    #plyrcard-action-drawer .lrm-thread-contact-copy strong{display:block;font-size:12px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-thread-contact-copy span{display:block;font-size:9px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-load-older{display:flex;justify-content:center;position:sticky;top:48px;z-index:4;padding:7px;background:linear-gradient(#fff 75%,rgba(255,255,255,0))}
+    #plyrcard-action-drawer .lrm-reply-composer{position:sticky;bottom:-14px;z-index:6;margin:12px -2px -14px;padding:10px 2px 2px;background:#fff;border-top:1px solid #e5e7eb}
+    #plyrcard-action-drawer .lrm-reply-box{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;align-items:end;padding:8px;border:1px solid #d0d5dd;border-radius:13px;background:#fff;box-shadow:0 -8px 24px rgba(15,23,42,.06)}
+    #plyrcard-action-drawer .lrm-reply-box textarea{border:0!important;box-shadow:none!important;resize:none;min-height:42px;max-height:110px;padding:7px!important;background:transparent!important}
+    #plyrcard-action-drawer .lrm-inbox-action-row{display:flex;align-items:center;gap:6px}
+    #plyrcard-action-drawer .lrm-inbox-toggle{min-width:34px;height:34px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#667085;cursor:pointer}
     #plyrcard-action-drawer .lrm-message{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;margin:10px 0}
     #plyrcard-action-drawer .lrm-message.is-out{grid-template-columns:minmax(0,1fr) 28px}
     #plyrcard-action-drawer .lrm-message-avatar{width:28px;height:28px;border-radius:999px;background:#f2f4f7;display:grid;place-items:center;font-size:9px;font-weight:900}
@@ -74,12 +99,12 @@
     #plyrcard-action-drawer .lrm-recipient-tab{border:1px solid #e5e7eb;border-radius:999px;background:#fff;color:#475467;padding:6px 10px;font-size:10px;font-weight:800;cursor:pointer}
     #plyrcard-action-drawer .lrm-recipient-tab.is-active{background:#f0522b;border-color:#f0522b;color:#fff}
     #plyrcard-action-drawer .lrm-points-overview{display:grid;grid-template-columns:minmax(0,1fr);gap:11px}
-    #plyrcard-action-drawer .lrm-points-balance{border:1px solid #e5e7eb;border-radius:16px;background:#fff;padding:15px}
+    #plyrcard-action-drawer .lrm-points-balance{border:1px solid #f1d4c8;border-radius:18px;background:linear-gradient(135deg,#fff7f2,#fff);padding:17px;box-shadow:0 10px 26px rgba(240,82,43,.06)}
     #plyrcard-action-drawer .lrm-balance-number{display:flex;align-items:flex-end;gap:7px;margin:14px 0}
     #plyrcard-action-drawer .lrm-balance-number strong{font-size:46px;line-height:.85;letter-spacing:-.06em;color:#c2410c;font-weight:950}
     #plyrcard-action-drawer .lrm-balance-number span{font-size:10px;font-weight:800;color:#667085}
     #plyrcard-action-drawer .lrm-service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-    #plyrcard-action-drawer .lrm-service-card{border:1px solid #e5e7eb;border-radius:13px;background:#f8fafc;padding:11px;display:flex;flex-direction:column;min-width:0}
+    #plyrcard-action-drawer .lrm-service-card{border:1px solid #e5e7eb;border-radius:15px;background:#fff;padding:12px;display:flex;flex-direction:column;min-width:0;box-shadow:0 6px 16px rgba(15,23,42,.035)}
     #plyrcard-action-drawer .lrm-service-head{display:flex;justify-content:space-between;gap:8px;align-items:start}
     #plyrcard-action-drawer .lrm-service-head strong{font-size:11px}
     #plyrcard-action-drawer .lrm-service-price{font-size:16px;font-weight:950;color:#c2410c;white-space:nowrap}
@@ -87,7 +112,7 @@
     #plyrcard-action-drawer .lrm-sample-grid a{border-radius:8px;overflow:hidden;background:#fff;border:1px solid #e5e7eb;min-height:54px;display:grid;place-items:center;text-decoration:none}
     #plyrcard-action-drawer .lrm-sample-grid img{width:100%;height:70px;object-fit:contain;display:block}
     #plyrcard-action-drawer .lrm-pack-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-    #plyrcard-action-drawer .lrm-pack{border:1px solid #e5e7eb;border-radius:13px;background:#f8fafc;padding:11px;display:flex;flex-direction:column;gap:5px}
+    #plyrcard-action-drawer .lrm-pack{border:1px solid #e5e7eb;border-radius:15px;background:#fff;padding:12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 6px 16px rgba(15,23,42,.035)}
     #plyrcard-action-drawer .lrm-pack .points{font-size:22px;font-weight:950;color:#c2410c}
     #plyrcard-action-drawer .lrm-history-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
     @media(max-width:1200px){
@@ -97,9 +122,11 @@
     @media(max-width:760px){
         #plyrcard-action-drawer .lrm-school-grid,#plyrcard-action-drawer .lrm-list-grid,#plyrcard-action-drawer .lrm-service-grid,#plyrcard-action-drawer .lrm-pack-grid,#plyrcard-action-drawer .lrm-history-grid,#plyrcard-action-drawer .lrm-points-overview,#plyrcard-action-drawer .lrm-inbox-shell{grid-template-columns:1fr}
         #plyrcard-action-drawer .lrm-filter-row{grid-template-columns:1fr 1fr}
+        #plyrcard-action-drawer .lrm-nav-tiles{grid-template-columns:1fr 1fr}
         #plyrcard-action-drawer .lrm-school-list-row{grid-template-columns:minmax(130px,1fr) 80px 38px}
         #plyrcard-action-drawer .lrm-school-list-row .lrm-hide-mobile{display:none}
-        #plyrcard-action-drawer .lrm-thread{max-height:none}
+        #plyrcard-action-drawer .lrm-thread{max-height:72vh}
+        #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{max-height:82vh;min-height:78vh}
     }
 </style>
 
@@ -153,21 +180,25 @@
     </div>
 </section>
 
-<section class="lr-view" data-lr-view="inbox">
+<section class="lr-view lrm-inbox-view" data-lr-view="inbox" data-lrm-inbox-root>
     <div class="lr-section">
         <div class="lrm-nested-window is-active" data-lrm-inbox-window="list">
             <div class="lrm-toolbar">
                 <div class="lrm-toolbar-top">
-                    <div><h3>Inbox</h3><p>Select a conversation to open it in a separate message window.</p></div>
-                    <button class="lr-btn" type="button" data-lrm-inbox-refresh><i class="fa-solid fa-rotate"></i> Refresh</button>
+                    <div><h3>Inbox</h3><p>Coach email conversations, using the same compact pattern as Recruiting Center.</p></div>
+                    <div class="lrm-inbox-action-row">
+                        <button class="lrm-inbox-toggle" type="button" data-lrm-inbox-size title="Maximize inbox" aria-label="Maximize inbox"><i class="fa-solid fa-expand"></i></button>
+                        <button class="lrm-inbox-toggle" type="button" data-lrm-inbox-refresh title="Refresh inbox" aria-label="Refresh inbox"><i class="fa-solid fa-rotate"></i></button>
+                    </div>
                 </div>
-                <input class="lr-input" type="search" data-lrm-inbox-search placeholder="Search coach or conversation">
+                <input class="lr-input" type="search" data-lrm-inbox-search placeholder="Search conversations...">
             </div>
             <div class="lrm-inbox-list" data-lrm-inbox-list><div class="lr-detail-empty">Loading conversations…</div></div>
         </div>
         <div class="lrm-nested-window" data-lrm-inbox-window="thread">
             <div class="lrm-nested-head">
                 <button type="button" class="lrm-nested-back" data-lrm-inbox-back><i class="fa-solid fa-chevron-left"></i> Conversations</button>
+                <button class="lrm-inbox-toggle" type="button" data-lrm-inbox-size title="Maximize inbox" aria-label="Maximize inbox"><i class="fa-solid fa-expand"></i></button>
             </div>
             <div class="lr-card lrm-thread" data-lrm-thread><div class="lr-detail-empty">Choose a conversation to read the email thread.</div></div>
         </div>
@@ -208,11 +239,12 @@
     <div class="lr-section">
         <div class="lrm-nested-window is-active" data-lrm-points-window="home">
             <div class="lrm-toolbar">
-                <div class="lrm-toolbar-top"><div><h3>PLYR Points</h3><p>Balance, point purchases, service usage and full credit tracking.</p></div><span class="lrm-pill">PLAYER CREDITS</span></div>
+                <div class="lrm-toolbar-top"><div><h3>PLYR Points</h3><p>Your recruiting credit wallet: spend, reload, and track every point.</p></div><span class="lrm-pill"><i class="fa-solid fa-coins" style="margin-right:5px"></i> PLYR WALLET</span></div>
             </div>
             <div class="lrm-points-balance">
-                <span class="lr-eyebrow">Available Balance</span>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span class="lr-eyebrow">Available Balance</span><span class="lrm-pill">Ready to use</span></div>
                 <div class="lrm-balance-number"><strong data-lrm-points-balance>0</strong><span>PLYR Points</span></div>
+                <p class="lr-card-copy">Spend points on recruiting services or add more when you need them.</p>
             </div>
             <div class="lrm-nav-tiles">
                 <button type="button" class="lrm-nav-tile" data-lrm-points-open="services"><span><strong>Use Points</strong><small>Browse enabled recruiting services and samples.</small></span><i class="fa-solid fa-chevron-right"></i></button>
@@ -259,7 +291,8 @@
 
     var data={schools:[],favorites:[],lists:[],conversations:[],templates:[],points:null,pointHistory:[]};
     var loaded={schools:false,favorites:false,lists:false,inbox:false,compose:false,points:false};
-    var schoolView='grid', activeConversation='', selectedComposeSchool=null, inboxTimer=null;
+    var schoolView='grid', activeConversation='', selectedComposeSchool=null, inboxTimer=null, inboxMaximized=false;
+    var threadState={conversation:null,messages:[],cursor:null,hasMore:false,loadingOlder:false};
 
     function q(s){return drawer.querySelector(s)}
     function qa(s){return Array.from(drawer.querySelectorAll(s))}
@@ -344,22 +377,35 @@
         var rows=(data.schools||[]).filter(function(s){return !current.has(String(s.id||''))&&String(s.name||'').toLowerCase().includes(term)}).slice(0,10);
         holder.innerHTML=rows.length?rows.map(function(s){return '<button type="button" class="lrm-list-result" data-lrm-add-school="'+esc(s.id||'')+'" data-list-key="'+esc(key)+'"><span>'+esc(s.name||'School')+'</span><i class="fa-solid fa-plus"></i></button>'}).join(''):'<div class="lr-card-copy">No matching schools.</div>';
     }
+    function inboxDate(value){
+        var d=new Date(value||'');if(Number.isNaN(d.getTime()))return '';
+        var today=new Date(),same=today.toDateString()===d.toDateString();
+        return same?d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    }
     function renderInbox(){
         var holder=q('[data-lrm-inbox-list]');if(!holder)return;
         var rows=data.conversations||[];
         holder.innerHTML=rows.length?rows.map(function(row){
-            var active=String(row.id||'')===activeConversation;
-            return '<button type="button" class="lrm-conversation '+(active?'is-active':'')+'" data-lrm-conversation="'+esc(row.id||'')+'"><div style="display:flex;justify-content:space-between;gap:7px"><strong style="font-size:11px;color:#101828">'+esc(row.contact_name||'Coach')+'</strong>'+(Number(row.unread_count||0)>0?'<span class="lrm-pill">'+Number(row.unread_count)+' new</span>':'')+'</div><div class="lr-card-copy" style="margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(row.last_message||'No preview available')+'</div></button>';
+            var active=String(row.id||'')===activeConversation,logo=row.school_logo_url||'',school=row.school||row.title||'Coach',preview=row.preview||row.last_message||'No message preview available.';
+            return '<button type="button" class="lrm-conversation '+(active?'is-active':'')+'" data-lrm-conversation="'+esc(row.id||'')+'"><span class="lrm-thread-logo">'+(logo?'<img src="'+esc(logo)+'" alt="" loading="lazy">':esc(initials(row.contact_name||'Coach')))+'</span><span class="lrm-thread-main"><span class="lrm-thread-name">'+esc(row.contact_name||'Coach')+'</span><span class="lrm-thread-school">'+esc(school)+'</span><span class="lrm-thread-preview">'+esc(preview)+'</span></span><span class="lrm-thread-side"><span class="lrm-thread-date">'+esc(inboxDate(row.last_message_at))+'</span>'+(Number(row.unread_count||0)>0?'<span class="lrm-unread-dot" title="'+Number(row.unread_count)+' unread"></span>':'')+'</span></button>';
         }).join(''):'<div class="lr-detail-empty">No conversations yet.</div>';
     }
     function safeEmailHtml(value){return String(value||'<p><em>No message body.</em></p>')}
     function messageDate(value){var d=new Date(value||'');return Number.isNaN(d.getTime())?'':d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
-    function renderThread(convo,messages){
+    function setInboxMaximized(value){
+        inboxMaximized=!!value;
+        var root=q('[data-lrm-inbox-root]');if(root)root.classList.toggle('is-maximized',inboxMaximized);
+        qa('[data-lrm-inbox-size]').forEach(function(btn){btn.title=inboxMaximized?'Minimize inbox':'Maximize inbox';btn.setAttribute('aria-label',btn.title);btn.innerHTML='<i class="fa-solid fa-'+(inboxMaximized?'compress':'expand')+'"></i>'});
+    }
+    function renderThread(){
         var thread=q('[data-lrm-thread]');if(!thread)return;
-        var title=convo?.contact_name||'Conversation';
-        thread.innerHTML='<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;position:sticky;top:-14px;background:#fff;padding:2px 0 10px;z-index:3"><div><h3 class="lr-card-title">'+esc(title)+'</h3><p class="lr-card-copy">'+esc(convo?.email||'')+'</p></div><button class="lr-btn lr-btn-primary" type="button" data-lrm-reply="'+esc(convo?.id||'')+'">Reply</button></div><div data-lrm-message-stack></div>';
+        var convo=threadState.conversation||{},messages=threadState.messages||[],title=convo.contact_name||'Conversation',school=convo.school||convo.title||convo.email||'',logo=convo.school_logo_url||'';
+        var latest=messages.length?messages[messages.length-1]:{},subject=String(latest.subject||'').trim();
+        if(subject&&!/^re:/i.test(subject))subject='Re: '+subject;
+        if(!subject)subject='Re: PLYRCARD Recruiting';
+        thread.innerHTML='<div class="lrm-thread-header"><div class="lrm-thread-contact"><span class="lrm-thread-logo">'+(logo?'<img src="'+esc(logo)+'" alt="">':esc(initials(title)))+'</span><span class="lrm-thread-contact-copy"><strong>'+esc(title)+'</strong><span>'+esc(school)+'</span></span></div><span class="lrm-pill">'+messages.length+' loaded</span></div>'+(threadState.hasMore?'<div class="lrm-load-older"><button class="lr-btn" type="button" data-lrm-load-older '+(threadState.loadingOlder?'disabled':'')+'>'+(threadState.loadingOlder?'Loading 10 older emails…':'Load 10 older emails')+'</button></div>':'')+'<div data-lrm-message-stack></div><form class="lrm-reply-composer" data-lrm-reply-form><input type="hidden" name="subject" value="'+esc(subject)+'"><div class="lrm-reply-box"><textarea class="lr-textarea" name="body" rows="2" maxlength="100000" placeholder="Reply to '+esc(title)+'..." required></textarea><button class="lr-btn lr-btn-primary" type="submit" aria-label="Send reply"><i class="fa-solid fa-paper-plane"></i></button></div></form>';
         var stack=q('[data-lrm-message-stack]');
-        (messages||[]).forEach(function(m){
+        messages.forEach(function(m){
             var direction=String(m.direction||'').toLowerCase(),out=direction.includes('out')||['sent','send','outgoing','out'].includes(direction);
             var article=document.createElement('article');article.className='lrm-message'+(out?' is-out':'');
             var avatar=document.createElement('span');avatar.className='lrm-message-avatar';avatar.textContent=out?'YOU':initials(title);
@@ -370,7 +416,31 @@
             if(out){article.appendChild(body);article.appendChild(avatar)}else{article.appendChild(avatar);article.appendChild(body)}
             stack.appendChild(article);
         });
-        if(!(messages||[]).length)stack.innerHTML='<div class="lr-detail-empty">No email messages in this conversation.</div>';
+        if(!messages.length)stack.innerHTML='<div class="lr-detail-empty">No email messages in this conversation.</div>';
+    }
+    async function loadOlderMessages(){
+        if(!activeConversation||threadState.loadingOlder||!threadState.hasMore||!threadState.cursor)return;
+        threadState.loadingOlder=true;renderThread();
+        try{
+            var url=drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(activeConversation)+'?limit=10&last_message_id='+encodeURIComponent(threadState.cursor);
+            var j=await api(url),older=Array.isArray(j.messages)?j.messages:[],seen=new Set((threadState.messages||[]).map(function(m){return String(m.id||'')}));
+            threadState.messages=older.filter(function(m){return !seen.has(String(m.id||''))}).concat(threadState.messages||[]);
+            threadState.cursor=j.last_message_id||threadState.cursor;threadState.hasMore=!!j.has_more;
+        }catch(e){toast(e.message,true)}
+        finally{threadState.loadingOlder=false;renderThread()}
+    }
+    async function submitThreadReply(form){
+        if(!activeConversation)return;
+        var fd=new FormData(form),body=String(fd.get('body')||'').trim(),subject=String(fd.get('subject')||'').trim();
+        if(!body)return;
+        busy(form,true,'Sending…');
+        try{
+            var j=await api(drawer.dataset.recruitingEmailUrl,{method:'POST',body:{target_mode:'conversation',conversation_id:activeConversation,subject:subject||'Re: PLYRCARD Recruiting',body:body}});
+            toast(j.message||'Reply sent.');form.reset();
+            await openConversation(activeConversation,true);
+            loaded.inbox=false;loadInbox(true);
+        }catch(e){toast(e.message,true)}
+        finally{busy(form,false)}
     }
     function renderCompose(){
         var template=q('[data-lrm-template]');if(template){var old=template.value;template.innerHTML='<option value="">Start from scratch</option>'+(data.templates||[]).map(function(r){return '<option value="'+esc(r.id||'')+'">'+esc(r.name||'Template')+'</option>'}).join('');if(old)template.value=old}
@@ -441,16 +511,21 @@
     function setInboxWindow(name){
         qa('[data-lrm-inbox-window]').forEach(function(el){el.classList.toggle('is-active',el.dataset.lrmInboxWindow===name)});
     }
-    async function openConversation(id){
-        activeConversation=String(id||'');renderInbox();setInboxWindow('thread');
-        var thread=q('[data-lrm-thread]');if(thread)thread.innerHTML='<div class="lr-detail-empty">Loading email thread…</div>';
-        try{var j=await api(drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(id)+'?limit=100'),convo=(data.conversations||[]).find(function(r){return String(r.id||'')===String(id)})||{id:id};renderThread(convo,j.messages||[])}catch(e){if(thread)thread.innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}
+    async function openConversation(id,preserveWindow){
+        activeConversation=String(id||'');renderInbox();if(!preserveWindow)setInboxWindow('thread');
+        var thread=q('[data-lrm-thread]');if(thread)thread.innerHTML='<div class="lr-detail-empty">Loading latest emails…</div>';
+        try{
+            var j=await api(drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(id)+'?limit=10'),convo=(data.conversations||[]).find(function(r){return String(r.id||'')===String(id)})||{id:id};
+            threadState={conversation:convo,messages:Array.isArray(j.messages)?j.messages:[],cursor:j.last_message_id||null,hasMore:!!j.has_more,loadingOlder:false};
+            renderThread();
+            requestAnimationFrame(function(){if(thread)thread.scrollTop=thread.scrollHeight});
+        }catch(e){if(thread)thread.innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}
     }
     function onView(view){
         if(view==='schools')loadSchools(false);
         else if(view==='favorites')loadFavorites(false);
         else if(view==='lists')loadLists(false);
-        else if(view==='inbox'){setInboxWindow('list');loadInbox(false);}
+        else if(view==='inbox'){setInboxWindow('list');setInboxMaximized(false);loadInbox(false);}
         else if(view==='compose')loadCompose(false);
         else if(view==='points'){setPointsWindow('home');loadPoints(false);}
     }
@@ -458,6 +533,8 @@
     document.addEventListener('click',function(event){
         var nav=event.target.closest('[data-lr-nav]');if(nav&&drawer.contains(nav))setTimeout(function(){onView(nav.dataset.lrNav)},0);
         var inboxBack=event.target.closest('[data-lrm-inbox-back]');if(inboxBack&&drawer.contains(inboxBack)){setInboxWindow('list');return}
+        var inboxSize=event.target.closest('[data-lrm-inbox-size]');if(inboxSize&&drawer.contains(inboxSize)){setInboxMaximized(!inboxMaximized);return}
+        var loadOlder=event.target.closest('[data-lrm-load-older]');if(loadOlder&&drawer.contains(loadOlder)){loadOlderMessages();return}
         var pointsOpen=event.target.closest('[data-lrm-points-open]');if(pointsOpen&&drawer.contains(pointsOpen)){setPointsWindow(pointsOpen.dataset.lrmPointsOpen);return}
         var pointsBack=event.target.closest('[data-lrm-points-back]');if(pointsBack&&drawer.contains(pointsBack)){setPointsWindow('home');return}
         var activityToggle=event.target.closest('[data-lrm-activity-preview-toggle]');if(activityToggle&&drawer.contains(activityToggle)){var preview=q('[data-lrm-activity-preview]'),minimized=preview?.classList.toggle('is-minimized');activityToggle.textContent=minimized?'Maximize':'Minimize';return}
@@ -468,7 +545,6 @@
         var addSchool=event.target.closest('[data-lrm-add-school]');if(addSchool&&drawer.contains(addSchool)){event.preventDefault();var key2=addSchool.dataset.listKey,id=addSchool.dataset.lrmAddSchool;api(drawer.dataset.dashboardSchoolListUrl,{method:'POST',body:{school_id:id,list_key:key2,in_list:true}}).then(function(){loaded.lists=false;loadLists(true);toast('School added to list.')}).catch(function(e){toast(e.message,true)});return}
         var del=event.target.closest('[data-lrm-list-delete]');if(del&&drawer.contains(del)){event.preventDefault();if(!confirm('Delete this recruiting list?'))return;api(drawer.dataset.recruitingListsUrl+'/'+encodeURIComponent(del.dataset.lrmListDelete),{method:'DELETE'}).then(function(j){data.lists=j.items||[];loaded.lists=true;renderLists();toast('List deleted.')}).catch(function(e){toast(e.message,true)});return}
         var convo=event.target.closest('[data-lrm-conversation]');if(convo&&drawer.contains(convo)){event.preventDefault();openConversation(convo.dataset.lrmConversation);return}
-        var reply=event.target.closest('[data-lrm-reply]');if(reply&&drawer.contains(reply)){event.preventDefault();var btn=drawer.querySelector('[data-lr-nav="compose"]');if(btn)btn.click();loadCompose(false).then(function(){var form=q('[data-lrm-compose-form]');if(form)form.dataset.conversationId=reply.dataset.lrmReply});return}
         var refresh=event.target.closest('[data-lrm-inbox-refresh]');if(refresh&&drawer.contains(refresh)){loaded.inbox=false;loadInbox(true);return}
         var choose=event.target.closest('[data-lrm-choose-school]');if(choose&&drawer.contains(choose)){selectedComposeSchool=(data.schools||[]).find(function(s){return String(s.id||'')===String(choose.dataset.lrmChooseSchool)})||null;q('[data-lrm-compose-school-search]').value='';renderComposeSchool();renderComposeSchoolResults();return}
         var clear=event.target.closest('[data-lrm-clear-compose-school]');if(clear&&drawer.contains(clear)){selectedComposeSchool=null;renderComposeSchool();return}
@@ -486,6 +562,11 @@
     },true);
     document.addEventListener('change',function(event){if(event.target.matches('[data-lrm-division-filter],[data-lrm-state-filter],[data-lrm-conference-filter]'))renderSchools()},true);
     document.addEventListener('plyrcard:points-refresh',function(){loaded.points=false;loadPoints(true)});
+
+    document.addEventListener('submit',function(event){
+        var replyForm=event.target.closest('[data-lrm-reply-form]');
+        if(replyForm&&drawer.contains(replyForm)){event.preventDefault();submitThreadReply(replyForm);}
+    },true);
 
     var listForm=q('[data-lrm-list-form]');
     if(listForm)listForm.addEventListener('submit',async function(event){event.preventDefault();busy(listForm,true,'Creating…');try{var j=await api(drawer.dataset.recruitingListsUrl,{method:'POST',body:new FormData(listForm)});data.lists=j.items||[];loaded.lists=true;listForm.reset();listForm.querySelector('[name="color"]').value='#ff6338';renderLists();toast('List created.')}catch(e){toast(e.message,true)}finally{busy(listForm,false)}});
