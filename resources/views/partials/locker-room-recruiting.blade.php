@@ -1,284 +1,391 @@
-{{-- Player-facing Recruiting Center + PLYR Points modules.
-     This partial intentionally contains no admin controls or admin links. --}}
+{{-- Player-facing Recruiting Center + PLYR Points.
+     Mirrors the Admin Recruiting Center interaction model without exposing admin controls. --}}
+<style>
+    #plyrcard-action-drawer .lrm-toolbar{display:grid;gap:10px;padding:14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;box-shadow:0 10px 26px rgba(15,23,42,.05)}
+    #plyrcard-action-drawer .lrm-toolbar-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+    #plyrcard-action-drawer .lrm-toolbar-top h3{margin:0;font-size:20px;line-height:1.1;font-weight:900;letter-spacing:-.03em}
+    #plyrcard-action-drawer .lrm-toolbar-top p{margin:5px 0 0;color:#667085;font-size:12px;line-height:1.4}
+    #plyrcard-action-drawer .lrm-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+    #plyrcard-action-drawer .lrm-filter-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;align-items:center}
+    #plyrcard-action-drawer .lrm-segment{display:inline-flex;gap:3px;padding:3px;border:1px solid #e5e7eb;border-radius:10px;background:#f8fafc}
+    #plyrcard-action-drawer .lrm-segment button{width:34px;height:32px;border:0;border-radius:8px;background:transparent;color:#667085;cursor:pointer}
+    #plyrcard-action-drawer .lrm-segment button.is-active{background:#fff;color:#f0522b;box-shadow:0 4px 12px rgba(15,23,42,.08)}
+    #plyrcard-action-drawer .lrm-school-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+    #plyrcard-action-drawer .lrm-school-card{position:relative;border:1px solid #e5e7eb;border-radius:14px;background:#fff;padding:12px;min-width:0;box-shadow:0 8px 20px rgba(15,23,42,.04)}
+    #plyrcard-action-drawer .lrm-school-card:hover{border-color:rgba(240,82,43,.35);box-shadow:0 13px 28px rgba(15,23,42,.07)}
+    #plyrcard-action-drawer .lrm-school-main{width:100%;border:0;background:transparent;padding:0;text-align:left;cursor:pointer;display:grid;grid-template-columns:44px minmax(0,1fr);gap:9px;align-items:center}
+    #plyrcard-action-drawer .lrm-school-logo{width:44px;height:44px;border-radius:11px;background:#f3f4f6;display:grid;place-items:center;overflow:hidden;font-size:11px;font-weight:900;color:#475467}
+    #plyrcard-action-drawer .lrm-school-logo img{width:100%;height:100%;object-fit:contain;padding:5px;background:#fff}
+    #plyrcard-action-drawer .lrm-school-copy{min-width:0}
+    #plyrcard-action-drawer .lrm-school-copy strong{display:block;color:#101828;font-size:12px;font-weight:850;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-school-copy small{display:block;margin-top:3px;color:#667085;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-school-foot{display:flex;align-items:center;justify-content:space-between;gap:7px;margin-top:10px;padding-top:9px;border-top:1px solid #eef2f6}
+    #plyrcard-action-drawer .lrm-pill{display:inline-flex;align-items:center;min-height:24px;padding:0 8px;border-radius:999px;background:#f8fafc;color:#475467;font-size:9px;font-weight:800}
+    #plyrcard-action-drawer .lrm-icon-btn{width:30px;height:30px;border:1px solid #e5e7eb;border-radius:9px;background:#fff;color:#667085;display:grid;place-items:center;cursor:pointer}
+    #plyrcard-action-drawer .lrm-icon-btn.is-active{color:#f0522b;border-color:rgba(240,82,43,.35);background:#fff5f1}
+    #plyrcard-action-drawer .lrm-school-list{display:grid;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;background:#fff}
+    #plyrcard-action-drawer .lrm-school-list-row{display:grid;grid-template-columns:minmax(160px,1.35fr) minmax(110px,1fr) minmax(110px,1fr) 78px 38px;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid #eef2f6}
+    #plyrcard-action-drawer .lrm-school-list-row:first-child{border-top:0}
+    #plyrcard-action-drawer .lrm-school-list-row>span{min-width:0;font-size:10px;color:#667085;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #plyrcard-action-drawer .lrm-list-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+    #plyrcard-action-drawer .lrm-list-card{border:1px solid #e5e7eb;border-radius:16px;background:#fff;padding:13px;box-shadow:0 8px 20px rgba(15,23,42,.04);min-width:0}
+    #plyrcard-action-drawer .lrm-list-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+    #plyrcard-action-drawer .lrm-list-title{display:flex;align-items:center;gap:8px;min-width:0}
+    #plyrcard-action-drawer .lrm-list-dot{width:9px;height:9px;border-radius:999px;flex:0 0 auto}
+    #plyrcard-action-drawer .lrm-list-title strong{font-size:13px;font-weight:850;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-school-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;max-height:116px;overflow:auto}
+    #plyrcard-action-drawer .lrm-school-chip{border:1px solid #e5e7eb;border-radius:9px;background:#f8fafc;padding:5px 7px;display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:750;color:#344054;cursor:pointer;max-width:100%}
+    #plyrcard-action-drawer .lrm-school-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    #plyrcard-action-drawer .lrm-list-add-panel{margin-top:9px;padding:9px;border:1px dashed #d0d5dd;border-radius:11px;background:#fafafa}
+    #plyrcard-action-drawer .lrm-list-search-results{display:grid;gap:5px;margin-top:7px;max-height:150px;overflow:auto}
+    #plyrcard-action-drawer .lrm-list-result{width:100%;border:0;border-radius:9px;background:#fff;padding:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;cursor:pointer}
+    #plyrcard-action-drawer .lrm-inbox-shell{display:grid;grid-template-columns:minmax(210px,.8fr) minmax(0,1.2fr);gap:10px;align-items:start}
+    #plyrcard-action-drawer .lrm-inbox-list{display:grid;gap:7px;max-height:62vh;overflow:auto}
+    #plyrcard-action-drawer .lrm-conversation{width:100%;border:1px solid #e5e7eb;border-radius:12px;background:#fff;padding:10px;text-align:left;cursor:pointer}
+    #plyrcard-action-drawer .lrm-conversation.is-active{border-color:rgba(240,82,43,.4);background:#fff8f5}
+    #plyrcard-action-drawer .lrm-thread{min-height:300px;max-height:66vh;overflow:auto}
+    #plyrcard-action-drawer .lrm-message{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;margin:10px 0}
+    #plyrcard-action-drawer .lrm-message.is-out{grid-template-columns:minmax(0,1fr) 28px}
+    #plyrcard-action-drawer .lrm-message-avatar{width:28px;height:28px;border-radius:999px;background:#f2f4f7;display:grid;place-items:center;font-size:9px;font-weight:900}
+    #plyrcard-action-drawer .lrm-message.is-out .lrm-message-avatar{grid-column:2;background:#fff0eb;color:#c2410c}
+    #plyrcard-action-drawer .lrm-message-body{min-width:0}
+    #plyrcard-action-drawer .lrm-message.is-out .lrm-message-body{grid-column:1;grid-row:1}
+    #plyrcard-action-drawer .lrm-msg-meta{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:#98a2b3;font-size:9px}
+    #plyrcard-action-drawer .lrm-email-body{border:1px solid #eaecf0;border-radius:12px;background:#fff;padding:10px;overflow:auto;max-width:100%;font-size:11px;line-height:1.5;color:#344054;word-break:break-word}
+    #plyrcard-action-drawer .lrm-email-body *{max-width:100%!important;box-sizing:border-box}
+    #plyrcard-action-drawer .lrm-email-body img{height:auto!important;max-width:100%!important}
+    #plyrcard-action-drawer .lrm-email-body table{width:100%!important;table-layout:auto}
+    #plyrcard-action-drawer .lrm-email-body pre{white-space:pre-wrap;word-break:break-word}
+    #plyrcard-action-drawer .lrm-compose-recipient{display:grid;gap:8px;padding:11px;border:1px solid #e5e7eb;border-radius:13px;background:#f8fafc}
+    #plyrcard-action-drawer .lrm-compose-school-results{display:grid;gap:5px;max-height:180px;overflow:auto;margin-top:6px}
+    #plyrcard-action-drawer .lrm-compose-school-result{width:100%;border:1px solid #e5e7eb;border-radius:9px;background:#fff;padding:8px;text-align:left;cursor:pointer}
+    #plyrcard-action-drawer .lrm-recipient-tabs{display:flex;gap:5px;flex-wrap:wrap}
+    #plyrcard-action-drawer .lrm-recipient-tab{border:1px solid #e5e7eb;border-radius:999px;background:#fff;color:#475467;padding:6px 10px;font-size:10px;font-weight:800;cursor:pointer}
+    #plyrcard-action-drawer .lrm-recipient-tab.is-active{background:#f0522b;border-color:#f0522b;color:#fff}
+    #plyrcard-action-drawer .lrm-points-overview{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:11px}
+    #plyrcard-action-drawer .lrm-points-balance{border:1px solid #e5e7eb;border-radius:16px;background:#fff;padding:15px}
+    #plyrcard-action-drawer .lrm-balance-number{display:flex;align-items:flex-end;gap:7px;margin:14px 0}
+    #plyrcard-action-drawer .lrm-balance-number strong{font-size:46px;line-height:.85;letter-spacing:-.06em;color:#c2410c;font-weight:950}
+    #plyrcard-action-drawer .lrm-balance-number span{font-size:10px;font-weight:800;color:#667085}
+    #plyrcard-action-drawer .lrm-service-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    #plyrcard-action-drawer .lrm-service-card{border:1px solid #e5e7eb;border-radius:13px;background:#f8fafc;padding:11px;display:flex;flex-direction:column;min-width:0}
+    #plyrcard-action-drawer .lrm-service-head{display:flex;justify-content:space-between;gap:8px;align-items:start}
+    #plyrcard-action-drawer .lrm-service-head strong{font-size:11px}
+    #plyrcard-action-drawer .lrm-service-price{font-size:16px;font-weight:950;color:#c2410c;white-space:nowrap}
+    #plyrcard-action-drawer .lrm-sample-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:8px}
+    #plyrcard-action-drawer .lrm-sample-grid a{border-radius:8px;overflow:hidden;background:#fff;border:1px solid #e5e7eb;min-height:54px;display:grid;place-items:center;text-decoration:none}
+    #plyrcard-action-drawer .lrm-sample-grid img{width:100%;height:70px;object-fit:contain;display:block}
+    #plyrcard-action-drawer .lrm-pack-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+    #plyrcard-action-drawer .lrm-pack{border:1px solid #e5e7eb;border-radius:13px;background:#f8fafc;padding:11px;display:flex;flex-direction:column;gap:5px}
+    #plyrcard-action-drawer .lrm-pack .points{font-size:22px;font-weight:950;color:#c2410c}
+    #plyrcard-action-drawer .lrm-history-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    @media(max-width:1200px){
+        #plyrcard-action-drawer .lrm-school-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+        #plyrcard-action-drawer .lrm-pack-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:760px){
+        #plyrcard-action-drawer .lrm-school-grid,#plyrcard-action-drawer .lrm-list-grid,#plyrcard-action-drawer .lrm-service-grid,#plyrcard-action-drawer .lrm-pack-grid,#plyrcard-action-drawer .lrm-history-grid,#plyrcard-action-drawer .lrm-points-overview,#plyrcard-action-drawer .lrm-inbox-shell{grid-template-columns:1fr}
+        #plyrcard-action-drawer .lrm-filter-row{grid-template-columns:1fr 1fr}
+        #plyrcard-action-drawer .lrm-school-list-row{grid-template-columns:minmax(130px,1fr) 80px 38px}
+        #plyrcard-action-drawer .lrm-school-list-row .lrm-hide-mobile{display:none}
+        #plyrcard-action-drawer .lrm-thread{max-height:none}
+    }
+</style>
+
 <section class="lr-view" data-lr-view="schools">
     <div class="lr-section">
-        <div class="lr-card">
-            <h3 class="lr-card-title">Discover Schools</h3>
-            <p class="lr-card-copy">Search recruiting programs available to your player account.</p>
-            <div class="lr-field" style="margin-top:12px;">
-                <input class="lr-input" type="search" data-lrm-school-search placeholder="Search school, conference, division, city or state">
+        <div class="lrm-toolbar">
+            <div class="lrm-toolbar-top">
+                <div><h3>Discover Schools</h3><p>Search, filter, favorite and open a school without leaving Locker Room.</p></div>
+                <div class="lrm-segment" aria-label="School view">
+                    <button type="button" class="is-active" data-lrm-school-view="grid" aria-label="Grid view"><i class="fa-solid fa-table-cells-large"></i></button>
+                    <button type="button" data-lrm-school-view="list" aria-label="List view"><i class="fa-solid fa-list"></i></button>
+                </div>
+            </div>
+            <div class="lrm-search-row">
+                <input class="lr-input" type="search" data-lrm-school-search placeholder="Search schools, coaches, conferences...">
+                <button class="lr-btn" type="button" data-lrm-schools-refresh aria-label="Refresh schools"><i class="fa-solid fa-rotate"></i></button>
+            </div>
+            <div class="lrm-filter-row">
+                <select class="lr-select" data-lrm-division-filter><option value="">All Divisions</option></select>
+                <select class="lr-select" data-lrm-state-filter><option value="">All States</option></select>
+                <select class="lr-select" data-lrm-conference-filter><option value="">All Conferences</option></select>
+                <span class="lrm-pill" data-lrm-school-count>0 schools</span>
             </div>
         </div>
         <div data-lrm-schools><div class="lr-detail-empty">Loading schools…</div></div>
     </div>
 </section>
 
-<section class="lr-view" data-lr-view="coaches">
-    <div class="lr-section">
-        <div class="lr-card">
-            <h3 class="lr-card-title">Coaches</h3>
-            <p class="lr-card-copy">Find coaches and start recruiting outreach from your player account.</p>
-            <div class="lr-field" style="margin-top:12px;">
-                <input class="lr-input" type="search" data-lrm-coach-search placeholder="Search coach, school, email or title">
-            </div>
-        </div>
-        <div data-lrm-coaches><div class="lr-detail-empty">Loading coaches…</div></div>
-    </div>
-</section>
-
 <section class="lr-view" data-lr-view="favorites">
     <div class="lr-section">
-        <div class="lr-card"><h3 class="lr-card-title">Favorite Schools</h3><p class="lr-card-copy">Schools you starred in your recruiting workspace.</p></div>
+        <div class="lrm-toolbar">
+            <div class="lrm-toolbar-top"><div><h3>Favorite Schools</h3><p>Your starred schools, using the same school drawer as Discover.</p></div><span class="lrm-pill" data-lrm-favorite-count>0 schools</span></div>
+        </div>
         <div data-lrm-favorites><div class="lr-detail-empty">Loading favorites…</div></div>
     </div>
 </section>
 
 <section class="lr-view" data-lr-view="lists">
     <div class="lr-section">
-        <form class="lr-card" data-lrm-list-form>
-            <h3 class="lr-card-title">My Lists</h3>
-            <p class="lr-card-copy">Create focused recruiting lists and organize target schools.</p>
-            <div class="lr-form-grid" style="margin-top:12px;">
-                <div class="lr-field"><label>List Name</label><input class="lr-input" name="name" maxlength="80" placeholder="e.g. Top Choices" required></div>
-                <div class="lr-field"><label>Color</label><input class="lr-input" name="color" type="color" value="#ff6338"></div>
-            </div>
-            <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-plus"></i> Create List</button></div>
-        </form>
+        <div class="lrm-toolbar">
+            <div class="lrm-toolbar-top"><div><h3>My Lists</h3><p>Organize schools into Dream Schools, On the Radar, conference groups or your own lists.</p></div></div>
+            <form data-lrm-list-form>
+                <div class="lrm-search-row">
+                    <input class="lr-input" name="name" maxlength="80" placeholder="New list name" required>
+                    <button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-plus"></i> New List</button>
+                </div>
+                <input type="hidden" name="color" value="#ff6338">
+            </form>
+        </div>
         <div data-lrm-lists><div class="lr-detail-empty">Loading lists…</div></div>
     </div>
 </section>
 
 <section class="lr-view" data-lr-view="inbox">
     <div class="lr-section">
-        <div class="lr-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-                <div><h3 class="lr-card-title">Inbox</h3><p class="lr-card-copy">Coach conversations from your recruiting email.</p></div>
-                <button class="lr-btn" type="button" data-lrm-inbox-refresh aria-label="Refresh inbox"><i class="fa-solid fa-rotate"></i></button>
+        <div class="lrm-toolbar">
+            <div class="lrm-toolbar-top">
+                <div><h3>Inbox</h3><p>Recruiting email conversations with coaches.</p></div>
+                <button class="lr-btn" type="button" data-lrm-inbox-refresh><i class="fa-solid fa-rotate"></i> Refresh</button>
             </div>
-            <div class="lr-field" style="margin-top:12px;"><input class="lr-input" type="search" data-lrm-inbox-search placeholder="Search conversations"></div>
+            <input class="lr-input" type="search" data-lrm-inbox-search placeholder="Search coach or conversation">
         </div>
-        <div data-lrm-inbox-list><div class="lr-detail-empty">Loading conversations…</div></div>
-        <div class="lr-card" data-lrm-thread hidden></div>
+        <div class="lrm-inbox-shell">
+            <div class="lrm-inbox-list" data-lrm-inbox-list><div class="lr-detail-empty">Loading conversations…</div></div>
+            <div class="lr-card lrm-thread" data-lrm-thread><div class="lr-detail-empty">Choose a conversation to read the email thread.</div></div>
+        </div>
     </div>
 </section>
 
 <section class="lr-view" data-lr-view="compose">
     <form class="lr-form" data-lrm-compose-form>
         <div class="lr-form-section">
-            <h4>Recruiting Email</h4>
-            <p class="lr-card-copy">Send player outreach to an individual coach or a recruiting list.</p>
-            <div class="lr-form-grid">
-                <div class="lr-field"><label>Send To</label><select class="lr-select" name="target_mode" data-lrm-compose-mode><option value="coach">Coach</option><option value="list">My List</option></select></div>
-                <div class="lr-field" data-lrm-coach-wrap><label>Coach</label><select class="lr-select" name="coach_id" data-lrm-compose-coach><option value="">Choose coach</option></select></div>
-                <div class="lr-field" data-lrm-list-wrap hidden><label>List</label><select class="lr-select" name="list_key" data-lrm-compose-list><option value="">Choose list</option></select></div>
+            <h4>Compose Email</h4>
+            <p class="lr-card-copy">Choose one school, then send to the Head Coach Only or All Coaches at that school.</p>
+            <input type="hidden" name="target_mode" value="school">
+            <input type="hidden" name="school_id" data-lrm-compose-school-id>
+            <input type="hidden" name="head_coach_only" value="1" data-lrm-head-only>
+            <div class="lrm-compose-recipient">
+                <div data-lrm-selected-school><span class="lr-card-copy">No school selected.</span></div>
+                <div class="lrm-recipient-tabs">
+                    <button type="button" class="lrm-recipient-tab is-active" data-lrm-recipient-mode="head">Head Coach Only</button>
+                    <button type="button" class="lrm-recipient-tab" data-lrm-recipient-mode="all">All Coaches</button>
+                </div>
+                <div class="lr-field">
+                    <label>Search School</label>
+                    <input class="lr-input" type="search" data-lrm-compose-school-search placeholder="Search for a school...">
+                    <div class="lrm-compose-school-results" data-lrm-compose-school-results></div>
+                </div>
+            </div>
+            <div class="lr-form-grid" style="margin-top:10px;">
                 <div class="lr-field is-full"><label>Template</label><select class="lr-select" data-lrm-template><option value="">Start from scratch</option></select></div>
                 <div class="lr-field is-full"><label>Subject</label><input class="lr-input" name="subject" maxlength="250" required></div>
-                <div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="body" rows="10" required></textarea></div>
+                <div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="body" rows="11" required></textarea></div>
             </div>
-            <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-paper-plane"></i> Send Email</button></div>
+            <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-paper-plane"></i> <span data-lrm-send-label>Choose a school</span></button></div>
         </div>
     </form>
 </section>
 
 <section class="lr-view" data-lr-view="points">
     <div class="lr-section">
-        <div class="lr-hero">
-            <span class="lr-eyebrow">PLYR Points</span>
-            <h3><span data-lrm-points-balance>0</span> points available</h3>
-            <p class="lr-muted">Purchase points, request services and track your point activity.</p>
+        <div class="lrm-toolbar">
+            <div class="lrm-toolbar-top"><div><h3>PLYR Points</h3><p>Use, purchase and track recruiting credits from one place.</p></div><span class="lrm-pill">PLAYER CREDITS</span></div>
+        </div>
+        <div class="lrm-points-overview">
+            <div class="lrm-points-balance">
+                <span class="lr-eyebrow">Available Balance</span>
+                <div class="lrm-balance-number"><strong data-lrm-points-balance>0</strong><span>PLYR Points</span></div>
+                <p class="lr-card-copy">Points can be used on enabled recruiting services and do not expire unless otherwise stated by the service.</p>
+            </div>
+            <div class="lr-card">
+                <h3 class="lr-card-title">Services</h3>
+                <p class="lr-card-copy">Admin-managed services and samples.</p>
+                <div class="lrm-service-grid" data-lrm-services><div class="lr-detail-empty">Loading services…</div></div>
+            </div>
         </div>
         <div data-lrm-packs></div>
-        <div class="lr-card">
-            <h3 class="lr-card-title">Services</h3>
-            <p class="lr-card-copy">Use points on services enabled by the PLYRCARD team.</p>
-            <div data-lrm-services><div class="lr-detail-empty">Loading services…</div></div>
+        <div class="lrm-history-grid">
+            <div class="lr-card"><h3 class="lr-card-title">My Requests</h3><div data-lrm-requests><div class="lr-detail-empty">Loading requests…</div></div></div>
+            <div class="lr-card"><h3 class="lr-card-title">Point Activity</h3><div data-lrm-history><div class="lr-detail-empty">Loading point activity…</div></div></div>
         </div>
-        <div class="lr-card"><h3 class="lr-card-title">My Requests</h3><div data-lrm-requests><div class="lr-detail-empty">Loading requests…</div></div></div>
-        <div class="lr-card"><h3 class="lr-card-title">Point Activity</h3><div data-lrm-history><div class="lr-detail-empty">Loading point activity…</div></div></div>
     </div>
 </section>
 
 <script>
 (function () {
-    var drawer = document.getElementById('plyrcard-action-drawer');
-    if (!drawer || drawer.dataset.lrmReady === '1') return;
-    drawer.dataset.lrmReady = '1';
+    var drawer=document.getElementById('plyrcard-action-drawer');
+    if(!drawer||drawer.dataset.lrmReady==='1')return;
+    drawer.dataset.lrmReady='1';
 
-    var data = {schools:[], coaches:[], favorites:[], lists:[], conversations:[], templates:[], points:null};
-    var loaded = {schools:false, coaches:false, favorites:false, lists:false, inbox:false, compose:false, points:false};
-    var searchTimer = null;
+    var data={schools:[],favorites:[],lists:[],conversations:[],templates:[],points:null};
+    var loaded={schools:false,favorites:false,lists:false,inbox:false,compose:false,points:false};
+    var schoolView='grid', activeConversation='', selectedComposeSchool=null, inboxTimer=null;
 
-    function q(selector) { return drawer.querySelector(selector); }
-    function esc(value) {
-        return String(value == null ? '' : value).replace(/[&<>'"]/g, function (ch) {
-            return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch];
-        });
-    }
-    function csrf() {
-        var meta = document.querySelector('meta[name="csrf-token"]');
-        var input = document.querySelector('input[name="_token"]');
-        return meta ? meta.content : (input ? input.value : '');
-    }
-    async function api(url, options) {
-        options = options || {};
-        var headers = Object.assign({'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrf()}, options.headers || {});
-        if (options.body && !(options.body instanceof FormData) && typeof options.body !== 'string') {
-            headers['Content-Type'] = 'application/json';
-            options.body = JSON.stringify(options.body);
-        }
-        var response = await fetch(url, Object.assign({credentials:'same-origin'}, options, {headers:headers}));
-        var json = {};
-        try { json = await response.json(); } catch (_) {}
-        if (!response.ok || json.success === false) {
-            var validation = json.errors ? Object.values(json.errors).flat().join(' ') : '';
-            throw new Error(validation || json.message || ('Request failed (' + response.status + ')'));
-        }
+    function q(s){return drawer.querySelector(s)}
+    function qa(s){return Array.from(drawer.querySelectorAll(s))}
+    function esc(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]})}
+    function csrf(){var m=document.querySelector('meta[name="csrf-token"]'),i=document.querySelector('input[name="_token"]');return m?m.content:(i?i.value:'')}
+    async function api(url,options){
+        options=options||{};
+        var headers=Object.assign({'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrf()},options.headers||{});
+        if(options.body&&!(options.body instanceof FormData)&&typeof options.body!=='string'){headers['Content-Type']='application/json';options.body=JSON.stringify(options.body)}
+        var response=await fetch(url,Object.assign({credentials:'same-origin'},options,{headers:headers})),json={};
+        try{json=await response.json()}catch(_){}
+        if(!response.ok||json.success===false){var validation=json.errors?Object.values(json.errors).flat().join(' '):'';throw new Error(validation||json.message||json.error||('Request failed ('+response.status+')'))}
         return json;
     }
-    function toast(message, error) {
-        var el = q('[data-lr-toast]');
-        if (!el) return;
-        el.textContent = message || (error ? 'Something went wrong.' : 'Saved.');
-        el.style.background = error ? '#991b1b' : '#111827';
-        el.classList.add('is-showing');
-        window.setTimeout(function () { el.classList.remove('is-showing'); }, 3200);
+    function toast(message,error){
+        var el=q('[data-lr-toast]');if(!el)return;
+        el.textContent=message||(error?'Something went wrong.':'Saved.');
+        el.style.background=error?'#991b1b':'#111827';el.classList.add('is-showing');
+        setTimeout(function(){el.classList.remove('is-showing')},3200);
     }
-    function busy(form, active, label) {
-        var button = form && form.querySelector('button[type="submit"]');
-        if (!button) return;
-        if (active) {
-            if (!button.dataset.lrmLabel) button.dataset.lrmLabel = button.innerHTML;
-            button.disabled = true;
-            button.textContent = label || 'Working…';
-        } else {
-            button.disabled = false;
-            if (button.dataset.lrmLabel) button.innerHTML = button.dataset.lrmLabel;
-        }
+    function busy(form,on,label){var b=form&&form.querySelector('button[type="submit"]');if(!b)return;if(on){if(!b.dataset.old)b.dataset.old=b.innerHTML;b.disabled=true;b.textContent=label||'Working…'}else{b.disabled=false;if(b.dataset.old)b.innerHTML=b.dataset.old}}
+    function money(cents){return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(cents||0)/100)}
+    function initials(name){return String(name||'').trim().split(/\s+/).filter(Boolean).slice(0,2).map(function(x){return x.charAt(0).toUpperCase()}).join('')||'S'}
+    function schoolRef(row){return String(row.id||row.school_id||row.reference||row.business_id||'')}
+    function schoolLogo(row){var url=row.logo_url||row.school_logo_url||row.business_logo_url||'';return url?'<img src="'+esc(url)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':esc(initials(row.name||row.school_name||'School'))}
+    function schoolCard(row){
+        var ref=schoolRef(row),fav=!!(row.is_favorite||row.favorite),count=Number(row.coach_count||row.coaches_count||(row.coaches||[]).length||0);
+        return '<article class="lrm-school-card"><div style="display:flex;gap:7px;align-items:start;"><button class="lrm-school-main" type="button" data-lr-dashboard-school="'+esc(ref)+'"><span class="lrm-school-logo">'+schoolLogo(row)+'</span><span class="lrm-school-copy"><strong>'+esc(row.name||'School')+'</strong><small>'+esc(row.conference||'Conference unavailable')+'</small></span></button><button class="lrm-icon-btn '+(fav?'is-active':'')+'" type="button" data-lrm-favorite="'+esc(ref)+'" data-favorite="'+(fav?'1':'0')+'" aria-label="Favorite school"><i class="fa-'+(fav?'solid':'regular')+' fa-star"></i></button></div><div class="lrm-school-foot"><span class="lrm-pill">'+esc(row.division||'Unlisted')+'</span><span style="font-size:9px;color:#667085;font-weight:800">'+count.toLocaleString()+' '+(count===1?'coach':'coaches')+'</span></div></article>';
     }
-    function money(cents) {
-        return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD'}).format(Number(cents || 0) / 100);
+    function filteredSchools(){
+        var term=String(q('[data-lrm-school-search]')?.value||'').toLowerCase().trim();
+        var division=String(q('[data-lrm-division-filter]')?.value||''),state=String(q('[data-lrm-state-filter]')?.value||''),conference=String(q('[data-lrm-conference-filter]')?.value||'');
+        return (data.schools||[]).filter(function(row){
+            if(division&&String(row.division||'')!==division)return false;
+            if(state&&String(row.state||'')!==state)return false;
+            if(conference&&String(row.conference||'')!==conference)return false;
+            if(!term)return true;
+            var coaches=Array.isArray(row.coaches)?row.coaches:[];
+            return [row.name,row.conference,row.division,row.city,row.state].concat(coaches.flatMap(function(c){return[c.name,c.email,c.title]})).join(' ').toLowerCase().includes(term);
+        });
     }
-    function schoolCard(row) {
-        var ref = row.id || row.reference || row.business_id || '';
-        var favored = !!(row.is_favorite || row.favorite);
-        var location = [row.city,row.state].filter(Boolean).join(', ');
-        var meta = [row.division,row.conference,location].filter(Boolean).join(' · ');
-        return '<article class="lr-card">' +
-            '<div style="display:flex;gap:12px;justify-content:space-between;align-items:start;">' +
-                '<div><h3 class="lr-card-title">' + esc(row.name || row.school_name || 'School') + '</h3><p class="lr-card-copy">' + esc(meta) + '</p></div>' +
-                '<button class="lr-btn" type="button" data-lrm-favorite="' + esc(ref) + '" data-favorite="' + (favored ? '1':'0') + '" aria-label="Favorite school"><i class="fa-' + (favored ? 'solid':'regular') + ' fa-star"></i></button>' +
-            '</div>' +
-            (ref ? '<div class="lr-actions"><button class="lr-btn" type="button" data-lr-dashboard-school="' + esc(ref) + '">View School</button></div>' : '') +
-        '</article>';
+    function optionValues(key){
+        return Array.from(new Set((data.schools||[]).map(function(row){return String(row[key]||'').trim()}).filter(Boolean))).sort(function(a,b){return a.localeCompare(b)});
     }
-    function coachCard(row) {
-        var id = row.id || row.contact_id || row.ghl_contact_id || '';
-        var school = row.school || row.school_name || '';
-        return '<article class="lr-card"><div style="display:flex;gap:12px;justify-content:space-between;align-items:start;">' +
-            '<div><h3 class="lr-card-title">' + esc(row.name || 'Coach') + '</h3><p class="lr-card-copy">' + esc(row.title || 'Coach') + (school ? ' · ' + esc(school) : '') + '</p>' + (row.email ? '<p class="lr-card-copy">' + esc(row.email) + '</p>' : '') + '</div>' +
-            '<button class="lr-btn lr-btn-primary" type="button" data-lrm-compose-coach="' + esc(id) + '">Email</button></div></article>';
+    function fillSelect(selector,label,key){
+        var el=q(selector);if(!el)return;var old=el.value;
+        el.innerHTML='<option value="">'+label+'</option>'+optionValues(key).map(function(v){return '<option value="'+esc(v)+'">'+esc(v)+'</option>'}).join('');
+        if(old&&Array.from(el.options).some(function(o){return o.value===old}))el.value=old;
     }
-    function renderSchools() {
-        var holder=q('[data-lrm-schools]'); if(!holder)return;
-        var term=String(q('[data-lrm-school-search]') ? q('[data-lrm-school-search]').value : '').toLowerCase().trim();
-        var rows=(data.schools||[]).filter(function(row){return !term || JSON.stringify(row).toLowerCase().indexOf(term)!==-1;});
-        holder.innerHTML=rows.length?rows.map(schoolCard).join(''):'<div class="lr-detail-empty">No schools matched your search.</div>';
+    function renderSchools(){
+        var holder=q('[data-lrm-schools]');if(!holder)return;
+        fillSelect('[data-lrm-division-filter]','All Divisions','division');
+        fillSelect('[data-lrm-state-filter]','All States','state');
+        fillSelect('[data-lrm-conference-filter]','All Conferences','conference');
+        var rows=filteredSchools(),count=q('[data-lrm-school-count]');if(count)count.textContent=rows.length.toLocaleString()+' schools';
+        qa('[data-lrm-school-view]').forEach(function(b){b.classList.toggle('is-active',b.dataset.lrmSchoolView===schoolView)});
+        if(!rows.length){holder.innerHTML='<div class="lr-detail-empty">No schools matched your filters.</div>';return}
+        if(schoolView==='list'){
+            holder.innerHTML='<div class="lrm-school-list">'+rows.map(function(row){
+                var ref=schoolRef(row),head=row.head_coach||{},headName=row.head_coach_name||head.name||'—',headEmail=row.head_coach_email||head.email||'—',fav=!!row.is_favorite;
+                return '<div class="lrm-school-list-row"><button class="lrm-school-main" style="grid-template-columns:34px minmax(0,1fr)" type="button" data-lr-dashboard-school="'+esc(ref)+'"><span class="lrm-school-logo" style="width:34px;height:34px">'+schoolLogo(row)+'</span><span class="lrm-school-copy"><strong>'+esc(row.name||'School')+'</strong><small>'+esc(row.conference||'')+'</small></span></button><span class="lrm-hide-mobile">'+esc(headName)+'</span><span class="lrm-hide-mobile">'+esc(headEmail)+'</span><span>'+esc(row.division||'—')+'</span><button class="lrm-icon-btn '+(fav?'is-active':'')+'" type="button" data-lrm-favorite="'+esc(ref)+'" data-favorite="'+(fav?'1':'0')+'"><i class="fa-'+(fav?'solid':'regular')+' fa-star"></i></button></div>';
+            }).join('')+'</div>';
+        }else holder.innerHTML='<div class="lrm-school-grid">'+rows.map(schoolCard).join('')+'</div>';
     }
-    function renderCoaches() {
-        var holder=q('[data-lrm-coaches]'); if(!holder)return;
-        var term=String(q('[data-lrm-coach-search]') ? q('[data-lrm-coach-search]').value : '').toLowerCase().trim();
-        var rows=(data.coaches||[]).filter(function(row){return !term || JSON.stringify(row).toLowerCase().indexOf(term)!==-1;});
-        holder.innerHTML=rows.length?rows.map(coachCard).join(''):'<div class="lr-detail-empty">No coaches matched your search.</div>';
+    function renderFavorites(){
+        var holder=q('[data-lrm-favorites]');if(!holder)return;var rows=data.favorites||[],count=q('[data-lrm-favorite-count]');if(count)count.textContent=rows.length.toLocaleString()+' schools';
+        holder.innerHTML=rows.length?'<div class="lrm-school-grid">'+rows.map(schoolCard).join('')+'</div>':'<div class="lr-detail-empty">You have not favorited any schools yet.</div>';
     }
-    function renderFavorites() {
-        var holder=q('[data-lrm-favorites]');if(!holder)return;
-        holder.innerHTML=(data.favorites||[]).length?data.favorites.map(schoolCard).join(''):'<div class="lr-detail-empty">You have not favorited any schools yet.</div>';
-    }
-    function renderLists() {
+    function listSchools(row){return Array.isArray(row.schools)?row.schools:[]}
+    function renderLists(){
         var holder=q('[data-lrm-lists]');if(!holder)return;
-        holder.innerHTML=(data.lists||[]).length?data.lists.map(function(row){
-            var schools=Array.isArray(row.schools)?row.schools:[];
-            var count=Number(row.school_count == null ? schools.length : row.school_count);
-            return '<article class="lr-card"><div style="display:flex;align-items:start;justify-content:space-between;gap:10px;"><div><h3 class="lr-card-title"><span style="display:inline-block;width:9px;height:9px;border-radius:99px;background:' + esc(row.color||'#ff6338') + ';margin-right:6px;"></span>' + esc(row.name||'List') + '</h3><p class="lr-card-copy">' + count.toLocaleString() + ' schools</p></div><button class="lr-btn" type="button" data-lrm-list-delete="' + esc(row.key||'') + '"><i class="fa-solid fa-trash"></i></button></div>' +
-                schools.slice(0,8).map(function(s){return '<div style="padding:8px 0;border-top:1px solid #eef2f6;font-size:12px;font-weight:700;">'+esc(s.name||'School')+'</div>';}).join('') +
-            '</article>';
-        }).join(''):'<div class="lr-detail-empty">No recruiting lists yet.</div>';
+        var rows=data.lists||[];
+        holder.innerHTML=rows.length?'<div class="lrm-list-grid">'+rows.map(function(row){
+            var schools=listSchools(row),key=String(row.key||''),count=Number(row.schools_count==null?schools.length:row.schools_count);
+            return '<article class="lrm-list-card" data-lrm-list-card="'+esc(key)+'"><div class="lrm-list-head"><div class="lrm-list-title"><span class="lrm-list-dot" style="background:'+esc(row.color||'#ff6338')+'"></span><div><strong>'+esc(row.label||row.name||'List')+'</strong><div class="lr-card-copy">'+count+' '+(count===1?'school':'schools')+'</div></div></div><div style="display:flex;gap:5px"><button class="lrm-icon-btn" type="button" data-lrm-list-add-toggle="'+esc(key)+'" title="Add schools"><i class="fa-solid fa-plus"></i></button><button class="lrm-icon-btn" type="button" data-lrm-list-delete="'+esc(key)+'" title="Delete list"><i class="fa-solid fa-trash"></i></button></div></div><div class="lrm-school-chips">'+(schools.length?schools.map(function(s){return '<button type="button" class="lrm-school-chip" data-lr-dashboard-school="'+esc(s.id||'')+'"><span>'+esc(s.name||'School')+'</span></button>'}).join(''):'<span class="lr-card-copy">No schools in this list yet.</span>')+'</div><div class="lrm-list-add-panel" data-lrm-list-add-panel="'+esc(key)+'" hidden><input class="lr-input" type="search" data-lrm-list-school-search="'+esc(key)+'" placeholder="Search schools to add..."><div class="lrm-list-search-results" data-lrm-list-results="'+esc(key)+'"></div></div></article>';
+        }).join('')+'</div>':'<div class="lr-detail-empty">No recruiting lists yet.</div>';
     }
-    function renderInbox() {
+    function renderListSearch(key){
+        var input=q('[data-lrm-list-school-search="'+CSS.escape(key)+'"]'),holder=q('[data-lrm-list-results="'+CSS.escape(key)+'"]');if(!input||!holder)return;
+        var term=String(input.value||'').trim().toLowerCase(),list=(data.lists||[]).find(function(r){return String(r.key||'')===key}),current=new Set(listSchools(list||{}).map(function(s){return String(s.id||'')}));
+        if(term.length<2){holder.innerHTML='';return}
+        var rows=(data.schools||[]).filter(function(s){return !current.has(String(s.id||''))&&String(s.name||'').toLowerCase().includes(term)}).slice(0,10);
+        holder.innerHTML=rows.length?rows.map(function(s){return '<button type="button" class="lrm-list-result" data-lrm-add-school="'+esc(s.id||'')+'" data-list-key="'+esc(key)+'"><span>'+esc(s.name||'School')+'</span><i class="fa-solid fa-plus"></i></button>'}).join(''):'<div class="lr-card-copy">No matching schools.</div>';
+    }
+    function renderInbox(){
         var holder=q('[data-lrm-inbox-list]');if(!holder)return;
-        holder.innerHTML=(data.conversations||[]).length?data.conversations.map(function(row){
-            var name=row.contact_name||row.name||'Coach';
-            var school=row.school||row.company_name||'';
-            var last=row.last_message||row.snippet||'';
-            return '<button class="lr-card" style="width:100%;text-align:left;" type="button" data-lrm-conversation="'+esc(row.id||'')+'"><h3 class="lr-card-title">'+esc(name)+'</h3><p class="lr-card-copy">'+esc(school)+(last?' · '+esc(last):'')+'</p>'+(Number(row.unread_count||0)>0?'<span class="lr-chip">'+Number(row.unread_count)+' unread</span>':'')+'</button>';
+        var rows=data.conversations||[];
+        holder.innerHTML=rows.length?rows.map(function(row){
+            var active=String(row.id||'')===activeConversation;
+            return '<button type="button" class="lrm-conversation '+(active?'is-active':'')+'" data-lrm-conversation="'+esc(row.id||'')+'"><div style="display:flex;justify-content:space-between;gap:7px"><strong style="font-size:11px;color:#101828">'+esc(row.contact_name||'Coach')+'</strong>'+(Number(row.unread_count||0)>0?'<span class="lrm-pill">'+Number(row.unread_count)+' new</span>':'')+'</div><div class="lr-card-copy" style="margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">'+esc(row.last_message||'No preview available')+'</div></button>';
         }).join(''):'<div class="lr-detail-empty">No conversations yet.</div>';
     }
-    function renderCompose() {
-        var coach=q('[data-lrm-compose-coach]'), list=q('[data-lrm-compose-list]'), template=q('[data-lrm-template]');
-        if(coach){var cv=coach.value;coach.innerHTML='<option value="">Choose coach</option>'+(data.coaches||[]).filter(function(r){return !!r.email;}).map(function(r){return '<option value="'+esc(r.id||r.contact_id||r.ghl_contact_id||'')+'">'+esc(r.name||'Coach')+' — '+esc(r.school||r.school_name||'')+'</option>';}).join('');if(cv)coach.value=cv;}
-        if(list){var lv=list.value;list.innerHTML='<option value="">Choose list</option>'+(data.lists||[]).map(function(r){return '<option value="'+esc(r.key||'')+'">'+esc(r.name||'List')+'</option>';}).join('');if(lv)list.value=lv;}
-        if(template){var tv=template.value;template.innerHTML='<option value="">Start from scratch</option>'+(data.templates||[]).map(function(r){return '<option value="'+esc(r.id||'')+'">'+esc(r.name||'Template')+'</option>';}).join('');if(tv)template.value=tv;}
+    function safeEmailHtml(value){return String(value||'<p><em>No message body.</em></p>')}
+    function messageDate(value){var d=new Date(value||'');return Number.isNaN(d.getTime())?'':d.toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+    function renderThread(convo,messages){
+        var thread=q('[data-lrm-thread]');if(!thread)return;
+        var title=convo?.contact_name||'Conversation';
+        thread.innerHTML='<div style="display:flex;justify-content:space-between;align-items:start;gap:8px;position:sticky;top:-14px;background:#fff;padding:2px 0 10px;z-index:3"><div><h3 class="lr-card-title">'+esc(title)+'</h3><p class="lr-card-copy">'+esc(convo?.email||'')+'</p></div><button class="lr-btn lr-btn-primary" type="button" data-lrm-reply="'+esc(convo?.id||'')+'">Reply</button></div><div data-lrm-message-stack></div>';
+        var stack=q('[data-lrm-message-stack]');
+        (messages||[]).forEach(function(m){
+            var direction=String(m.direction||'').toLowerCase(),out=direction.includes('out')||['sent','send','outgoing','out'].includes(direction);
+            var article=document.createElement('article');article.className='lrm-message'+(out?' is-out':'');
+            var avatar=document.createElement('span');avatar.className='lrm-message-avatar';avatar.textContent=out?'YOU':initials(title);
+            var body=document.createElement('div');body.className='lrm-message-body';
+            var meta=document.createElement('div');meta.className='lrm-msg-meta';meta.innerHTML='<span><strong>'+esc(out?'You':title)+'</strong></span><span>'+esc(messageDate(m.created_at))+'</span>';
+            var email=document.createElement('div');email.className='lrm-email-body';email.innerHTML=safeEmailHtml(m.rendered_html);
+            body.appendChild(meta);body.appendChild(email);
+            if(out){article.appendChild(body);article.appendChild(avatar)}else{article.appendChild(avatar);article.appendChild(body)}
+            stack.appendChild(article);
+        });
+        if(!(messages||[]).length)stack.innerHTML='<div class="lr-detail-empty">No email messages in this conversation.</div>';
     }
-    function renderPoints() {
-        var p=data.points||{}, balance=Number(p.balance||0), balanceEl=q('[data-lrm-points-balance]');
-        if(balanceEl)balanceEl.textContent=balance.toLocaleString();
+    function renderCompose(){
+        var template=q('[data-lrm-template]');if(template){var old=template.value;template.innerHTML='<option value="">Start from scratch</option>'+(data.templates||[]).map(function(r){return '<option value="'+esc(r.id||'')+'">'+esc(r.name||'Template')+'</option>'}).join('');if(old)template.value=old}
+        renderComposeSchool();
+        renderComposeSchoolResults();
+    }
+    function renderComposeSchool(){
+        var box=q('[data-lrm-selected-school]'),id=q('[data-lrm-compose-school-id]'),label=q('[data-lrm-send-label]');
+        if(!box||!id)return;
+        if(!selectedComposeSchool){box.innerHTML='<span class="lr-card-copy">No school selected.</span>';id.value='';if(label)label.textContent='Choose a school';return}
+        var count=Number(selectedComposeSchool.coach_count||selectedComposeSchool.coaches_count||(selectedComposeSchool.coaches||[]).length||0);
+        box.innerHTML='<div style="display:flex;align-items:center;gap:8px"><span class="lrm-school-logo" style="width:36px;height:36px">'+schoolLogo(selectedComposeSchool)+'</span><div><strong style="font-size:12px">'+esc(selectedComposeSchool.name||'School')+'</strong><div class="lr-card-copy">'+count+' '+(count===1?'coach':'coaches')+'</div></div><button type="button" class="lrm-icon-btn" data-lrm-clear-compose-school style="margin-left:auto"><i class="fa-solid fa-xmark"></i></button></div>';
+        id.value=schoolRef(selectedComposeSchool);if(label)label.textContent='Send Email';
+    }
+    function renderComposeSchoolResults(){
+        var holder=q('[data-lrm-compose-school-results]'),input=q('[data-lrm-compose-school-search]');if(!holder||!input)return;
+        var term=String(input.value||'').trim().toLowerCase();
+        if(!term){holder.innerHTML='';return}
+        var rows=(data.schools||[]).filter(function(s){return [s.name,s.conference,s.division,s.city,s.state].join(' ').toLowerCase().includes(term)}).slice(0,15);
+        holder.innerHTML=rows.length?rows.map(function(s){return '<button type="button" class="lrm-compose-school-result" data-lrm-choose-school="'+esc(s.id||'')+'"><strong style="font-size:11px">'+esc(s.name||'School')+'</strong><div class="lr-card-copy">'+esc([s.conference,s.division].filter(Boolean).join(' · '))+' · '+Number(s.coach_count||s.coaches_count||(s.coaches||[]).length||0)+' coaches</div></button>'}).join(''):'<div class="lr-card-copy">No schools found.</div>';
+    }
+    function renderPoints(){
+        var p=data.points||{},balance=Number(p.balance||0),balanceEl=q('[data-lrm-points-balance]');if(balanceEl)balanceEl.textContent=balance.toLocaleString();
+        var services=q('[data-lrm-services]');
+        if(services)services.innerHTML=(p.catalog||[]).map(function(s){
+            var enough=balance>=Number(s.points||0),samples=Array.isArray(s.samples)?s.samples:[];
+            return '<article class="lrm-service-card"><div class="lrm-service-head"><strong>'+esc(s.name||'Service')+'</strong><span class="lrm-service-price">'+Number(s.points||0)+' <small>pts</small></span></div><p class="lr-card-copy" style="margin-top:5px;flex:1">'+esc(s.description||'')+'</p>'+(samples.length?'<div class="lrm-sample-grid">'+samples.slice(0,6).map(function(sample){if(sample.type==='image')return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener"><img src="'+esc(sample.url||'')+'" alt="Service sample"></a>';if(sample.type==='youtube')return '<a href="'+esc(sample.url||sample.embed_url||'#')+'" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i></a>';return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>'}).join('')+'</div>':'')+'<button class="lr-btn lr-btn-primary" style="margin-top:8px;width:100%" type="button" data-lrm-service="'+esc(s.key)+'" data-points="'+Number(s.points||0)+'" '+(enough?'':'disabled')+'>'+(enough?esc(s.cta||'Request Service'):'Not enough points')+'</button></article>';
+        }).join('')||'<div class="lr-detail-empty">No point services are currently enabled.</div>';
         var packs=q('[data-lrm-packs]');
         if(packs){
             if(p.can_buy_points){
                 var rows=Array.isArray(p.point_packs)?p.point_packs:[];
-                packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy Points</h3><div class="lr-plan-grid">'+rows.map(function(row){
-                    return '<article class="lr-plan-card"><div class="lr-plan-name">'+esc(row.label)+'</div><div class="lr-plan-price">'+money(row.price_cents)+'</div><p class="lr-card-copy">'+Number(row.points||0).toLocaleString()+' PLYR Points</p><button class="lr-btn lr-btn-primary" type="button" data-lrm-point-pack="'+esc(row.key)+'">Buy Points</button></article>';
-                }).join('')+'</div>'+(p.custom_purchase&&p.custom_purchase.enabled?'<div class="lr-field" style="margin-top:12px;"><label>Custom Points</label><div style="display:flex;gap:8px;"><input class="lr-input" type="number" data-lrm-custom-points min="'+Number(p.custom_purchase.min_points||1)+'" max="'+Number(p.custom_purchase.max_points||1000)+'" value="'+Number(p.custom_purchase.min_points||1)+'"><button class="lr-btn" type="button" data-lrm-custom-buy>Buy</button></div></div>':'')+'</div>';
-            } else {
-                packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy Points</h3><p class="lr-card-copy">Point packs are available with an active My Journey membership.</p><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="upgrade">Get My Journey</button></div></div>';
-            }
+                packs.innerHTML='<div class="lr-card"><div style="display:flex;justify-content:space-between;gap:8px;align-items:end"><div><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Recharge your balance without leaving Locker Room.</p></div></div><div class="lrm-pack-grid" style="margin-top:10px">'+rows.map(function(row){return '<article class="lrm-pack"><span class="lr-eyebrow">Point Pack</span><span class="points">'+Number(row.points||0).toLocaleString()+'</span><strong>'+money(row.price_cents)+'</strong><span class="lr-card-copy">'+esc(row.note||'Add points to your current balance.')+'</span><button class="lr-btn lr-btn-primary" type="button" data-lrm-point-pack="'+esc(row.key)+'">Buy Points</button></article>'}).join('')+'</div>'+(p.custom_purchase&&p.custom_purchase.enabled?'<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px dashed #d0d5dd;border-radius:12px"><div><label style="font-size:10px;font-weight:850">CUSTOM POINTS</label><input class="lr-input" type="number" data-lrm-custom-points min="'+Number(p.custom_purchase.min_points||1)+'" max="'+Number(p.custom_purchase.max_points||1000)+'" value="'+Number(p.custom_purchase.min_points||1)+'"></div><button class="lr-btn" type="button" data-lrm-custom-buy>Buy Custom</button></div>':'')+'</div>';
+            }else packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Point packs are available with My Journey.</p><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="upgrade">Get My Journey</button></div></div>';
         }
-        var services=q('[data-lrm-services]');
-        if(services)services.innerHTML=(p.catalog||[]).map(function(s){
-            var enough=balance>=Number(s.points||0);
-            return '<article style="padding:12px 0;border-top:1px solid #eef2f6;"><div style="display:flex;justify-content:space-between;gap:12px;"><div><strong>'+esc(s.name)+'</strong><div class="lr-card-copy">'+esc(s.description||'')+'</div></div><strong>'+Number(s.points||0)+' pts</strong></div>' +
-                ((s.inclusions||[]).length?'<ul class="lr-plan-list">'+s.inclusions.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'') +
-                ((s.samples||[]).length?'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:10px;">'+s.samples.slice(0,6).map(function(sample){if(sample.type==='youtube')return '<a href="'+esc(sample.url||sample.embed_url||'#')+'" target="_blank" rel="noopener" style="aspect-ratio:1/1;border-radius:10px;background:#111827;color:#fff;display:grid;place-items:center;text-decoration:none;"><i class="fa-brands fa-youtube"></i></a>';if(sample.type==='image')return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener" style="border-radius:10px;overflow:hidden;background:#f3f4f6;display:block;"><img src="'+esc(sample.url||'')+'" alt="Service sample" style="width:100%;height:auto;max-height:130px;object-fit:contain;display:block;"></a>';return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener" class="lr-btn" style="min-height:60px;">View Sample</a>';}).join('')+'</div>':'') +
-                '<div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lrm-service="'+esc(s.key)+'" data-points="'+Number(s.points||0)+'" '+(enough?'':'disabled')+'>'+(enough?esc(s.cta||'Request Service'):'Not enough points')+'</button></div></article>';
-        }).join('')||'<div class="lr-detail-empty">No point services are currently enabled.</div>';
-        var requests=q('[data-lrm-requests]');
-        if(requests)requests.innerHTML=(p.requests||[]).map(function(r){
-            return '<div style="padding:10px 0;border-top:1px solid #eef2f6;"><div style="display:flex;justify-content:space-between;gap:10px;"><strong>'+esc(r.item_name||'Service Request')+'</strong><span class="lr-chip">'+esc(r.status_label||r.status||'Submitted')+'</span></div><div class="lr-card-copy">'+Number(r.points_spent||0)+' points'+(r.delivery_url?' · <a href="'+esc(r.delivery_url)+'" target="_blank" rel="noopener">Open delivery</a>':'')+'</div></div>';
-        }).join('')||'<div class="lr-detail-empty">No service requests yet.</div>';
-        var history=q('[data-lrm-history]');
-        if(history)history.innerHTML=(p.transactions||[]).map(function(r){
-            var points=Number(r.points||0);
-            var date=r.created_at?new Date(r.created_at).toLocaleDateString():'';
-            return '<div style="display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #eef2f6;"><div><strong>'+esc(r.reason||r.type||'Point activity')+'</strong><div class="lr-card-copy">'+esc(date)+'</div></div><strong>'+(points>0?'+':'')+points+'</strong></div>';
-        }).join('')||'<div class="lr-detail-empty">No point activity yet.</div>';
+        var requests=q('[data-lrm-requests]');if(requests)requests.innerHTML=(p.requests||[]).map(function(r){return '<div style="padding:9px 0;border-top:1px solid #eef2f6"><div style="display:flex;justify-content:space-between;gap:8px"><strong style="font-size:10px">'+esc(r.item_name||'Service Request')+'</strong><span class="lrm-pill">'+esc(r.status_label||r.status||'Submitted')+'</span></div><div class="lr-card-copy">'+Number(r.points_spent||0)+' points'+(r.delivery_url?' · <a href="'+esc(r.delivery_url)+'" target="_blank" rel="noopener">Open delivery</a>':'')+'</div></div>'}).join('')||'<div class="lr-detail-empty">No service requests yet.</div>';
+        var history=q('[data-lrm-history]');if(history)history.innerHTML=(p.transactions||[]).map(function(r){var pts=Number(r.points||0);return '<div style="padding:9px 0;border-top:1px solid #eef2f6;display:flex;justify-content:space-between;gap:8px"><div><strong style="font-size:10px">'+esc(r.reason||r.type||'Point activity')+'</strong><div class="lr-card-copy">'+(r.created_at?esc(new Date(r.created_at).toLocaleDateString()):'')+'</div></div><strong style="font-size:11px;color:'+(pts<0?'#b42318':'#15803d')+'">'+(pts>0?'+':'')+pts+'</strong></div>'}).join('')||'<div class="lr-detail-empty">No point activity yet.</div>';
     }
 
-    async function loadSchools(force){if(loaded.schools&&!force)return renderSchools();try{var j=await api(drawer.dataset.recruitingSchoolsUrl);data.schools=j.items||[];data.lists=j.lists||data.lists;loaded.schools=true;renderSchools();}catch(e){q('[data-lrm-schools]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>';}}
-    async function loadCoaches(force){if(loaded.coaches&&!force)return renderCoaches();try{var j=await api(drawer.dataset.recruitingCoachesUrl);data.coaches=j.items||[];loaded.coaches=true;renderCoaches();}catch(e){q('[data-lrm-coaches]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>';}}
-    async function loadFavorites(force){if(loaded.favorites&&!force)return renderFavorites();try{var j=await api(drawer.dataset.recruitingFavoritesUrl);data.favorites=j.items||[];data.lists=j.lists||data.lists;loaded.favorites=true;renderFavorites();}catch(e){q('[data-lrm-favorites]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>';}}
-    async function loadLists(force){if(loaded.lists&&!force)return renderLists();try{var j=await api(drawer.dataset.recruitingListsUrl);data.lists=j.items||[];loaded.lists=true;renderLists();}catch(e){q('[data-lrm-lists]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>';}}
-    async function loadInbox(force){if(loaded.inbox&&!force)return renderInbox();try{var term=encodeURIComponent(q('[data-lrm-inbox-search]')?q('[data-lrm-inbox-search]').value:'');var j=await api(drawer.dataset.recruitingConversationsUrl+'?q='+term+'&limit=50');data.conversations=j.conversations||[];loaded.inbox=true;renderInbox();}catch(e){q('[data-lrm-inbox-list]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>';}}
-    async function loadCompose(force){if(loaded.compose&&!force)return renderCompose();try{var results=await Promise.all([loaded.coaches?Promise.resolve({items:data.coaches}):api(drawer.dataset.recruitingCoachesUrl),loaded.lists?Promise.resolve({items:data.lists}):api(drawer.dataset.recruitingListsUrl),api(drawer.dataset.recruitingTemplatesUrl)]);data.coaches=results[0].items||[];data.lists=results[1].items||[];data.templates=results[2].items||[];loaded.coaches=true;loaded.lists=true;loaded.compose=true;renderCompose();}catch(e){toast(e.message,true);}}
-    async function loadPoints(force){if(loaded.points&&!force)return renderPoints();try{data.points=await api(drawer.dataset.pointsUrl);loaded.points=true;renderPoints();}catch(e){toast(e.message,true);}}
+    async function loadSchools(force){if(loaded.schools&&!force){renderSchools();return}try{var j=await api(drawer.dataset.recruitingSchoolsUrl+'?per_page=60');data.schools=j.items||[];data.lists=j.lists||data.lists;loaded.schools=true;renderSchools()}catch(e){q('[data-lrm-schools]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
+    async function loadFavorites(force){if(loaded.favorites&&!force){renderFavorites();return}try{var j=await api(drawer.dataset.recruitingFavoritesUrl+'?per_page=60');data.favorites=j.items||[];loaded.favorites=true;renderFavorites()}catch(e){q('[data-lrm-favorites]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
+    async function loadLists(force){if(loaded.lists&&!force){renderLists();return}try{var j=await api(drawer.dataset.recruitingListsUrl);data.lists=j.items||[];loaded.lists=true;if(!loaded.schools)await loadSchools(false);renderLists()}catch(e){q('[data-lrm-lists]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
+    async function loadInbox(force){if(loaded.inbox&&!force){renderInbox();return}try{var term=encodeURIComponent(q('[data-lrm-inbox-search]')?.value||''),url=drawer.dataset.recruitingConversationsUrl+'?q='+term+'&limit=100'+(force?'&refresh=1':'');var j=await api(url);data.conversations=j.conversations||[];loaded.inbox=true;renderInbox()}catch(e){q('[data-lrm-inbox-list]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
+    async function loadCompose(force){if(loaded.compose&&!force){renderCompose();return}try{if(!loaded.schools)await loadSchools(false);var t=await api(drawer.dataset.recruitingTemplatesUrl);data.templates=t.items||[];loaded.compose=true;renderCompose()}catch(e){toast(e.message,true)}}
+    async function loadPoints(force){if(loaded.points&&!force){renderPoints();return}try{data.points=await api(drawer.dataset.pointsUrl);loaded.points=true;renderPoints()}catch(e){toast(e.message,true)}}
 
-    async function openConversation(id) {
-        var thread=q('[data-lrm-thread]');if(!thread)return;
-        thread.hidden=false;thread.innerHTML='<div class="lr-detail-empty">Loading thread…</div>';
-        try {
-            var j=await api(drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(id)+'?limit=50');
-            var convo=(data.conversations||[]).find(function(row){return String(row.id)===String(id);})||{};
-            var messages=(j.messages||[]).map(function(m){
-                var outgoing=String(m.direction||'').toLowerCase()==='outbound';
-                return '<div style="padding:10px 12px;border-radius:12px;background:'+(outgoing?'#fff3ee':'#f8fafc')+';"><strong style="font-size:10px;text-transform:uppercase;">'+esc(m.direction||'message')+'</strong><div style="font-size:12px;margin-top:4px;">'+esc(m.text_body||m.body||m.message||m.text||'')+'</div></div>';
-            }).join('');
-            thread.innerHTML='<div style="display:flex;justify-content:space-between;align-items:start;gap:10px;"><div><h3 class="lr-card-title">'+esc(convo.contact_name||convo.name||'Conversation')+'</h3><p class="lr-card-copy">'+esc(convo.school||convo.company_name||'')+'</p></div><button class="lr-btn lr-btn-primary" type="button" data-lrm-reply="'+esc(id)+'">Reply</button></div><div style="display:grid;gap:8px;margin-top:12px;">'+(messages||'<div class="lr-detail-empty">No messages in this thread.</div>')+'</div>';
-            thread.scrollIntoView({behavior:'auto',block:'start'});
-        } catch(e) { thread.innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'; }
+    async function openConversation(id){
+        activeConversation=String(id||'');renderInbox();
+        var thread=q('[data-lrm-thread]');if(thread)thread.innerHTML='<div class="lr-detail-empty">Loading email thread…</div>';
+        try{var j=await api(drawer.dataset.recruitingConversationsUrl+'/'+encodeURIComponent(id)+'?limit=100'),convo=(data.conversations||[]).find(function(r){return String(r.id||'')===String(id)})||{id:id};renderThread(convo,j.messages||[])}catch(e){if(thread)thread.innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}
     }
-
-    function onView(view) {
+    function onView(view){
         if(view==='schools')loadSchools(false);
-        else if(view==='coaches')loadCoaches(false);
         else if(view==='favorites')loadFavorites(false);
         else if(view==='lists')loadLists(false);
         else if(view==='inbox')loadInbox(false);
@@ -287,61 +394,50 @@
     }
 
     document.addEventListener('click',function(event){
-        var nav=event.target.closest('[data-lr-nav]');
-        if(nav&&drawer.contains(nav))window.setTimeout(function(){onView(nav.dataset.lrNav);},0);
-
-        var favorite=event.target.closest('[data-lrm-favorite]');
-        if(favorite&&drawer.contains(favorite)){event.preventDefault();event.stopPropagation();var want=favorite.dataset.favorite!=='1';api(drawer.dataset.dashboardSchoolFavoriteUrl,{method:'POST',body:{school_id:favorite.dataset.lrmFavorite,favorite:want}}).then(function(){loaded.schools=false;loaded.favorites=false;loadSchools(true);if(q('[data-lr-view="favorites"]').classList.contains('is-active'))loadFavorites(true);toast(want?'School favorited.':'Favorite removed.');}).catch(function(e){toast(e.message,true);});return;}
-
-        var composeCoach=event.target.closest('[data-lrm-compose-coach]');
-        if(composeCoach&&drawer.contains(composeCoach)&&composeCoach.tagName!=='SELECT'){event.preventDefault();var composeNav=drawer.querySelector('[data-lr-nav="compose"]');if(composeNav)composeNav.click();loadCompose(false).then(function(){var select=q('[data-lrm-compose-coach]');if(select)select.value=composeCoach.dataset.lrmComposeCoach;});return;}
-
-        var deleteList=event.target.closest('[data-lrm-list-delete]');
-        if(deleteList&&drawer.contains(deleteList)){event.preventDefault();if(!confirm('Delete this recruiting list?'))return;api(drawer.dataset.recruitingListsUrl+'/'+encodeURIComponent(deleteList.dataset.lrmListDelete),{method:'DELETE'}).then(function(j){data.lists=j.items||[];renderLists();toast('List deleted.');}).catch(function(e){toast(e.message,true);});return;}
-
-        var conversation=event.target.closest('[data-lrm-conversation]');
-        if(conversation&&drawer.contains(conversation)){event.preventDefault();openConversation(conversation.dataset.lrmConversation);return;}
-
-        var reply=event.target.closest('[data-lrm-reply]');
-        if(reply&&drawer.contains(reply)){event.preventDefault();var composeNav2=drawer.querySelector('[data-lr-nav="compose"]');if(composeNav2)composeNav2.click();loadCompose(false).then(function(){var form=q('[data-lrm-compose-form]');if(form)form.dataset.conversationId=reply.dataset.lrmReply;});return;}
-
-        var refresh=event.target.closest('[data-lrm-inbox-refresh]');
-        if(refresh&&drawer.contains(refresh)){event.preventDefault();loaded.inbox=false;loadInbox(true);return;}
-
-        var pack=event.target.closest('[data-lrm-point-pack]');
-        if(pack&&drawer.contains(pack)){event.preventDefault();document.dispatchEvent(new CustomEvent('plyrcard:locker-point-pack',{detail:{pack:pack.dataset.lrmPointPack}}));return;}
-
-        var custom=event.target.closest('[data-lrm-custom-buy]');
-        if(custom&&drawer.contains(custom)){event.preventDefault();var p=data.points||{},cfg=p.custom_purchase||{},input=q('[data-lrm-custom-points]'),amount=Math.round(Number(input?input.value:0)),min=Number(cfg.min_points||1),max=Number(cfg.max_points||1000);if(!Number.isFinite(amount)||amount<min||amount>max){toast('Choose between '+min+' and '+max+' points.',true);return;}document.dispatchEvent(new CustomEvent('plyrcard:locker-point-pack',{detail:{pack:'custom-'+amount}}));return;}
-
-        var service=event.target.closest('[data-lrm-service]');
-        if(service&&drawer.contains(service)){event.preventDefault();var p2=data.points||{},cost=Number(service.dataset.points||0);if(Number(p2.balance||0)<cost){toast('You do not have enough points.',true);return;}if(!confirm('Use '+cost+' points for this service?'))return;var token='locker-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);api(drawer.dataset.creditUseUrl,{method:'POST',body:{request_token:token,confirm_spend:1,items:[{selected:1,item_key:service.dataset.lrmService,quantity:1,rush:0,notes:'Requested from Locker Room'}]}}).then(function(){loaded.points=false;loadPoints(true);toast('Service requested with PLYR Points.');}).catch(function(e){toast(e.message,true);});return;}
+        var nav=event.target.closest('[data-lr-nav]');if(nav&&drawer.contains(nav))setTimeout(function(){onView(nav.dataset.lrNav)},0);
+        var view=event.target.closest('[data-lrm-school-view]');if(view&&drawer.contains(view)){schoolView=view.dataset.lrmSchoolView==='list'?'list':'grid';renderSchools();return}
+        var refreshSchools=event.target.closest('[data-lrm-schools-refresh]');if(refreshSchools&&drawer.contains(refreshSchools)){loaded.schools=false;loadSchools(true);return}
+        var fav=event.target.closest('[data-lrm-favorite]');if(fav&&drawer.contains(fav)){event.preventDefault();event.stopPropagation();var want=fav.dataset.favorite!=='1';api(drawer.dataset.dashboardSchoolFavoriteUrl,{method:'POST',body:{school_id:fav.dataset.lrmFavorite,favorite:want}}).then(function(){loaded.schools=false;loaded.favorites=false;loadSchools(true);if(q('[data-lr-view="favorites"]')?.classList.contains('is-active'))loadFavorites(true);toast(want?'School favorited.':'Favorite removed.')}).catch(function(e){toast(e.message,true)});return}
+        var addToggle=event.target.closest('[data-lrm-list-add-toggle]');if(addToggle&&drawer.contains(addToggle)){var key=addToggle.dataset.lrmListAddToggle,panel=q('[data-lrm-list-add-panel="'+CSS.escape(key)+'"]');if(panel){panel.hidden=!panel.hidden;if(!panel.hidden)q('[data-lrm-list-school-search="'+CSS.escape(key)+'"]')?.focus()}return}
+        var addSchool=event.target.closest('[data-lrm-add-school]');if(addSchool&&drawer.contains(addSchool)){event.preventDefault();var key2=addSchool.dataset.listKey,id=addSchool.dataset.lrmAddSchool;api(drawer.dataset.dashboardSchoolListUrl,{method:'POST',body:{school_id:id,list_key:key2,in_list:true}}).then(function(){loaded.lists=false;loadLists(true);toast('School added to list.')}).catch(function(e){toast(e.message,true)});return}
+        var del=event.target.closest('[data-lrm-list-delete]');if(del&&drawer.contains(del)){event.preventDefault();if(!confirm('Delete this recruiting list?'))return;api(drawer.dataset.recruitingListsUrl+'/'+encodeURIComponent(del.dataset.lrmListDelete),{method:'DELETE'}).then(function(j){data.lists=j.items||[];loaded.lists=true;renderLists();toast('List deleted.')}).catch(function(e){toast(e.message,true)});return}
+        var convo=event.target.closest('[data-lrm-conversation]');if(convo&&drawer.contains(convo)){event.preventDefault();openConversation(convo.dataset.lrmConversation);return}
+        var reply=event.target.closest('[data-lrm-reply]');if(reply&&drawer.contains(reply)){event.preventDefault();var btn=drawer.querySelector('[data-lr-nav="compose"]');if(btn)btn.click();loadCompose(false).then(function(){var form=q('[data-lrm-compose-form]');if(form)form.dataset.conversationId=reply.dataset.lrmReply});return}
+        var refresh=event.target.closest('[data-lrm-inbox-refresh]');if(refresh&&drawer.contains(refresh)){loaded.inbox=false;loadInbox(true);return}
+        var choose=event.target.closest('[data-lrm-choose-school]');if(choose&&drawer.contains(choose)){selectedComposeSchool=(data.schools||[]).find(function(s){return String(s.id||'')===String(choose.dataset.lrmChooseSchool)})||null;q('[data-lrm-compose-school-search]').value='';renderComposeSchool();renderComposeSchoolResults();return}
+        var clear=event.target.closest('[data-lrm-clear-compose-school]');if(clear&&drawer.contains(clear)){selectedComposeSchool=null;renderComposeSchool();return}
+        var recipientMode=event.target.closest('[data-lrm-recipient-mode]');if(recipientMode&&drawer.contains(recipientMode)){var head=recipientMode.dataset.lrmRecipientMode!=='all';q('[data-lrm-head-only]').value=head?'1':'0';qa('[data-lrm-recipient-mode]').forEach(function(b){b.classList.toggle('is-active',b===recipientMode)});return}
+        var pack=event.target.closest('[data-lrm-point-pack]');if(pack&&drawer.contains(pack)){document.dispatchEvent(new CustomEvent('plyrcard:locker-point-pack',{detail:{pack:pack.dataset.lrmPointPack}}));return}
+        var custom=event.target.closest('[data-lrm-custom-buy]');if(custom&&drawer.contains(custom)){var p=data.points||{},cfg=p.custom_purchase||{},input=q('[data-lrm-custom-points]'),amount=Math.round(Number(input?.value||0)),min=Number(cfg.min_points||1),max=Number(cfg.max_points||1000);if(!Number.isFinite(amount)||amount<min||amount>max){toast('Choose between '+min+' and '+max+' points.',true);return}document.dispatchEvent(new CustomEvent('plyrcard:locker-point-pack',{detail:{pack:'custom-'+amount}}));return}
+        var service=event.target.closest('[data-lrm-service]');if(service&&drawer.contains(service)){var p2=data.points||{},cost=Number(service.dataset.points||0);if(Number(p2.balance||0)<cost){toast('You do not have enough points.',true);return}if(!confirm('Use '+cost+' points for this service?'))return;var token='locker-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);api(drawer.dataset.creditUseUrl,{method:'POST',body:{request_token:token,confirm_spend:1,items:[{selected:1,item_key:service.dataset.lrmService,quantity:1,rush:0,notes:'Requested from Locker Room'}]}}).then(function(){loaded.points=false;loadPoints(true);toast('Service requested with PLYR Points.')}).catch(function(e){toast(e.message,true)});return}
     },true);
-
-    document.addEventListener('plyrcard:points-refresh',function(){loaded.points=false;loadPoints(true);});
 
     document.addEventListener('input',function(event){
         if(event.target.matches('[data-lrm-school-search]'))renderSchools();
-        if(event.target.matches('[data-lrm-coach-search]'))renderCoaches();
-        if(event.target.matches('[data-lrm-inbox-search]')){clearTimeout(searchTimer);searchTimer=setTimeout(function(){loaded.inbox=false;loadInbox(true);},350);}
+        if(event.target.matches('[data-lrm-list-school-search]'))renderListSearch(event.target.dataset.lrmListSchoolSearch);
+        if(event.target.matches('[data-lrm-compose-school-search]'))renderComposeSchoolResults();
+        if(event.target.matches('[data-lrm-inbox-search]')){clearTimeout(inboxTimer);inboxTimer=setTimeout(function(){loaded.inbox=false;loadInbox(false)},350)}
     },true);
+    document.addEventListener('change',function(event){if(event.target.matches('[data-lrm-division-filter],[data-lrm-state-filter],[data-lrm-conference-filter]'))renderSchools()},true);
+    document.addEventListener('plyrcard:points-refresh',function(){loaded.points=false;loadPoints(true)});
 
     var listForm=q('[data-lrm-list-form]');
-    if(listForm)listForm.addEventListener('submit',async function(event){event.preventDefault();busy(listForm,true,'Creating…');try{var j=await api(drawer.dataset.recruitingListsUrl,{method:'POST',body:new FormData(listForm)});data.lists=j.items||[];loaded.lists=true;listForm.reset();var color=listForm.querySelector('[name="color"]');if(color)color.value='#ff6338';renderLists();toast('List created.');}catch(e){toast(e.message,true);}finally{busy(listForm,false);}});
-
-    var mode=q('[data-lrm-compose-mode]');
-    if(mode)mode.addEventListener('change',function(){var list=mode.value==='list';q('[data-lrm-coach-wrap]').hidden=list;q('[data-lrm-list-wrap]').hidden=!list;});
+    if(listForm)listForm.addEventListener('submit',async function(event){event.preventDefault();busy(listForm,true,'Creating…');try{var j=await api(drawer.dataset.recruitingListsUrl,{method:'POST',body:new FormData(listForm)});data.lists=j.items||[];loaded.lists=true;listForm.reset();listForm.querySelector('[name="color"]').value='#ff6338';renderLists();toast('List created.')}catch(e){toast(e.message,true)}finally{busy(listForm,false)}});
 
     var template=q('[data-lrm-template]');
-    if(template)template.addEventListener('change',function(){var row=(data.templates||[]).find(function(t){return String(t.id)===String(template.value);});if(!row)return;var form=q('[data-lrm-compose-form]');if(!form)return;form.querySelector('[name="subject"]').value=row.subject||'';form.querySelector('[name="body"]').value=String(row.body_html||'').replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim();});
+    if(template)template.addEventListener('change',function(){var row=(data.templates||[]).find(function(t){return String(t.id||'')===String(template.value)});if(!row)return;var form=q('[data-lrm-compose-form]');form.querySelector('[name="subject"]').value=row.subject||'';form.querySelector('[name="body"]').value=String(row.body_html||'').replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim()});
 
-    var composeForm=q('[data-lrm-compose-form]');
-    if(composeForm)composeForm.addEventListener('submit',async function(event){
-        event.preventDefault();busy(composeForm,true,'Sending…');
-        var fd=new FormData(composeForm);
-        var body={target_mode:fd.get('target_mode'),coach_id:fd.get('coach_id'),list_key:fd.get('list_key'),subject:fd.get('subject'),body:fd.get('body')};
-        if(composeForm.dataset.conversationId){body.target_mode='conversation';body.conversation_id=composeForm.dataset.conversationId;}
-        try{var j=await api(drawer.dataset.recruitingEmailUrl,{method:'POST',body:body});toast(j.message||'Recruiting email sent.');composeForm.dataset.conversationId='';composeForm.reset();q('[data-lrm-list-wrap]').hidden=true;q('[data-lrm-coach-wrap]').hidden=false;loaded.inbox=false;}catch(e){toast(e.message,true);}finally{busy(composeForm,false);}
+    var compose=q('[data-lrm-compose-form]');
+    if(compose)compose.addEventListener('submit',async function(event){
+        event.preventDefault();var fd=new FormData(compose),body;
+        if(compose.dataset.conversationId){body={target_mode:'conversation',conversation_id:compose.dataset.conversationId,subject:fd.get('subject'),body:fd.get('body')}}
+        else{
+            if(!selectedComposeSchool){toast('Choose a school before sending.',true);return}
+            body={target_mode:'school',school_id:fd.get('school_id'),head_coach_only:fd.get('head_coach_only')==='1',subject:fd.get('subject'),body:fd.get('body')}
+        }
+        busy(compose,true,'Sending…');
+        try{var j=await api(drawer.dataset.recruitingEmailUrl,{method:'POST',body:body});toast(j.message||'Recruiting email sent.');compose.dataset.conversationId='';compose.querySelector('[name="subject"]').value='';compose.querySelector('[name="body"]').value='';loaded.inbox=false}
+        catch(e){toast(e.message,true)}finally{busy(compose,false)}
     });
 })();
 </script>
