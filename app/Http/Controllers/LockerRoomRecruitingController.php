@@ -127,7 +127,11 @@ class LockerRoomRecruitingController extends Controller
         ]);
     }
 
-    public function conversations(Request $request, CoachDatabaseService $recruiting): JsonResponse
+    public function conversations(
+        Request $request,
+        CoachDatabaseService $recruiting,
+        LocalRecruitingDatabaseService $database,
+    ): JsonResponse
     {
         $user = $this->premiumUser($request);
         $search = trim((string) $request->query('q', ''));
@@ -160,6 +164,40 @@ class LockerRoomRecruitingController extends Controller
             }
         }
 
+        if ($result['success'] ?? false) {
+            $coaches = collect($database->coachRows($user));
+            $byContact = $coaches
+                ->filter(fn (array $row): bool => filled($row['contact_id'] ?? $row['ghl_contact_id'] ?? null))
+                ->keyBy(fn (array $row): string => strtolower(trim((string) ($row['contact_id'] ?? $row['ghl_contact_id'] ?? ''))));
+            $byEmail = $coaches
+                ->filter(fn (array $row): bool => filled($row['email'] ?? null))
+                ->keyBy(fn (array $row): string => strtolower(trim((string) ($row['email'] ?? ''))));
+
+            $result['conversations'] = collect((array) ($result['conversations'] ?? []))
+                ->filter(fn ($row): bool => is_array($row))
+                ->map(function (array $row) use ($byContact, $byEmail): array {
+                    $contactId = strtolower(trim((string) ($row['contact_id'] ?? '')));
+                    $email = strtolower(trim((string) ($row['email'] ?? '')));
+                    $coach = ($contactId !== '' ? $byContact->get($contactId) : null)
+                        ?: ($email !== '' ? $byEmail->get($email) : null);
+
+                    $preview = $this->cleanInboxPreview((string) ($row['last_message'] ?? ''));
+
+                    return [
+                        ...$row,
+                        'contact_name' => trim((string) ($coach['name'] ?? $row['contact_name'] ?? 'Coach')) ?: 'Coach',
+                        'school' => trim((string) ($coach['school'] ?? $coach['school_name'] ?? '')),
+                        'school_logo_url' => trim((string) ($coach['school_logo_url'] ?? $coach['logo_url'] ?? '')),
+                        'title' => trim((string) ($coach['title'] ?? 'Coach')),
+                        'conference' => trim((string) ($coach['conference'] ?? '')),
+                        'division' => trim((string) ($coach['division'] ?? '')),
+                        'preview' => $preview,
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
         return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
     }
 
@@ -173,7 +211,7 @@ class LockerRoomRecruitingController extends Controller
             $user,
             trim($conversation),
             $request->filled('last_message_id') ? trim((string) $request->query('last_message_id')) : null,
-            min(max((int) $request->query('limit', 50), 1), 100),
+            min(max((int) $request->query('limit', 10), 1), 100),
         );
 
         if ($result['success'] ?? false) {
@@ -691,6 +729,19 @@ class LockerRoomRecruitingController extends Controller
         }
 
         return ctype_digit($template) ? (int) $template : null;
+    }
+
+    protected function cleanInboxPreview(string $value): string
+    {
+        $value = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $value = preg_replace('/<\s*style\b[^>]*>.*?<\s*\/\s*style\s*>/is', ' ', $value) ?? $value;
+        $value = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', ' ', $value) ?? $value;
+        $value = strip_tags($value);
+        $value = preg_replace('/\b(?:font-family|font-size|line-height|color|background|margin|padding|display|width|height)\s*:[^;}{]+;?/i', ' ', $value) ?? $value;
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+        $value = trim($value);
+
+        return Str::limit($value !== '' ? $value : 'No message preview available.', 150, '…');
     }
 
     protected function sanitizeInboxEmailHtml(array $message): string
