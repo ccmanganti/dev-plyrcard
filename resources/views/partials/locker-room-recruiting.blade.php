@@ -150,6 +150,148 @@
         #plyrcard-action-drawer .lrm-reply-composer{padding:9px 10px 10px}
         #plyrcard-action-drawer .lrm-message-scroll{padding:0 10px 10px}
     }
+
+    /* Locker Room Inbox v2: isolated mobile-first layout */
+    #plyrcard-action-drawer .lrm-inbox-view,
+    #plyrcard-action-drawer .lrm-inbox-view *{min-width:0;box-sizing:border-box}
+    #plyrcard-action-drawer .lrm-inbox-view .lr-section{overflow:hidden}
+    #plyrcard-action-drawer .lrm-inbox-view .lrm-toolbar{margin-bottom:10px}
+    #plyrcard-action-drawer .lrm-inbox-list{
+        width:100%;
+        max-width:100%;
+        display:block;
+        overflow-y:auto;
+        overflow-x:hidden;
+        border:1px solid #e5e7eb;
+        border-radius:14px;
+        background:#fff;
+        max-height:58vh;
+    }
+    #plyrcard-action-drawer .lrm-conversation{
+        position:relative;
+        width:100%;
+        max-width:100%;
+        display:flex;
+        align-items:flex-start;
+        gap:10px;
+        padding:12px;
+        border:0;
+        border-bottom:1px solid #eef2f6;
+        background:#fff;
+        text-align:left;
+        overflow:hidden;
+        cursor:pointer;
+    }
+    #plyrcard-action-drawer .lrm-conversation:last-child{border-bottom:0}
+    #plyrcard-action-drawer .lrm-conversation.is-active{background:#fff7f3;box-shadow:inset 3px 0 #ff5a36}
+    #plyrcard-action-drawer .lrm-conversation-avatar{
+        width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:1px solid #e5e7eb;
+        background:#f8fafc;display:grid;place-items:center;overflow:hidden;font-size:10px;font-weight:900;color:#344054
+    }
+    #plyrcard-action-drawer .lrm-conversation-avatar img{width:100%;height:100%;object-fit:contain;padding:4px;background:#fff}
+    #plyrcard-action-drawer .lrm-conversation-content{flex:1 1 auto;width:0;overflow:hidden}
+    #plyrcard-action-drawer .lrm-conversation-top{display:flex;align-items:center;gap:7px;width:100%}
+    #plyrcard-action-drawer .lrm-conversation-name{
+        flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+        font-size:11px;font-weight:900;line-height:1.3;color:#101828
+    }
+    #plyrcard-action-drawer .lrm-conversation-time{flex:0 0 auto;font-size:8px;color:#98a2b3;white-space:nowrap}
+    #plyrcard-action-drawer .lrm-conversation-school{
+        margin-top:2px;font-size:9px;line-height:1.3;color:#667085;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+    }
+    #plyrcard-action-drawer .lrm-conversation-preview{
+        display:-webkit-box!important;
+        -webkit-box-orient:vertical;
+        -webkit-line-clamp:2;
+        white-space:normal!important;
+        overflow:hidden!important;
+        text-overflow:ellipsis;
+        overflow-wrap:anywhere!important;
+        word-break:break-word!important;
+        max-width:100%!important;
+        width:100%!important;
+        margin-top:5px;
+        font-size:10px;
+        line-height:1.42;
+        color:#667085;
+    }
+    #plyrcard-action-drawer .lrm-conversation-unread{
+        display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;
+        background:#ff5a36;color:#fff;font-size:8px;font-weight:900;margin-left:5px
+    }
+
+    #plyrcard-action-drawer .lrm-thread{
+        width:100%;max-width:100%;height:68vh;min-height:440px;display:flex;flex-direction:column;
+        overflow:hidden!important;padding:0!important;border:1px solid #e5e7eb;border-radius:14px;background:#fff;isolation:isolate
+    }
+    #plyrcard-action-drawer .lrm-thread-header{
+        flex:0 0 auto;position:relative!important;top:auto!important;z-index:2!important;
+        display:flex;align-items:center;justify-content:space-between;gap:8px;
+        padding:11px 12px!important;margin:0!important;border-bottom:1px solid #eef2f6;background:#fff
+    }
+    #plyrcard-action-drawer .lrm-thread-header-left{display:flex;align-items:center;gap:9px;min-width:0}
+    #plyrcard-action-drawer .lrm-thread-header-copy{min-width:0}
+    #plyrcard-action-drawer .lrm-thread-header-copy strong{display:block;font-size:11px;color:#101828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #plyrcard-action-drawer .lrm-thread-header-copy span{display:block;margin-top:2px;font-size:9px;color:#667085;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    #plyrcard-action-drawer .lrm-message-scroll{
+        flex:1 1 auto;min-height:0;width:100%;max-width:100%;overflow-y:auto!important;overflow-x:hidden!important;
+        padding:8px 10px 12px!important;background:#f8fafc;overscroll-behavior:contain;position:relative!important;z-index:1!important
+    }
+    #plyrcard-action-drawer .lrm-load-older{
+        position:relative!important;top:auto!important;z-index:1!important;background:transparent!important;padding:3px 0 10px!important
+    }
+    #plyrcard-action-drawer .lrm-message{
+        display:block!important;width:100%;max-width:100%;margin:8px 0!important;overflow:hidden
+    }
+    #plyrcard-action-drawer .lrm-message-avatar{display:none!important}
+    #plyrcard-action-drawer .lrm-message-body{width:100%;max-width:100%;min-width:0!important}
+    #plyrcard-action-drawer .lrm-message.is-out .lrm-message-body{grid-column:auto!important;grid-row:auto!important}
+    #plyrcard-action-drawer .lrm-msg-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 2px 4px;font-size:8px;color:#98a2b3}
+    #plyrcard-action-drawer .lrm-mail-card{
+        width:100%;max-width:100%;overflow:hidden;border:1px solid #e5e7eb;border-radius:11px;background:#fff
+    }
+    #plyrcard-action-drawer .lrm-message.is-out .lrm-mail-card{border-color:#f5c9bb;background:#fffaf8}
+    #plyrcard-action-drawer .lrm-mail-preview{
+        display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;
+        padding:10px 11px;font-size:10px;line-height:1.5;color:#475467;
+        overflow:hidden;overflow-wrap:anywhere;word-break:break-word;white-space:normal
+    }
+    #plyrcard-action-drawer .lrm-mail-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:1px solid #eef2f6;background:#fff}
+    #plyrcard-action-drawer .lrm-mail-expand{
+        border:0;background:transparent;padding:3px;color:#e64a27;font-size:9px;font-weight:850;cursor:pointer
+    }
+    #plyrcard-action-drawer .lrm-mail-full{display:none;width:100%;max-width:100%;overflow:hidden;border-top:1px solid #eef2f6;background:#fff}
+    #plyrcard-action-drawer .lrm-mail-card.is-expanded .lrm-mail-preview{display:none}
+    #plyrcard-action-drawer .lrm-mail-card.is-expanded .lrm-mail-full{display:block}
+    #plyrcard-action-drawer .lrm-mail-card.is-expanded .lrm-mail-expand::after{content:"Hide email"}
+    #plyrcard-action-drawer .lrm-mail-card:not(.is-expanded) .lrm-mail-expand::after{content:"View full email"}
+
+    #plyrcard-action-drawer .lrm-mail-frame{
+        display:block;width:100%;max-width:100%;height:230px;border:0;background:#fff;overflow:hidden
+    }
+    #plyrcard-action-drawer .lrm-reply-composer{
+        flex:0 0 auto;position:relative!important;bottom:auto!important;z-index:2!important;
+        width:100%;max-width:100%;margin:0!important;padding:9px 10px!important;border-top:1px solid #e5e7eb;background:#fff
+    }
+    #plyrcard-action-drawer .lrm-reply-box{
+        width:100%;max-width:100%;display:flex!important;align-items:flex-end;gap:7px;
+        padding:7px!important;border:1px solid #d0d5dd;border-radius:11px;box-shadow:none!important
+    }
+    #plyrcard-action-drawer .lrm-reply-box textarea{flex:1 1 auto;min-width:0;min-height:38px!important;max-height:96px!important}
+    #plyrcard-action-drawer .lrm-reply-box button{flex:0 0 38px;width:38px;height:38px;padding:0!important;display:grid;place-items:center}
+
+    #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{height:calc(100vh - 175px);min-height:520px;max-height:none}
+    #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-inbox-list{max-height:76vh}
+
+    @media(max-width:760px){
+        #plyrcard-action-drawer .lrm-inbox-list{max-height:62vh}
+        #plyrcard-action-drawer .lrm-thread{height:72vh;min-height:430px}
+        #plyrcard-action-drawer .lrm-inbox-view.is-maximized .lrm-thread{height:calc(100vh - 150px);min-height:520px}
+        #plyrcard-action-drawer .lrm-mail-frame{height:210px}
+    }
+
 </style>
 
 <section class="lr-view" data-lr-view="schools">
@@ -408,8 +550,17 @@
         var holder=q('[data-lrm-inbox-list]');if(!holder)return;
         var rows=data.conversations||[];
         holder.innerHTML=rows.length?rows.map(function(row){
-            var active=String(row.id||'')===activeConversation,logo=row.school_logo_url||'',school=row.school||row.title||'Coach',preview=row.preview||row.last_message||'No message preview available.';
-            return '<button type="button" class="lrm-conversation '+(active?'is-active':'')+'" data-lrm-conversation="'+esc(row.id||'')+'"><span class="lrm-thread-logo">'+(logo?'<img src="'+esc(logo)+'" alt="" loading="lazy">':esc(initials(row.contact_name||'Coach')))+'</span><span class="lrm-thread-main"><span class="lrm-thread-name">'+esc(row.contact_name||'Coach')+'</span><span class="lrm-thread-school">'+esc(school)+'</span><span class="lrm-thread-preview">'+esc(preview)+'</span></span><span class="lrm-thread-side"><span class="lrm-thread-date">'+esc(inboxDate(row.last_message_at))+'</span>'+(Number(row.unread_count||0)>0?'<span class="lrm-unread-dot" title="'+Number(row.unread_count)+' unread"></span>':'')+'</span></button>';
+            var active=String(row.id||'')===activeConversation;
+            var logo=row.school_logo_url||'',school=row.school||row.title||'Coach';
+            var preview=String(row.preview||row.last_message||'No message preview available.').replace(/\s+/g,' ').trim();
+            return '<button type="button" class="lrm-conversation '+(active?'is-active':'')+'" data-lrm-conversation="'+esc(row.id||'')+'">'+
+                '<span class="lrm-conversation-avatar">'+(logo?'<img src="'+esc(logo)+'" alt="" loading="lazy">':esc(initials(row.contact_name||'Coach')))+'</span>'+
+                '<span class="lrm-conversation-content">'+
+                    '<span class="lrm-conversation-top"><span class="lrm-conversation-name">'+esc(row.contact_name||'Coach')+'</span><span class="lrm-conversation-time">'+esc(inboxDate(row.last_message_at))+'</span>'+(Number(row.unread_count||0)>0?'<span class="lrm-conversation-unread">'+Number(row.unread_count)+'</span>':'')+'</span>'+
+                    '<span class="lrm-conversation-school">'+esc(school)+'</span>'+
+                    '<span class="lrm-conversation-preview">'+esc(preview)+'</span>'+
+                '</span>'+
+            '</button>';
         }).join(''):'<div class="lr-detail-empty">No conversations yet.</div>';
     }
     function safeEmailHtml(value){return String(value||'<p><em>No message body.</em></p>')}
@@ -419,24 +570,53 @@
         var root=q('[data-lrm-inbox-root]');if(root)root.classList.toggle('is-maximized',inboxMaximized);
         qa('[data-lrm-inbox-size]').forEach(function(btn){btn.title=inboxMaximized?'Minimize inbox':'Maximize inbox';btn.setAttribute('aria-label',btn.title);btn.innerHTML='<i class="fa-solid fa-'+(inboxMaximized?'compress':'expand')+'"></i>'});
     }
+    function emailFrameDocument(html){
+        return '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>'+
+            'html,body{margin:0!important;padding:0!important;width:100%!important;max-width:100%!important;overflow-x:hidden!important;background:#fff;color:#344054;font:12px/1.5 Arial,Helvetica,sans-serif;box-sizing:border-box}'+
+            '*,*:before,*:after{box-sizing:border-box!important;max-width:100%!important;min-width:0!important;overflow-wrap:anywhere!important;word-break:break-word!important}'+
+            'body{padding:10px!important}img{max-width:100%!important;height:auto!important;object-fit:contain!important}'+
+            'table{width:100%!important;max-width:100%!important;min-width:0!important;table-layout:fixed!important;border-collapse:collapse!important}'+
+            'td,th,tr,tbody,thead{max-width:100%!important;min-width:0!important;width:auto!important;white-space:normal!important;overflow-wrap:anywhere!important}'+
+            'div,p,span,a,blockquote{max-width:100%!important;width:auto!important;white-space:normal!important}pre,code{white-space:pre-wrap!important;word-break:break-word!important}'+
+            '</style></head><body>'+String(html||'<p>No message body.</p>')+'</body></html>';
+    }
     function renderThread(){
         var thread=q('[data-lrm-thread]');if(!thread)return;
         var convo=threadState.conversation||{},messages=threadState.messages||[],title=convo.contact_name||'Conversation',school=convo.school||convo.title||convo.email||'',logo=convo.school_logo_url||'';
         var latest=messages.length?messages[messages.length-1]:{},subject=String(latest.subject||'').trim();
         if(subject&&!/^re:/i.test(subject))subject='Re: '+subject;
         if(!subject)subject='Re: PLYRCARD Recruiting';
-        thread.innerHTML='<div class="lrm-thread-header"><div class="lrm-thread-contact"><span class="lrm-thread-logo">'+(logo?'<img src="'+esc(logo)+'" alt="">':esc(initials(title)))+'</span><span class="lrm-thread-contact-copy"><strong>'+esc(title)+'</strong><span>'+esc(school)+'</span></span></div><span class="lrm-pill">'+messages.length+' loaded</span></div><div class="lrm-message-scroll" data-lrm-message-scroll>'+(threadState.hasMore?'<div class="lrm-load-older"><button class="lr-btn" type="button" data-lrm-load-older '+(threadState.loadingOlder?'disabled':'')+'>'+(threadState.loadingOlder?'Loading 10 older emails…':'Load 10 older emails')+'</button></div>':'')+'<div data-lrm-message-stack></div></div><form class="lrm-reply-composer" data-lrm-reply-form><input type="hidden" name="subject" value="'+esc(subject)+'"><div class="lrm-reply-box"><textarea class="lr-textarea" name="body" rows="2" maxlength="100000" placeholder="Reply to '+esc(title)+'..." required></textarea><button class="lr-btn lr-btn-primary" type="submit" aria-label="Send reply"><i class="fa-solid fa-paper-plane"></i></button></div></form>';
+
+        thread.innerHTML='<div class="lrm-thread-header">'+
+            '<div class="lrm-thread-header-left"><span class="lrm-conversation-avatar">'+(logo?'<img src="'+esc(logo)+'" alt="">':esc(initials(title)))+'</span><span class="lrm-thread-header-copy"><strong>'+esc(title)+'</strong><span>'+esc(school)+'</span></span></div>'+
+            '<span class="lrm-pill">'+messages.length+' loaded</span>'+
+        '</div>'+
+        '<div class="lrm-message-scroll" data-lrm-message-scroll>'+
+            (threadState.hasMore?'<div class="lrm-load-older"><button class="lr-btn" type="button" data-lrm-load-older '+(threadState.loadingOlder?'disabled':'')+'>'+(threadState.loadingOlder?'Loading 10 older emails…':'Load 10 older emails')+'</button></div>':'')+
+            '<div data-lrm-message-stack></div>'+
+        '</div>'+
+        '<form class="lrm-reply-composer" data-lrm-reply-form><input type="hidden" name="subject" value="'+esc(subject)+'"><div class="lrm-reply-box"><textarea class="lr-textarea" name="body" rows="2" maxlength="100000" placeholder="Reply to '+esc(title)+'..." required></textarea><button class="lr-btn lr-btn-primary" type="submit" aria-label="Send reply"><i class="fa-solid fa-paper-plane"></i></button></div></form>';
+
         var stack=q('[data-lrm-message-stack]');
-        messages.forEach(function(m){
+        messages.forEach(function(m,index){
             var direction=String(m.direction||'').toLowerCase(),out=direction.includes('out')||['sent','send','outgoing','out'].includes(direction);
-            var article=document.createElement('article');article.className='lrm-message'+(out?' is-out':'');
-            var avatar=document.createElement('span');avatar.className='lrm-message-avatar';avatar.textContent=out?'YOU':initials(title);
-            var body=document.createElement('div');body.className='lrm-message-body';
-            var meta=document.createElement('div');meta.className='lrm-msg-meta';meta.innerHTML='<span><strong>'+esc(out?'You':title)+'</strong></span><span>'+esc(messageDate(m.created_at))+'</span>';
-            var email=document.createElement('div');email.className='lrm-email-body';email.innerHTML=safeEmailHtml(m.rendered_html);
-            body.appendChild(meta);body.appendChild(email);
-            if(out){article.appendChild(body);article.appendChild(avatar)}else{article.appendChild(avatar);article.appendChild(body)}
+            var preview=String(m.display_text||'').replace(/\s+/g,' ').trim();
+            if(preview.length>320)preview=preview.slice(0,317)+'…';
+
+            var article=document.createElement('article');
+            article.className='lrm-message'+(out?' is-out':'');
+            article.innerHTML='<div class="lrm-message-body">'+
+                '<div class="lrm-msg-meta"><span><strong>'+esc(out?'You':title)+'</strong></span><span>'+esc(messageDate(m.created_at))+'</span></div>'+
+                '<div class="lrm-mail-card" data-lrm-mail-card="'+index+'">'+
+                    '<div class="lrm-mail-preview">'+esc(preview||'Open this email to view its contents.')+'</div>'+
+                    '<div class="lrm-mail-full"><iframe class="lrm-mail-frame" title="Email message" sandbox="" data-lrm-mail-frame="'+index+'"></iframe></div>'+
+                    '<div class="lrm-mail-actions"><span class="lr-card-copy">'+esc(m.subject||'Email message')+'</span><button type="button" class="lrm-mail-expand" data-lrm-mail-expand="'+index+'"></button></div>'+
+                '</div>'+
+            '</div>';
             stack.appendChild(article);
+
+            var frame=article.querySelector('[data-lrm-mail-frame="'+index+'"]');
+            if(frame)frame.srcdoc=emailFrameDocument(m.rendered_html);
         });
         if(!messages.length)stack.innerHTML='<div class="lr-detail-empty">No email messages in this conversation.</div>';
     }
@@ -561,6 +741,7 @@
         var inboxBack=event.target.closest('[data-lrm-inbox-back]');if(inboxBack&&drawer.contains(inboxBack)){setInboxWindow('list');return}
         var inboxSize=event.target.closest('[data-lrm-inbox-size]');if(inboxSize&&drawer.contains(inboxSize)){setInboxMaximized(!inboxMaximized);return}
         var loadOlder=event.target.closest('[data-lrm-load-older]');if(loadOlder&&drawer.contains(loadOlder)){loadOlderMessages();return}
+        var mailExpand=event.target.closest('[data-lrm-mail-expand]');if(mailExpand&&drawer.contains(mailExpand)){var card=mailExpand.closest('.lrm-mail-card');if(card)card.classList.toggle('is-expanded');return}
         var pointsOpen=event.target.closest('[data-lrm-points-open]');if(pointsOpen&&drawer.contains(pointsOpen)){setPointsWindow(pointsOpen.dataset.lrmPointsOpen);return}
         var pointsBack=event.target.closest('[data-lrm-points-back]');if(pointsBack&&drawer.contains(pointsBack)){setPointsWindow('home');return}
         var activityToggle=event.target.closest('[data-lrm-activity-preview-toggle]');if(activityToggle&&drawer.contains(activityToggle)){var preview=q('[data-lrm-activity-preview]'),minimized=preview?.classList.toggle('is-minimized');activityToggle.textContent=minimized?'Maximize':'Minimize';return}
