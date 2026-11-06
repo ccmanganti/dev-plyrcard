@@ -31,6 +31,7 @@ class MyList extends Model
     public function schools(): BelongsToMany
     {
         return $this->belongsToMany(School::class, 'my_list_schools', 'my_list_id', 'school_id')
+            ->using(MyListSchool::class)
             ->withTimestamps();
     }
 }
