@@ -292,6 +292,79 @@
         #plyrcard-action-drawer .lrm-mail-frame{height:210px}
     }
 
+
+    /* Locker Room PLYR Points v2 */
+    #plyrcard-action-drawer .lrm-points-home{display:grid;gap:12px}
+    #plyrcard-action-drawer .lrm-points-wallet{
+        border:1px solid #f4c8b8;border-radius:18px;padding:16px;
+        background:linear-gradient(135deg,#fff4ee 0%,#fff 62%);
+        box-shadow:0 10px 28px rgba(240,82,43,.07)
+    }
+    #plyrcard-action-drawer .lrm-wallet-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+    #plyrcard-action-drawer .lrm-wallet-label{display:flex;align-items:center;gap:7px;color:#7c2d12;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}
+    #plyrcard-action-drawer .lrm-wallet-label i{width:28px;height:28px;border-radius:9px;background:#fff;display:grid;place-items:center;color:#f0522b}
+    #plyrcard-action-drawer .lrm-wallet-balance{display:flex;align-items:flex-end;gap:8px;margin:13px 0 10px}
+    #plyrcard-action-drawer .lrm-wallet-balance strong{font-size:44px;line-height:.9;letter-spacing:-.05em;font-weight:950;color:#111827}
+    #plyrcard-action-drawer .lrm-wallet-balance span{font-size:10px;font-weight:850;color:#667085;padding-bottom:4px}
+    #plyrcard-action-drawer .lrm-wallet-actions{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:7px}
+    #plyrcard-action-drawer .lrm-wallet-actions button{min-height:40px;border-radius:10px;font-size:10px;font-weight:850;cursor:pointer}
+    #plyrcard-action-drawer .lrm-wallet-primary{border:1px solid #f0522b;background:#f0522b;color:#fff}
+    #plyrcard-action-drawer .lrm-wallet-secondary{border:1px solid #e5e7eb;background:#fff;color:#344054}
+    #plyrcard-action-drawer .lrm-points-section{
+        border:1px solid #e5e7eb;border-radius:16px;background:#fff;padding:13px;
+        box-shadow:0 7px 20px rgba(15,23,42,.035)
+    }
+    #plyrcard-action-drawer .lrm-points-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+    #plyrcard-action-drawer .lrm-points-section-head h3{margin:0;font-size:14px;font-weight:900;color:#101828}
+    #plyrcard-action-drawer .lrm-points-section-head p{margin:3px 0 0;font-size:10px;line-height:1.45;color:#667085}
+    #plyrcard-action-drawer .lrm-service-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    #plyrcard-action-drawer .lrm-service-card{
+        position:relative;border:1px solid #e5e7eb;border-radius:14px;background:#fff;
+        padding:12px;box-shadow:none;overflow:hidden
+    }
+    #plyrcard-action-drawer .lrm-service-card:hover{border-color:#f2c2b1;background:#fffaf8}
+    #plyrcard-action-drawer .lrm-service-head{align-items:flex-start}
+    #plyrcard-action-drawer .lrm-service-head strong{font-size:12px;line-height:1.3;color:#101828}
+    #plyrcard-action-drawer .lrm-service-price{
+        display:inline-flex;align-items:center;gap:3px;padding:5px 7px;border-radius:999px;
+        background:#fff1eb;color:#c2410c;font-size:11px;font-weight:950
+    }
+    #plyrcard-action-drawer .lrm-service-price small{font-size:8px;text-transform:uppercase}
+    #plyrcard-action-drawer .lrm-service-description{
+        margin:7px 0 10px;font-size:10px;line-height:1.45;color:#667085;
+        display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden
+    }
+    #plyrcard-action-drawer .lrm-service-meta{display:flex;align-items:center;gap:6px;min-height:22px;margin-bottom:9px}
+    #plyrcard-action-drawer .lrm-service-meta span{font-size:9px;color:#667085}
+    #plyrcard-action-drawer .lrm-service-meta i{color:#f0522b}
+    #plyrcard-action-drawer .lrm-service-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto}
+    #plyrcard-action-drawer .lrm-service-actions.is-single{grid-template-columns:1fr}
+    #plyrcard-action-drawer .lrm-service-action{
+        min-height:36px;border-radius:9px;font-size:9px;font-weight:900;cursor:pointer;
+        display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none
+    }
+    #plyrcard-action-drawer .lrm-service-action.is-primary{border:1px solid #f0522b;background:#f0522b;color:#fff}
+    #plyrcard-action-drawer .lrm-service-action.is-secondary{border:1px solid #e5e7eb;background:#fff;color:#344054}
+    #plyrcard-action-drawer .lrm-service-action.is-buy{border:1px solid #f4c7b5;background:#fff7f3;color:#c2410c}
+    #plyrcard-action-drawer .lrm-service-shortfall{margin-top:6px;font-size:8px;line-height:1.35;color:#b45309;text-align:center}
+    #plyrcard-action-drawer .lrm-samples-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+    #plyrcard-action-drawer .lrm-sample-card{
+        border:1px solid #e5e7eb;border-radius:13px;background:#fff;overflow:hidden;
+        min-height:130px;text-decoration:none;color:#344054;display:flex;flex-direction:column
+    }
+    #plyrcard-action-drawer .lrm-sample-media{flex:1;min-height:105px;background:#f8fafc;display:grid;place-items:center;overflow:hidden}
+    #plyrcard-action-drawer .lrm-sample-media img{width:100%;height:auto;max-height:230px;object-fit:contain;display:block}
+    #plyrcard-action-drawer .lrm-sample-media i{font-size:24px;color:#f0522b}
+    #plyrcard-action-drawer .lrm-sample-caption{padding:8px 9px;font-size:9px;font-weight:800;color:#475467;display:flex;align-items:center;justify-content:space-between;gap:7px}
+    #plyrcard-action-drawer .lrm-points-empty{padding:18px;border:1px dashed #d0d5dd;border-radius:12px;text-align:center;color:#667085;font-size:10px}
+    @media(max-width:760px){
+        #plyrcard-action-drawer .lrm-wallet-actions{grid-template-columns:1fr 1fr}
+        #plyrcard-action-drawer .lrm-wallet-actions .lrm-wallet-primary{grid-column:1/-1}
+        #plyrcard-action-drawer .lrm-service-grid{grid-template-columns:1fr}
+        #plyrcard-action-drawer .lrm-samples-grid{grid-template-columns:1fr}
+        #plyrcard-action-drawer .lrm-service-description{-webkit-line-clamp:4}
+    }
+
 </style>
 
 <section class="lr-view" data-lr-view="schools">
@@ -403,31 +476,55 @@
     <div class="lr-section">
         <div class="lrm-nested-window is-active" data-lrm-points-window="home">
             <div class="lrm-toolbar">
-                <div class="lrm-toolbar-top"><div><h3>PLYR Points</h3><p>Your recruiting credit wallet: spend, reload, and track every point.</p></div><span class="lrm-pill"><i class="fa-solid fa-coins" style="margin-right:5px"></i> PLYR WALLET</span></div>
-            </div>
-            <div class="lrm-points-balance">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><span class="lr-eyebrow">Available Balance</span><span class="lrm-pill">Ready to use</span></div>
-                <div class="lrm-balance-number"><strong data-lrm-points-balance>0</strong><span>PLYR Points</span></div>
-                <p class="lr-card-copy">Spend points on recruiting services or add more when you need them.</p>
-            </div>
-            <div class="lrm-nav-tiles">
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="services"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span><i class="fa-solid fa-chevron-right lrm-point-action-arrow"></i></span><span><strong>Use Points</strong><small>Recruiting graphics, editing, outreach and enabled services.</small></span></button>
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="buy"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-plus"></i></span><i class="fa-solid fa-chevron-right lrm-point-action-arrow"></i></span><span><strong>Buy Points</strong><small>Reload with a point pack or choose a custom amount.</small></span></button>
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="requests"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-list-check"></i></span><span class="value" data-lrm-request-count>0</span></span><span><strong>My Requests</strong><small>Track current work, status updates and delivered files.</small></span></button>
-                <button type="button" class="lrm-nav-tile" data-lrm-points-open="activity"><span class="lrm-point-action-top"><span class="lrm-point-action-icon"><i class="fa-solid fa-clock-rotate-left"></i></span><span class="value" data-lrm-activity-count>0</span></span><span><strong>Point Tracking</strong><small>See where every point was earned, purchased, used or returned.</small></span></button>
-            </div>
-            <div class="lr-card" style="margin-top:10px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
-                    <div><h3 class="lr-card-title">Recent Point Activity</h3><p class="lr-card-copy">A minimized preview of your credit ledger.</p></div>
-                    <button type="button" class="lrm-activity-toggle" data-lrm-activity-preview-toggle>Maximize</button>
+                <div class="lrm-toolbar-top">
+                    <div><h3>PLYR Points</h3><p>Use your points on recruiting services, reload your balance, and track every transaction.</p></div>
+                    <span class="lrm-pill"><i class="fa-solid fa-coins" style="margin-right:5px"></i> PLYR WALLET</span>
                 </div>
-                <div class="lrm-collapsible-list is-minimized" data-lrm-activity-preview><div class="lr-detail-empty">Loading point activity…</div></div>
+            </div>
+
+            <div class="lrm-points-home">
+                <div class="lrm-points-wallet">
+                    <div class="lrm-wallet-top">
+                        <span class="lrm-wallet-label"><i class="fa-solid fa-coins"></i> Available Balance</span>
+                        <span class="lrm-pill">Ready to use</span>
+                    </div>
+                    <div class="lrm-wallet-balance"><strong data-lrm-points-balance>0</strong><span>PLYR Points</span></div>
+                    <div class="lrm-wallet-actions">
+                        <button type="button" class="lrm-wallet-primary" data-lrm-points-open="buy"><i class="fa-solid fa-plus"></i> Buy Points</button>
+                        <button type="button" class="lrm-wallet-secondary" data-lrm-points-open="requests"><i class="fa-solid fa-list-check"></i> My Requests <span data-lrm-request-count>0</span></button>
+                        <button type="button" class="lrm-wallet-secondary" data-lrm-points-open="activity"><i class="fa-solid fa-clock-rotate-left"></i> Tracking</button>
+                    </div>
+                </div>
+
+                <div class="lrm-points-section">
+                    <div class="lrm-points-section-head">
+                        <div><h3>Spend your points</h3><p>Choose a service. View its samples first, then request it when you are ready.</p></div>
+                    </div>
+                    <div class="lrm-service-grid" data-lrm-services><div class="lr-detail-empty">Loading services…</div></div>
+                </div>
+
+                <div class="lrm-points-section">
+                    <div class="lrm-points-section-head">
+                        <div><h3>Recent point activity</h3><p>A quick view of your latest credits and spending.</p></div>
+                        <button type="button" class="lrm-activity-toggle" data-lrm-activity-preview-toggle>Maximize</button>
+                    </div>
+                    <div class="lrm-collapsible-list is-minimized" data-lrm-activity-preview><div class="lr-detail-empty">Loading point activity…</div></div>
+                </div>
             </div>
         </div>
 
-        <div class="lrm-nested-window" data-lrm-points-window="services">
-            <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
-            <div class="lr-card"><h3 class="lr-card-title">Use PLYR Points</h3><p class="lr-card-copy">Choose an enabled recruiting service.</p><div class="lrm-service-grid" data-lrm-services></div></div>
+        <div class="lrm-nested-window" data-lrm-points-window="samples">
+            <div class="lrm-nested-head">
+                <button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button>
+            </div>
+            <div class="lrm-points-section">
+                <div class="lrm-points-section-head">
+                    <div><h3 data-lrm-sample-title>Service Samples</h3><p data-lrm-sample-description>Preview examples before using your points.</p></div>
+                    <span class="lrm-service-price" data-lrm-sample-price>0 <small>pts</small></span>
+                </div>
+                <div class="lrm-samples-grid" data-lrm-sample-gallery></div>
+                <div style="margin-top:10px" data-lrm-sample-actions></div>
+            </div>
         </div>
 
         <div class="lrm-nested-window" data-lrm-points-window="buy">
@@ -437,12 +534,18 @@
 
         <div class="lrm-nested-window" data-lrm-points-window="requests">
             <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
-            <div class="lr-card"><h3 class="lr-card-title">My Requests</h3><p class="lr-card-copy">Service status, spent points, returned points and delivery details.</p><div data-lrm-requests></div></div>
+            <div class="lrm-points-section">
+                <div class="lrm-points-section-head"><div><h3>My Requests</h3><p>Track status, points spent, returned credits, and delivered work.</p></div></div>
+                <div data-lrm-requests></div>
+            </div>
         </div>
 
         <div class="lrm-nested-window" data-lrm-points-window="activity">
             <div class="lrm-nested-head"><button type="button" class="lrm-nested-back" data-lrm-points-back><i class="fa-solid fa-chevron-left"></i> PLYR Points</button></div>
-            <div class="lr-card"><h3 class="lr-card-title">Credit Points Tracking</h3><p class="lr-card-copy">Complete point ledger including purchases, referral rewards, debits, refunds, returns and adjustments.</p><div data-lrm-history></div></div>
+            <div class="lrm-points-section">
+                <div class="lrm-points-section-head"><div><h3>Credit Points Tracking</h3><p>Purchases, referral rewards, service spending, returns, refunds and adjustments.</p></div><span class="lrm-pill"><span data-lrm-activity-count>0</span> entries</span></div>
+                <div data-lrm-history></div>
+            </div>
         </div>
     </div>
 </section>
@@ -455,7 +558,7 @@
 
     var data={schools:[],favorites:[],lists:[],conversations:[],templates:[],points:null,pointHistory:[]};
     var loaded={schools:false,favorites:false,lists:false,inbox:false,compose:false,points:false};
-    var schoolView='grid', activeConversation='', selectedComposeSchool=null, inboxTimer=null, inboxMaximized=false;
+    var schoolView='grid', activeConversation='', selectedComposeSchool=null, inboxTimer=null, inboxMaximized=false, activePointSampleKey='';
     var threadState={conversation:null,messages:[],cursor:null,hasMore:false,loadingOlder:false};
 
     function q(s){return drawer.querySelector(s)}
@@ -675,36 +778,80 @@
         var points=Number(entry.points||0),positive=entry.positive===true||points>0;
         return '<div style="padding:10px 0;border-top:1px solid #eef2f6;display:flex;justify-content:space-between;gap:10px;align-items:start"><div style="min-width:0"><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong style="font-size:10px">'+esc(entry.item||'PLYR Points activity')+'</strong><span class="lrm-pill">'+esc(entry.status||entry.type||'Activity')+'</span></div><div class="lr-card-copy">'+esc(entry.date_time||entry.date||'')+(entry.source?' · '+esc(entry.source):'')+'</div></div><strong style="font-size:12px;color:'+(positive?'#15803d':'#b42318')+';white-space:nowrap">'+esc(entry.amount||(points>0?'+':'')+points)+'</strong></div>';
     }
+    function renderPointSamples(){
+        var p=data.points||{},catalog=Array.isArray(p.catalog)?p.catalog:[],service=catalog.find(function(row){return String(row.key||'')===String(activePointSampleKey)});
+        var title=q('[data-lrm-sample-title]'),description=q('[data-lrm-sample-description]'),price=q('[data-lrm-sample-price]'),gallery=q('[data-lrm-sample-gallery]'),actions=q('[data-lrm-sample-actions]');
+        if(!gallery||!actions)return;
+        if(!service){
+            if(title)title.textContent='Service Samples';
+            if(description)description.textContent='Preview examples before using your points.';
+            if(price)price.innerHTML='0 <small>pts</small>';
+            gallery.innerHTML='<div class="lrm-points-empty">No service selected.</div>';
+            actions.innerHTML='';
+            return;
+        }
+        var samples=Array.isArray(service.samples)?service.samples:[],cost=Number(service.points||0),balance=Number(p.balance||0),enough=balance>=cost;
+        if(title)title.textContent=service.name||'Service Samples';
+        if(description)description.textContent=service.description||'Preview examples before using your points.';
+        if(price)price.innerHTML=Number(cost).toLocaleString()+' <small>pts</small>';
+        gallery.innerHTML=samples.length?samples.map(function(sample,index){
+            var url=sample.url||sample.embed_url||'#';
+            if(sample.type==='image'){
+                return '<a class="lrm-sample-card" href="'+esc(url)+'" target="_blank" rel="noopener"><span class="lrm-sample-media"><img src="'+esc(url)+'" alt="Service sample '+(index+1)+'"></span><span class="lrm-sample-caption"><span>Sample '+(index+1)+'</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span></a>';
+            }
+            if(sample.type==='youtube'){
+                return '<a class="lrm-sample-card" href="'+esc(url)+'" target="_blank" rel="noopener"><span class="lrm-sample-media"><i class="fa-brands fa-youtube"></i></span><span class="lrm-sample-caption"><span>Video Sample '+(index+1)+'</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span></a>';
+            }
+            return '<a class="lrm-sample-card" href="'+esc(url)+'" target="_blank" rel="noopener"><span class="lrm-sample-media"><i class="fa-solid fa-file-arrow-up"></i></span><span class="lrm-sample-caption"><span>Open Sample '+(index+1)+'</span><i class="fa-solid fa-arrow-up-right-from-square"></i></span></a>';
+        }).join(''):'<div class="lrm-points-empty">No samples have been added for this service yet.</div>';
+        actions.innerHTML=enough
+            ? '<button class="lr-btn lr-btn-primary" style="width:100%" type="button" data-lrm-service="'+esc(service.key)+'" data-points="'+cost+'"><i class="fa-solid fa-wand-magic-sparkles"></i> '+esc(service.cta||'Request Service')+' · '+cost+' pts</button>'
+            : '<button class="lr-btn" style="width:100%" type="button" data-lrm-points-open="buy"><i class="fa-solid fa-plus"></i> Get '+Math.max(0,cost-balance)+' more points</button>';
+    }
     function renderPoints(){
         var p=data.points||{},history=Array.isArray(data.pointHistory)?data.pointHistory:[],balance=Number(p.balance||0),balanceEl=q('[data-lrm-points-balance]');
         if(balanceEl)balanceEl.textContent=balance.toLocaleString();
         var requestCount=q('[data-lrm-request-count]');if(requestCount)requestCount.textContent=Number((p.requests||[]).length).toLocaleString();
         var activityCount=q('[data-lrm-activity-count]');if(activityCount)activityCount.textContent=history.length.toLocaleString();
 
+        var catalog=Array.isArray(p.catalog)?p.catalog:[];
         var services=q('[data-lrm-services]');
-        if(services)services.innerHTML=(p.catalog||[]).map(function(s){
-            var enough=balance>=Number(s.points||0),samples=Array.isArray(s.samples)?s.samples:[];
-            return '<article class="lrm-service-card"><div class="lrm-service-head"><strong>'+esc(s.name||'Service')+'</strong><span class="lrm-service-price">'+Number(s.points||0)+' <small>pts</small></span></div><p class="lr-card-copy" style="margin-top:5px;flex:1">'+esc(s.description||'')+'</p>'+(samples.length?'<div class="lrm-sample-grid">'+samples.slice(0,6).map(function(sample){if(sample.type==='image')return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener"><img src="'+esc(sample.url||'')+'" alt="Service sample"></a>';if(sample.type==='youtube')return '<a href="'+esc(sample.url||sample.embed_url||'#')+'" target="_blank" rel="noopener"><i class="fa-brands fa-youtube"></i></a>';return '<a href="'+esc(sample.url||'#')+'" target="_blank" rel="noopener"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>'}).join('')+'</div>':'')+'<button class="lr-btn lr-btn-primary" style="margin-top:8px;width:100%" type="button" data-lrm-service="'+esc(s.key)+'" data-points="'+Number(s.points||0)+'" '+(enough?'':'disabled')+'>'+(enough?esc(s.cta||'Request Service'):'Not enough points')+'</button></article>';
-        }).join('')||'<div class="lr-detail-empty">No point services are currently enabled.</div>';
+        if(services)services.innerHTML=catalog.length?catalog.map(function(s){
+            var cost=Number(s.points||0),enough=balance>=cost,samples=Array.isArray(s.samples)?s.samples:[],shortfall=Math.max(0,cost-balance);
+            var sampleButton=samples.length
+                ? '<button class="lrm-service-action is-secondary" type="button" data-lrm-service-samples="'+esc(s.key)+'"><i class="fa-regular fa-images"></i> See Samples'+(samples.length>1?' ('+samples.length+')':'')+'</button>'
+                : '';
+            var requestButton=enough
+                ? '<button class="lrm-service-action is-primary" type="button" data-lrm-service="'+esc(s.key)+'" data-points="'+cost+'"><i class="fa-solid fa-wand-magic-sparkles"></i> '+esc(s.cta||'Request')+'</button>'
+                : '<button class="lrm-service-action is-buy" type="button" data-lrm-points-open="buy"><i class="fa-solid fa-plus"></i> Get Points</button>';
+            return '<article class="lrm-service-card">'+
+                '<div class="lrm-service-head"><strong>'+esc(s.name||'Service')+'</strong><span class="lrm-service-price">'+cost.toLocaleString()+' <small>pts</small></span></div>'+
+                '<p class="lrm-service-description">'+esc(s.description||'Use your PLYR Points for this recruiting service.')+'</p>'+
+                '<div class="lrm-service-meta">'+(samples.length?'<i class="fa-regular fa-images"></i><span>'+samples.length+' sample'+(samples.length===1?'':'s')+' available</span>':'<i class="fa-regular fa-circle"></i><span>Samples coming soon</span>')+'</div>'+
+                '<div class="lrm-service-actions'+(sampleButton?'':' is-single')+'">'+sampleButton+requestButton+'</div>'+
+                (!enough?'<div class="lrm-service-shortfall">You need '+shortfall.toLocaleString()+' more points for this service.</div>':'')+
+            '</article>';
+        }).join(''):'<div class="lrm-points-empty">No PLYR Point services are currently enabled.</div>';
 
         var packs=q('[data-lrm-packs]');
         if(packs){
             if(p.can_buy_points){
                 var rows=Array.isArray(p.point_packs)?p.point_packs:[];
-                packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Recharge your balance without leaving Locker Room.</p><div class="lrm-pack-grid" style="margin-top:10px">'+rows.map(function(row){return '<article class="lrm-pack"><span class="lr-eyebrow">Point Pack</span><span class="points">'+Number(row.points||0).toLocaleString()+'</span><strong>'+money(row.price_cents)+'</strong><span class="lr-card-copy">'+esc(row.note||'Add points to your current balance.')+'</span><button class="lr-btn lr-btn-primary" type="button" data-lrm-point-pack="'+esc(row.key)+'">Buy Points</button></article>'}).join('')+'</div>'+(p.custom_purchase&&p.custom_purchase.enabled?'<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px;padding:10px;border:1px dashed #d0d5dd;border-radius:12px"><div><label style="font-size:10px;font-weight:850">CUSTOM POINTS</label><input class="lr-input" type="number" data-lrm-custom-points min="'+Number(p.custom_purchase.min_points||1)+'" max="'+Number(p.custom_purchase.max_points||1000)+'" value="'+Number(p.custom_purchase.min_points||1)+'"></div><button class="lr-btn" type="button" data-lrm-custom-buy>Buy Custom</button></div>':'')+'</div>';
-            }else packs.innerHTML='<div class="lr-card"><h3 class="lr-card-title">Buy More Points</h3><p class="lr-card-copy">Point packs are available with My Journey.</p><div class="lr-actions"><button class="lr-btn lr-btn-primary" type="button" data-lr-nav="upgrade">Get My Journey</button></div></div>';
+                packs.innerHTML='<div class="lrm-points-section"><div class="lrm-points-section-head"><div><h3>Buy More Points</h3><p>Choose a pack or enter a custom amount.</p></div></div><div class="lrm-pack-grid">'+rows.map(function(row){return '<article class="lrm-pack"><span class="lr-eyebrow">Point Pack</span><span class="points">'+Number(row.points||0).toLocaleString()+'</span><strong>'+money(row.price_cents)+'</strong><span class="lr-card-copy">'+esc(row.note||'Add points to your current balance.')+'</span><button class="lr-btn lr-btn-primary" type="button" data-lrm-point-pack="'+esc(row.key)+'">Buy '+Number(row.points||0).toLocaleString()+' Points</button></article>'}).join('')+'</div>'+(p.custom_purchase&&p.custom_purchase.enabled?'<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px;padding:11px;border:1px dashed #d0d5dd;border-radius:12px;background:#fafafa"><div><label style="font-size:10px;font-weight:850">CUSTOM POINTS</label><input class="lr-input" type="number" data-lrm-custom-points min="'+Number(p.custom_purchase.min_points||1)+'" max="'+Number(p.custom_purchase.max_points||1000)+'" value="'+Number(p.custom_purchase.min_points||1)+'"></div><button class="lr-btn" type="button" data-lrm-custom-buy>Buy Custom</button></div>':'')+'</div>';
+            }else packs.innerHTML='<div class="lrm-points-section"><div class="lrm-points-section-head"><div><h3>Buy More Points</h3><p>Point packs are available with My Journey.</p></div></div><button class="lr-btn lr-btn-primary" style="width:100%" type="button" data-lr-nav="upgrade">Get My Journey</button></div>';
         }
 
         var requests=q('[data-lrm-requests]');
         if(requests)requests.innerHTML=(p.requests||[]).map(function(r){
             var returned=Number(r.credits_returned||0);
-            return '<div style="padding:10px 0;border-top:1px solid #eef2f6"><div style="display:flex;justify-content:space-between;gap:8px"><strong style="font-size:10px">'+esc(r.item_name||'Service Request')+'</strong><span class="lrm-pill">'+esc(r.status_label||r.status||'Submitted')+'</span></div><div class="lr-card-copy">'+Number(r.points_spent||0)+' points spent'+(returned>0?' · '+returned+' returned':'')+(r.delivery_url?' · <a href="'+esc(r.delivery_url)+'" target="_blank" rel="noopener">Open delivery</a>':'')+'</div>'+(r.delivery_notes?'<div class="lr-card-copy" style="margin-top:4px">'+esc(r.delivery_notes)+'</div>':'')+'</div>';
-        }).join('')||'<div class="lr-detail-empty">No service requests yet.</div>';
+            return '<div style="padding:11px 0;border-top:1px solid #eef2f6"><div style="display:flex;justify-content:space-between;gap:8px"><strong style="font-size:10px">'+esc(r.item_name||'Service Request')+'</strong><span class="lrm-pill">'+esc(r.status_label||r.status||'Submitted')+'</span></div><div class="lr-card-copy">'+Number(r.points_spent||0)+' points spent'+(returned>0?' · '+returned+' returned':'')+(r.delivery_url?' · <a href="'+esc(r.delivery_url)+'" target="_blank" rel="noopener">Open delivery</a>':'')+'</div>'+(r.delivery_notes?'<div class="lr-card-copy" style="margin-top:4px">'+esc(r.delivery_notes)+'</div>':'')+'</div>';
+        }).join('')||'<div class="lrm-points-empty">You have not requested a PLYR Points service yet.</div>';
 
         var historyHolder=q('[data-lrm-history]');
-        if(historyHolder)historyHolder.innerHTML=history.length?history.map(pointActivityRow).join(''):'<div class="lr-detail-empty">No point activity yet.</div>';
+        if(historyHolder)historyHolder.innerHTML=history.length?history.map(pointActivityRow).join(''):'<div class="lrm-points-empty">No point activity yet.</div>';
         var preview=q('[data-lrm-activity-preview]');
-        if(preview)preview.innerHTML=history.length?history.slice(0,8).map(pointActivityRow).join(''):'<div class="lr-detail-empty">No point activity yet.</div>';
+        if(preview)preview.innerHTML=history.length?history.slice(0,8).map(pointActivityRow).join(''):'<div class="lrm-points-empty">No point activity yet.</div>';
+        renderPointSamples();
     }
 
     async function loadSchools(force){if(loaded.schools&&!force){renderSchools();return}try{var j=await api(drawer.dataset.recruitingSchoolsUrl+'?per_page=60');data.schools=j.items||[];data.lists=j.lists||data.lists;loaded.schools=true;renderSchools()}catch(e){q('[data-lrm-schools]').innerHTML='<div class="lr-detail-empty">'+esc(e.message)+'</div>'}}
@@ -742,6 +889,7 @@
         var inboxSize=event.target.closest('[data-lrm-inbox-size]');if(inboxSize&&drawer.contains(inboxSize)){setInboxMaximized(!inboxMaximized);return}
         var loadOlder=event.target.closest('[data-lrm-load-older]');if(loadOlder&&drawer.contains(loadOlder)){loadOlderMessages();return}
         var mailExpand=event.target.closest('[data-lrm-mail-expand]');if(mailExpand&&drawer.contains(mailExpand)){var card=mailExpand.closest('.lrm-mail-card');if(card)card.classList.toggle('is-expanded');return}
+        var sampleOpen=event.target.closest('[data-lrm-service-samples]');if(sampleOpen&&drawer.contains(sampleOpen)){activePointSampleKey=String(sampleOpen.dataset.lrmServiceSamples||'');renderPointSamples();setPointsWindow('samples');return}
         var pointsOpen=event.target.closest('[data-lrm-points-open]');if(pointsOpen&&drawer.contains(pointsOpen)){setPointsWindow(pointsOpen.dataset.lrmPointsOpen);return}
         var pointsBack=event.target.closest('[data-lrm-points-back]');if(pointsBack&&drawer.contains(pointsBack)){setPointsWindow('home');return}
         var activityToggle=event.target.closest('[data-lrm-activity-preview-toggle]');if(activityToggle&&drawer.contains(activityToggle)){var preview=q('[data-lrm-activity-preview]'),minimized=preview?.classList.toggle('is-minimized');activityToggle.textContent=minimized?'Maximize':'Minimize';return}
