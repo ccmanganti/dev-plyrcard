@@ -1754,10 +1754,12 @@ class LockerRoomDataService
             'exists' => (bool) $website,
             'is_published' => (bool) ($website?->is_published ?? false),
             'url' => $url,
-            // Always use the player's real PLYRCARD URL. The public pending-site
-            // middleware intentionally shows the "We are preparing your PLYRCARD"
-            // experience when the active website is not published yet.
-            'owner_visit_url' => $url,
+            // Always enter through the owner bridge. It supports active websites
+            // before publication and then forwards to the player's real website,
+            // where the website middleware handles the pending/preparing state.
+            'owner_visit_url' => $website
+                ? route('locker-room.website.visit', $website)
+                : $url,
             'domain' => $website?->domain,
             'slug' => $website?->slug,
         ];
