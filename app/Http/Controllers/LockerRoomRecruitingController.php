@@ -13,6 +13,7 @@ use App\Services\PlyrPointCatalogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -129,14 +130,35 @@ class LockerRoomRecruitingController extends Controller
     public function conversations(Request $request, CoachDatabaseService $recruiting): JsonResponse
     {
         $user = $this->premiumUser($request);
-        $result = $recruiting->getConversationsForUser($user, [
-            'limit' => min(max((int) $request->query('limit', 50), 1), 100),
-            'search' => trim((string) $request->query('q', '')),
-            'status' => trim((string) $request->query('status', 'all')) ?: 'all',
-            'sortBy' => 'last_message_date',
-            'sort' => 'desc',
-            'fetch_all' => false,
-        ]);
+        $search = trim((string) $request->query('q', ''));
+        $refresh = $request->boolean('refresh');
+        $cacheKey = 'locker-room:inbox:' . $user->getKey() . ':' . md5(strtolower($search));
+
+        $loader = function () use ($user, $recruiting, $search): array {
+            return $recruiting->getConversationsForUser($user, [
+                'limit' => 100,
+                'search' => $search,
+                'status' => 'all',
+                'sortBy' => 'last_message_date',
+                'sort' => 'desc',
+                'fetch_all' => false,
+            ]);
+        };
+
+        if ($refresh) {
+            $result = $loader();
+            if ($result['success'] ?? false) {
+                Cache::put($cacheKey, $result, now()->addMinutes(5));
+            }
+        } else {
+            $result = Cache::get($cacheKey);
+            if (! is_array($result)) {
+                $result = $loader();
+                if ($result['success'] ?? false) {
+                    Cache::put($cacheKey, $result, now()->addMinutes(5));
+                }
+            }
+        }
 
         return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
     }
@@ -153,6 +175,18 @@ class LockerRoomRecruitingController extends Controller
             $request->filled('last_message_id') ? trim((string) $request->query('last_message_id')) : null,
             min(max((int) $request->query('limit', 50), 1), 100),
         );
+
+        if ($result['success'] ?? false) {
+            $result['messages'] = collect((array) ($result['messages'] ?? []))
+                ->filter(fn ($row): bool => is_array($row))
+                ->map(fn (array $row): array => [
+                    ...$row,
+                    'rendered_html' => $this->sanitizeInboxEmailHtml($row),
+                    'display_text' => $this->inboxMessageText($row),
+                ])
+                ->values()
+                ->all();
+        }
 
         return response()->json($result, ($result['success'] ?? false) ? 200 : 422);
     }
@@ -204,7 +238,9 @@ class LockerRoomRecruitingController extends Controller
         $user = $this->premiumUser($request);
 
         $data = $request->validate([
-            'target_mode' => ['required', Rule::in(['coach', 'coaches', 'list', 'conversation'])],
+            'target_mode' => ['required', Rule::in(['school', 'coach', 'coaches', 'list', 'conversation'])],
+            'school_id' => ['nullable', 'string', 'max:120'],
+            'head_coach_only' => ['nullable', 'boolean'],
             'coach_id' => ['nullable', 'string', 'max:120'],
             'coach_ids' => ['nullable', 'array', 'max:100'],
             'coach_ids.*' => ['string', 'max:120'],
@@ -480,6 +516,43 @@ class LockerRoomRecruitingController extends Controller
     ): Collection {
         $mode = (string) $data['target_mode'];
 
+        if ($mode === 'school') {
+            $schoolId = trim((string) ($data['school_id'] ?? ''));
+            if ($schoolId === '') {
+                return collect();
+            }
+
+            $school = $database->schoolRow($user, $schoolId);
+            if (! is_array($school)) {
+                return collect();
+            }
+
+            $coaches = collect((array) ($school['coaches'] ?? []))
+                ->filter(fn ($coach): bool => is_array($coach) && filter_var($coach['email'] ?? '', FILTER_VALIDATE_EMAIL))
+                ->map(function (array $coach) use ($school): array {
+                    return [
+                        ...$coach,
+                        'school' => $school['name'] ?? $coach['school'] ?? '',
+                        'school_name' => $school['name'] ?? $coach['school_name'] ?? '',
+                        'business_id' => $school['business_id'] ?? $coach['business_id'] ?? '',
+                    ];
+                })
+                ->values();
+
+            if ($requestHeadOnly = (bool) ($data['head_coach_only'] ?? true)) {
+                $head = $coaches->first(function (array $coach): bool {
+                    $title = strtolower(trim((string) ($coach['title'] ?? '')));
+                    return str_contains($title, 'head')
+                        && ! str_contains($title, 'assistant')
+                        && ! str_contains($title, 'associate');
+                });
+
+                return collect([$head ?: $coaches->first()])->filter();
+            }
+
+            return $coaches;
+        }
+
         if ($mode === 'conversation') {
             $conversationId = trim((string) ($data['conversation_id'] ?? ''));
             if ($conversationId === '') {
@@ -618,6 +691,75 @@ class LockerRoomRecruitingController extends Controller
         }
 
         return ctype_digit($template) ? (int) $template : null;
+    }
+
+    protected function sanitizeInboxEmailHtml(array $message): string
+    {
+        $raw = collect([
+            $message['rendered_html'] ?? null,
+            $message['html_body'] ?? null,
+            $message['htmlBody'] ?? null,
+            $message['body'] ?? null,
+            $message['content'] ?? null,
+            $message['text_body'] ?? null,
+            $message['textBody'] ?? null,
+            $message['text'] ?? null,
+        ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+
+        $html = trim((string) ($raw ?? ''));
+        if ($html === '') {
+            return '<p><em>This email does not contain a displayable message body.</em></p>';
+        }
+
+        if (! str_contains($html, '<') && preg_match('/&lt;\/?[a-z][^&]*&gt;/i', $html)) {
+            $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (str_contains($decoded, '<')) {
+                $html = $decoded;
+            }
+        }
+
+        if (! preg_match('/<\s*(?:p|div|br|strong|b|em|i|u|ul|ol|li|a|blockquote|span|h[1-6]|table|tr|td|th|img)\b/i', $html)) {
+            return '<p>' . nl2br(e(html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8'))) . '</p>';
+        }
+
+        if (preg_match('/<body\b[^>]*>(.*?)<\/body>/is', $html, $bodyMatch)) {
+            $html = (string) ($bodyMatch[1] ?? $html);
+        }
+
+        $html = preg_replace('/<\s*style\b[^>]*>.*?<\s*\/\s*style\s*>/is', '', $html) ?? $html;
+        $html = preg_replace('/<\s*script\b[^>]*>.*?<\s*\/\s*script\s*>/is', '', $html) ?? $html;
+        $html = preg_replace('/<\s*script\b[^>]*\/?>/is', '', $html) ?? $html;
+        $html = preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html) ?? $html;
+        $html = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $html) ?? $html;
+        $html = preg_replace('/<\/?(?:html|head|body|meta|title|link)\b[^>]*>/i', '', $html) ?? $html;
+        $html = strip_tags($html, '<p><div><br><strong><b><em><i><u><ul><ol><li><a><blockquote><span><h1><h2><h3><h4><h5><h6><table><tbody><thead><tr><td><th><img>');
+
+        if (trim(strip_tags($html)) === '' && ! str_contains(strtolower($html), '<img')) {
+            $text = $this->inboxMessageText($message);
+            return $text !== ''
+                ? '<p>' . nl2br(e($text)) . '</p>'
+                : '<p><em>This email does not contain a displayable message body.</em></p>';
+        }
+
+        return trim($html);
+    }
+
+    protected function inboxMessageText(array $message): string
+    {
+        $raw = collect([
+            $message['text_body'] ?? null,
+            $message['textBody'] ?? null,
+            $message['text'] ?? null,
+            $message['html_body'] ?? null,
+            $message['body'] ?? null,
+        ])->first(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '');
+
+        $text = html_entity_decode((string) ($raw ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = strip_tags($text);
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+
+        return trim($text);
     }
 
     protected function sanitizeEmailHtml(string $html): string
