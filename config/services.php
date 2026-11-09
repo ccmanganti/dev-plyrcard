@@ -64,6 +64,15 @@ return [
         'company_id' => env('GHL_COMPANY_ID'),
     ],
 
+    'plyomat' => [
+        // Centralized from the Plyomat developer integration. Trainer records
+        // only store the encrypted API key; these values are not user-editable.
+        'base_url' => env('PLYOMAT_API_BASE_URL', 'https://app.plyomat.com'),
+        'athlete_read_path' => env('PLYOMAT_ATHLETE_READ_PATH', '/api/athletes/{athlete_id}'),
+        'auth_header' => env('PLYOMAT_AUTH_HEADER', 'Authorization'),
+        'auth_prefix' => env('PLYOMAT_AUTH_PREFIX', 'Bearer'),
+    ],
+
     'tracking' => [
         'base_url' => env('TRACKING_BASE_URL', env('APP_URL', 'https://plyrcard.com')),
     ],
