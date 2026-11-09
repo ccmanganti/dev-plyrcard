@@ -42,8 +42,169 @@ class PlyrLabDataService
             ],
             'booking' => $booking ? $this->bookingPayload($booking) : null,
             'trainers' => $trainers,
-            'stats' => $booking?->plyomat_stats,
+            'stats' => $this->statsPayload($player, $booking),
         ];
+    }
+
+    /**
+     * Return exact Plyomat measurements plus PLYRCARD-style 40-99 ratings.
+     *
+     * Ratings are cohort-relative (same sport/gender when available), while the
+     * measured values remain untouched. This mirrors the athlete reference UI:
+     * RATING is normalized; MEASURED is the exact Plyomat result.
+     */
+    protected function statsPayload(User $player, ?PlyrLabBooking $booking): ?array
+    {
+        if (! $booking || ! is_array($booking->plyomat_stats)) {
+            return $booking?->plyomat_stats;
+        }
+
+        $stats = $booking->plyomat_stats;
+        $sport = strtolower(trim((string) $player->sport));
+        $gender = $this->normalizedGender($player->gender);
+
+        $cohort = PlyrLabBooking::query()
+            ->with('player')
+            ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
+            ->whereNotNull('plyomat_stats')
+            ->latest('id')
+            ->get()
+            ->unique('player_user_id')
+            ->filter(function (PlyrLabBooking $peer) use ($sport, $gender): bool {
+                if (! $peer->player || ! is_array($peer->plyomat_stats)) {
+                    return false;
+                }
+
+                $peerSport = strtolower(trim((string) $peer->player->sport));
+                $peerGender = $this->normalizedGender($peer->player->gender);
+
+                $sportMatches = $sport === '' || $peerSport === '' || $peerSport === $sport;
+                $genderMatches = $gender === '' || $peerGender === '' || $peerGender === $gender;
+
+                return $sportMatches && $genderMatches;
+            })
+            ->values();
+
+        $numberAt = static function (array $payload, string $path): ?float {
+            $value = data_get($payload, $path);
+
+            return is_numeric($value) ? (float) $value : null;
+        };
+
+        $metric = [
+            'jump' => ['path' => 'jump.vertical_jump_cm', 'low' => false],
+            'rsi' => ['path' => 'jump.rsi', 'low' => false],
+            'bounce' => ['path' => 'jump.bounce_height_cm', 'low' => false],
+            'quick' => ['path' => 'jump.ground_contact_ms', 'low' => true],
+            'balance' => ['path' => 'jump.balance_gap_percent', 'low' => true],
+            't10' => ['path' => 'speed.sprint_10m_seconds', 'low' => true],
+            't20' => ['path' => 'speed.sprint_20m_seconds', 'low' => true],
+            't30' => ['path' => 'speed.sprint_30m_seconds', 'low' => true],
+            'vmax' => ['path' => 'speed.top_speed_kph', 'low' => false],
+        ];
+
+        $percentiles = [];
+        foreach ($metric as $key => $definition) {
+            $current = $numberAt($stats, $definition['path']);
+            if ($current === null) {
+                $percentiles[$key] = null;
+                continue;
+            }
+
+            $pool = $cohort
+                ->map(fn (PlyrLabBooking $peer): ?float => $numberAt($peer->plyomat_stats ?? [], $definition['path']))
+                ->filter(fn (?float $value): bool => $value !== null)
+                ->values();
+
+            if ($pool->count() < 2) {
+                // Same neutral starting percentile used by the supplied PLYRLab HTML.
+                $percentiles[$key] = 50.0;
+                continue;
+            }
+
+            $better = 0.0;
+            $ties = 0;
+            foreach ($pool as $candidate) {
+                if (abs($candidate - $current) < 0.000001) {
+                    $ties++;
+                    continue;
+                }
+
+                if ($definition['low'] ? $candidate > $current : $candidate < $current) {
+                    $better++;
+                }
+            }
+
+            // One tie is the athlete themself; remaining ties count half.
+            $otherTies = max(0, $ties - 1);
+            $percentile = ($better + ($otherTies / 2)) / max(1, $pool->count() - 1) * 100;
+            $percentiles[$key] = round(max(0, min(100, $percentile)), 1);
+        }
+
+        $rating = static fn (?float $percentile): ?int => $percentile === null
+            ? null
+            : (int) max(40, min(99, round(40 + ($percentile * 0.59))));
+
+        $weightedPercentile = static function (array $weights, array $values): ?float {
+            $total = 0.0;
+            $weight = 0.0;
+
+            foreach ($weights as $key => $w) {
+                if (($values[$key] ?? null) === null) {
+                    continue;
+                }
+
+                $total += $values[$key] * $w;
+                $weight += $w;
+            }
+
+            return $weight > 0 ? $total / $weight : null;
+        };
+
+        $overallPercentile = $weightedPercentile([
+            'rsi' => 0.35,
+            'jump' => 0.30,
+            'bounce' => 0.15,
+            'quick' => 0.10,
+            'balance' => 0.10,
+        ], $percentiles);
+
+        $paceValues = array_values(array_filter([
+            $percentiles['t10'] ?? null,
+            $percentiles['t20'] ?? null,
+            $percentiles['t30'] ?? null,
+            $percentiles['vmax'] ?? null,
+        ], static fn ($value): bool => $value !== null));
+
+        $pacePercentile = $paceValues === []
+            ? null
+            : array_sum($paceValues) / count($paceValues);
+
+        $stats['ratings'] = [
+            'overall' => $rating($overallPercentile),
+            'pace' => $rating($pacePercentile),
+            'jump' => $rating($percentiles['jump'] ?? null),
+            'bounce' => $rating($percentiles['bounce'] ?? null),
+            'rsi' => $rating($percentiles['rsi'] ?? null),
+            'quick' => $rating($percentiles['quick'] ?? null),
+            'balance' => $rating($percentiles['balance'] ?? null),
+            'percentiles' => $percentiles,
+            'cohort_size' => $cohort->count(),
+            'basis' => 'same sport and gender PLYRLab cohort',
+        ];
+
+        return $stats;
+    }
+
+    protected function normalizedGender(mixed $gender): string
+    {
+        $gender = strtolower(trim((string) $gender));
+
+        return match ($gender) {
+            'm', 'male', 'man', 'men', 'boy', 'boys' => 'men',
+            'f', 'female', 'woman', 'women', 'girl', 'girls' => 'women',
+            default => $gender,
+        };
     }
 
     public function syncStats(PlyrLabBooking $booking): PlyrLabBooking
