@@ -69,8 +69,9 @@ return [
         // only store the encrypted API key; these values are not user-editable.
         'base_url' => env('PLYOMAT_API_BASE_URL', 'https://api.plyomat.com'),
         'athlete_read_path' => env('PLYOMAT_ATHLETE_READ_PATH', '/v1/athletes'),
+        'athlete_create_path' => env('PLYOMAT_ATHLETE_CREATE_PATH', '/v1/athletes'),
         'auth_header' => env('PLYOMAT_AUTH_HEADER', 'Authorization'),
-        'auth_prefix' => env('PLYOMAT_AUTH_PREFIX', 'Api-Key'),
+        'auth_prefix' => env('PLYOMAT_AUTH_PREFIX', 'Bearer'),
     ],
 
     'tracking' => [
