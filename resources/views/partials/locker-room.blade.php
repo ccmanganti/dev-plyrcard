@@ -41,6 +41,7 @@
     $lrPointsHistoryUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points.history') ? route('locker-room.points.history') : null;
     $lrPlyrLabUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab') ? route('locker-room.plyr-lab') : null;
     $lrPlyrLabBookUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab.book') ? route('locker-room.plyr-lab.book') : null;
+    $lrPlyrLabConnectUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab.connect') ? route('locker-room.plyr-lab.connect') : null;
     $lrPlyrLabRefreshUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab.refresh') ? route('locker-room.plyr-lab.refresh') : null;
     $lrCreditUseUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('support.credits.store') ? route('support.credits.store') : null;
     $lrPointPackStartBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/start') : null;
@@ -719,6 +720,7 @@
      data-points-history-url="{{ $lrPointsHistoryUrl }}"
      data-plyr-lab-url="{{ $lrPlyrLabUrl }}"
      data-plyr-lab-book-url="{{ $lrPlyrLabBookUrl }}"
+     data-plyr-lab-connect-url="{{ $lrPlyrLabConnectUrl }}"
      data-plyr-lab-refresh-url="{{ $lrPlyrLabRefreshUrl }}"
      data-credit-use-url="{{ $lrCreditUseUrl }}"
      data-point-pack-start-base-url="{{ $lrPointPackStartBaseUrl }}"
