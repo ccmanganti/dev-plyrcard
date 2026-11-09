@@ -114,6 +114,10 @@ class PlyomatService
             '/api/v1/athlete/{athlete_id}',
             '/api/athletes/{athlete_id}',
             '/api/athlete/{athlete_id}',
+            '/api/v1/athletes?athlete_id={athlete_id}',
+            '/api/v1/athletes?id={athlete_id}',
+            '/api/athletes?athlete_id={athlete_id}',
+            '/api/athletes?id={athlete_id}',
         ])));
 
         $candidates = [];
@@ -210,8 +214,12 @@ class PlyomatService
             data_get($payload, 'data'),
             data_get($payload, 'athlete'),
             data_get($payload, 'result'),
+            data_get($payload, 'athletes'),
+            data_get($payload, 'results'),
             data_get($payload, 'data.athlete'),
+            data_get($payload, 'data.athletes'),
             data_get($payload, 'result.athlete'),
+            data_get($payload, 'result.athletes'),
         ];
 
         foreach ($candidates as $candidate) {
