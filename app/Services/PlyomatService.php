@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
-use App\Models\User;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -16,46 +15,6 @@ class PlyomatService
     public function isConfigured(PlyrLabTrainer $trainer): bool
     {
         return $trainer->hasPlyomatConnection();
-    }
-
-    public function createAthlete(PlyrLabBooking $booking): array
-    {
-        $booking->loadMissing(['player.team', 'player.club', 'trainer']);
-        $trainer = $booking->trainer;
-        $player = $booking->player;
-
-        if (! $trainer || ! $player || ! $this->isConfigured($trainer)) {
-            throw new RuntimeException('Plyomat integration is not configured for this trainer.');
-        }
-
-        $payload = $this->playerPayload($player);
-        $response = $this->request($trainer)
-            ->post($this->endpoint($trainer, (string) $trainer->plyomat_create_athlete_path), $payload);
-
-        if (! $response->successful()) {
-            if ($response->status() === 403) {
-                throw new RuntimeException('Plyomat denied Athlete Write access. Confirm this trainer API key includes the Athlete Write scope.');
-            }
-
-            throw new RuntimeException('Plyomat athlete write failed: HTTP ' . $response->status() . '.');
-        }
-
-        $json = $response->json();
-        $athleteId = data_get($json, 'id')
-            ?? data_get($json, 'athlete_id')
-            ?? data_get($json, 'athleteId')
-            ?? data_get($json, 'data.id')
-            ?? data_get($json, 'data.athlete_id')
-            ?? data_get($json, 'data.athleteId');
-
-        if (blank($athleteId)) {
-            throw new RuntimeException('Plyomat athlete creation succeeded but no athlete ID was returned.');
-        }
-
-        return [
-            'athlete_id' => (string) $athleteId,
-            'response' => is_array($json) ? $json : [],
-        ];
     }
 
     public function readAthlete(PlyrLabBooking $booking): array
@@ -81,11 +40,19 @@ class PlyomatService
         $response = $this->request($trainer)->get($this->endpoint($trainer, $path));
 
         if (! $response->successful()) {
-            if ($response->status() === 403) {
-                throw new RuntimeException('Plyomat denied Athlete Read access. Confirm this trainer API key includes the Athlete Read scope.');
+            if ($response->status() === 401) {
+                throw new RuntimeException('The trainer\'s Plyomat API credentials were rejected.');
             }
 
-            throw new RuntimeException('Plyomat athlete read failed: HTTP ' . $response->status() . '.');
+            if ($response->status() === 403) {
+                throw new RuntimeException('Plyomat denied Athlete Read access for this trainer.');
+            }
+
+            if ($response->status() === 404) {
+                throw new RuntimeException('No athlete with that Plyomat ID was found in this trainer\'s account.');
+            }
+
+            throw new RuntimeException('Plyomat athlete lookup failed: HTTP ' . $response->status() . '.');
         }
 
         $json = $response->json();
@@ -96,28 +63,6 @@ class PlyomatService
     public function fetchStats(PlyrLabBooking $booking): array
     {
         return $this->normalizeStats($this->readAthlete($booking));
-    }
-
-    public function playerPayload(User $player): array
-    {
-        $position = is_array($player->position)
-            ? array_values(array_filter(array_map('strval', $player->position)))
-            : array_values(array_filter([trim((string) $player->position)]));
-
-        return [
-            'external_id' => 'plyrcard:' . $player->getKey(),
-            'first_name' => (string) $player->first_name,
-            'last_name' => (string) $player->last_name,
-            'name' => trim((string) $player->first_name . ' ' . (string) $player->last_name),
-            'email' => (string) ($player->personal_email ?: $player->email),
-            'date_of_birth' => $player->birth ? (string) $player->birth : null,
-            'gender' => $player->gender ?: null,
-            'sport' => $player->sport ?: null,
-            'team' => $player->team?->name ?: $player->team_name ?: $player->club?->name,
-            'position' => $position,
-            'height' => $player->height ?: null,
-            'weight' => $player->weight ?: null,
-        ];
     }
 
     public function normalizeStats(array $payload): array
