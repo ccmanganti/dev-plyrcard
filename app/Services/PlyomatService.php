@@ -55,6 +55,15 @@ class PlyomatService
                 }
 
                 if (! $response->successful()) {
+                    $errorJson = $response->json();
+
+                    if (is_array($errorJson)) {
+                        $attempts[array_key_last($attempts)]['error_keys'] = array_slice(array_keys($errorJson), 0, 8);
+                        $attempts[array_key_last($attempts)]['error_message'] = data_get($errorJson, 'message')
+                            ?? data_get($errorJson, 'detail')
+                            ?? data_get($errorJson, 'error');
+                    }
+
                     continue;
                 }
 
@@ -106,11 +115,13 @@ class PlyomatService
                 $query = parse_url((string) ($attempt['url'] ?? ''), PHP_URL_QUERY);
                 $target = $host . $path . ($query ? '?' . $query : '');
                 $type = trim((string) ($attempt['content_type'] ?? '')) ?: 'unknown content type';
-                $keys = $attempt['json_keys'] ?? [];
+                $keys = $attempt['json_keys'] ?? ($attempt['error_keys'] ?? []);
+                $message = trim((string) ($attempt['error_message'] ?? ''));
 
                 return $target . ' → HTTP ' . ($attempt['status'] ?? '?')
                     . ' · ' . $type
-                    . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '');
+                    . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '')
+                    . ($message !== '' ? ' · ' . Str::limit($message, 120) : '');
             })
             ->implode(' | ');
 
@@ -134,14 +145,30 @@ class PlyomatService
         $paths = array_values(array_unique(array_filter([
             trim((string) $trainer->plyomat_stats_path),
             trim((string) config('services.plyomat.athlete_read_path')),
+            '/v1/athletes/{athlete_id}',
+            '/v1/athlete/{athlete_id}',
+            '/athletes/{athlete_id}',
+            '/athlete/{athlete_id}',
             '/api/v1/athletes/{athlete_id}',
             '/api/v1/athlete/{athlete_id}',
             '/api/athletes/{athlete_id}',
             '/api/athlete/{athlete_id}',
+            '/v1/athletes?athlete_id={athlete_id}',
+            '/v1/athletes?id={athlete_id}',
+            '/v1/athlete?athlete_id={athlete_id}',
+            '/v1/athlete?id={athlete_id}',
+            '/athletes?athlete_id={athlete_id}',
+            '/athletes?id={athlete_id}',
             '/api/v1/athletes?athlete_id={athlete_id}',
             '/api/v1/athletes?id={athlete_id}',
             '/api/athletes?athlete_id={athlete_id}',
             '/api/athletes?id={athlete_id}',
+            // Some read APIs expose a collection only. We can safely fetch the
+            // accessible athlete list and select the exact ID locally.
+            '/v1/athletes',
+            '/athletes',
+            '/api/v1/athletes',
+            '/api/athletes',
         ])));
 
         $candidates = [];
