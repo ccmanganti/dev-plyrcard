@@ -36,12 +36,14 @@ class PlyomatService
                 $response = $this->request($trainer, $auth)->get($candidate['url']);
                 $contentType = strtolower((string) $response->header('Content-Type'));
 
-                $attempts[] = [
+                $attempt = [
                     'url' => $candidate['url'],
                     'status' => $response->status(),
                     'content_type' => $contentType,
                     'auth' => $auth['label'],
                 ];
+
+                $attempts[] = $attempt;
 
                 if (in_array($response->status(), [401, 403], true)) {
                     $lastAuthStatus = $response->status();
@@ -57,6 +59,10 @@ class PlyomatService
                 }
 
                 $json = $response->json();
+
+                if (is_array($json)) {
+                    $attempts[array_key_last($attempts)]['json_keys'] = array_slice(array_keys($json), 0, 8);
+                }
 
                 if (! is_array($json)) {
                     // A 200 HTML response means we hit the Plyomat web app/SPA,
@@ -92,7 +98,25 @@ class PlyomatService
             throw new RuntimeException('Plyomat denied Athlete Read access. Check the API key scope for this trainer.');
         }
 
-        throw new RuntimeException('PLYRCard could not find a valid Plyomat Athlete Read response for that ID. The endpoint returned a web/empty response instead of athlete data.');
+        $summary = collect($attempts)
+            ->take(8)
+            ->map(function (array $attempt): string {
+                $host = parse_url((string) ($attempt['url'] ?? ''), PHP_URL_HOST) ?: 'unknown-host';
+                $path = parse_url((string) ($attempt['url'] ?? ''), PHP_URL_PATH) ?: '/';
+                $query = parse_url((string) ($attempt['url'] ?? ''), PHP_URL_QUERY);
+                $target = $host . $path . ($query ? '?' . $query : '');
+                $type = trim((string) ($attempt['content_type'] ?? '')) ?: 'unknown content type';
+                $keys = $attempt['json_keys'] ?? [];
+
+                return $target . ' → HTTP ' . ($attempt['status'] ?? '?')
+                    . ' · ' . $type
+                    . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '');
+            })
+            ->implode(' | ');
+
+        throw new RuntimeException(
+            'Plyomat did not return an athlete record for that valid ID. API diagnostics: ' . $summary
+        );
     }
 
     protected function endpointCandidates(PlyrLabTrainer $trainer, string $athleteId): array
