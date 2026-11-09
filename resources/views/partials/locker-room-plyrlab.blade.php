@@ -487,9 +487,11 @@
     }
 
     async function submitBooking(form){
-        if(busy)return;busy=true;render();
+        if(busy)return;
+        var fd=new FormData(form),payload={trainer_id:Number(fd.get('trainer_id')),scheduled_for:fd.get('scheduled_for'),notes:String(fd.get('notes')||'')};
+        busy=true;render();
         try{
-            var fd=new FormData(form),json=await api(drawer.dataset.plyrLabBookUrl,{method:'POST',body:{trainer_id:Number(fd.get('trainer_id')),scheduled_for:fd.get('scheduled_for'),notes:String(fd.get('notes')||'')}});
+            var json=await api(drawer.dataset.plyrLabBookUrl,{method:'POST',body:payload});
             lab=json.data||lab;loaded=true;activeTab='home';toast(json.message||'Trainer booked.');render();
         }catch(e){if(e.payload&&e.payload.data){lab=e.payload.data;loaded=true}toast(e.message,true);render()}
         finally{busy=false;render()}
