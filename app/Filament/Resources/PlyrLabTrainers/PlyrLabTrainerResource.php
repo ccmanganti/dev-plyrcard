@@ -21,6 +21,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use UnitEnum;
 
 class PlyrLabTrainerResource extends Resource
 {
@@ -30,16 +31,26 @@ class PlyrLabTrainerResource extends Resource
     protected static ?string $navigationLabel = 'PLYRLab Trainers';
     protected static ?string $modelLabel = 'PLYRLab Trainer';
     protected static ?string $pluralModelLabel = 'PLYRLab Trainers';
-    protected static ?int $navigationSort = 35;
+    protected static string | UnitEnum | null $navigationGroup = 'Recruiting Center';
+    protected static ?int $navigationSort = 12;
+
+    protected static function canManagePlyrLab(): bool
+    {
+        $user = auth()->user();
+
+        return $user
+            && method_exists($user, 'isSuperadminOrImpersonating')
+            && $user->isSuperadminOrImpersonating();
+    }
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()?->isSuperadminOrImpersonating() ?? false;
+        return static::canManagePlyrLab();
     }
 
     public static function canViewAny(): bool
     {
-        return auth()->user()?->isSuperadminOrImpersonating() ?? false;
+        return static::canManagePlyrLab();
     }
 
     public static function canCreate(): bool
