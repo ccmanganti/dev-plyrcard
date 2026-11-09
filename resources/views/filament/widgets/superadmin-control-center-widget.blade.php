@@ -17,6 +17,7 @@
                 athletes: @js(url('/admin/athletes')),
                 followups: @js(url('/admin/follow-ups')),
                 subscriptions: @js(url('/admin/subscriptions')),
+                plyrlab: @js(url('/admin/plyrlab')),
                 amplify: @js(url('/admin/amplify-credits')),
             };
             if (routes[name]) {
@@ -539,6 +540,180 @@
                 @endforelse
             </div>
         </section>
+    </section>
+
+    @endif
+
+    @if($initialTab === 'plyrlab')
+    <section class="pc-view">
+        <div class="pc-view-head">
+            <div>
+                <span class="pc-kicker">PERFORMANCE OPERATIONS</span>
+                <h2>PLYRLab</h2>
+                <p>Manage PLYRLab trainers, Plyomat connections, and player bookings from the Recruiting Center.</p>
+            </div>
+            <div class="pc-view-actions">
+                @if($plyrlab_add_trainer_url)<a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-primary">+ Add trainer</a>@endif
+                @if($plyrlab_trainers_url)<a href="{{ $plyrlab_trainers_url }}" class="pc-btn">Manage trainers</a>@endif
+            </div>
+        </div>
+
+        <div class="pc-stat-grid pc-stat-grid-four">
+            <div class="pc-stat">
+                <span class="pc-stat-icon is-coral">⚗</span>
+                <small>PLYRLab trainers</small>
+                <strong>{{ number_format($plyrlab_stats['trainers'] ?? 0) }}</strong>
+                <span>{{ number_format($plyrlab_stats['bookable'] ?? 0) }} currently available for booking</span>
+            </div>
+            <div class="pc-stat">
+                <span class="pc-stat-icon is-green">✓</span>
+                <small>Plyomat connected</small>
+                <strong>{{ number_format($plyrlab_stats['connected'] ?? 0) }}</strong>
+                <span>trainers with API credentials and athlete provisioning configured</span>
+            </div>
+            <div class="pc-stat">
+                <span class="pc-stat-icon is-blue">◎</span>
+                <small>Active PLYRLab players</small>
+                <strong>{{ number_format($plyrlab_stats['active_athletes'] ?? 0) }}</strong>
+                <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }} total trainer bookings</span>
+            </div>
+            <div class="pc-stat">
+                <span class="pc-stat-icon is-amber">!</span>
+                <small>Needs attention</small>
+                <strong>{{ number_format($plyrlab_stats['needs_attention'] ?? 0) }}</strong>
+                <span>bookings waiting for Plyomat setup or retry</span>
+            </div>
+        </div>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div>
+                    <h3>Trainer management</h3>
+                    <p>Registered PLYRCARD trainers and the Plyomat account used when a player books them.</p>
+                </div>
+                <div class="pc-view-actions">
+                    @if($plyrlab_add_trainer_url)<a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-small is-primary">Add trainer</a>@endif
+                    @if($plyrlab_trainers_url)<a href="{{ $plyrlab_trainers_url }}" class="pc-btn is-small">Open full manager</a>@endif
+                </div>
+            </header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
+                    <thead>
+                        <tr>
+                            <th>Trainer</th>
+                            <th>Specialties</th>
+                            <th>Booking</th>
+                            <th>Plyomat</th>
+                            <th>Players</th>
+                            <th>Bookings</th>
+                            <th>Last booking</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($plyrlab_trainers as $trainer)
+                        <tr>
+                            <td>
+                                <div class="pc-person">
+                                    <span class="pc-avatar">{{ $trainer['initials'] }}</span>
+                                    <span>
+                                        <b>{{ $trainer['name'] }}</b>
+                                        <small>{{ $trainer['headline'] }}{{ $trainer['location'] ? ' · '.$trainer['location'] : '' }}</small>
+                                    </span>
+                                </div>
+                            </td>
+                            <td>
+                                @if(count($trainer['specialties']))
+                                    <div class="pc-chip-row">
+                                        @foreach(array_slice($trainer['specialties'], 0, 3) as $specialty)
+                                            <span class="pc-pill">{{ $specialty }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="pc-muted-value">Not set</span>
+                                @endif
+                            </td>
+                            <td>
+                                <span class="pc-state is-{{ $trainer['bookable'] ? 'active' : 'churned' }}">{{ $trainer['bookable'] ? 'Bookable' : 'Hidden' }}</span>
+                            </td>
+                            <td>
+                                <span class="pc-state is-{{ $trainer['plyomat_connected'] ? 'active' : 'past_due' }}">{{ $trainer['plyomat_connected'] ? 'Connected' : 'Setup needed' }}</span>
+                            </td>
+                            <td class="pc-mono">{{ number_format($trainer['active_athletes']) }}</td>
+                            <td class="pc-mono">{{ number_format($trainer['bookings']) }}</td>
+                            <td>{{ $trainer['last_booking'] }}</td>
+                            <td>
+                                @if($trainer['edit_url'])<a href="{{ $trainer['edit_url'] }}" class="pc-btn is-small">Edit trainer</a>@endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8">
+                                <div class="pc-empty">
+                                    No PLYRLab trainers have been configured yet.
+                                    @if($plyrlab_add_trainer_url)<br><br><a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-primary">Add the first trainer</a>@endif
+                                </div>
+                            </td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="pc-panel">
+            <header class="pc-panel-head">
+                <div>
+                    <h3>Recent PLYRLab bookings</h3>
+                    <p>Player-to-trainer bookings and their current Plyomat provisioning state.</p>
+                </div>
+            </header>
+            <div class="pc-table-wrap">
+                <table class="pc-table">
+                    <thead>
+                        <tr>
+                            <th>Player</th>
+                            <th>Trainer</th>
+                            <th>Session</th>
+                            <th>Status</th>
+                            <th>Plyomat profile</th>
+                            <th>Last sync</th>
+                            <th>Player</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @forelse($plyrlab_bookings as $booking)
+                        <tr>
+                            <td>
+                                <div class="pc-person">
+                                    <span class="pc-avatar">{{ $booking['initials'] }}</span>
+                                    <span><b>{{ $booking['player'] }}</b><small>{{ $booking['sport'] }}</small></span>
+                                </div>
+                            </td>
+                            <td>{{ $booking['trainer'] }}</td>
+                            <td>{{ $booking['scheduled_for'] }}</td>
+                            <td>
+                                <span class="pc-state is-{{ $booking['needs_attention'] ? 'past_due' : ($booking['status'] === 'active' || $booking['status'] === 'completed' ? 'active' : 'needs_push') }}">{{ $booking['status_label'] }}</span>
+                            </td>
+                            <td>
+                                <span class="pc-state is-{{ $booking['plyomat_ready'] ? 'active' : 'needs_push' }}">{{ $booking['plyomat_ready'] ? 'Created' : 'Pending' }}</span>
+                            </td>
+                            <td>{{ $booking['last_sync'] }}</td>
+                            <td>
+                                @if($booking['user_url'])<a href="{{ $booking['user_url'] }}" class="pc-btn is-small">View player</a>@endif
+                            </td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="7"><div class="pc-empty">No PLYRLab bookings have been made yet.</div></td></tr>
+                    @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <div class="pc-note">
+            Trainer API keys stay encrypted and are never shown here. Use <b>Manage trainers</b> to update each trainer's Plyomat account, API key, authentication format, athlete-creation endpoint, stats endpoint, booking availability, specialties, and public trainer information.
+        </div>
     </section>
 
     @endif
