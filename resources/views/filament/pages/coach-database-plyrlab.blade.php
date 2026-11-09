@@ -326,6 +326,97 @@
     }
 </style>
 
+
+<style id="plyrlab-matchday-night">
+    .plab-shell{
+        --plab-cond:"Arial Narrow","Roboto Condensed",Arial,sans-serif;
+        --plab-display:Impact,"Arial Black",sans-serif;
+        --plab-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    }
+    .plab-match-home{display:grid;gap:14px}
+    .plab-hero2{
+        position:relative;overflow:hidden;display:grid;grid-template-columns:210px minmax(0,1fr);
+        gap:22px;align-items:center;padding:18px 22px;border-radius:14px;
+        border:1px solid rgba(255,99,72,.35);
+        background:
+            linear-gradient(115deg,rgba(255,255,255,.06) 0 18%,transparent 18% 40%,rgba(255,255,255,.03) 40% 52%,transparent 52%),
+            radial-gradient(90% 120% at 100% 0%,rgba(255,99,72,.28),transparent 60%),
+            linear-gradient(135deg,#15171c 0%,#23262e 55%,#17191e 100%);
+    }
+    .plab-hero-main{display:grid;gap:6px;justify-items:start;min-width:0}
+    .plab-hero-k{font:800 14px var(--plab-cond);letter-spacing:.16em;text-transform:uppercase;color:#ff8a72}
+    .plab-hero-name{margin:0;font:400 clamp(28px,4vw,44px)/.98 var(--plab-display);text-transform:uppercase;overflow-wrap:anywhere}
+    .plab-hero-sub{font-size:14px;color:#cfcac3}
+    .plab-rating-note{margin-top:5px;font-size:11px;color:var(--plab-muted)}
+    .plab-home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .plab-match-block{background:var(--plab-panel);border:1px solid var(--plab-line);border-radius:10px;padding:14px 16px;display:grid;gap:7px;align-content:start}
+    .plab-block-k{font:800 13px var(--plab-cond);letter-spacing:.16em;text-transform:uppercase;color:var(--plab-coral)}
+    .plab-block-t{font:800 24px/1.05 var(--plab-cond);text-transform:uppercase;letter-spacing:.02em}
+    .plab-block-p{margin:0;font-size:13px;color:#cfcac3}
+    .plab-measured-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+    .plab-measured-chip{border:1px solid var(--plab-line);border-radius:14px;padding:3px 9px;font-size:12px;color:#cfcac3}
+    .plab-measured-chip b{font-family:var(--plab-mono);color:var(--plab-ice);font-weight:600}
+    .plab-ratings-legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--plab-muted);margin-bottom:12px}
+    .plab-ratings-legend i{display:inline-block;width:12px;height:12px;margin-right:6px;vertical-align:-1px}
+    .plab-ratings-legend .r{clip-path:polygon(50% 0,100% 18%,100% 76%,50% 100%,0 76%,0 18%);background:linear-gradient(160deg,#3ce08a,#1a8f52)}
+    .plab-ratings-legend .m{border:2px solid var(--plab-ice);border-radius:2px}
+    .plab-ratings-legend .b{border:2px dashed var(--plab-gold);border-radius:5px}
+    .plab-stat-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(285px,1fr));gap:12px}
+    .plab-stat-card{background:var(--plab-panel);border:1px solid var(--plab-line);border-radius:12px;padding:14px;display:grid;gap:10px;align-content:start}
+    .plab-stat-head{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center}
+    .plab-rating-shield{
+        width:58px;height:68px;display:grid;place-content:center;justify-items:center;line-height:1;gap:1px;
+        clip-path:polygon(50% 0,100% 18%,100% 76%,50% 100%,0 76%,0 18%);
+        font-family:var(--plab-cond);color:#07140d;background:linear-gradient(160deg,#3ce08a,#1a8f52)
+    }
+    .plab-rating-shield.is-mid{background:linear-gradient(160deg,#ffd25c,#b8871b);color:#1a1405}
+    .plab-rating-shield.is-low{background:linear-gradient(160deg,#ff7076,#a8262d);color:#1a0506}
+    .plab-rating-shield.is-empty{background:#3a3e47;color:#c9c4bd}
+    .plab-rating-shield b{font-size:28px}.plab-rating-shield small{font-size:8px;font-weight:800;letter-spacing:.12em}
+    .plab-stat-name{margin:0;font:800 26px/1 var(--plab-cond);text-transform:uppercase}
+    .plab-stat-sub{display:block;color:var(--plab-muted);font-size:12px;margin-top:3px}
+    .plab-measure{
+        background:#0b0d11;border:1px solid #22303a;border-radius:10px;padding:10px 12px;display:grid;gap:3px
+    }
+    .plab-measure small{font:600 10px var(--plab-mono);letter-spacing:.18em;text-transform:uppercase;color:var(--plab-ice)}
+    .plab-measure b{font:600 30px/1.05 var(--plab-mono)}
+    .plab-measure b em{font-style:normal;font-size:13px;color:var(--plab-muted);margin-left:5px}
+    .plab-benchmark{border-left:2px solid var(--plab-gold);padding-left:9px;font-size:12px;color:#d3cec7}
+    .plab-card-wrap{width:200px!important}
+    .plab-pcard{
+        --shape:polygon(0 7.5%,13% 5.5%,37% 3%,43% 0,50% 2.6%,57% 0,63% 3%,87% 5.5%,100% 7.5%,100% 85%,50% 100%,0 85%);
+        container-type:inline-size;position:relative;width:100%;aspect-ratio:300/422;
+        filter:drop-shadow(0 16px 26px rgba(0,0,0,.55))
+    }
+    .plab-pc-frame{position:absolute;inset:0;clip-path:var(--shape);background:linear-gradient(150deg,var(--f1) 0%,var(--f2) 28%,var(--f3) 52%,var(--f2) 74%,var(--f1) 100%);padding:3.4cqw}
+    .plab-pc-in{position:relative;width:100%;height:100%;clip-path:var(--shape);overflow:hidden;color:#fff;background:linear-gradient(180deg,#1d2f52 0%,#182a47 55%,#0f1d33 100%);box-shadow:inset 0 0 0 1.2cqw rgba(10,20,40,.55)}
+    .plab-pc-art{position:absolute;inset:0;background:radial-gradient(60% 45% at 62% 52%,rgba(255,150,70,.55),transparent 70%),radial-gradient(50% 40% at 18% 22%,rgba(140,120,255,.45),transparent 70%),repeating-linear-gradient(118deg,rgba(255,255,255,.07) 0 2cqw,transparent 2cqw 9cqw),linear-gradient(200deg,rgba(255,99,72,.35),transparent 55%);mix-blend-mode:screen}
+    .plab-pc-photo{position:absolute;right:-2%;top:8%;width:72%;height:52%;display:grid;place-items:end center;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 64%,transparent 100%),linear-gradient(90deg,transparent 0,#000 34%);-webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 64%,transparent 100%),linear-gradient(90deg,transparent 0,#000 34%);mask-composite:intersect}
+    .plab-pc-photo img{width:100%;height:100%;object-fit:cover;object-position:50% 15%}
+    .plab-pc-photo span{font-size:20cqw;opacity:.45;margin:auto}
+    .plab-pc-top{position:absolute;left:9%;top:13%;display:grid;justify-items:start;gap:1.2cqw;z-index:2}
+    .plab-pc-ovr{font:800 25cqw/.82 var(--plab-cond);letter-spacing:-.02em;text-shadow:0 .6cqw 2cqw rgba(0,0,0,.45);display:flex;align-items:flex-start;gap:1cqw}
+    .plab-pc-ovr small{font-size:5.4cqw;letter-spacing:.06em;margin-top:2.4cqw;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.85}
+    .plab-pc-pos{font:800 8cqw/1 var(--plab-cond);text-transform:uppercase}
+    .plab-pc-crest{margin-top:1.4cqw;width:15cqw;height:17.5cqw;display:grid;place-content:center;justify-items:center;clip-path:polygon(0 0,100% 0,100% 62%,50% 100%,0 62%);background:linear-gradient(160deg,var(--f1),var(--f3));color:#1a1405}
+    .plab-pc-crest b{font:800 5.8cqw/1 var(--plab-cond)}.plab-pc-crest span{font:700 2.7cqw var(--plab-cond);letter-spacing:.12em;text-transform:uppercase;padding-bottom:4cqw}
+    .plab-pc-name{position:absolute;left:6%;right:6%;top:50.5%;z-index:2;display:grid;justify-items:end;text-align:right;line-height:.86;text-shadow:0 .6cqw 2cqw rgba(0,0,0,.55)}
+    .plab-pc-first{font:400 7.4cqw var(--plab-display);text-transform:uppercase;margin-right:22%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    .plab-pc-last{font:400 15cqw var(--plab-display);text-transform:uppercase;letter-spacing:-.02em;white-space:nowrap;max-width:100%;overflow:hidden}
+    .plab-pc-stats{position:absolute;left:12%;right:12%;top:65.5%;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;gap:4cqw;border-top:.5cqw solid rgba(255,255,255,.35);padding-top:2.4cqw}
+    .plab-pc-col{display:grid;gap:.6cqw}.plab-pc-col div{display:flex;justify-content:space-between;align-items:baseline;gap:2cqw;font-family:var(--plab-cond);line-height:1}
+    .plab-pc-col b{font-size:8.2cqw}.plab-pc-col span{font-size:6.2cqw;opacity:.92}.plab-pc-div{width:.5cqw;background:rgba(255,255,255,.3)}
+    .plab-pc-brand{position:absolute;left:0;right:0;bottom:5.5%;text-align:center;font:400 4.2cqw var(--plab-display);letter-spacing:.22em;color:rgba(255,255,255,.9);z-index:2}
+    .plab-pc-brand:before{content:"";display:block;width:26%;height:.4cqw;margin:0 auto 2cqw;background:rgba(255,255,255,.35)}
+    @media(max-width:760px){
+        .plab-hero2{grid-template-columns:118px minmax(0,1fr);gap:14px;padding:14px}
+        .plab-card-wrap{width:118px!important}.plab-home-grid{grid-template-columns:1fr}
+        .plab-hero-name{font-size:24px}.plab-hero-sub{font-size:12px}
+        .plab-stat-cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -12px;padding:0 12px 8px;scrollbar-width:none}
+        .plab-stat-cards::-webkit-scrollbar{display:none}.plab-stat-card{flex:0 0 86%;scroll-snap-align:center}
+    }
+</style>
+
 <x-filament-panels::page>
 <div class="plyrlab-recruiting-page"
      data-plyrlab-page
@@ -436,22 +527,53 @@
         input.value=local;input.min=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);
     }
 
+
+    function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+    function legacyRating(v){
+        var n=num(v);if(n===null)return null;
+        return Math.round(40+clamp(n,0,100)*.59);
+    }
+    function ratings(){return stats().ratings||{}}
+    function rating(key){
+        var r=ratings(),v=num(r[key]);
+        if(v!==null)return Math.round(clamp(v,40,99));
+        if(key==='overall')return legacyRating(stats().overall_score);
+        if(key==='pace')return legacyRating(stats().pace_score);
+        return null;
+    }
+    function ratingClass(v){return v===null?'is-empty':v>=75?'':v>=60?'is-mid':'is-low'}
+    function teamInitials(v){
+        return String(v||'').replace(/[^A-Za-z0-9\s]/g,' ').trim().split(/\s+/).filter(Boolean).slice(0,3).map(function(x){return x.charAt(0).toUpperCase()}).join('')||'PL';
+    }
+    function tierFor(v){return v===null?'NEW':v>=85?'ELITE':v>=75?'GOLD':v>=65?'SILVER':'BRONZE'}
+    function frameFor(v){
+        if(v===null)return['#9aa0a8','#5b616b','#33373e'];
+        if(v>=75)return['#fff1c4','#e9b949','#a8771c'];
+        if(v>=65)return['#f4f6f8','#b9c0c8','#6f7782'];
+        return['#ffd9b8','#c98a55','#7c4a24'];
+    }
+    function metricRating(key){
+        var r=ratings(),v=num(r[key]);return v===null?null:Math.round(clamp(v,40,99));
+    }
+
+
     function cardHtml(){
-        var p=player(),j=jump(),s=speed(),ov=num(stats().overall_score),rows=[
-            ['VJ',val(j.vertical_jump_cm,1,'')],
-            ['RSI',val(j.rsi,2,'')],
-            ['GCT',val(j.ground_contact_ms,0,'')],
-            ['10M',val(s.sprint_10m_seconds,2,'')],
-            ['30M',val(s.sprint_30m_seconds,2,'')],
-            ['TOP',val(s.top_speed_kph,1,'')]
-        ];
-        return '<div class="plab-card-wrap"><div class="plab-card"><div class="plab-card-in">'+
-            '<div class="plab-card-ovr">'+(ov===null?'–':Math.round(ov))+'</div><div class="plab-card-pos">'+esc(positionText())+'</div>'+
-            '<div class="plab-card-photo">'+(p.photo_url?'<img src="'+esc(p.photo_url)+'" alt="">':'<span><i class="fa-solid fa-user"></i></span>')+'</div>'+
-            '<div class="plab-card-name">'+esc(p.last_name||p.name||'PLAYER')+'</div>'+
-            '<div class="plab-card-stats">'+rows.map(function(r){return'<div class="plab-card-stat"><b>'+esc(r[1])+'</b><span>'+esc(r[0])+'</span></div>'}).join('')+'</div>'+
-            '<div class="plab-card-brand">PLYRCARD</div>'+
-        '</div></div></div>';
+        var p=player(),r=ratings(),ov=rating('overall'),fr=frameFor(ov),name=String(p.name||'PLAYER').trim().split(/\s+/),
+            last=name.length>1?name.pop():name[0],first=name.length?name.join(' '):'',
+            rows=[['PAC',rating('pace')],['JMP',metricRating('jump')],['BNC',metricRating('bounce')],['RSI',metricRating('rsi')],['QCK',metricRating('quick')],['BAL',metricRating('balance')]];
+        return '<div class="plab-card-wrap"><div class="plab-pcard" style="--f1:'+fr[0]+';--f2:'+fr[1]+';--f3:'+fr[2]+'">'+
+            '<div class="plab-pc-frame"><div class="plab-pc-in">'+
+                '<div class="plab-pc-art"></div>'+
+                '<div class="plab-pc-photo">'+(p.photo_url?'<img src="'+esc(p.photo_url)+'" alt="">':'<span><i class="fa-solid fa-user"></i></span>')+'</div>'+
+                '<div class="plab-pc-top"><div class="plab-pc-ovr"><small>OVR</small>'+(ov===null?'–':ov)+'</div><div class="plab-pc-pos">'+esc(positionText())+'</div>'+
+                    '<div class="plab-pc-crest"><b>'+esc(teamInitials(p.team))+'</b><span>'+esc(tierFor(ov))+'</span></div></div>'+
+                '<div class="plab-pc-name">'+(first?'<span class="plab-pc-first">'+esc(first)+'</span>':'')+'<span class="plab-pc-last">'+esc(last||'PLAYER')+'</span></div>'+
+                '<div class="plab-pc-stats">'+
+                    '<div class="plab-pc-col">'+rows.slice(0,3).map(function(x){return'<div><b>'+(x[1]===null?'–':x[1])+'</b><span>'+x[0]+'</span></div>'}).join('')+'</div>'+
+                    '<i class="plab-pc-div"></i>'+
+                    '<div class="plab-pc-col">'+rows.slice(3).map(function(x){return'<div><b>'+(x[1]===null?'–':x[1])+'</b><span>'+x[0]+'</span></div>'}).join('')+'</div>'+
+                '</div><div class="plab-pc-brand">PLYRCARD</div>'+
+            '</div></div></div></div>';
     }
 
     function notice(){
@@ -461,50 +583,67 @@
         return '<div class="plab-notice"><i class="fa-solid fa-circle-info"></i><span>'+esc(text)+'</span></div>';
     }
 
-    function homeView(){
-        var p=player(),b=booking(),t=trainer(),j=jump(),s=speed();
-        return notice()+'<div class="plab-home"><div>'+cardHtml()+'</div><div class="plab-home-main">'+
-            '<div class="plab-welcome"><span>PLYRLab · Personal Performance</span><h3>'+esc(p.first_name||'Player')+'</h3><p>'+(hasStats()?'Your latest Plyomat testing results are connected below.':'Your Lab is unlocked. Testing results will appear here as soon as they are available from your trainer’s Plyomat account.')+'</p></div>'+
-            '<div class="plab-info-grid">'+
-                info('Sport',p.sport||'–')+info('Position',positionText())+info('Team',p.team||'–')+info('Height / Weight',[p.height,p.weight].filter(Boolean).join(' · ')||'–')+
-            '</div>'+
-            '<div class="plab-trainerbar"><small>Your PLYRLab Trainer</small><strong>'+esc(t?t.name:'Trainer pending')+'</strong><span>'+(b?esc(fmtDateTime(b.scheduled_for)):'')+(t&&t.headline?' · '+esc(t.headline):'')+'</span></div>'+
-            (hasStats()?'<div class="plab-info-grid">'+
-                info('Latest test',fmtDate(stats().latest_test_at||b&&b.last_synced_at))+info('Top speed',val(s.top_speed_kph,1,'km/h'))+
-                info('Vertical jump',val(j.vertical_jump_cm,1,'cm'))+info('RSI',val(j.rsi,2,''))+
-            '</div>':'')+
-        '</div></div>';
-    }
-    function info(label,value){return'<div class="plab-info"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></div>'}
 
-    function metric(label,value){return'<div class="plab-metric"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>'}
-    function statsView(){
-        var st=stats(),j=jump(),s=speed();
-        if(!hasStats())return notice()+'<div class="plab-empty"><b style="display:block;color:var(--plab-fg);font-size:13px;text-transform:uppercase;margin-bottom:5px">No Plyomat results yet</b>Your trainer is booked and PLYRLab is unlocked. Once a jump or speed assessment reaches your connected Plyomat profile, it will appear here.</div>';
-        var overall=num(st.overall_score),pace=num(st.pace_score),profile=st.jump_profile||'–';
-        return notice()+'<div class="plab-kpis">'+
-            kpi('Overall',overall===null?'–':Math.round(overall),'PLYRLab score')+
-            kpi('Jump profile',profile,'Latest classification')+
-            kpi('Pace',pace===null?'–':Math.round(pace),'Speed score')+
-            kpi('Last test',fmtDate(st.latest_test_at),'Plyomat')+
-        '</div><div class="plab-metrics-grid">'+
-            '<div class="plab-box"><h3>Jump</h3>'+
-                metric('Vertical jump',val(j.vertical_jump_cm,1,'cm'))+
-                metric('Reactive strength (RSI)',val(j.rsi,2,''))+
-                metric('Bounce height',val(j.bounce_height_cm,1,'cm'))+
-                metric('Ground contact',val(j.ground_contact_ms,0,'ms'))+
-                metric('Left leg',val(j.left_jump_cm,1,'cm'))+
-                metric('Right leg',val(j.right_jump_cm,1,'cm'))+
-                metric('Left / right gap',val(j.balance_gap_percent,1,'%'))+
-            '</div>'+
-            '<div class="plab-box"><h3>Speed</h3>'+
-                metric('10 m sprint',val(s.sprint_10m_seconds,2,'s'))+
-                metric('20 m sprint',val(s.sprint_20m_seconds,2,'s'))+
-                metric('30 m sprint',val(s.sprint_30m_seconds,2,'s'))+
-                metric('Top speed',val(s.top_speed_kph,1,'km/h'))+
+    function homeView(){
+        var p=player(),b=booking(),t=trainer(),j=jump(),s=speed(),ov=rating('overall'),cohort=num(ratings().cohort_size);
+        var measured=[
+            ['Vertical',val(j.vertical_jump_cm,1,'cm')],['RSI',val(j.rsi,2,'')],
+            ['10 m',val(s.sprint_10m_seconds,2,'s')],['Top speed',val(s.top_speed_kph,1,'km/h')]
+        ].filter(function(x){return x[1]!=='–'});
+        return notice()+'<div class="plab-match-home">'+
+            '<section class="plab-hero2"><div>'+cardHtml()+'</div><div class="plab-hero-main">'+
+                '<span class="plab-hero-k">'+(ov===null?'NEW PLAYER':tierFor(ov)+' · PLYRLAB RATING')+'</span>'+
+                '<h3 class="plab-hero-name">'+esc(p.name||'Player')+'</h3>'+
+                '<div class="plab-hero-sub">'+esc(p.team||'Independent')+' · '+esc(p.sport||'Athlete')+' · '+esc(positionText())+'</div>'+
+                '<div class="plab-rating-note">Card numbers are normalized ratings (40–99). Exact Plyomat measurements stay separate below.</div>'+
+            '</div></section>'+
+            '<div class="plab-home-grid">'+
+                '<div class="plab-match-block"><span class="plab-block-k">Latest measurements</span>'+
+                    (measured.length?'<div class="plab-measured-row">'+measured.map(function(x){return'<span class="plab-measured-chip">'+esc(x[0])+' <b>'+esc(x[1])+'</b></span>'}).join('')+'</div>':'<b class="plab-block-t">No tests yet</b><p class="plab-block-p">Your first Plyomat test will populate your measured values and ratings.</p>')+
+                '</div>'+
+                '<div class="plab-match-block"><span class="plab-block-k">Your PLYRLab trainer</span><b class="plab-block-t">'+esc(t?t.name:'Trainer pending')+'</b>'+
+                    '<p class="plab-block-p">'+(b?esc(fmtDateTime(b.scheduled_for)):'')+(t&&t.headline?' · '+esc(t.headline):'')+'</p>'+
+                    (cohort!==null?'<p class="plab-block-p">Current ratings use a '+Math.round(cohort)+'-athlete comparison cohort.</p>':'')+
+                '</div>'+
             '</div>'+
         '</div>';
     }
+
+    function info(label,value){return'<div class="plab-info"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></div>'}
+
+    function metric(label,value){return'<div class="plab-metric"><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>'}
+
+    function statCard(label,key,measured,unit,benchmark){
+        var r=metricRating(key),display=measured==='–'?'–':measured;
+        return '<article class="plab-stat-card"><div class="plab-stat-head">'+
+            '<span class="plab-rating-shield '+ratingClass(r)+'"><b>'+(r===null?'–':r)+'</b><small>RATING</small></span>'+
+            '<div><h3 class="plab-stat-name">'+esc(label)+'</h3><span class="plab-stat-sub">Normalized vs your PLYRLab cohort</span></div></div>'+
+            '<div class="plab-measure"><small>Measured · exact</small><b>'+esc(display)+(display==='–'||!unit?'':' <em>'+esc(unit)+'</em>')+'</b></div>'+
+            (benchmark?'<div class="plab-benchmark">Benchmark · '+esc(benchmark)+'</div>':'')+
+        '</article>';
+    }
+    function statsView(){
+        var st=stats(),j=jump(),s=speed(),sex=String(player().gender||'').toLowerCase()==='female'?'women':'men',bench=D1[sex],ov=rating('overall'),pace=rating('pace');
+        if(!hasStats())return notice()+'<div class="plab-empty"><b style="display:block;color:var(--plab-fg);font-size:13px;text-transform:uppercase;margin-bottom:5px">No Plyomat results yet</b>Your trainer is booked and PLYRLab is unlocked. Once a jump or speed assessment reaches your connected Plyomat profile, it will appear here.</div>';
+        var cards=[
+            statCard('Vertical Jump','jump',val(j.vertical_jump_cm,1,''),'cm',bench.svj+' cm D1 target'),
+            statCard('Reactive Strength','rsi',val(j.rsi,2,''),'','RSI is shown as an exact measured value'),
+            statCard('Bounce','bounce',val(j.bounce_height_cm,1,''),'cm','Higher is better'),
+            statCard('Quick Feet','quick',val(j.ground_contact_ms,0,''),'ms','Lower ground contact is better'),
+            statCard('Balance','balance',val(j.balance_gap_percent,1,''),'%','Lower left/right gap is better'),
+            statCard('10 m Sprint','t10',val(s.sprint_10m_seconds,2,''),'s',bench.t10.toFixed(2)+' s D1 target'),
+            statCard('30 m Sprint','t30',val(s.sprint_30m_seconds,2,''),'s',bench.t30.toFixed(2)+' s D1 target'),
+            statCard('Top Speed','vmax',val(s.top_speed_kph,1,''),'km/h',bench.vmax.toFixed(1)+' km/h D1 target')
+        ];
+        return notice()+'<div class="plab-ratings-legend"><span><i class="r"></i>Rating · normalized 40–99</span><span><i class="m"></i>Measured · exact Plyomat value</span><span><i class="b"></i>Benchmark · D1 reference</span></div>'+
+            '<div class="plab-kpis">'+
+                kpi('Overall',ov===null?'–':ov,'Normalized rating')+
+                kpi('Pace',pace===null?'–':pace,'Normalized rating')+
+                kpi('Jump profile',st.jump_profile||'–','Latest classification')+
+                kpi('Last test',fmtDate(st.latest_test_at),'Plyomat')+
+            '</div><div class="plab-stat-cards">'+cards.join('')+'</div>';
+    }
+
     function kpi(label,value,sub){return'<div class="plab-kpi"><small>'+esc(label)+'</small><b>'+esc(value)+'</b><em>'+esc(sub)+'</em></div>'}
 
     function bodyView(){
