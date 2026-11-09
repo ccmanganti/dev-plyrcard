@@ -260,7 +260,7 @@
     /* Home = same Matchday Night hierarchy as the HTML reference. */
     .plab-match-home{display:grid;gap:14px}
     .plab-hero2{
-        position:relative;overflow:hidden;display:grid;grid-template-columns:220px minmax(0,1fr);
+        position:relative;overflow:hidden;display:grid;grid-template-columns:250px minmax(0,1fr);
         gap:24px;align-items:center;padding:18px 22px;border-radius:14px;
         border:1px solid rgba(255,99,72,.35);
         background:
@@ -292,7 +292,7 @@
 
     /* Exact PLYRCARD structure from the supplied reference, with stronger
        handling for long real-world names/profile labels. */
-    .plab-card-wrap{width:200px!important;max-width:100%;margin:0 auto}
+    .plab-card-wrap{width:230px!important;max-width:100%;margin:0 auto}
     .plab-pcard{
         --shape:polygon(0 7.5%,13% 5.5%,37% 3%,43% 0,50% 2.6%,57% 0,63% 3%,87% 5.5%,100% 7.5%,100% 85%,50% 100%,0 85%);
         container-type:inline-size;position:relative;width:100%;aspect-ratio:300/422;
@@ -302,20 +302,20 @@
     .plab-pc-in{position:relative;width:100%;height:100%;clip-path:var(--shape);overflow:hidden;color:#fff;background:linear-gradient(180deg,#1d2f52 0%,#182a47 55%,#0f1d33 100%);box-shadow:inset 0 0 0 1.2cqw rgba(10,20,40,.55)}
     .plab-pc-art{position:absolute;inset:0;background:radial-gradient(60% 45% at 62% 52%,rgba(255,150,70,.55),transparent 70%),radial-gradient(50% 40% at 18% 22%,rgba(140,120,255,.45),transparent 70%),repeating-linear-gradient(118deg,rgba(255,255,255,.07) 0 2cqw,transparent 2cqw 9cqw),linear-gradient(200deg,rgba(255,99,72,.35),transparent 55%);mix-blend-mode:screen}
     .plab-pc-photo{position:absolute;right:-2%;top:8%;width:72%;height:52%;display:grid;place-items:end center;-webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 64%,transparent 100%),linear-gradient(90deg,transparent 0,#000 34%);-webkit-mask-composite:source-in;mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 64%,transparent 100%),linear-gradient(90deg,transparent 0,#000 34%);mask-composite:intersect}
-    .plab-pc-photo img{width:100%;height:100%;object-fit:cover;object-position:50% 15%}.plab-pc-photo span{font-size:20cqw;opacity:.45;margin:auto}
+    .plab-pc-photo img{width:100%;height:100%;object-fit:cover;object-position:50% 15%}.plab-pc-photo svg{width:78%;height:auto;opacity:.55;align-self:end;justify-self:center}
     .plab-pc-top{position:absolute;left:9%;top:13%;display:grid;justify-items:start;gap:1.2cqw;z-index:2}
     .plab-pc-ovr{font:800 25cqw/.82 var(--plab-cond);letter-spacing:-.02em;text-shadow:0 .6cqw 2cqw rgba(0,0,0,.45);display:flex;align-items:flex-start;gap:1cqw}
     .plab-pc-ovr small{font-size:5.4cqw;letter-spacing:.06em;margin-top:2.4cqw;writing-mode:vertical-rl;transform:rotate(180deg);opacity:.85}
-    .plab-pc-profile{font:800 7.5cqw/1 var(--plab-cond);letter-spacing:.02em;text-transform:uppercase;max-width:36cqw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 .5cqw 1.6cqw rgba(0,0,0,.5)}
+    .plab-pc-profile{font:800 8cqw/1 var(--plab-cond);letter-spacing:.02em;text-transform:uppercase;max-width:42cqw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-shadow:0 .5cqw 1.6cqw rgba(0,0,0,.5)}
     .plab-pc-crest{margin-top:1.4cqw;width:15cqw;height:17.5cqw;display:grid;place-content:center;justify-items:center;gap:.4cqw;clip-path:polygon(0 0,100% 0,100% 62%,50% 100%,0 62%);background:linear-gradient(160deg,var(--f1),var(--f3));color:#1a1405}
     .plab-pc-crest b{font:800 5.8cqw/1 var(--plab-cond)}.plab-pc-crest span{font:700 2.7cqw var(--plab-cond);letter-spacing:.12em;text-transform:uppercase;margin-top:-1cqw;padding-bottom:4cqw}
     .plab-pc-name{position:absolute;left:6%;right:6%;top:50.5%;z-index:2;display:grid;justify-items:end;text-align:right;line-height:.86;text-shadow:0 .6cqw 2cqw rgba(0,0,0,.55)}
-    .plab-pc-first{font:400 7.1cqw var(--plab-display);text-transform:uppercase;margin-right:22%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:78%}
-    .plab-pc-last{font:400 14.2cqw var(--plab-display);text-transform:uppercase;letter-spacing:-.02em;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-    .plab-pc-name.is-long .plab-pc-first{font-size:6.1cqw}.plab-pc-name.is-long .plab-pc-last{font-size:11.4cqw}
-    .plab-pc-stats{position:absolute;left:12%;right:12%;top:66%;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;gap:4cqw;border-top:.5cqw solid rgba(255,255,255,.35);padding-top:2.4cqw}
-    .plab-pc-col{display:grid;gap:1cqw}.plab-pc-col div{display:flex;justify-content:space-between;align-items:baseline;gap:2cqw;font-family:var(--plab-cond);line-height:1}
-    .plab-pc-col b{font-weight:800;font-size:7.8cqw}.plab-pc-col span{font-weight:600;font-size:5.4cqw;letter-spacing:.02em;opacity:.92}.plab-pc-div{width:.5cqw;background:rgba(255,255,255,.3)}
+    .plab-pc-first{font:400 7.4cqw var(--plab-display);text-transform:uppercase;margin-right:22%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+    .plab-pc-last{font:400 15cqw var(--plab-display);text-transform:uppercase;letter-spacing:-.02em;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:clip}
+    .plab-pc-name.is-long .plab-pc-first{font-size:6.8cqw}.plab-pc-name.is-long .plab-pc-last{font-size:13cqw}
+    .plab-pc-stats{position:absolute;left:12%;right:12%;top:65.5%;z-index:2;display:grid;grid-template-columns:1fr auto 1fr;gap:4cqw;border-top:.5cqw solid rgba(255,255,255,.35);padding-top:2.4cqw}
+    .plab-pc-col{display:grid;gap:.6cqw}.plab-pc-col div{display:flex;justify-content:space-between;align-items:baseline;gap:2cqw;font-family:var(--plab-cond);line-height:1}
+    .plab-pc-col b{font-weight:800;font-size:8.2cqw}.plab-pc-col span{font-weight:600;font-size:6.2cqw;letter-spacing:.02em;opacity:.92}.plab-pc-div{width:.5cqw;background:rgba(255,255,255,.3)}
     .plab-pc-brand{position:absolute;left:0;right:0;bottom:5.5%;text-align:center;font:400 4.2cqw var(--plab-display);letter-spacing:.22em;color:rgba(255,255,255,.9);z-index:2}
     .plab-pc-brand:before{content:"";display:block;width:26%;height:.4cqw;margin:0 auto 2cqw;background:rgba(255,255,255,.35)}
 
@@ -505,6 +505,10 @@
         var ov=rating('overall');
         return ov===null?'Prospect':tierFor(ov);
     }
+    function cardPositionText(){
+        var pos=positionText();
+        return pos&&pos!=='Athlete'?pos:profileText();
+    }
     function shortDate(v){
         if(!v)return'';
         var d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString(undefined,{month:'short',day:'numeric'});
@@ -514,14 +518,14 @@
     function cardHtml(){
         var p=player(),ov=rating('overall'),fr=frameFor(ov),parts=String(p.name||'PLAYER').trim().split(/\s+/),
             last=parts.length>1?parts.pop():parts[0],first=parts.length?parts.join(' '):'',
-            nameLong=(String(first||'').length+String(last||'').length)>15,
+            nameLong=(String(first||'').length+String(last||'').length)>19,
             rows=[['PAC',rating('pace')],['JMP',metricRating('jump')],['BNC',metricRating('bounce')],['RSI',metricRating('rsi')],['QCK',metricRating('quick')],['BAL',metricRating('balance')]];
         return '<div class="plab-card-wrap"><div class="plab-pcard" style="--f1:'+fr[0]+';--f2:'+fr[1]+';--f3:'+fr[2]+'">'+
             '<div class="plab-pc-frame"><div class="plab-pc-in">'+
                 '<div class="plab-pc-art" aria-hidden="true"></div>'+
-                '<div class="plab-pc-photo">'+(p.photo_url?'<img src="'+esc(p.photo_url)+'" alt="">':'<span><i class="fa-solid fa-user"></i></span>')+'</div>'+
+                '<div class="plab-pc-photo">'+(p.photo_url?'<img src="'+esc(p.photo_url)+'" alt="">':'<svg viewBox="0 0 120 150" aria-hidden="true"><circle cx="60" cy="38" r="24" fill="currentColor"></circle><path d="M21 142c2-35 17-58 39-58s37 23 39 58H21z" fill="currentColor"></path><path d="M34 91c8-10 17-15 26-15s18 5 26 15l-8 10c-6-7-12-10-18-10s-12 3-18 10l-8-10z" fill="currentColor" opacity=".65"></path></svg>')+'</div>'+
                 '<div class="plab-pc-top"><div class="plab-pc-ovr"><small>OVR</small>'+(ov===null?'–':ov)+'</div>'+
-                    '<div class="plab-pc-profile">'+esc(profileText())+'</div>'+
+                    '<div class="plab-pc-profile">'+esc(cardPositionText())+'</div>'+
                     '<div class="plab-pc-crest"><b>'+esc(teamInitials(p.team))+'</b><span>'+esc(tierFor(ov))+'</span></div></div>'+
                 '<div class="plab-pc-name '+(nameLong?'is-long':'')+'">'+(first?'<span class="plab-pc-first">'+esc(first)+'</span>':'')+'<span class="plab-pc-last">'+esc(last||'PLAYER')+'</span></div>'+
                 '<div class="plab-pc-stats">'+
