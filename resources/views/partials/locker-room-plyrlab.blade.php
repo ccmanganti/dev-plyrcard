@@ -534,18 +534,38 @@
 
     function connectionPanel(){
         var b=booking();if(!b||b.plyomat_ready)return'';
+        var state=String(b.status||'');
+
+        if(state==='provisioning'||state==='pending'){
+            return '<section class="plab-connect">'+
+                '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat setup</span><h3 class="plab-connect-title">Creating your athlete profile</h3>'+
+                '<p class="plab-connect-copy">PLYRCard is creating your athlete directly in Plyomat using your booked trainer\'s API connection. You do not need to enter an Athlete ID unless an existing Plyomat profile is detected.</p></div>'+
+                '<span class="plab-connect-state">Creating profile</span></div>'+
+                '<div class="plab-connect-help">This uses your PLYRCard first name, last name, gender, height and weight when available, plus a PLYRCard external ID to help prevent duplicates.</div>'+
+            '</section>';
+        }
+
+        if(state==='awaiting_integration'){
+            return '<section class="plab-connect">'+
+                '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat connection</span><h3 class="plab-connect-title">Trainer API connection needs attention</h3>'+
+                '<p class="plab-connect-copy">PLYRCard cannot create or read your Plyomat athlete until the trainer\'s API key is configured with Athlete Read + Athlete Write access.</p></div>'+
+                '<span class="plab-connect-state">API attention</span></div>'+
+            '</section>';
+        }
+
         var t=trainer(),trainerName=t&&t.name?t.name:'your trainer';
         return '<section class="plab-connect">'+
-            '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat connection</span><h3 class="plab-connect-title">Connect your athlete profile</h3>'+
-                '<p class="plab-connect-copy">'+esc(trainerName)+' creates your athlete profile inside Plyomat. Ask them for your <b>Plyomat Athlete ID</b>, then enter it below. PLYRCARD will verify that the ID is accessible through your booked trainer before saving it.</p></div>'+
-                '<span class="plab-connect-state">Awaiting Athlete ID</span></div>'+
+            '<div class="plab-connect-head"><div><span class="plab-connect-k">Existing Plyomat profile</span><h3 class="plab-connect-title">Connect an existing Athlete ID</h3>'+
+                '<p class="plab-connect-copy">Automatic creation could not complete or Plyomat may already have this athlete. Ask '+esc(trainerName)+' for the existing <b>Plyomat Athlete ID</b> and enter it below.</p></div>'+
+                '<span class="plab-connect-state">Manual fallback</span></div>'+
             '<form class="plab-connect-form" data-plab-connect-form>'+
-                '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Enter the ID from your trainer" required></label>'+
+                '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Enter the existing Plyomat Athlete ID" required></label>'+
                 '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Verifying…':'Connect Profile')+'</button>'+
             '</form>'+
-            '<div class="plab-connect-help">The ID is not saved unless Plyomat confirms that your booked trainer can read that athlete record.</div>'+
+            '<div class="plab-connect-help">The ID is saved only after Plyomat confirms that your booked trainer can read that athlete record.</div>'+
         '</section>';
     }
+
 
     function cardHtml(){
         var p=player(),ov=rating('overall'),fr=frameFor(ov),parts=String(p.name||'PLAYER').trim().split(/\s+/),
@@ -748,7 +768,7 @@
         var tabContent=activeTab==='stats'?statsView():activeTab==='body'?bodyView():activeTab==='d1'?d1View():homeView();
         var syncControl=b&&b.plyomat_ready
             ? '<div class="plab-sync"><button type="button" class="plab-btn is-ghost" data-plab-refresh '+(busy?'disabled':'')+'><i class="fa-solid fa-rotate"></i> '+(busy?'Syncing…':'Refresh Stats')+'</button><small>'+(b.last_synced_at?'Last sync '+esc(fmtDateTime(b.last_synced_at)):esc(status))+'</small></div>'
-            : '<div class="plab-sync"><small>Waiting for your Plyomat Athlete ID</small></div>';
+            : '<div class="plab-sync"><small>'+(b&&b.status==='provisioning'?'Creating your Plyomat athlete profile…':b&&b.status==='awaiting_integration'?'Trainer API connection needs attention':'Manual Athlete ID available if an existing profile already exists')+'</small></div>';
         root().innerHTML=shell(
             '<div class="plab-athlete-head">'+
                 avatarHtml(p)+
