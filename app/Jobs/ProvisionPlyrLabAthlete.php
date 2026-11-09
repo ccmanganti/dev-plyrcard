@@ -38,10 +38,14 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
     public function handle(PlyomatService $plyomat): void
     {
         $booking = PlyrLabBooking::query()
-            ->with(['player.team', 'player.club', 'trainer'])
+            ->with(['trainer'])
             ->find($this->bookingId);
 
         if (! $booking || ! in_array($booking->status, PlyrLabBooking::ACCESS_STATUSES, true)) {
+            return;
+        }
+
+        if (blank($booking->plyomat_athlete_id)) {
             return;
         }
 
@@ -50,39 +54,13 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
         if (! $trainer || ! $plyomat->isConfigured($trainer)) {
             $booking->forceFill([
                 'status' => 'awaiting_integration',
-                'last_sync_error' => 'Plyomat API credentials or athlete-creation endpoint are not configured for this trainer yet.',
+                'last_sync_error' => 'The trainer\'s Plyomat Athlete Read connection is not configured.',
             ])->save();
 
             return;
         }
 
-        if (filled($booking->plyomat_athlete_id)) {
-            $this->syncStatsWhenAvailable($booking, $plyomat);
-            return;
-        }
-
-        $booking->forceFill([
-            'status' => 'provisioning',
-            'last_sync_error' => null,
-        ])->save();
-
-        $result = $plyomat->createAthlete($booking);
-
-        $booking->forceFill([
-            'status' => 'active',
-            'plyomat_athlete_id' => (string) $result['athlete_id'],
-            'plyomat_provisioned_at' => now(),
-            'last_sync_error' => null,
-        ])->save();
-
-        $this->syncStatsWhenAvailable($booking->fresh(['trainer']) ?? $booking, $plyomat);
-
-        Log::info('PLYRLab athlete provisioned in Plyomat.', [
-            'booking_id' => $booking->getKey(),
-            'player_user_id' => $booking->player_user_id,
-            'trainer_id' => $booking->trainer_id,
-            'plyomat_athlete_id' => $booking->plyomat_athlete_id,
-        ]);
+        $this->syncStatsWhenAvailable($booking, $plyomat);
     }
 
     protected function syncStatsWhenAvailable(PlyrLabBooking $booking, PlyomatService $plyomat): void
@@ -106,7 +84,7 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
                 'last_sync_error' => $exception->getMessage(),
             ])->save();
 
-            Log::warning('PLYRLab initial Plyomat stats sync failed after provisioning.', [
+            Log::warning('PLYRLab Plyomat stats sync failed.', [
                 'booking_id' => $booking->getKey(),
                 'error' => $exception->getMessage(),
             ]);
@@ -119,12 +97,11 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
 
         if ($booking && $booking->isOpen()) {
             $booking->forceFill([
-                'status' => 'provisioning_failed',
                 'last_sync_error' => $exception->getMessage(),
             ])->save();
         }
 
-        Log::error('PLYRLab Plyomat provisioning failed.', [
+        Log::error('PLYRLab Plyomat background sync failed.', [
             'booking_id' => $this->bookingId,
             'error' => $exception->getMessage(),
         ]);
