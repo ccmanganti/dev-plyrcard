@@ -39,6 +39,9 @@
     $lrRecruitingEmailUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.email.send') ? route('locker-room.recruiting.email.send') : null;
     $lrPointsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points') ? route('locker-room.points') : null;
     $lrPointsHistoryUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points.history') ? route('locker-room.points.history') : null;
+    $lrPlyrLabUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab') ? route('locker-room.plyr-lab') : null;
+    $lrPlyrLabBookUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab.book') ? route('locker-room.plyr-lab.book') : null;
+    $lrPlyrLabRefreshUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab.refresh') ? route('locker-room.plyr-lab.refresh') : null;
     $lrCreditUseUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('support.credits.store') ? route('support.credits.store') : null;
     $lrPointPackStartBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/start') : null;
     $lrPointPackStatusBaseUrl = $lrLoggedIn ? url('/billing/point-packs/__PACK__/status') : null;
@@ -714,6 +717,9 @@
      data-recruiting-email-url="{{ $lrRecruitingEmailUrl }}"
      data-points-url="{{ $lrPointsUrl }}"
      data-points-history-url="{{ $lrPointsHistoryUrl }}"
+     data-plyr-lab-url="{{ $lrPlyrLabUrl }}"
+     data-plyr-lab-book-url="{{ $lrPlyrLabBookUrl }}"
+     data-plyr-lab-refresh-url="{{ $lrPlyrLabRefreshUrl }}"
      data-credit-use-url="{{ $lrCreditUseUrl }}"
      data-point-pack-start-base-url="{{ $lrPointPackStartBaseUrl }}"
      data-point-pack-status-base-url="{{ $lrPointPackStatusBaseUrl }}"
@@ -774,6 +780,7 @@
                         </div>
                         <div class="lr-menu-grid">
                             <button class="lr-menu-card" type="button" data-lr-nav="dashboard" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-chart-line"></i></span><span class="lr-menu-copy"><strong>Dashboard</strong><small>Recruiting stats and progress</small></span></button>
+                            <button class="lr-menu-card" type="button" data-lr-nav="plyrlab"><span class="lr-menu-icon"><i class="fa-solid fa-flask-vial"></i></span><span class="lr-menu-copy"><strong>PLYRLab</strong><small>Plyomat performance stats</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="schools" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-school"></i></span><span class="lr-menu-copy"><strong>Discover Schools</strong><small>Search recruiting programs</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="favorites" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-star"></i></span><span class="lr-menu-copy"><strong>Favorites</strong><small>Your saved schools</small></span></button>
                             <button class="lr-menu-card" type="button" data-lr-nav="lists" data-lr-premium="1"><span class="lr-menu-icon"><i class="fa-solid fa-list"></i></span><span class="lr-menu-copy"><strong>My Lists</strong><small>Organize target schools</small></span></button>
@@ -806,6 +813,7 @@
                         <div class="lr-card" data-lr-next-schedule><h3 class="lr-card-title">Next Schedule</h3><p class="lr-card-copy">No upcoming game has been added yet.</p><div class="lr-actions"><button class="lr-btn" type="button" data-lr-nav="schedule">Open Schedule</button></div></div>
                     </div>
                 </section>
+                @include('partials.locker-room-plyrlab')
                 <section class="lr-view" data-lr-view="profile">
                     <form class="lr-form" data-lr-profile-form enctype="multipart/form-data">
                         <div class="lr-tabs" data-lr-profile-tabs>
@@ -1156,8 +1164,8 @@
     const csrf = () => document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value || '';
     const money = cents => new Intl.NumberFormat('en-US', {style:'currency', currency: state?.billing?.currency || 'USD'}).format((Number(cents || 0))/100);
     const esc = value => String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
-    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',schools:'Discover Schools',favorites:'Favorites',lists:'My Lists',inbox:'Inbox',compose:'Compose Email',points:'PLYR Points',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',upgrade:'Upgrade',checkout:'Service Checkout',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
-    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',schools:'Search recruiting programs',favorites:'Your saved schools',lists:'Organize recruiting targets',inbox:'Coach conversations',compose:'Send recruiting outreach',points:'Purchases, services and point activity',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
+    const titles = {'guest-home':'Get Started','share-site':'Share PLYRCARD',home:'Locker Room',dashboard:'Dashboard',plyrlab:'PLYRLab',schools:'Discover Schools',favorites:'Favorites',lists:'My Lists',inbox:'Inbox',compose:'Compose Email',points:'PLYR Points',profile:'Quick Profile',photos:'My Photos',schedule:'My Schedule',settings:'Settings',upgrade:'Upgrade',checkout:'Service Checkout',refer:'Refer a Friend',support:'Support','book-call': authenticated ? 'Book a Call' : 'Book Demo',billing:'Billing & Payments',password:'Change Password',gate:'My Journey','forgot-password':'Reset Password',login:'Sign In'};
+    const subtitles = {'guest-home':'Everything you need to get started','share-site':'Share PLYRCARD with someone',home:'Your player workspace',dashboard:'Recruiting stats from your workspace',plyrlab:'Your personal Plyomat performance dashboard',schools:'Search recruiting programs',favorites:'Your saved schools',lists:'Organize recruiting targets',inbox:'Coach conversations',compose:'Send recruiting outreach',points:'Purchases, services and point activity',profile:'Edit your most important athlete details',photos:'Your player and PLYRCARD image galleries',schedule:'View, create and edit schedule items',settings:'Notifications and PLYRCARD preferences',share:'Your public player link',upgrade:'Current plans and pricing',checkout:'Complete your upgrade inside Locker Room',services:'Coming soon services',refer:'Invite an athlete by email',support:'Get help from our team','book-call': authenticated ? 'Schedule time with our team' : 'See how PLYRCARD works',billing:'Payment method, subscription and billing information',password:'Secure your Locker Room account',gate:'Upgrade to unlock this feature','forgot-password':'Recover access to your account',login:'Welcome back'};
     function showToast(message, error = false) {
         const el = q('[data-lr-toast]'); if (!el) return;
         el.textContent = message || (error ? 'Something went wrong.' : 'Saved.');
@@ -1226,6 +1234,7 @@
         if (view === 'support') ensureSupportTickets();
         if (view === 'book-call') ensureBookEmbed();
         render();
+        document.dispatchEvent(new CustomEvent('plyrcard:locker-view', {detail:{view}}));
     }
     function goBack() { if (currentView === 'checkout') stopLockerCheckoutPolling(); const target = history.pop() || (authenticated ? 'home' : 'guest-home'); setView(target, false); }
     async function request(url, options = {}) {
