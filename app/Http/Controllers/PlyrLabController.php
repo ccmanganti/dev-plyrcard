@@ -76,7 +76,7 @@ class PlyrLabController extends Controller
                 'player_user_id' => $player->getKey(),
                 'trainer_id' => $trainer->getKey(),
                 'scheduled_for' => $validated['scheduled_for'],
-                'status' => 'awaiting_athlete_id',
+                'status' => 'provisioning',
                 'notes' => $validated['notes'] ?? null,
             ]);
         });
@@ -89,9 +89,11 @@ class PlyrLabController extends Controller
             }
         }
 
+        ProvisionPlyrLabAthlete::dispatch($booking->getKey())->afterCommit();
+
         return response()->json([
             'success' => true,
-            'message' => 'Trainer booked. Ask your trainer for your Plyomat Athlete ID after they create your profile, then connect it in PLYRLab.',
+            'message' => 'Trainer booked. PLYRCard is creating your Plyomat athlete profile automatically. If an existing profile is detected, you can connect it with the Athlete ID instead.',
             'data' => $dataService->payload($player),
         ]);
     }
