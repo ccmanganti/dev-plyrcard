@@ -33,7 +33,11 @@ class PlyomatService
             ->post($this->endpoint($trainer, (string) $trainer->plyomat_create_athlete_path), $payload);
 
         if (! $response->successful()) {
-            throw new RuntimeException('Plyomat athlete creation failed: HTTP ' . $response->status() . '.');
+            if ($response->status() === 403) {
+                throw new RuntimeException('Plyomat denied Athlete Write access. Confirm this trainer API key includes the Athlete Write scope.');
+            }
+
+            throw new RuntimeException('Plyomat athlete write failed: HTTP ' . $response->status() . '.');
         }
 
         $json = $response->json();
@@ -54,7 +58,7 @@ class PlyomatService
         ];
     }
 
-    public function fetchStats(PlyrLabBooking $booking): array
+    public function readAthlete(PlyrLabBooking $booking): array
     {
         $booking->loadMissing('trainer');
         $trainer = $booking->trainer;
@@ -65,7 +69,7 @@ class PlyomatService
 
         $path = trim((string) $trainer->plyomat_stats_path);
         if ($path === '') {
-            return $booking->plyomat_stats ?? [];
+            throw new RuntimeException('The Plyomat Athlete Read endpoint is not configured for this trainer.');
         }
 
         $path = str_replace(
@@ -77,12 +81,21 @@ class PlyomatService
         $response = $this->request($trainer)->get($this->endpoint($trainer, $path));
 
         if (! $response->successful()) {
-            throw new RuntimeException('Plyomat stats sync failed: HTTP ' . $response->status() . '.');
+            if ($response->status() === 403) {
+                throw new RuntimeException('Plyomat denied Athlete Read access. Confirm this trainer API key includes the Athlete Read scope.');
+            }
+
+            throw new RuntimeException('Plyomat athlete read failed: HTTP ' . $response->status() . '.');
         }
 
         $json = $response->json();
 
-        return $this->normalizeStats(is_array($json) ? $json : []);
+        return is_array($json) ? $json : [];
+    }
+
+    public function fetchStats(PlyrLabBooking $booking): array
+    {
+        return $this->normalizeStats($this->readAthlete($booking));
     }
 
     public function playerPayload(User $player): array
