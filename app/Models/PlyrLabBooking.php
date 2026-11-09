@@ -10,8 +10,8 @@ class PlyrLabBooking extends Model
 {
     use HasFactory;
 
-    public const OPEN_STATUSES = ['pending', 'provisioning', 'awaiting_integration', 'active', 'provisioning_failed'];
-    public const ACCESS_STATUSES = ['pending', 'provisioning', 'awaiting_integration', 'active', 'provisioning_failed', 'completed'];
+    public const OPEN_STATUSES = ['pending', 'awaiting_athlete_id', 'awaiting_integration', 'active', 'provisioning', 'provisioning_failed'];
+    public const ACCESS_STATUSES = ['pending', 'awaiting_athlete_id', 'awaiting_integration', 'active', 'provisioning', 'provisioning_failed', 'completed'];
 
     protected $fillable = [
         'player_user_id',
