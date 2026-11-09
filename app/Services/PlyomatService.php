@@ -133,12 +133,11 @@ class PlyomatService
     protected function endpointCandidates(PlyrLabTrainer $trainer, string $athleteId): array
     {
         $legacyBase = trim((string) $trainer->plyomat_base_url);
-        $configuredBase = trim((string) config('services.plyomat.base_url', 'https://app.plyomat.com'));
+        $configuredBase = trim((string) config('services.plyomat.base_url', 'https://api.plyomat.com'));
 
         $bases = array_values(array_unique(array_filter([
             $legacyBase,
             $configuredBase,
-            'https://app.plyomat.com',
             'https://api.plyomat.com',
         ])));
 
