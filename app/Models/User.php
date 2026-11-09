@@ -141,6 +141,9 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
     public function favoriteSchools(): BelongsToMany { return $this->belongsToMany(School::class, 'favorite_schools')->withTimestamps(); }
     public function recruitingLists(): HasMany { return $this->hasMany(MyList::class); }
 
+    public function plyrLabTrainerProfile(): HasOne { return $this->hasOne(PlyrLabTrainer::class); }
+    public function plyrLabBookings(): HasMany { return $this->hasMany(PlyrLabBooking::class, 'player_user_id'); }
+
     public function isClubManager(): bool
     {
         return method_exists($this, 'hasRole') && ($this->hasRole('Club Manager') || $this->hasRole('club manager') || $this->hasRole('ClubManager'));
