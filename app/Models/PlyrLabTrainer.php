@@ -58,8 +58,6 @@ class PlyrLabTrainer extends Model
 
     public function hasPlyomatConnection(): bool
     {
-        return filled($this->plyomat_api_key)
-            && filled($this->plyomat_base_url)
-            && filled($this->plyomat_stats_path);
+        return filled($this->plyomat_api_key);
     }
 }
