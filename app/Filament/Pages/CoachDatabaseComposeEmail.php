@@ -16,7 +16,7 @@ class CoachDatabaseComposeEmail extends Page
     protected static string | UnitEnum | null $navigationGroup = 'Recruiting Center';
     protected static ?string $title = 'Compose Email';
     protected static ?string $slug = 'coach-database/compose-email';
-    protected static ?int $navigationSort = 17;
+    protected static ?int $navigationSort = 18;
     protected string $view = 'filament.pages.coach-database';
 
     protected function coachDatabaseSection(): string
