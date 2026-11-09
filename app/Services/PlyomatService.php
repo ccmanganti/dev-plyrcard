@@ -177,7 +177,6 @@ class PlyomatService
                 'sprint_30m_seconds' => $number($value(['sprint_30m_seconds', '30m_seconds', 't30', '30m'])),
                 'top_speed_kph' => $number($value(['top_speed_kph', 'max_speed_kph', 'vmax_kph', 'vmax', 'top_speed'])),
             ],
-            'raw' => $payload,
         ];
     }
 
