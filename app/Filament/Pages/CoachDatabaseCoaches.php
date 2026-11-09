@@ -16,7 +16,7 @@ class CoachDatabaseCoaches extends Page
     protected static string | UnitEnum | null $navigationGroup = 'Recruiting Center';
     protected static ?string $title = 'Coaches';
     protected static ?string $slug = 'coach-database/coaches';
-    protected static ?int $navigationSort = 12;
+    protected static ?int $navigationSort = 13;
     protected string $view = 'filament.pages.coach-database';
 
     public static function shouldRegisterNavigation(): bool
