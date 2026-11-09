@@ -59,6 +59,8 @@ Route::middleware('auth')->group(function (): void {
         ->name('locker-room.plyr-lab');
     Route::post('/locker-room/plyr-lab/book', [PlyrLabController::class, 'book'])
         ->name('locker-room.plyr-lab.book');
+    Route::post('/locker-room/plyr-lab/provision', [PlyrLabController::class, 'provision'])
+        ->name('locker-room.plyr-lab.provision');
     Route::post('/locker-room/plyr-lab/connect', [PlyrLabController::class, 'connect'])
         ->name('locker-room.plyr-lab.connect');
     Route::post('/locker-room/plyr-lab/refresh', [PlyrLabController::class, 'refresh'])
