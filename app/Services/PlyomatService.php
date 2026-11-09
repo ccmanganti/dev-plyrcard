@@ -26,9 +26,9 @@ class PlyomatService
             throw new RuntimeException('This player does not have a Plyomat athlete ID yet.');
         }
 
-        $path = trim((string) $trainer->plyomat_stats_path);
+        $path = trim((string) config('services.plyomat.athlete_read_path'));
         if ($path === '') {
-            throw new RuntimeException('The Plyomat Athlete Read endpoint is not configured for this trainer.');
+            throw new RuntimeException('The Plyomat Athlete Read endpoint is not configured.');
         }
 
         $path = str_replace(
@@ -140,8 +140,8 @@ class PlyomatService
 
     protected function request(PlyrLabTrainer $trainer): PendingRequest
     {
-        $header = trim((string) ($trainer->plyomat_auth_header ?: 'Authorization'));
-        $prefix = trim((string) ($trainer->plyomat_auth_prefix ?: ''));
+        $header = trim((string) config('services.plyomat.auth_header', 'Authorization'));
+        $prefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
         $key = trim((string) $trainer->plyomat_api_key);
         $credential = trim(($prefix !== '' ? $prefix . ' ' : '') . $key);
 
@@ -157,7 +157,7 @@ class PlyomatService
 
     protected function endpoint(PlyrLabTrainer $trainer, string $path): string
     {
-        $base = rtrim(trim((string) $trainer->plyomat_base_url), '/');
+        $base = rtrim(trim((string) config('services.plyomat.base_url', 'https://app.plyomat.com')), '/');
         $path = trim($path);
 
         if (Str::startsWith($path, ['http://', 'https://'])) {
