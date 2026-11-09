@@ -464,7 +464,7 @@
             '<label>Session date & time<input class="plab-in" type="datetime-local" name="scheduled_for" required data-plab-datetime></label>'+
             '<label>Note for your trainer<textarea class="plab-in" name="notes" maxlength="1000" placeholder="What do you want to work on? Any testing goals?"></textarea></label>'+
             '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'><i class="fa-solid fa-calendar-check"></i> '+(busy?'Booking…':'Book Trainer & Unlock PLYRLab')+'</button>'+
-            '<div style="font-size:8px;color:var(--plab-muted);line-height:1.45">Booking unlocks your PLYRLab. Your trainer creates your athlete profile in Plyomat, then gives you the Athlete ID to connect here.</div>'+
+            '<div style="font-size:8px;color:var(--plab-muted);line-height:1.45">Booking unlocks your PLYRLab and PLYRCard automatically creates your athlete profile in Plyomat. Athlete ID entry is only used as a fallback when a profile already exists.</div>'+
         '</form>':'';
 
         root().innerHTML=shell('<div class="plab-lock">'+
@@ -541,7 +541,7 @@
                 '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat setup</span><h3 class="plab-connect-title">Creating your athlete profile</h3>'+
                 '<p class="plab-connect-copy">PLYRCard is creating your athlete directly in Plyomat using your booked trainer\'s API connection. You do not need to enter an Athlete ID unless an existing Plyomat profile is detected.</p></div>'+
                 '<span class="plab-connect-state">Creating profile</span></div>'+
-                '<div class="plab-connect-help">This uses your PLYRCard first name, last name, gender, height and weight when available, plus a PLYRCard external ID to help prevent duplicates.</div>'+
+                '<div class="plab-connect-help">This uses your PLYRCard first name, last name, gender, height and weight, plus a PLYRCard external ID to help prevent duplicates.</div>'+
             '</section>';
         }
 
