@@ -7,6 +7,7 @@ use App\Models\PlyrLabTrainer;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -26,38 +27,226 @@ class PlyomatService
             throw new RuntimeException('This player does not have a Plyomat athlete ID yet.');
         }
 
-        $path = trim((string) config('services.plyomat.athlete_read_path'));
-        if ($path === '') {
-            throw new RuntimeException('The Plyomat Athlete Read endpoint is not configured.');
+        $athleteId = trim((string) $booking->plyomat_athlete_id);
+        $attempts = [];
+        $lastAuthStatus = null;
+
+        foreach ($this->endpointCandidates($trainer, $athleteId) as $candidate) {
+            foreach ($this->authCandidates($trainer) as $auth) {
+                $response = $this->request($trainer, $auth)->get($candidate['url']);
+                $contentType = strtolower((string) $response->header('Content-Type'));
+
+                $attempts[] = [
+                    'url' => $candidate['url'],
+                    'status' => $response->status(),
+                    'content_type' => $contentType,
+                    'auth' => $auth['label'],
+                ];
+
+                if (in_array($response->status(), [401, 403], true)) {
+                    $lastAuthStatus = $response->status();
+                    continue;
+                }
+
+                if (in_array($response->status(), [404, 405], true)) {
+                    break;
+                }
+
+                if (! $response->successful()) {
+                    continue;
+                }
+
+                $json = $response->json();
+
+                if (! is_array($json)) {
+                    // A 200 HTML response means we hit the Plyomat web app/SPA,
+                    // not the developer API. Keep probing the read-only API candidates.
+                    continue;
+                }
+
+                $athlete = $this->extractAthletePayload($json, $athleteId);
+
+                if ($athlete !== null) {
+                    $this->rememberWorkingConnection($trainer, $candidate, $auth);
+
+                    return $athlete;
+                }
+            }
         }
 
-        $path = str_replace(
-            ['{athlete}', '{athlete_id}', '{id}'],
-            rawurlencode((string) $booking->plyomat_athlete_id),
-            $path,
-        );
+        Log::warning('PLYRLab could not resolve Plyomat Athlete Read endpoint.', [
+            'trainer_id' => $trainer->getKey(),
+            'athlete_id' => $athleteId,
+            'attempts' => $attempts,
+        ]);
 
-        $response = $this->request($trainer)->get($this->endpoint($trainer, $path));
-
-        if (! $response->successful()) {
-            if ($response->status() === 401) {
-                throw new RuntimeException('The trainer\'s Plyomat API credentials were rejected.');
-            }
-
-            if ($response->status() === 403) {
-                throw new RuntimeException('Plyomat denied Athlete Read access for this trainer.');
-            }
-
-            if ($response->status() === 404) {
-                throw new RuntimeException('No athlete with that Plyomat ID was found in this trainer\'s account.');
-            }
-
-            throw new RuntimeException('Plyomat athlete lookup failed: HTTP ' . $response->status() . '.');
+        if ($lastAuthStatus === 401) {
+            throw new RuntimeException('The trainer\'s Plyomat API key was rejected. Check that the key is valid and has Athlete Read access.');
         }
 
-        $json = $response->json();
+        if ($lastAuthStatus === 403) {
+            throw new RuntimeException('Plyomat denied Athlete Read access. Check the API key scope for this trainer.');
+        }
 
-        return is_array($json) ? $json : [];
+        throw new RuntimeException('PLYRCard could not find a valid Plyomat Athlete Read response for that ID. The endpoint returned a web/empty response instead of athlete data.');
+    }
+
+    protected function endpointCandidates(PlyrLabTrainer $trainer, string $athleteId): array
+    {
+        $legacyBase = trim((string) $trainer->plyomat_base_url);
+        $configuredBase = trim((string) config('services.plyomat.base_url', 'https://app.plyomat.com'));
+
+        $bases = array_values(array_unique(array_filter([
+            $legacyBase,
+            $configuredBase,
+            'https://app.plyomat.com',
+            'https://api.plyomat.com',
+        ])));
+
+        $paths = array_values(array_unique(array_filter([
+            trim((string) $trainer->plyomat_stats_path),
+            trim((string) config('services.plyomat.athlete_read_path')),
+            '/api/v1/athletes/{athlete_id}',
+            '/api/v1/athlete/{athlete_id}',
+            '/api/athletes/{athlete_id}',
+            '/api/athlete/{athlete_id}',
+        ])));
+
+        $candidates = [];
+
+        foreach ($paths as $path) {
+            $resolvedPath = str_replace(
+                ['{athlete}', '{athlete_id}', '{id}'],
+                rawurlencode($athleteId),
+                $path,
+            );
+
+            if (Str::startsWith($resolvedPath, ['http://', 'https://'])) {
+                $candidates[$resolvedPath] = [
+                    'url' => $resolvedPath,
+                    'base_url' => Str::beforeLast($resolvedPath, '/'),
+                    'path' => $path,
+                ];
+
+                continue;
+            }
+
+            foreach ($bases as $base) {
+                $url = rtrim($base, '/') . '/' . ltrim($resolvedPath, '/');
+
+                $candidates[$url] = [
+                    'url' => $url,
+                    'base_url' => rtrim($base, '/'),
+                    'path' => $path,
+                ];
+            }
+        }
+
+        return array_values($candidates);
+    }
+
+    protected function authCandidates(PlyrLabTrainer $trainer): array
+    {
+        $configuredHeader = trim((string) config('services.plyomat.auth_header', 'Authorization'));
+        $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
+
+        return [
+            [
+                'label' => 'configured',
+                'header' => $configuredHeader,
+                'prefix' => $configuredPrefix,
+            ],
+            [
+                'label' => 'authorization_raw',
+                'header' => 'Authorization',
+                'prefix' => '',
+            ],
+            [
+                'label' => 'x_api_key',
+                'header' => 'X-API-Key',
+                'prefix' => '',
+            ],
+            [
+                'label' => 'api_key',
+                'header' => 'API-Key',
+                'prefix' => '',
+            ],
+        ];
+    }
+
+    protected function extractAthletePayload(array $payload, string $athleteId): ?array
+    {
+        $candidates = [
+            $payload,
+            data_get($payload, 'data'),
+            data_get($payload, 'athlete'),
+            data_get($payload, 'result'),
+            data_get($payload, 'data.athlete'),
+            data_get($payload, 'result.athlete'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if (! is_array($candidate) || $candidate === []) {
+                continue;
+            }
+
+            if (array_is_list($candidate)) {
+                $match = collect($candidate)->first(function ($row) use ($athleteId): bool {
+                    if (! is_array($row)) {
+                        return false;
+                    }
+
+                    $id = data_get($row, 'id')
+                        ?? data_get($row, 'athlete_id')
+                        ?? data_get($row, 'athleteId')
+                        ?? data_get($row, 'uuid');
+
+                    return $id !== null && (string) $id === $athleteId;
+                });
+
+                if (is_array($match)) {
+                    return $match;
+                }
+
+                if (count($candidate) === 1 && is_array($candidate[0])) {
+                    return $candidate[0];
+                }
+
+                continue;
+            }
+
+            $hasAthleteShape = collect([
+                'id',
+                'athlete_id',
+                'athleteId',
+                'uuid',
+                'first_name',
+                'firstName',
+                'last_name',
+                'lastName',
+                'name',
+                'email',
+                'assessments',
+                'sessions',
+                'results',
+            ])->contains(fn (string $key): bool => data_get($candidate, $key) !== null);
+
+            if ($hasAthleteShape) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    protected function rememberWorkingConnection(PlyrLabTrainer $trainer, array $candidate, array $auth): void
+    {
+        $trainer->forceFill([
+            'plyomat_base_url' => $candidate['base_url'] ?? null,
+            'plyomat_stats_path' => $candidate['path'] ?? null,
+            'plyomat_auth_header' => $auth['header'] ?? 'Authorization',
+            'plyomat_auth_prefix' => $auth['prefix'] ?? '',
+        ])->saveQuietly();
     }
 
     public function fetchStats(PlyrLabBooking $booking): array
@@ -138,32 +327,25 @@ class PlyomatService
         ];
     }
 
-    protected function request(PlyrLabTrainer $trainer): PendingRequest
+    protected function request(PlyrLabTrainer $trainer, ?array $auth = null): PendingRequest
     {
-        $header = trim((string) config('services.plyomat.auth_header', 'Authorization'));
-        $prefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
+        $auth ??= [
+            'header' => trim((string) ($trainer->plyomat_auth_header ?: config('services.plyomat.auth_header', 'Authorization'))),
+            'prefix' => trim((string) ($trainer->plyomat_auth_prefix ?? config('services.plyomat.auth_prefix', 'Bearer'))),
+        ];
+
+        $header = trim((string) ($auth['header'] ?? 'Authorization'));
+        $prefix = trim((string) ($auth['prefix'] ?? ''));
         $key = trim((string) $trainer->plyomat_api_key);
         $credential = trim(($prefix !== '' ? $prefix . ' ' : '') . $key);
 
         return Http::acceptJson()
             ->asJson()
             ->timeout(25)
-            ->retry(2, 350)
+            ->retry(1, 250)
             ->withHeaders([
                 $header => $credential,
                 'X-PLYRCARD-Integration' => 'PLYRLab',
             ]);
-    }
-
-    protected function endpoint(PlyrLabTrainer $trainer, string $path): string
-    {
-        $base = rtrim(trim((string) config('services.plyomat.base_url', 'https://app.plyomat.com')), '/');
-        $path = trim($path);
-
-        if (Str::startsWith($path, ['http://', 'https://'])) {
-            return $path;
-        }
-
-        return $base . '/' . ltrim($path, '/');
     }
 }
