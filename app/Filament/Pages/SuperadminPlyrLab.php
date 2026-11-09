@@ -10,15 +10,15 @@ class SuperadminPlyrLab extends SuperadminAthletes
 {
     protected static ?string $slug = 'plyrlab';
 
-    protected static ?string $navigationLabel = 'PLYRLab';
+    protected static ?string $navigationLabel = 'PLYRLab Management';
 
-    protected static ?string $title = 'PLYRLab';
+    protected static ?string $title = 'PLYRLab Management';
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-beaker';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Recruiting Center';
+    protected static string | \UnitEnum | null $navigationGroup = 'Operations & Support';
 
-    protected static ?int $navigationSort = 11;
+    protected static ?int $navigationSort = 14;
 
     protected static string $controlCenterWidgetClass = SuperadminPlyrLabControlCenterWidget::class;
 
