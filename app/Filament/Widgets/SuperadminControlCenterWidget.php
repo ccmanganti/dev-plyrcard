@@ -907,11 +907,11 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'trainer' => $booking->trainer?->displayName() ?? 'Trainer unavailable',
                         'scheduled_for' => $booking->scheduled_for?->format('M j, Y · g:i A') ?? 'Not scheduled',
                         'status' => $status,
-                        'status_label' => Str::headline($status),
+                        'status_label' => $status === 'awaiting_athlete_id' ? 'Awaiting Athlete ID' : Str::headline($status),
                         'plyomat_ready' => filled($booking->plyomat_athlete_id),
                         'last_sync' => $booking->plyomat_last_synced_at?->diffForHumans()
                             ?? ($booking->plyomat_provisioned_at?->diffForHumans() ?? 'Not synced'),
-                        'needs_attention' => in_array($status, ['awaiting_integration', 'provisioning_failed'], true),
+                        'needs_attention' => in_array($status, ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true),
                         'user_url' => $player ? $this->userUrl($player) : null,
                     ];
                 })
@@ -932,7 +932,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         ->distinct('player_user_id')
                         ->count('player_user_id'),
                     'needs_attention' => (clone $bookingQuery)
-                        ->whereIn('status', ['awaiting_integration', 'provisioning_failed'])
+                        ->whereIn('status', ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'])
                         ->count(),
                 ],
                 'trainers_url' => $this->plyrLabTrainerIndexUrl(),
