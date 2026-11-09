@@ -52,6 +52,6 @@ class PlyrLabTrainerBookedNotification extends Notification implements ShouldQue
 
         return $mail
             ->action('Open PLYRCARD', url('/admin'))
-            ->line('PLYRCARD will provision the player in your connected Plyomat account in the background.');
+            ->line('Create this athlete in Plyomat, then give the player their Plyomat Athlete ID. The player will enter that ID in PLYRLab to connect and sync their results.');
     }
 }
