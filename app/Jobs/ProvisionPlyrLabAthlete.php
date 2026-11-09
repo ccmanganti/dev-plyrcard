@@ -65,7 +65,7 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
 
     protected function syncStatsWhenAvailable(PlyrLabBooking $booking, PlyomatService $plyomat): void
     {
-        if (blank($booking->trainer?->plyomat_stats_path) || blank($booking->plyomat_athlete_id)) {
+        if (! $booking->trainer?->hasPlyomatConnection() || blank($booking->plyomat_athlete_id)) {
             return;
         }
 
