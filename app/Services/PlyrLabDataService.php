@@ -278,10 +278,15 @@ class PlyrLabDataService
         return [
             'id' => $booking->getKey(),
             'status' => $booking->status,
-            'status_label' => str($booking->status)->replace('_', ' ')->title()->toString(),
+            'status_label' => match ($booking->status) {
+                'awaiting_athlete_id' => 'Awaiting Athlete ID',
+                'awaiting_integration' => 'Awaiting Integration',
+                default => str($booking->status)->replace('_', ' ')->title()->toString(),
+            },
             'scheduled_for' => $booking->scheduled_for?->toIso8601String(),
             'notes' => $booking->notes,
             'plyomat_ready' => filled($booking->plyomat_athlete_id),
+            'plyomat_athlete_id' => $booking->plyomat_athlete_id,
             'last_synced_at' => $booking->plyomat_last_synced_at?->toIso8601String(),
             'trainer' => $trainer ? $this->trainerPayload($trainer) : null,
         ];
@@ -294,10 +299,11 @@ class PlyrLabDataService
         }
 
         return match ($booking->status) {
-            'active' => 'Your PLYRLab is connected to your trainer and ready for performance data.',
-            'awaiting_integration' => 'Trainer booked. Your Plyomat profile is being connected.',
-            'provisioning', 'pending' => 'Trainer booked. We are preparing your Plyomat athlete profile.',
-            'provisioning_failed' => 'Trainer booked. Your PLYRLab remains unlocked while the Plyomat connection is retried.',
+            'active' => 'Your PLYRLab is connected to Plyomat and ready for performance data.',
+            'awaiting_athlete_id' => 'Trainer booked. Ask your trainer for your Plyomat Athlete ID, then enter it here to connect your results.',
+            'awaiting_integration' => 'Your Athlete ID is saved, but your trainer\'s Plyomat read connection needs attention.',
+            'provisioning', 'pending' => 'Trainer booked. Ask your trainer for your Plyomat Athlete ID after they create your profile.',
+            'provisioning_failed' => 'Trainer booked. Enter the Athlete ID provided by your trainer to reconnect your Plyomat profile.',
             'completed' => 'Your PLYRLab remains available with your saved performance results.',
             default => 'Your PLYRLab access is active.',
         };
