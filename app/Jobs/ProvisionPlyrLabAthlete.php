@@ -41,7 +41,7 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
             ->with(['player.team', 'player.club', 'trainer'])
             ->find($this->bookingId);
 
-        if (! $booking || ! $booking->isOpen()) {
+        if (! $booking || ! in_array($booking->status, PlyrLabBooking::ACCESS_STATUSES, true)) {
             return;
         }
 
