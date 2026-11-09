@@ -16,7 +16,7 @@ class CoachDatabaseConversations extends Page
     protected static string | UnitEnum | null $navigationGroup = 'Recruiting Center';
     protected static ?string $title = 'Inbox';
     protected static ?string $slug = 'coach-database/conversations';
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 19;
     protected string $view = 'filament.pages.coach-database';
 
     protected function coachDatabaseSection(): string
