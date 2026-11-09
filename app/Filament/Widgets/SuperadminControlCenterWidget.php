@@ -3,12 +3,15 @@
 namespace App\Filament\Widgets;
 
 use App\Filament\Resources\CreditServiceRequests\CreditServiceRequestResource;
+use App\Filament\Resources\PlyrLabTrainers\PlyrLabTrainerResource;
 use App\Filament\Resources\Users\UserResource;
 use App\Models\AdminSupportMessage;
 use App\Models\CreditPointTransaction;
 use App\Models\CreditServiceRequest;
 use App\Models\CoachDatabaseEmailMessage;
 use App\Models\PaymentTransaction;
+use App\Models\PlyrLabBooking;
+use App\Models\PlyrLabTrainer;
 use App\Models\User;
 use App\Services\ProfileCompletionService;
 use Carbon\Carbon;
@@ -38,6 +41,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'athletes' => (int) ($data['athlete_count'] ?? 0),
                 'followups' => count((array) ($data['attention_all'] ?? [])),
                 'subscriptions' => (int) ($data['billing_stats']['active'] ?? 0),
+                'plyrlab' => (int) ($data['plyrlab_stats']['active_athletes'] ?? 0),
                 'amplify' => (int) ($data['amplify_credit_stats']['athletes'] ?? 0),
             ];
         } catch (Throwable) {
@@ -45,6 +49,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'athletes' => 0,
                 'followups' => 0,
                 'subscriptions' => 0,
+                'plyrlab' => 0,
                 'amplify' => 0,
             ];
         }
@@ -53,7 +58,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
     public function getViewData(): array
     {
         return Cache::remember(
-            'superadmin:control-center:v4',
+            'superadmin:control-center:v5',
             now()->addSeconds(45),
             function (): array {
                 $base = parent::getViewData();
@@ -400,6 +405,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
         $serviceActivity = $this->serviceActivity();
         $paymentActivity = $this->paymentActivity();
+        $plyrLabAdmin = $this->plyrLabAdminData();
 
         $newSignups = $rows
             ->sortByDesc('joined_sort')
@@ -427,6 +433,11 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'amplify_credit_rows' => $amplifyCredits['rows'],
             'amplify_credit_stats' => $amplifyCredits['stats'],
             'amplify_credit_services' => $amplifyCredits['services'],
+            'plyrlab_trainers' => $plyrLabAdmin['trainers'],
+            'plyrlab_bookings' => $plyrLabAdmin['bookings'],
+            'plyrlab_stats' => $plyrLabAdmin['stats'],
+            'plyrlab_trainers_url' => $plyrLabAdmin['trainers_url'],
+            'plyrlab_add_trainer_url' => $plyrLabAdmin['add_trainer_url'],
             'coach_outreach_sent' => $coachOutreachSent,
             'reminders_this_week' => $this->recentReminderActivity($athleteIds),
             'service_activity' => $serviceActivity,
@@ -799,6 +810,163 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 ],
                 'services' => $emptyServices,
             ];
+        }
+    }
+
+    protected function plyrLabAdminData(): array
+    {
+        $empty = [
+            'trainers' => [],
+            'bookings' => [],
+            'stats' => [
+                'trainers' => 0,
+                'bookable' => 0,
+                'connected' => 0,
+                'bookings' => 0,
+                'active_athletes' => 0,
+                'needs_attention' => 0,
+            ],
+            'trainers_url' => null,
+            'add_trainer_url' => null,
+        ];
+
+        if (
+            ! class_exists(PlyrLabTrainer::class)
+            || ! class_exists(PlyrLabBooking::class)
+            || ! Schema::hasTable('plyr_lab_trainers')
+            || ! Schema::hasTable('plyr_lab_bookings')
+        ) {
+            return $empty;
+        }
+
+        try {
+            $trainers = PlyrLabTrainer::query()
+                ->with('user:id,first_name,last_name,email,player_image,plyrcard_image')
+                ->withCount('bookings')
+                ->orderByDesc('is_active')
+                ->orderBy('display_name')
+                ->get();
+
+            $trainerRows = $trainers
+                ->map(function (PlyrLabTrainer $trainer): array {
+                    $latestBooking = PlyrLabBooking::query()
+                        ->where('trainer_id', $trainer->getKey())
+                        ->latest('created_at')
+                        ->first();
+
+                    $activeAthletes = PlyrLabBooking::query()
+                        ->where('trainer_id', $trainer->getKey())
+                        ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
+                        ->distinct('player_user_id')
+                        ->count('player_user_id');
+
+                    $name = $trainer->displayName();
+
+                    return [
+                        'id' => (int) $trainer->getKey(),
+                        'name' => $name,
+                        'initials' => collect(preg_split('/\s+/', trim($name)) ?: [])
+                            ->filter()
+                            ->take(2)
+                            ->map(fn (string $part): string => Str::upper(Str::substr($part, 0, 1)))
+                            ->implode('') ?: 'PL',
+                        'email' => (string) ($trainer->user?->email ?? ''),
+                        'headline' => trim((string) ($trainer->headline ?? '')) ?: 'PLYRLab Performance Trainer',
+                        'location' => trim((string) ($trainer->location ?? '')),
+                        'specialties' => array_values(array_filter((array) ($trainer->specialties ?? []))),
+                        'bookable' => (bool) $trainer->is_active,
+                        'plyomat_connected' => $trainer->hasPlyomatConnection(),
+                        'bookings' => (int) ($trainer->bookings_count ?? 0),
+                        'active_athletes' => $activeAthletes,
+                        'last_booking' => $latestBooking?->created_at?->diffForHumans() ?? 'No bookings yet',
+                        'edit_url' => $this->plyrLabTrainerUrl($trainer),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $bookings = PlyrLabBooking::query()
+                ->with([
+                    'player:id,first_name,last_name,email,personal_email,sport,team_name',
+                    'trainer.user:id,first_name,last_name,email',
+                ])
+                ->latest('created_at')
+                ->limit(30)
+                ->get()
+                ->map(function (PlyrLabBooking $booking): array {
+                    $player = $booking->player;
+                    $playerName = $this->userName($player);
+                    $status = trim((string) $booking->status) ?: 'pending';
+
+                    return [
+                        'id' => (int) $booking->getKey(),
+                        'player_id' => (int) ($booking->player_user_id ?? 0),
+                        'player' => $playerName,
+                        'initials' => $player ? $this->initials($player) : 'P',
+                        'sport' => $player ? $this->sportLabel((string) ($player->sport ?? '')) : 'Athlete',
+                        'trainer' => $booking->trainer?->displayName() ?? 'Trainer unavailable',
+                        'scheduled_for' => $booking->scheduled_for?->format('M j, Y · g:i A') ?? 'Not scheduled',
+                        'status' => $status,
+                        'status_label' => Str::headline($status),
+                        'plyomat_ready' => filled($booking->plyomat_athlete_id),
+                        'last_sync' => $booking->plyomat_last_synced_at?->diffForHumans()
+                            ?? ($booking->plyomat_provisioned_at?->diffForHumans() ?? 'Not synced'),
+                        'needs_attention' => in_array($status, ['awaiting_integration', 'provisioning_failed'], true),
+                        'user_url' => $player ? $this->userUrl($player) : null,
+                    ];
+                })
+                ->all();
+
+            $bookingQuery = PlyrLabBooking::query();
+
+            return [
+                'trainers' => $trainerRows,
+                'bookings' => $bookings,
+                'stats' => [
+                    'trainers' => $trainers->count(),
+                    'bookable' => $trainers->where('is_active', true)->count(),
+                    'connected' => $trainers->filter(fn (PlyrLabTrainer $trainer): bool => $trainer->hasPlyomatConnection())->count(),
+                    'bookings' => (clone $bookingQuery)->count(),
+                    'active_athletes' => (clone $bookingQuery)
+                        ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
+                        ->distinct('player_user_id')
+                        ->count('player_user_id'),
+                    'needs_attention' => (clone $bookingQuery)
+                        ->whereIn('status', ['awaiting_integration', 'provisioning_failed'])
+                        ->count(),
+                ],
+                'trainers_url' => $this->plyrLabTrainerIndexUrl(),
+                'add_trainer_url' => $this->plyrLabTrainerCreateUrl(),
+            ];
+        } catch (Throwable) {
+            return $empty;
+        }
+    }
+
+    protected function plyrLabTrainerIndexUrl(): ?string
+    {
+        try {
+            return PlyrLabTrainerResource::getUrl('index');
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    protected function plyrLabTrainerCreateUrl(): ?string
+    {
+        try {
+            return PlyrLabTrainerResource::getUrl('create');
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    protected function plyrLabTrainerUrl(PlyrLabTrainer $trainer): ?string
+    {
+        try {
+            return PlyrLabTrainerResource::getUrl('edit', ['record' => $trainer]);
+        } catch (Throwable) {
+            return null;
         }
     }
 
