@@ -306,7 +306,7 @@ trait InteractsWithCoachDatabase
     public function mount(CoachDatabaseService $coachDatabaseService): void
     {
         $requestedSection = trim((string) request()->query('section', ''));
-        $allowedSections = ['dashboard','schools','coaches','favorites','lists','conversations','campaigns','compose','photos','support','schedule','services','settings','profile'];
+        $allowedSections = ['dashboard','plyrlab','schools','coaches','favorites','lists','conversations','campaigns','compose','photos','support','schedule','services','settings','profile'];
         $this->section = in_array($requestedSection, $allowedSections, true) ? $requestedSection : $this->coachDatabaseSection();
         $this->dataCacheKey = $this->cacheKey();
         $user = Auth::user();
@@ -531,7 +531,7 @@ trait InteractsWithCoachDatabase
     public function switchRecruitingSection(string $section): void
     {
         $allowedSections = [
-            'dashboard', 'schools', 'coaches', 'favorites', 'lists',
+            'dashboard', 'plyrlab', 'schools', 'coaches', 'favorites', 'lists',
             'conversations', 'campaigns', 'compose', 'photos', 'support',
             'schedule', 'services', 'settings', 'profile',
         ];
@@ -760,7 +760,7 @@ trait InteractsWithCoachDatabase
 
     protected function canFreeRoleAccessCoachDatabaseSection(string $section): bool
     {
-        return in_array($section, ['profile', 'photos', 'schedule', 'services', 'support', 'settings'], true);
+        return in_array($section, ['profile', 'photos', 'schedule', 'services', 'support', 'settings', 'plyrlab'], true);
     }
 
     /**
@@ -1233,6 +1233,7 @@ trait InteractsWithCoachDatabase
     public function pageUrl(string $section): string
     {
         return match ($section) {
+            'plyrlab' => \App\Filament\Pages\CoachDatabasePlyrLab::getUrl(),
             'schools' => \App\Filament\Pages\CoachDatabaseSchools::getUrl(),
             'coaches' => \App\Filament\Pages\CoachDatabaseCoaches::getUrl(),
             'favorites' => \App\Filament\Pages\CoachDatabaseFavorites::getUrl(),
