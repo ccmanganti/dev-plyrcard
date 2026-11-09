@@ -20,7 +20,7 @@ class PlyrLabDataService
         $booking = PlyrLabBooking::query()
             ->with(['trainer.user'])
             ->where('player_user_id', $player->getKey())
-            ->whereIn('status', PlyrLabBooking::OPEN_STATUSES)
+            ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
             ->latest('id')
             ->first();
 
@@ -118,7 +118,6 @@ class PlyrLabDataService
             'notes' => $booking->notes,
             'plyomat_ready' => filled($booking->plyomat_athlete_id),
             'last_synced_at' => $booking->plyomat_last_synced_at?->toIso8601String(),
-            'last_sync_error' => $booking->last_sync_error,
             'trainer' => $trainer ? $this->trainerPayload($trainer) : null,
         ];
     }
@@ -133,6 +132,8 @@ class PlyrLabDataService
             'active' => 'Your PLYRLab is connected to your trainer and ready for performance data.',
             'awaiting_integration' => 'Trainer booked. Your Plyomat profile is being connected.',
             'provisioning', 'pending' => 'Trainer booked. We are preparing your Plyomat athlete profile.',
+            'provisioning_failed' => 'Trainer booked. Your PLYRLab remains unlocked while the Plyomat connection is retried.',
+            'completed' => 'Your PLYRLab remains available with your saved performance results.',
             default => 'Your PLYRLab access is active.',
         };
     }
