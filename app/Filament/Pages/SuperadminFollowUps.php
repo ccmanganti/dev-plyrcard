@@ -15,7 +15,7 @@ class SuperadminFollowUps extends SuperadminAthletes
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bell-alert';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static string $controlCenterWidgetClass = SuperadminFollowUpsControlCenterWidget::class;
 
