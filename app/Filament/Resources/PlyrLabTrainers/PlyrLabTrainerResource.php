@@ -118,7 +118,7 @@ class PlyrLabTrainerResource extends Resource
                 ]),
 
             Section::make('Plyomat connection')
-                ->description('Only the Plyomat API key is required. PLYRCARD uses the fixed API base URL, Athlete Read endpoint, and authorization format configured for the Plyomat developer API.')
+                ->description('Only the Plyomat API key is required. PLYRCARD uses Plyomat’s documented API automatically to create athletes and read their data.')
                 ->schema([
                     TextInput::make('plyomat_api_key')
                         ->label('API key')
@@ -126,7 +126,7 @@ class PlyrLabTrainerResource extends Resource
                         ->revealable()
                         ->required(fn (string $operation): bool => $operation === 'create')
                         ->dehydrated(fn (?string $state): bool => filled($state))
-                        ->helperText('Use a key with Athlete Read access. Leave blank when editing to keep the current encrypted key.'),
+                        ->helperText('Use a key with Athlete Read + Athlete Write access. Leave blank when editing to keep the current encrypted key.'),
                 ]),
        ]);
     }
