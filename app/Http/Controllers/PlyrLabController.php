@@ -19,6 +19,20 @@ class PlyrLabController extends Controller
         $player = $request->user();
         abort_unless($player, 403);
 
+        $booking = PlyrLabBooking::query()
+            ->where('player_user_id', $player->getKey())
+            ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
+            ->latest('id')
+            ->first();
+
+        if (
+            $booking
+            && filled($booking->plyomat_athlete_id)
+            && (! $booking->plyomat_last_synced_at || $booking->plyomat_last_synced_at->lt(now()->subMinutes(10)))
+        ) {
+            ProvisionPlyrLabAthlete::dispatch($booking->getKey());
+        }
+
         return response()->json([
             'success' => true,
             'data' => $dataService->payload($player),
