@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
+use App\Models\User;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
@@ -16,6 +17,210 @@ class PlyomatService
     public function isConfigured(PlyrLabTrainer $trainer): bool
     {
         return $trainer->hasPlyomatConnection();
+    }
+
+    public function createAthlete(PlyrLabBooking $booking): array
+    {
+        $booking->loadMissing(['trainer', 'player']);
+        $trainer = $booking->trainer;
+        $player = $booking->player;
+
+        if (! $trainer || ! $player) {
+            throw new RuntimeException('PLYRLab booking is missing its trainer or player.');
+        }
+
+        if (! $this->isConfigured($trainer)) {
+            throw new RuntimeException('The trainer\'s Plyomat API key is not configured.');
+        }
+
+        $path = trim((string) config('services.plyomat.athlete_create_path', '/v1/athletes'));
+        $url = rtrim((string) config('services.plyomat.base_url', 'https://api.plyomat.com'), '/')
+            . '/' . ltrim($path, '/');
+
+        $response = $this->request($trainer, [
+            'header' => 'Authorization',
+            'prefix' => 'Bearer',
+        ])->post($url, $this->athleteCreatePayload($player));
+
+        if (! $response->successful()) {
+            $json = $response->json();
+            $message = is_array($json)
+                ? (data_get($json, 'message') ?? data_get($json, 'detail') ?? data_get($json, 'error'))
+                : null;
+
+            if ($response->status() === 401) {
+                throw new RuntimeException('Plyomat rejected the trainer\'s Bearer token. Confirm the API key is valid.');
+            }
+
+            if ($response->status() === 403) {
+                throw new RuntimeException('The trainer\'s Plyomat API key does not have Athlete Write access.');
+            }
+
+            if ($response->status() === 409) {
+                throw new RuntimeException('Plyomat reports that this athlete already exists. Use the existing Athlete ID to connect the profile.');
+            }
+
+            throw new RuntimeException(
+                'Plyomat athlete creation failed: HTTP ' . $response->status()
+                . ($message ? ' · ' . Str::limit((string) $message, 180) : '')
+            );
+        }
+
+        $json = $response->json();
+
+        if (! is_array($json)) {
+            throw new RuntimeException('Plyomat created the athlete but did not return a JSON athlete record.');
+        }
+
+        $athlete = $this->extractCreatedAthletePayload($json);
+        $athleteId = $this->athleteIdentifier($athlete);
+
+        if ($athleteId === null) {
+            throw new RuntimeException('Plyomat created the athlete but the response did not include an athlete ID.');
+        }
+
+        return $athlete;
+    }
+
+    public function athleteIdentifier(array $athlete): ?string
+    {
+        $id = data_get($athlete, 'id')
+            ?? data_get($athlete, 'athlete_id')
+            ?? data_get($athlete, 'athleteId')
+            ?? data_get($athlete, 'uuid');
+
+        if ($id === null || trim((string) $id) === '') {
+            return null;
+        }
+
+        return trim((string) $id);
+    }
+
+    public function athleteCreatePayload(User $player): array
+    {
+        $firstName = trim((string) $player->first_name);
+        $lastName = trim((string) $player->last_name);
+
+        if ($firstName === '' || $lastName === '') {
+            throw new RuntimeException('The player needs a first and last name before PLYRCard can create the Plyomat athlete.');
+        }
+
+        $gender = strtolower(trim((string) $player->gender));
+        $gender = match ($gender) {
+            'female', 'f', 'woman', 'women', 'girl' => 'female',
+            'male', 'm', 'man', 'men', 'boy' => 'male',
+            default => null,
+        };
+
+        if ($gender === null) {
+            throw new RuntimeException('The player needs a male/female gender value before PLYRCard can create the Plyomat athlete.');
+        }
+
+        $payload = [
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'external_id' => app()->environment() . '-' . $player->getKey(),
+            'external_source' => 'plyrcard',
+            'gender' => $gender,
+        ];
+
+        $height = $this->heightCm($player->height);
+        $weight = $this->weightKg($player->weight);
+
+        if ($height !== null) {
+            $payload['height_cm'] = $height;
+        }
+
+        if ($weight !== null) {
+            $payload['body_weight_kg'] = $weight;
+        }
+
+        return $payload;
+    }
+
+    protected function extractCreatedAthletePayload(array $payload): array
+    {
+        foreach ([
+            $payload,
+            data_get($payload, 'data'),
+            data_get($payload, 'athlete'),
+            data_get($payload, 'result'),
+            data_get($payload, 'data.athlete'),
+            data_get($payload, 'result.athlete'),
+        ] as $candidate) {
+            if (! is_array($candidate) || $candidate === []) {
+                continue;
+            }
+
+            if ($this->athleteIdentifier($candidate) !== null) {
+                return $candidate;
+            }
+        }
+
+        return $payload;
+    }
+
+    protected function heightCm(mixed $value): ?float
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        $raw = strtolower(trim((string) $value));
+
+        if (preg_match('/^(\d+)\s*[\'′]\s*(\d+(?:\.\d+)?)?\s*(?:[\\"″])?$/u', $raw, $match)) {
+            $feet = (float) $match[1];
+            $inches = isset($match[2]) && $match[2] !== '' ? (float) $match[2] : 0.0;
+
+            return round(($feet * 12 + $inches) * 2.54, 2);
+        }
+
+        $number = preg_replace('/[^0-9.]+/', '', $raw);
+        if ($number === '' || ! is_numeric($number)) {
+            return null;
+        }
+
+        $number = (float) $number;
+
+        if (str_contains($raw, 'ft') || str_contains($raw, 'feet')) {
+            return round($number * 30.48, 2);
+        }
+
+        if (str_contains($raw, 'in')) {
+            return round($number * 2.54, 2);
+        }
+
+        if ($number > 0 && $number < 3) {
+            return round($number * 100, 2);
+        }
+
+        if ($number >= 3 && $number <= 8) {
+            return round($number * 30.48, 2);
+        }
+
+        return $number > 0 ? round($number, 2) : null;
+    }
+
+    protected function weightKg(mixed $value): ?float
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        $raw = strtolower(trim((string) $value));
+        $number = preg_replace('/[^0-9.]+/', '', $raw);
+
+        if ($number === '' || ! is_numeric($number)) {
+            return null;
+        }
+
+        $number = (float) $number;
+
+        if (str_contains($raw, 'lb')) {
+            return round($number * 0.45359237, 2);
+        }
+
+        return $number > 0 ? round($number, 2) : null;
     }
 
     public function readAthlete(PlyrLabBooking $booking): array
@@ -206,7 +411,7 @@ class PlyomatService
     protected function authCandidates(PlyrLabTrainer $trainer): array
     {
         $configuredHeader = trim((string) config('services.plyomat.auth_header', 'Authorization'));
-        $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Api-Key'));
+        $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
         $savedHeader = trim((string) ($trainer->plyomat_auth_header ?: ''));
         $savedPrefix = trim((string) ($trainer->plyomat_auth_prefix ?? ''));
 
@@ -217,9 +422,9 @@ class PlyomatService
                 'prefix' => $savedPrefix,
             ],
             [
-                'label' => 'authorization_api_key',
+                'label' => 'authorization_bearer',
                 'header' => 'Authorization',
-                'prefix' => 'Api-Key',
+                'prefix' => 'Bearer',
             ],
             [
                 'label' => 'configured',
@@ -232,9 +437,9 @@ class PlyomatService
                 'prefix' => 'Token',
             ],
             [
-                'label' => 'authorization_bearer',
+                'label' => 'authorization_api_key',
                 'header' => 'Authorization',
-                'prefix' => 'Bearer',
+                'prefix' => 'Api-Key',
             ],
             [
                 'label' => 'authorization_raw',
