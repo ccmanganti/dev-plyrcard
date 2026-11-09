@@ -300,10 +300,10 @@ class PlyrLabDataService
 
         return match ($booking->status) {
             'active' => 'Your PLYRLab is connected to Plyomat and ready for performance data.',
-            'awaiting_athlete_id' => 'Trainer booked. Ask your trainer for your Plyomat Athlete ID, then enter it here to connect your results.',
-            'awaiting_integration' => 'Your Athlete ID is saved, but your trainer\'s Plyomat read connection needs attention.',
-            'provisioning', 'pending' => 'Trainer booked. Ask your trainer for your Plyomat Athlete ID after they create your profile.',
-            'provisioning_failed' => 'Trainer booked. Enter the Athlete ID provided by your trainer to reconnect your Plyomat profile.',
+            'provisioning', 'pending' => 'Trainer booked. PLYRCard is creating your Plyomat athlete profile automatically.',
+            'awaiting_athlete_id' => 'An existing Plyomat athlete may already exist. Enter the Athlete ID from your trainer to connect that profile instead.',
+            'awaiting_integration' => 'Your trainer\'s Plyomat API connection needs attention before PLYRCard can create or read athlete data.',
+            'provisioning_failed' => 'Automatic Plyomat creation failed. You can connect an existing Athlete ID instead, or have an admin check the trainer API key.',
             'completed' => 'Your PLYRLab remains available with your saved performance results.',
             default => 'Your PLYRLab access is active.',
         };
