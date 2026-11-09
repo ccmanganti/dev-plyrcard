@@ -15,7 +15,7 @@ class SuperadminBilling extends SuperadminAthletes
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static string $controlCenterWidgetClass = SuperadminSubscriptionsControlCenterWidget::class;
 
