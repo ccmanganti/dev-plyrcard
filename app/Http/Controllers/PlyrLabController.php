@@ -7,6 +7,7 @@ use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
 use App\Notifications\PlyrLabTrainerBookedNotification;
 use App\Services\PlyrLabDataService;
+use App\Services\PlyomatService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -75,7 +76,7 @@ class PlyrLabController extends Controller
                 'player_user_id' => $player->getKey(),
                 'trainer_id' => $trainer->getKey(),
                 'scheduled_for' => $validated['scheduled_for'],
-                'status' => 'pending',
+                'status' => 'awaiting_athlete_id',
                 'notes' => $validated['notes'] ?? null,
             ]);
         });
@@ -88,11 +89,88 @@ class PlyrLabController extends Controller
             }
         }
 
-        ProvisionPlyrLabAthlete::dispatch($booking->getKey())->afterCommit();
+        return response()->json([
+            'success' => true,
+            'message' => 'Trainer booked. Ask your trainer for your Plyomat Athlete ID after they create your profile, then connect it in PLYRLab.',
+            'data' => $dataService->payload($player),
+        ]);
+    }
+
+    public function connect(Request $request, PlyrLabDataService $dataService, PlyomatService $plyomat): JsonResponse
+    {
+        $player = $request->user();
+        abort_unless($player, 403);
+
+        $validated = $request->validate([
+            'athlete_id' => ['required', 'string', 'max:255'],
+        ]);
+
+        $athleteId = trim((string) $validated['athlete_id']);
+
+        $booking = PlyrLabBooking::query()
+            ->with(['trainer.user'])
+            ->where('player_user_id', $player->getKey())
+            ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
+            ->latest('id')
+            ->first();
+
+        if (! $booking) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Book a PLYRLab trainer before connecting a Plyomat Athlete ID.',
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
+
+        if (! $booking->trainer || ! $plyomat->isConfigured($booking->trainer)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Your trainer\'s Plyomat Athlete Read connection is not configured yet.',
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
+
+        $previousId = $booking->plyomat_athlete_id;
+        $previousStatus = $booking->status;
+
+        try {
+            // Verify the ID before persisting it. readAthlete() uses the booked
+            // trainer's API credentials, so a successful response proves that
+            // this trainer can access the submitted athlete.
+            $booking->setAttribute('plyomat_athlete_id', $athleteId);
+            $athlete = $plyomat->readAthlete($booking);
+
+            if ($athlete === []) {
+                throw new \RuntimeException('Plyomat returned an empty athlete record for that ID.');
+            }
+
+            $stats = $plyomat->normalizeStats($athlete);
+
+            $booking->forceFill([
+                'status' => 'active',
+                'plyomat_athlete_id' => $athleteId,
+                'plyomat_provisioned_at' => now(),
+                'plyomat_last_synced_at' => now(),
+                'plyomat_stats' => $stats,
+                'last_sync_error' => null,
+            ])->save();
+        } catch (Throwable $exception) {
+            $booking->forceFill([
+                'status' => filled($previousId) ? $previousStatus : 'awaiting_athlete_id',
+                'plyomat_athlete_id' => $previousId,
+                'last_sync_error' => $exception->getMessage(),
+            ])->save();
+
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Trainer booked. Your PLYRLab is unlocked while your Plyomat profile is prepared.',
+            'message' => 'Plyomat profile connected. Your available performance data has been synced.',
             'data' => $dataService->payload($player),
         ]);
     }
@@ -118,13 +196,11 @@ class PlyrLabController extends Controller
         }
 
         if (blank($booking->plyomat_athlete_id)) {
-            ProvisionPlyrLabAthlete::dispatch($booking->getKey());
-
             return response()->json([
-                'success' => true,
-                'message' => 'Your Plyomat profile is still being prepared. We retried the connection in the background.',
+                'success' => false,
+                'message' => 'Enter the Plyomat Athlete ID provided by your trainer before refreshing stats.',
                 'data' => $dataService->payload($player),
-            ]);
+            ], 422);
         }
 
         try {
