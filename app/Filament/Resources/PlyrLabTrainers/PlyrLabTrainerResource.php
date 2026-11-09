@@ -38,9 +38,13 @@ class PlyrLabTrainerResource extends Resource
     {
         $user = auth()->user();
 
-        return $user
-            && method_exists($user, 'isSuperadminOrImpersonating')
-            && $user->isSuperadminOrImpersonating();
+        return (bool) ($user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            ));
     }
 
     public static function shouldRegisterNavigation(): bool
