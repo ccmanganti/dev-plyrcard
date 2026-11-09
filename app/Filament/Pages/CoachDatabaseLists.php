@@ -21,7 +21,7 @@ class CoachDatabaseLists extends Page
 
     protected static ?string $slug = 'coach-database/lists';
 
-    protected static ?int $navigationSort = 16;
+    protected static ?int $navigationSort = 15;
 
     protected string $view = 'filament.pages.coach-database';
 
