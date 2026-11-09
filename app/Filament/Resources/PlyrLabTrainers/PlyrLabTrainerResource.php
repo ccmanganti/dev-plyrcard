@@ -118,39 +118,17 @@ class PlyrLabTrainerResource extends Resource
                 ]),
 
             Section::make('Plyomat connection')
-                ->description('Use a Plyomat developer API key with Athlete Read access. Trainers create athletes inside Plyomat; PLYRCARD connects them by Athlete ID. Credentials are encrypted at rest and never exposed in Locker Room.')
-                ->columns(2)
+                ->description('Only the Plyomat API key is required. PLYRCARD uses the fixed API base URL, Athlete Read endpoint, and authorization format configured for the Plyomat developer API.')
                 ->schema([
-                    TextInput::make('plyomat_base_url')
-                        ->label('API base URL')
-                        ->url()
-                        ->maxLength(500)
-                        ->placeholder('https://...'),
                     TextInput::make('plyomat_api_key')
                         ->label('API key')
                         ->password()
                         ->revealable()
+                        ->required(fn (string $operation): bool => $operation === 'create')
                         ->dehydrated(fn (?string $state): bool => filled($state))
-                        ->helperText('The key needs Athlete Read access. Leave blank when editing to keep the current encrypted key.'),
-                    TextInput::make('plyomat_auth_header')
-                        ->label('Auth header')
-                        ->default('Authorization')
-                        ->maxLength(100),
-                    TextInput::make('plyomat_auth_prefix')
-                        ->label('Auth prefix')
-                        ->default('Bearer')
-                        ->maxLength(100)
-                        ->helperText('For example Bearer. Leave blank if the API expects the raw key.'),
-                    TextInput::make('plyomat_account_id')
-                        ->label('Trainer Plyomat account ID')
-                        ->maxLength(255),
-                    TextInput::make('plyomat_stats_path')
-                        ->label('Athlete Read endpoint')
-                        ->maxLength(500)
-                        ->placeholder('/api/athletes/{athlete_id}')
-                        ->helperText('Used to verify a player-entered Athlete ID and refresh PLYRLab. Supports {athlete}, {athlete_id}, or {id}.'),
+                        ->helperText('Use a key with Athlete Read access. Leave blank when editing to keep the current encrypted key.'),
                 ]),
-        ]);
+       ]);
     }
 
     public static function table(Table $table): Table
