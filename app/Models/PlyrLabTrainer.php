@@ -60,7 +60,6 @@ class PlyrLabTrainer extends Model
     {
         return filled($this->plyomat_api_key)
             && filled($this->plyomat_base_url)
-            && filled($this->plyomat_create_athlete_path)
             && filled($this->plyomat_stats_path);
     }
 }
