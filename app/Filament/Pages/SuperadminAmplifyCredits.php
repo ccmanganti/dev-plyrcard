@@ -15,7 +15,7 @@ class SuperadminAmplifyCredits extends SuperadminAthletes
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-bolt';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 6;
 
     protected static string $controlCenterWidgetClass = SuperadminAmplifyCreditsControlCenterWidget::class;
 
