@@ -116,26 +116,26 @@ class PlyomatService
             throw new RuntimeException('The player needs a male/female gender value before PLYRCard can create the Plyomat athlete.');
         }
 
-        $payload = [
+        $height = $this->heightCm($player->height);
+        $weight = $this->weightKg($player->weight);
+
+        if ($height === null) {
+            throw new RuntimeException('The player needs a valid height before PLYRCard can create the Plyomat athlete.');
+        }
+
+        if ($weight === null) {
+            throw new RuntimeException('The player needs a valid body weight before PLYRCard can create the Plyomat athlete.');
+        }
+
+        return [
             'first_name' => $firstName,
             'last_name' => $lastName,
             'external_id' => app()->environment() . '-' . $player->getKey(),
             'external_source' => 'plyrcard',
             'gender' => $gender,
+            'height_cm' => $height,
+            'body_weight_kg' => $weight,
         ];
-
-        $height = $this->heightCm($player->height);
-        $weight = $this->weightKg($player->weight);
-
-        if ($height !== null) {
-            $payload['height_cm'] = $height;
-        }
-
-        if ($weight !== null) {
-            $payload['body_weight_kg'] = $weight;
-        }
-
-        return $payload;
     }
 
     protected function extractCreatedAthletePayload(array $payload): array
