@@ -206,7 +206,7 @@ class PlyomatService
     protected function authCandidates(PlyrLabTrainer $trainer): array
     {
         $configuredHeader = trim((string) config('services.plyomat.auth_header', 'Authorization'));
-        $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
+        $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Api-Key'));
         $savedHeader = trim((string) ($trainer->plyomat_auth_header ?: ''));
         $savedPrefix = trim((string) ($trainer->plyomat_auth_prefix ?? ''));
 
@@ -217,9 +217,24 @@ class PlyomatService
                 'prefix' => $savedPrefix,
             ],
             [
+                'label' => 'authorization_api_key',
+                'header' => 'Authorization',
+                'prefix' => 'Api-Key',
+            ],
+            [
                 'label' => 'configured',
                 'header' => $configuredHeader,
                 'prefix' => $configuredPrefix,
+            ],
+            [
+                'label' => 'authorization_token',
+                'header' => 'Authorization',
+                'prefix' => 'Token',
+            ],
+            [
+                'label' => 'authorization_bearer',
+                'header' => 'Authorization',
+                'prefix' => 'Bearer',
             ],
             [
                 'label' => 'authorization_raw',
@@ -232,7 +247,7 @@ class PlyomatService
                 'prefix' => '',
             ],
             [
-                'label' => 'api_key',
+                'label' => 'api_key_header',
                 'header' => 'API-Key',
                 'prefix' => '',
             ],
