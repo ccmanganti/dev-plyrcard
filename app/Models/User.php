@@ -153,12 +153,25 @@ class User extends Authenticatable implements HasName, FilamentUser, MustVerifyE
 
     public function isSuperadminOrImpersonating(): bool
     {
-        if ($this->hasRole('superadmin')) return true;
+        $isSuperadmin = fn (?self $user): bool => (bool) ($user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            ));
+
+        if ($isSuperadmin($this)) {
+            return true;
+        }
+
         if (app('impersonate')->isImpersonating()) {
             $impersonatorId = app('impersonate')->getImpersonatorId();
             $impersonator = static::find($impersonatorId);
-            return $impersonator?->hasRole('superadmin') ?? false;
+
+            return $isSuperadmin($impersonator);
         }
+
         return false;
     }
 
