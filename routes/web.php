@@ -29,6 +29,7 @@ use App\Http\Controllers\LockerRoomPasswordResetController;
 use App\Http\Middleware\SendPlayerActivityEmail;
 use App\Http\Controllers\PointPackPurchaseController;
 use App\Http\Controllers\PlyrPointsHistoryController;
+use App\Http\Controllers\PlyrLabController;
 /*
  * Load this file from routes/web.php before any catch-all /{slug} route:
  * require __DIR__ . '/external_tracking.php';
@@ -54,6 +55,12 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.point-packs.status');
     Route::get('/locker-room/points/history', PlyrPointsHistoryController::class)
         ->name('locker-room.points.history');
+    Route::get('/locker-room/plyr-lab', [PlyrLabController::class, 'index'])
+        ->name('locker-room.plyr-lab');
+    Route::post('/locker-room/plyr-lab/book', [PlyrLabController::class, 'book'])
+        ->name('locker-room.plyr-lab.book');
+    Route::post('/locker-room/plyr-lab/refresh', [PlyrLabController::class, 'refresh'])
+        ->name('locker-room.plyr-lab.refresh');
     // Native Stripe registration retry. The initial registration POST logs the
     // new user in before the browser calls this endpoint.
     Route::post('/registration/stripe/start', [RegistrationController::class, 'startStripePayment'])
