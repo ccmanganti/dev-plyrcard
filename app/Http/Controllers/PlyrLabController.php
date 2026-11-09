@@ -91,7 +91,7 @@ class PlyrLabController extends Controller
         $booking = PlyrLabBooking::query()
             ->with(['trainer.user'])
             ->where('player_user_id', $player->getKey())
-            ->whereIn('status', PlyrLabBooking::OPEN_STATUSES)
+            ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
             ->latest('id')
             ->first();
 
