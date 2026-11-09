@@ -114,7 +114,7 @@ class PlyrLabTrainerResource extends Resource
                 ]),
 
             Section::make('Plyomat connection')
-                ->description('Use a Plyomat developer API key with Athlete Read and Athlete Write access. Credentials are encrypted at rest and never exposed in Locker Room.')
+                ->description('Use a Plyomat developer API key with Athlete Read access. Trainers create athletes inside Plyomat; PLYRCARD connects them by Athlete ID. Credentials are encrypted at rest and never exposed in Locker Room.')
                 ->columns(2)
                 ->schema([
                     TextInput::make('plyomat_base_url')
@@ -127,7 +127,7 @@ class PlyrLabTrainerResource extends Resource
                         ->password()
                         ->revealable()
                         ->dehydrated(fn (?string $state): bool => filled($state))
-                        ->helperText('The key needs Athlete Read + Athlete Write access. Leave blank when editing to keep the current encrypted key.'),
+                        ->helperText('The key needs Athlete Read access. Leave blank when editing to keep the current encrypted key.'),
                     TextInput::make('plyomat_auth_header')
                         ->label('Auth header')
                         ->default('Authorization')
@@ -140,16 +140,11 @@ class PlyrLabTrainerResource extends Resource
                     TextInput::make('plyomat_account_id')
                         ->label('Trainer Plyomat account ID')
                         ->maxLength(255),
-                    TextInput::make('plyomat_create_athlete_path')
-                        ->label('Athlete Write endpoint')
-                        ->maxLength(500)
-                        ->placeholder('/api/athletes')
-                        ->helperText('Used when a player books this trainer. Requires Athlete Write access.'),
                     TextInput::make('plyomat_stats_path')
                         ->label('Athlete Read endpoint')
                         ->maxLength(500)
                         ->placeholder('/api/athletes/{athlete_id}')
-                        ->helperText('Used to refresh the player in PLYRLab. Requires Athlete Read access and supports {athlete}, {athlete_id}, or {id}.'),
+                        ->helperText('Used to verify a player-entered Athlete ID and refresh PLYRLab. Supports {athlete}, {athlete_id}, or {id}.'),
                 ]),
         ]);
     }
