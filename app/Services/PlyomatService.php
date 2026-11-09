@@ -60,8 +60,8 @@ class PlyomatService
 
                 if (! is_array($json)) {
                     // A 200 HTML response means we hit the Plyomat web app/SPA,
-                    // not the developer API. Keep probing the read-only API candidates.
-                    continue;
+                    // not the developer API. Auth headers cannot fix the route.
+                    break;
                 }
 
                 $athlete = $this->extractAthletePayload($json, $athleteId);
@@ -71,6 +71,10 @@ class PlyomatService
 
                     return $athlete;
                 }
+
+                // We reached a JSON endpoint, but it was not an athlete payload.
+                // Try the next candidate route rather than repeating auth variants.
+                break;
             }
         }
 
@@ -149,8 +153,15 @@ class PlyomatService
     {
         $configuredHeader = trim((string) config('services.plyomat.auth_header', 'Authorization'));
         $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
+        $savedHeader = trim((string) ($trainer->plyomat_auth_header ?: ''));
+        $savedPrefix = trim((string) ($trainer->plyomat_auth_prefix ?? ''));
 
-        return [
+        $candidates = [
+            [
+                'label' => 'saved',
+                'header' => $savedHeader,
+                'prefix' => $savedPrefix,
+            ],
             [
                 'label' => 'configured',
                 'header' => $configuredHeader,
@@ -172,6 +183,24 @@ class PlyomatService
                 'prefix' => '',
             ],
         ];
+
+        $seen = [];
+
+        return array_values(array_filter($candidates, function (array $candidate) use (&$seen): bool {
+            if (blank($candidate['header'] ?? null)) {
+                return false;
+            }
+
+            $signature = strtolower((string) $candidate['header']) . '|' . (string) ($candidate['prefix'] ?? '');
+
+            if (isset($seen[$signature])) {
+                return false;
+            }
+
+            $seen[$signature] = true;
+
+            return true;
+        }));
     }
 
     protected function extractAthletePayload(array $payload, string $athleteId): ?array
