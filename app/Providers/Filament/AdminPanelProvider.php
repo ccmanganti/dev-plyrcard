@@ -1878,6 +1878,7 @@ class AdminPanelProvider extends PanelProvider
                                             || current.includes('/coach-database/photos')
                                             || current.includes('/coach-database/schedule')
                                             || current.includes('/coach-database/services')
+                                            || current.includes('/coach-database/plyrlab')
                                             || current.includes('/coach-database/support')
                                             || current.includes('/profile')
                                             || current.includes('/settings')
@@ -1929,7 +1930,7 @@ class AdminPanelProvider extends PanelProvider
                                         document.body.classList.remove('plyr-free-upgrade-open');
                                     };
 
-                                    const allowedLabel = (text) => ['Athlete Profile', 'My Photos', 'My Schedule', 'PLYR Points', 'Support', 'Settings'].includes(String(text || '').trim());
+                                    const allowedLabel = (text) => ['Athlete Profile', 'My Photos', 'My Schedule', 'PLYR Points', 'PLYRLab', 'Support', 'Settings'].includes(String(text || '').trim());
 
                                     const applyFreeLocks = () => {
                                         document.querySelectorAll('[data-plyr-free-close]').forEach((button) => {
@@ -1975,6 +1976,7 @@ class AdminPanelProvider extends PanelProvider
                                                 || hrefPath.includes('/coach-database/photos')
                                                 || hrefPath.includes('/coach-database/schedule')
                                                 || hrefPath.includes('/coach-database/services')
+                                                || hrefPath.includes('/coach-database/plyrlab')
                                                 || hrefPath.includes('/coach-database/support')
                                                 || hrefPath === profilePath
                                                 || hrefPath.startsWith(profilePath + '/')
