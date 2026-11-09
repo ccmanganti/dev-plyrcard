@@ -290,6 +290,21 @@
     .plab-coachbar{border:1px solid var(--plab-line);border-left:3px solid var(--plab-coral);border-radius:8px;background:var(--plab-panel);padding:10px 14px;display:grid;gap:2px}
     .plab-coachbar strong{font:800 19px var(--plab-cond);text-transform:uppercase}.plab-coachbar small{color:var(--plab-muted);font-size:12px}
 
+
+    .plab-connect{
+        border:1px solid rgba(255,99,72,.55);border-radius:12px;background:
+        radial-gradient(90% 130% at 100% 0%,rgba(255,99,72,.16),transparent 60%),var(--plab-panel);
+        padding:14px 16px;margin-bottom:14px;display:grid;gap:10px
+    }
+    .plab-connect-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:start}
+    .plab-connect-k{font:800 12px var(--plab-cond);letter-spacing:.16em;text-transform:uppercase;color:var(--plab-coral)}
+    .plab-connect-title{margin:2px 0 3px;font:800 24px/1 var(--plab-cond);text-transform:uppercase}
+    .plab-connect-copy{margin:0;color:#cfcac3;font-size:12px;line-height:1.5}
+    .plab-connect-state{border:1px solid var(--plab-line);border-radius:999px;padding:5px 9px;font:800 10px var(--plab-cond);letter-spacing:.1em;text-transform:uppercase;color:var(--plab-gold);white-space:nowrap}
+    .plab-connect-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+    .plab-connect-form label{display:grid;gap:4px;font:800 9px var(--plab-cond);letter-spacing:.12em;text-transform:uppercase;color:var(--plab-muted)}
+    .plab-connect-help{font-size:10px;color:var(--plab-muted);line-height:1.4}
+
     /* Exact PLYRCARD structure from the supplied reference, with stronger
        handling for long real-world names/profile labels. */
     .plab-card-wrap{width:230px!important;max-width:100%;margin:0 auto}
@@ -364,6 +379,7 @@
         .plab-home-grid{grid-template-columns:1fr}.plab-stat-cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -12px;padding:0 12px 8px;scrollbar-width:none}.plab-stat-cards::-webkit-scrollbar{display:none}.plab-stat-card{flex:0 0 86%;scroll-snap-align:center}
         .plab-body-map{grid-template-columns:1fr}.plab-body-flip{display:flex}.plab-body-figures{grid-template-columns:1fr;max-width:230px;margin:0 auto}.plab-body-figures[data-side=front] .plab-body-svg[data-view=back],.plab-body-figures[data-side=back] .plab-body-svg[data-view=front]{display:none}
         .plab-zone-list{margin-top:10px}
+        .plab-connect-head,.plab-connect-form{grid-template-columns:1fr}.plab-connect-state{justify-self:start}
     }
     @media(prefers-reduced-motion:reduce){.plab-body-zone.is-weak{animation:none;stroke:#fff;stroke-dasharray:4 3}}
 </style>
@@ -448,7 +464,7 @@
             '<label>Session date & time<input class="plab-in" type="datetime-local" name="scheduled_for" required data-plab-datetime></label>'+
             '<label>Note for your trainer<textarea class="plab-in" name="notes" maxlength="1000" placeholder="What do you want to work on? Any testing goals?"></textarea></label>'+
             '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'><i class="fa-solid fa-calendar-check"></i> '+(busy?'Booking…':'Book Trainer & Unlock PLYRLab')+'</button>'+
-            '<div style="font-size:8px;color:var(--plab-muted);line-height:1.45">Booking unlocks your PLYRLab. PLYRCARD then creates your athlete profile inside this trainer’s connected Plyomat account in the background.</div>'+
+            '<div style="font-size:8px;color:var(--plab-muted);line-height:1.45">Booking unlocks your PLYRLab. Your trainer creates your athlete profile in Plyomat, then gives you the Athlete ID to connect here.</div>'+
         '</form>':'';
 
         root().innerHTML=shell('<div class="plab-lock">'+
@@ -515,6 +531,22 @@
     }
 
 
+
+    function connectionPanel(){
+        var b=booking();if(!b||b.plyomat_ready)return'';
+        var t=trainer(),trainerName=t&&t.name?t.name:'your trainer';
+        return '<section class="plab-connect">'+
+            '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat connection</span><h3 class="plab-connect-title">Connect your athlete profile</h3>'+
+                '<p class="plab-connect-copy">'+esc(trainerName)+' creates your athlete profile inside Plyomat. Ask them for your <b>Plyomat Athlete ID</b>, then enter it below. PLYRCARD will verify that the ID is accessible through your booked trainer before saving it.</p></div>'+
+                '<span class="plab-connect-state">Awaiting Athlete ID</span></div>'+
+            '<form class="plab-connect-form" data-plab-connect-form>'+
+                '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Enter the ID from your trainer" required></label>'+
+                '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Verifying…':'Connect Profile')+'</button>'+
+            '</form>'+
+            '<div class="plab-connect-help">The ID is not saved unless Plyomat confirms that your booked trainer can read that athlete record.</div>'+
+        '</section>';
+    }
+
     function cardHtml(){
         var p=player(),ov=rating('overall'),fr=frameFor(ov),parts=String(p.name||'PLAYER').trim().split(/\s+/),
             last=parts.length>1?parts.pop():parts[0],first=parts.length?parts.join(' '):'',
@@ -537,9 +569,9 @@
     }
 
     function notice(){
-        var b=booking();if(!b||b.status==='active')return'';
-        var text=(lab.access&&lab.access.message)||'Your Plyomat profile is being prepared.';
-        if(b.status==='provisioning_failed')text='Your trainer booking is active, but the Plyomat connection needs attention. Your PLYRLab remains unlocked.';
+        var b=booking();if(!b||b.status==='active'||b.status==='awaiting_athlete_id')return'';
+        var text=(lab.access&&lab.access.message)||'Your Plyomat connection needs attention.';
+        if(b.status==='awaiting_integration')text='Your Athlete ID is saved, but your trainer\'s Plyomat Athlete Read connection needs attention.';
         return '<div class="plab-notice"><i class="fa-solid fa-circle-info"></i><span>'+esc(text)+'</span></div>';
     }
 
@@ -714,19 +746,23 @@
     function renderUnlocked(){
         var p=player(),b=booking(),status=b?b.status_label:'Unlocked';
         var tabContent=activeTab==='stats'?statsView():activeTab==='body'?bodyView():activeTab==='d1'?d1View():homeView();
+        var syncControl=b&&b.plyomat_ready
+            ? '<div class="plab-sync"><button type="button" class="plab-btn is-ghost" data-plab-refresh '+(busy?'disabled':'')+'><i class="fa-solid fa-rotate"></i> '+(busy?'Syncing…':'Refresh Stats')+'</button><small>'+(b.last_synced_at?'Last sync '+esc(fmtDateTime(b.last_synced_at)):esc(status))+'</small></div>'
+            : '<div class="plab-sync"><small>Waiting for your Plyomat Athlete ID</small></div>';
         root().innerHTML=shell(
             '<div class="plab-athlete-head">'+
                 avatarHtml(p)+
                 '<div><div class="plab-athlete-name">'+esc(p.name||'Player')+'</div><div class="plab-athlete-sub">'+esc(p.team||'Independent')+' · '+esc(p.sport||'Athlete')+'</div></div>'+
-                '<div class="plab-sync"><button type="button" class="plab-btn is-ghost" data-plab-refresh '+(busy?'disabled':'')+'><i class="fa-solid fa-rotate"></i> '+(busy?'Syncing…':'Refresh Stats')+'</button><small>'+(b&&b.last_synced_at?'Last sync '+esc(fmtDateTime(b.last_synced_at)):esc(status))+'</small></div>'+
+                syncControl+
             '</div>'+
             '<nav class="plab-nav" aria-label="PLYRLab player views">'+
                 tabButton('home','Home')+tabButton('stats','Stats')+tabButton('body','Body Map')+tabButton('d1','vs D1')+
             '</nav>'+
-            '<div class="plab-body">'+tabContent+'</div>',
+            '<div class="plab-body">'+connectionPanel()+tabContent+'</div>',
             '<b>'+esc(status)+'</b><br>'+esc((b&&b.trainer&&b.trainer.name)||'PLYRLab')
         );
     }
+
 
     var PLAB_ICONS={
         home:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7v9h-6v-6H9v6H3z"></path></svg>',
@@ -754,6 +790,22 @@
         }catch(e){if(e.payload&&e.payload.data){lab=e.payload.data;loaded=true}toast(e.message,true);render()}
         finally{busy=false;render()}
     }
+
+    async function connectAthlete(form){
+        if(busy)return;
+        var fd=new FormData(form),athleteId=String(fd.get('athlete_id')||'').trim();
+        if(!athleteId){toast('Enter the Plyomat Athlete ID provided by your trainer.',true);return}
+        if(!drawer.dataset.plyrLabConnectUrl){toast('The Plyomat connection endpoint is unavailable.',true);return}
+        busy=true;render();
+        try{
+            var json=await api(drawer.dataset.plyrLabConnectUrl,{method:'POST',body:{athlete_id:athleteId}});
+            lab=json.data||lab;loaded=true;activeTab='home';toast(json.message||'Plyomat profile connected.');
+        }catch(e){
+            if(e.payload&&e.payload.data){lab=e.payload.data;loaded=true}
+            toast(e.message,true);
+        }finally{busy=false;render()}
+    }
+
     async function refreshStats(){
         if(busy)return;busy=true;render();
         try{var json=await api(drawer.dataset.plyrLabRefreshUrl,{method:'POST',body:{}});lab=json.data||lab;loaded=true;toast(json.message||'Stats refreshed.')}
@@ -771,6 +823,7 @@
         var refresh=event.target.closest('[data-plab-refresh]');if(refresh&&drawer.contains(refresh)){refreshStats();return}
     },true);
     document.addEventListener('submit',function(event){
+        var connectForm=event.target.closest('[data-plab-connect-form]');if(connectForm&&drawer.contains(connectForm)){event.preventDefault();connectAthlete(connectForm);return}
         var form=event.target.closest('[data-plab-book-form]');if(form&&drawer.contains(form)){event.preventDefault();submitBooking(form)}
     },true);
 })();
