@@ -21,7 +21,7 @@ class CoachDatabaseFavorites extends Page
 
     protected static ?string $slug = 'coach-database/favorites';
 
-    protected static ?int $navigationSort = 13;
+    protected static ?int $navigationSort = 14;
 
     protected string $view = 'filament.pages.coach-database';
 
