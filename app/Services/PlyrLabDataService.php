@@ -230,7 +230,7 @@ class PlyrLabDataService
             'plyomat_last_synced_at' => now(),
             'last_sync_error' => $hasMeasurements
                 ? null
-                : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                : $this->plyomat->performanceSyncMessage($stats),
         ])->save();
 
         return $booking->fresh(['trainer.user']) ?? $booking;
