@@ -483,6 +483,26 @@
     }
     @media(prefers-reduced-motion:reduce){.plab-connection-spinner:before{animation-duration:1.8s}}
 
+
+    .plab-booking-manager{
+        margin-top:14px;border:1px solid var(--plab-line);border-radius:12px;background:rgba(17,19,24,.78);overflow:hidden
+    }
+    .plab-booking-manager-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid var(--plab-line)}
+    .plab-booking-manager-head b{display:block;font:800 16px var(--plab-cond);text-transform:uppercase}
+    .plab-booking-manager-head small{display:block;margin-top:2px;color:var(--plab-muted);font-size:10px}
+    .plab-booking-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) auto;gap:8px;align-items:end;padding:12px 14px}
+    .plab-booking-form label{display:grid;gap:4px;font:800 9px var(--plab-cond);letter-spacing:.11em;text-transform:uppercase;color:var(--plab-muted)}
+    .plab-booking-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+    .plab-btn.is-danger{border-color:rgba(239,74,82,.55);background:rgba(239,74,82,.08);color:#ff8e93}
+    .plab-btn.is-danger:hover{background:rgba(239,74,82,.15)}
+    .plab-waiting-trainer{
+        display:flex;align-items:center;gap:9px;margin-top:10px;padding:9px 11px;border:1px solid rgba(242,191,58,.38);
+        border-radius:8px;background:rgba(242,191,58,.06);color:#e8d18c;font-size:11px
+    }
+    .plab-wait-dot{width:9px;height:9px;border-radius:50%;background:var(--plab-gold);box-shadow:0 0 0 0 rgba(242,191,58,.4);animation:plab-wait-pulse 1.6s ease-out infinite}
+    @keyframes plab-wait-pulse{70%{box-shadow:0 0 0 8px rgba(242,191,58,0)}100%{box-shadow:0 0 0 0 rgba(242,191,58,0)}}
+    @media(max-width:760px){.plab-booking-form{grid-template-columns:1fr}.plab-booking-actions{align-items:stretch}.plab-booking-actions .plab-btn{flex:1}}
+
     /* Exact PLYRCARD structure from the supplied reference, with stronger
        handling for long real-world names/profile labels. */
     .plab-card-wrap{width:230px!important;max-width:100%;margin:0 auto}
@@ -567,6 +587,8 @@
      data-plyrlab-page
      data-plyr-lab-url="{{ route('locker-room.plyr-lab') }}"
      data-plyr-lab-book-url="{{ route('locker-room.plyr-lab.book') }}"
+     data-plyr-lab-booking-update-url="{{ route('locker-room.plyr-lab.booking.update') }}"
+     data-plyr-lab-booking-cancel-url="{{ route('locker-room.plyr-lab.booking.cancel') }}"
      data-plyr-lab-connect-url="{{ route('locker-room.plyr-lab.connect') }}"
      data-plyr-lab-refresh-url="{{ route('locker-room.plyr-lab.refresh') }}">
     <div class="plab-shell" data-plab-root>
@@ -583,7 +605,7 @@
     drawer.dataset.plyrLabReady='1';
 
     var root=function(){return drawer.querySelector('[data-plab-root]')};
-    var lab=null,loaded=false,loading=false,activeTab='home',selectedTrainerId=null,busy=false,bodySide='front',activeZone=null;
+    var lab=null,loaded=false,loading=false,activeTab='home',selectedTrainerId=null,busy=false,bodySide='front',activeZone=null,pollTimer=null;
 
     function esc(v){return String(v==null?'':v).replace(/[&<>'"]/g,function(ch){return {'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]})}
     function csrf(){var m=document.querySelector('meta[name="csrf-token"]'),i=document.querySelector('input[name="_token"]');return m?m.content:(i?i.value:'')}
@@ -727,6 +749,26 @@
 
 
 
+
+    function localDateTime(v){
+        if(!v)return'';
+        var d=new Date(v);if(Number.isNaN(d.getTime()))return'';
+        var pad=function(n){return String(n).padStart(2,'0')};
+        return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+    }
+    function bookingManager(){
+        var b=booking(),t=trainer();if(!b)return'';
+        return '<section class="plab-booking-manager">'+
+            '<div class="plab-booking-manager-head"><div><b>Manage trainer booking</b><small>'+esc(t&&t.name?t.name:'PLYRLab trainer')+' · '+esc(fmtDateTime(b.scheduled_for))+'</small></div><span class="plab-connect-state">'+esc(b.status_label||b.status||'Booked')+'</span></div>'+
+            '<form class="plab-booking-form" data-plab-booking-manage-form>'+
+                '<label>Session time<input class="plab-in" name="scheduled_for" type="datetime-local" value="'+esc(localDateTime(b.scheduled_for))+'" required></label>'+
+                '<label>Notes<input class="plab-in" name="notes" type="text" maxlength="1000" value="'+esc(b.notes||'')+'" placeholder="Optional note for your trainer"></label>'+
+                '<div class="plab-booking-actions"><button class="plab-btn is-ghost" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Saving…':'Save Booking')+'</button>'+
+                '<button class="plab-btn is-danger" type="button" data-plab-cancel-booking '+(busy?'disabled':'')+'>Cancel Booking</button></div>'+
+            '</form>'+
+        '</section>';
+    }
+
     function connectionPanel(){
         var b=booking();if(!b||b.plyomat_ready)return'';
         var state=String(b.status||'');
@@ -742,9 +784,10 @@
 
         if(state==='awaiting_integration'){
             return '<section class="plab-connect">'+
-                '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat connection</span><h3 class="plab-connect-title">Trainer API connection needs attention</h3>'+
-                '<p class="plab-connect-copy">PLYRCard cannot create or read your Plyomat athlete until the trainer\'s API key is configured with Athlete Read + Athlete Write access.</p></div>'+
-                '<span class="plab-connect-state">API attention</span></div>'+
+                '<div class="plab-connect-head"><div><span class="plab-connect-k">Awaiting trainer setup</span><h3 class="plab-connect-title">Your trainer is connecting Plyomat</h3>'+
+                '<p class="plab-connect-copy">Your booking is saved. '+esc(trainer()&&trainer().name?trainer().name:'Your trainer')+' has not connected a Plyomat API key yet, so PLYRCard cannot create or verify your athlete profile. You can come back soon—this page checks again automatically—or cancel the booking below.</p></div>'+
+                '<span class="plab-connect-state">Waiting for trainer</span></div>'+
+                '<div class="plab-waiting-trainer"><i class="plab-wait-dot"></i><span>We will retry automatically as soon as the trainer API connection is available.</span></div>'+
             '</section>';
         }
 
@@ -969,7 +1012,7 @@
 
         var title=connecting?'Connecting your Plyomat profile'
             :duplicate?'Existing Plyomat profile detected'
-            :apiIssue?'Trainer API connection required'
+            :apiIssue?'Awaiting trainer setup'
             :'Automatic connection needs attention';
 
         var copy=connecting
@@ -977,19 +1020,19 @@
             :duplicate
                 ? 'Plyomat indicates that this athlete may already exist. Enter the existing Athlete ID below and PLYRCard will verify it before unlocking PLYRLab.'
                 :apiIssue
-                    ? 'Your booking is saved, but PLYRCard cannot create or verify a Plyomat athlete until the trainer API connection is fixed.'
+                    ? 'Your booking is confirmed, but your trainer has not connected their Plyomat API key yet. PLYRLab stays locked while we wait. Come back soon or cancel the booking below.'
                     : 'Automatic athlete creation did not complete. If your trainer already has your Plyomat profile, you can still connect it using the existing Athlete ID below.';
 
-        var step2=connecting?'is-active':(duplicate||failed?'is-error':'');
+        var step2=(connecting||apiIssue)?'is-active':(duplicate||failed?'is-error':'');
         var step3=duplicate||failed?'is-active':(connecting?'':'');
-        var fallback=(duplicate||failed||apiIssue)?connectionPanel():'';
-        var error=b&&b.connection_error?'<div class="plab-connection-error"><b>Connection detail:</b> '+esc(b.connection_error)+'</div>':'';
+        var fallback=(duplicate||failed)?connectionPanel():(apiIssue?connectionPanel():'');
+        var error=(!apiIssue&&b&&b.connection_error)?'<div class="plab-connection-error"><b>Connection detail:</b> '+esc(b.connection_error)+'</div>':'';
 
         root().innerHTML=shell(
             '<div class="plab-pending">'+
                 '<section class="plab-pending-card">'+
                     '<div class="plab-pending-main">'+
-                        (connecting?'<div class="plab-connection-spinner" aria-label="Connecting"></div>':'<div class="plab-connection-lock"><i class="fa-solid fa-lock"></i></div>')+
+                        ((connecting||apiIssue)?'<div class="plab-connection-spinner" aria-label="Waiting"></div>':'<div class="plab-connection-lock"><i class="fa-solid fa-lock"></i></div>')+
                         '<div><span class="plab-pending-eyebrow">PLYRLab locked · '+esc(status)+'</span><h3 class="plab-pending-title">'+esc(title)+'</h3><p class="plab-pending-copy">'+esc(copy)+'</p></div>'+
                     '</div>'+
                     '<div class="plab-connect-steps">'+
@@ -1006,9 +1049,15 @@
                     error+
                 '</section>'+
                 fallback+
+                bookingManager()+
             '</div>',
             '<b>'+esc(status)+'</b><br>PLYRLab unlocks after Plyomat verification'
         );
+
+        if(pollTimer){clearTimeout(pollTimer);pollTimer=null}
+        if(connecting||apiIssue){
+            pollTimer=setTimeout(function(){loaded=false;load(true)},8000);
+        }
     }
 
     function renderUnlocked(){
@@ -1026,7 +1075,7 @@
             '<nav class="plab-nav" aria-label="PLYRLab player views">'+
                 tabButton('home','Home')+tabButton('stats','Stats')+tabButton('body','Body Map')+tabButton('d1','vs D1')+
             '</nav>'+
-            '<div class="plab-body">'+connectionPanel()+tabContent+'</div>',
+            '<div class="plab-body">'+bookingManager()+connectionPanel()+tabContent+'</div>',
             '<b>'+esc(status)+'</b><br>'+esc((b&&b.trainer&&b.trainer.name)||'PLYRLab')
         );
     }
@@ -1045,9 +1094,15 @@
 
     function render(){
         if(!root()||!lab)return;
-        if(lab.access&&lab.access.unlocked)renderUnlocked();
-        else if(booking())renderPendingConnection();
-        else renderLocked();
+        if(lab.access&&lab.access.unlocked){
+            if(pollTimer){clearTimeout(pollTimer);pollTimer=null}
+            renderUnlocked();
+        }else if(booking()){
+            renderPendingConnection();
+        }else{
+            if(pollTimer){clearTimeout(pollTimer);pollTimer=null}
+            renderLocked();
+        }
     }
 
     async function submitBooking(form){
@@ -1095,6 +1150,35 @@
         }finally{busy=false;render()}
     }
 
+
+    async function updateBooking(form){
+        if(busy)return;
+        var fd=new FormData(form),payload={scheduled_for:fd.get('scheduled_for'),notes:String(fd.get('notes')||'')};
+        if(!drawer.dataset.plyrLabBookingUpdateUrl){toast('Booking update endpoint is unavailable.',true);return}
+        busy=true;render();
+        try{
+            var json=await api(drawer.dataset.plyrLabBookingUpdateUrl,{method:'PATCH',body:payload});
+            lab=json.data||lab;loaded=true;toast(json.message||'Booking updated.');
+        }catch(e){
+            if(e.payload&&e.payload.data){lab=e.payload.data;loaded=true}
+            toast(e.message,true);
+        }finally{busy=false;render()}
+    }
+
+    async function cancelBooking(){
+        if(busy)return;
+        if(!window.confirm('Cancel this PLYRLab trainer booking?'))return;
+        if(!drawer.dataset.plyrLabBookingCancelUrl){toast('Booking cancellation endpoint is unavailable.',true);return}
+        busy=true;
+        try{
+            var json=await api(drawer.dataset.plyrLabBookingCancelUrl,{method:'POST',body:{}});
+            lab=json.data||lab;loaded=true;activeTab='home';selectedTrainerId=null;toast(json.message||'Booking cancelled.');
+        }catch(e){
+            if(e.payload&&e.payload.data){lab=e.payload.data;loaded=true}
+            toast(e.message,true);
+        }finally{busy=false;render()}
+    }
+
     async function refreshStats(){
         if(busy)return;busy=true;render();
         try{var json=await api(drawer.dataset.plyrLabRefreshUrl,{method:'POST',body:{}});lab=json.data||lab;loaded=true;toast(json.message||'Stats refreshed.')}
@@ -1107,9 +1191,11 @@
         var tab=event.target.closest('[data-plab-tab]');if(tab&&drawer.contains(tab)){activeTab=tab.dataset.plabTab||'home';render();return}
         var bv=event.target.closest('[data-plab-bview]');if(bv&&drawer.contains(bv)){bodySide=bv.dataset.plabBview||'front';render();return}
         var bz=event.target.closest('[data-plab-zone]');if(bz&&drawer.contains(bz)){activeZone=bz.dataset.plabZone||null;render();return}
+        var cancel=event.target.closest('[data-plab-cancel-booking]');if(cancel&&drawer.contains(cancel)){cancelBooking();return}
         var refresh=event.target.closest('[data-plab-refresh]');if(refresh&&drawer.contains(refresh)){refreshStats();return}
     },true);
     document.addEventListener('submit',function(event){
+        var manageForm=event.target.closest('[data-plab-booking-manage-form]');if(manageForm&&drawer.contains(manageForm)){event.preventDefault();updateBooking(manageForm);return}
         var connectForm=event.target.closest('[data-plab-connect-form]');if(connectForm&&drawer.contains(connectForm)){event.preventDefault();connectAthlete(connectForm);return}
         var form=event.target.closest('[data-plab-book-form]');if(form&&drawer.contains(form)){event.preventDefault();submitBooking(form)}
     },true);
