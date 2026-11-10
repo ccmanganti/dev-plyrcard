@@ -79,10 +79,19 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
                     'last_sync_error' => null,
                 ])->save();
             } catch (Throwable $exception) {
-                $duplicate = str_contains(strtolower($exception->getMessage()), 'already exists');
+                $error = strtolower($exception->getMessage());
+                $duplicate = str_contains($error, 'already exists');
+                $trainerConnectionIssue = str_contains($error, 'bearer token')
+                    || str_contains($error, 'api key')
+                    || str_contains($error, 'athlete write access')
+                    || str_contains($error, 'athlete read access')
+                    || str_contains($error, 'http 401')
+                    || str_contains($error, 'http 403');
 
                 $booking->forceFill([
-                    'status' => $duplicate ? 'awaiting_athlete_id' : 'provisioning_failed',
+                    'status' => $duplicate
+                        ? 'awaiting_athlete_id'
+                        : ($trainerConnectionIssue ? 'awaiting_integration' : 'provisioning_failed'),
                     'last_sync_error' => $exception->getMessage(),
                 ])->save();
 
@@ -103,7 +112,7 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
 
     protected function syncStatsWhenAvailable(PlyrLabBooking $booking, PlyomatService $plyomat): void
     {
-        if (! $booking->trainer?->hasPlyomatConnection() || blank($booking->plyomat_athlete_id)) {
+        if (! $booking->trainer || ! $plyomat->isConfigured($booking->trainer) || blank($booking->plyomat_athlete_id)) {
             return;
         }
 
