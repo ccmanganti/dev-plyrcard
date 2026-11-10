@@ -345,6 +345,16 @@ class PlyomatService
 
                 $athlete = $this->extractAthletePayload($json, $athleteId);
 
+                if ($athlete === null && ($candidate['path'] ?? null) === '/v1/athletes') {
+                    $athlete = $this->findAthleteAcrossCollectionPages(
+                        $trainer,
+                        $candidate,
+                        $auth,
+                        $json,
+                        $athleteId,
+                    );
+                }
+
                 if ($athlete !== null) {
                     $this->rememberWorkingConnection($trainer, $candidate, $auth);
 
@@ -460,6 +470,69 @@ class PlyomatService
         }
 
         return array_values($candidates);
+    }
+
+    protected function findAthleteAcrossCollectionPages(
+        PlyrLabTrainer $trainer,
+        array $candidate,
+        array $auth,
+        array $firstPage,
+        string $athleteId,
+    ): ?array {
+        $match = $this->extractAthletePayload($firstPage, $athleteId);
+
+        if ($match !== null) {
+            return $match;
+        }
+
+        $hasMore = (bool) data_get($firstPage, 'has_more', false);
+        $limit = max(1, (int) data_get($firstPage, 'limit', count((array) data_get($firstPage, 'data', [])) ?: 50));
+        $offset = max(0, (int) data_get($firstPage, 'offset', 0));
+        $total = max(0, (int) data_get($firstPage, 'total', 0));
+
+        if (! $hasMore) {
+            return null;
+        }
+
+        $baseUrl = rtrim((string) ($candidate['base_url'] ?? config('services.plyomat.base_url', 'https://api.plyomat.com')), '/');
+        $pagesChecked = 1;
+
+        while ($hasMore && $pagesChecked < 50) {
+            $offset += $limit;
+            $url = $baseUrl . '/v1/athletes?limit=' . $limit . '&offset=' . $offset;
+            $response = $this->request($trainer, $auth)->get($url);
+
+            if (! $response->successful()) {
+                break;
+            }
+
+            $json = $response->json();
+
+            if (! is_array($json)) {
+                break;
+            }
+
+            $match = $this->extractAthletePayload($json, $athleteId);
+
+            if ($match !== null) {
+                return $match;
+            }
+
+            $hasMore = (bool) data_get($json, 'has_more', false);
+            $nextLimit = (int) data_get($json, 'limit', $limit);
+
+            if ($nextLimit > 0) {
+                $limit = $nextLimit;
+            }
+
+            $pagesChecked++;
+
+            if ($total > 0 && $offset + $limit >= $total) {
+                break;
+            }
+        }
+
+        return null;
     }
 
     protected function authCandidates(PlyrLabTrainer $trainer): array
