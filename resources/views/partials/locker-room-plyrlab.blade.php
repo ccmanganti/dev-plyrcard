@@ -562,8 +562,7 @@
                 '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Enter the existing Plyomat Athlete ID" required></label>'+
                 '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Verifying…':'Connect Profile')+'</button>'+
             '</form>'+
-            '<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="plab-btn is-ghost" data-plab-provision '+(busy?'disabled':'')+'><i class="fa-solid fa-wand-magic-sparkles"></i> Try Automatic Creation</button></div>'+
-            '<div class="plab-connect-help">Use Athlete ID if a Plyomat profile already exists. Otherwise, Try Automatic Creation will call Plyomat POST /v1/athletes using the booked trainer\'s Bearer token.</div>'+
+            '<div class="plab-connect-help">Use Athlete ID only when a Plyomat profile already exists. Automatic creation is triggered immediately when the trainer booking is made.</div>'+
         '</section>';
     }
 
@@ -827,19 +826,6 @@
         }finally{busy=false;render()}
     }
 
-    async function provisionAthlete(){
-        if(busy)return;
-        if(!drawer.dataset.plyrLabProvisionUrl){toast('The automatic Plyomat creation endpoint is unavailable.',true);return}
-        busy=true;render();
-        try{
-            var json=await api(drawer.dataset.plyrLabProvisionUrl,{method:'POST',body:{}});
-            lab=json.data||lab;loaded=true;activeTab='home';toast(json.message||'Creating Plyomat athlete profile.');
-        }catch(e){
-            if(e.payload&&e.payload.data){lab=e.payload.data;loaded=true}
-            toast(e.message,true);
-        }finally{busy=false;render()}
-    }
-
     async function refreshStats(){
         if(busy)return;busy=true;render();
         try{var json=await api(drawer.dataset.plyrLabRefreshUrl,{method:'POST',body:{}});lab=json.data||lab;loaded=true;toast(json.message||'Stats refreshed.')}
@@ -854,7 +840,6 @@
         var tab=event.target.closest('[data-plab-tab]');if(tab&&drawer.contains(tab)){activeTab=tab.dataset.plabTab||'home';render();return}
         var bv=event.target.closest('[data-plab-bview]');if(bv&&drawer.contains(bv)){bodySide=bv.dataset.plabBview||'front';render();return}
         var bz=event.target.closest('[data-plab-zone]');if(bz&&drawer.contains(bz)){activeZone=bz.dataset.plabZone||null;render();return}
-        var provision=event.target.closest('[data-plab-provision]');if(provision&&drawer.contains(provision)){provisionAthlete();return}
         var refresh=event.target.closest('[data-plab-refresh]');if(refresh&&drawer.contains(refresh)){refreshStats();return}
     },true);
     document.addEventListener('submit',function(event){
