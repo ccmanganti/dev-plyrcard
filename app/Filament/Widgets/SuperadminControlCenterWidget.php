@@ -1610,7 +1610,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'can_manage' => $isSuperadmin
                             || ($viewerTrainer && (int) $booking->trainer_id === (int) $viewerTrainer->getKey()),
                         'athlete_id' => (string) ($booking->plyomat_athlete_id ?? ''),
-                        'connection_error' => (string) ($booking->last_sync_error ?? ''),
+                        'connection_error' => app(PlyomatService::class)->userFacingSyncError($booking->last_sync_error),
                         'user_url' => $player ? $this->userUrl($player) : null,
                     ];
                 })
