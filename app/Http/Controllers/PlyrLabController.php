@@ -205,6 +205,13 @@ class PlyrLabController extends Controller
                 throw new \RuntimeException('Plyomat returned an empty athlete record for that ID.');
             }
 
+            $canonicalAthleteId = $plyomat->athleteIdentifier($athlete) ?: $athleteId;
+
+            // If the player entered an external/short identifier, switch the
+            // booking to Plyomat's canonical primary UUID before requesting
+            // sessions/results.
+            $booking->setAttribute('plyomat_athlete_id', $canonicalAthleteId);
+
             // The athlete profile proves the ID is valid. Pull performance
             // data separately because Plyomat roster responses may not contain
             // sessions/assessment measurements.
@@ -213,7 +220,7 @@ class PlyrLabController extends Controller
 
             $booking->forceFill([
                 'status' => 'active',
-                'plyomat_athlete_id' => $athleteId,
+                'plyomat_athlete_id' => $canonicalAthleteId,
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
                 'plyomat_stats' => $stats,
