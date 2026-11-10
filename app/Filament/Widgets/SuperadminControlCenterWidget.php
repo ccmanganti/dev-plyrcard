@@ -131,6 +131,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             ->latest('id')
             ->first();
 
+        $createdForManualConnect = false;
+
         if (! $booking) {
             $booking = PlyrLabBooking::query()->create([
                 'player_user_id' => $player->getKey(),
@@ -139,6 +141,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'status' => 'awaiting_athlete_id',
                 'notes' => 'Connected manually by PLYRLab admin.',
             ]);
+            $createdForManualConnect = true;
         }
 
         $previous = [
@@ -174,12 +177,16 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 ->success()
                 ->send();
         } catch (Throwable $exception) {
-            $booking->forceFill([
-                'trainer_id' => $previous['trainer_id'],
-                'plyomat_athlete_id' => $previous['athlete_id'],
-                'status' => $previous['status'],
-                'last_sync_error' => $exception->getMessage(),
-            ])->save();
+            if ($createdForManualConnect) {
+                $booking->delete();
+            } else {
+                $booking->forceFill([
+                    'trainer_id' => $previous['trainer_id'],
+                    'plyomat_athlete_id' => $previous['athlete_id'],
+                    'status' => $previous['status'],
+                    'last_sync_error' => $exception->getMessage(),
+                ])->save();
+            }
 
             Notification::make()
                 ->title('Manual connection failed')
