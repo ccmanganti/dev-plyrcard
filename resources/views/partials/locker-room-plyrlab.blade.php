@@ -333,6 +333,8 @@
         font-style:normal;border:1px solid #3b4049;border-radius:999px;padding:3px 7px;
         color:#b9bec7;background:#111318;font-size:9px;line-height:1
     }
+    .plab-trainer-meta em.is-api-ready{border-color:rgba(52,210,122,.38);color:#75e7aa;background:rgba(52,210,122,.07)}
+    .plab-trainer-meta em.is-api-wait{border-color:rgba(242,191,58,.38);color:#e8d18c;background:rgba(242,191,58,.06)}
     .plab-book-form{margin-top:4px!important;padding:17px!important;gap:11px!important}
     .plab-book-selected{
         display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;
@@ -564,7 +566,7 @@
                 '<span class="plab-trainer-check"><i class="fa-solid fa-check"></i></span>'+
                 avatarHtml(t)+
                 '<span><strong>'+esc(t.name)+'</strong><small>'+esc(t.headline||'PLYRLab Performance Trainer')+'</small>'+
-                '<span class="plab-trainer-meta">'+(t.location?'<em><i class="fa-solid fa-location-dot"></i> '+esc(t.location)+'</em>':'')+'<em><i class="fa-regular fa-clock"></i> '+esc(t.duration_minutes||60)+' min</em></span>'+
+                '<span class="plab-trainer-meta">'+(t.location?'<em><i class="fa-solid fa-location-dot"></i> '+esc(t.location)+'</em>':'')+'<em><i class="fa-regular fa-clock"></i> '+esc(t.duration_minutes||60)+' min</em><em class="'+(t.api_connected?'is-api-ready':'is-api-wait')+'"><i class="fa-solid '+(t.api_connected?'fa-link':'fa-hourglass-half')+'"></i> '+(t.api_connected?'Plyomat ready':'Setup pending')+'</em></span>'+
                 '<span class="plab-specialties">'+arr(t.specialties).slice(0,4).map(function(x){return'<span class="plab-chip">'+esc(x)+'</span>'}).join('')+'</span></span></button>';
         }).join(''):'<div class="plab-empty" style="grid-column:1/-1">No PLYRLab trainers are available for booking yet.</div>';
 
