@@ -138,17 +138,39 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'plyomat_provisioned_at' => now(),
             'plyomat_last_synced_at' => null,
             // Never carry measurements from the previous Athlete ID into an
-            // admin override. The next successful API sync repopulates them.
+            // admin override. A fresh sync is attempted immediately below.
             'plyomat_stats' => null,
             'last_sync_error' => null,
         ])->save();
+
+        $syncMessage = 'API verification was bypassed; fresh performance data will sync when the trainer API is available.';
+
+        if ($trainer->hasPlyomatApiKey()) {
+            try {
+                $stats = app(PlyomatService::class)->fetchStats($booking->fresh(['trainer']) ?? $booking);
+
+                $booking->forceFill([
+                    'plyomat_stats' => $stats,
+                    'plyomat_last_synced_at' => now(),
+                    'last_sync_error' => null,
+                ])->save();
+
+                $syncMessage = 'The override was saved and PLYRCard immediately pulled the available Plyomat performance data.';
+            } catch (Throwable $exception) {
+                $booking->forceFill([
+                    'last_sync_error' => $exception->getMessage(),
+                ])->save();
+
+                $syncMessage = 'The override was saved, but the immediate Plyomat sync could not complete: ' . $exception->getMessage();
+            }
+        }
 
         $this->plyrLabAdminConnect = [];
         Cache::forget('superadmin:control-center:v6');
 
         Notification::make()
             ->title('Athlete ID overridden')
-            ->body($this->userName($player) . ' now uses Athlete ID ' . $athleteId . ' through ' . $trainer->displayName() . '. API verification was intentionally bypassed.')
+            ->body($this->userName($player) . ' now uses Athlete ID ' . $athleteId . ' through ' . $trainer->displayName() . '. ' . $syncMessage)
             ->warning()
             ->send();
     }
@@ -187,12 +209,34 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'last_sync_error' => null,
         ])->save();
 
+        $syncMessage = 'API verification was bypassed; fresh performance data will sync when the trainer API is available.';
+
+        if ($trainer->hasPlyomatApiKey()) {
+            try {
+                $stats = app(PlyomatService::class)->fetchStats($booking->fresh(['trainer']) ?? $booking);
+
+                $booking->forceFill([
+                    'plyomat_stats' => $stats,
+                    'plyomat_last_synced_at' => now(),
+                    'last_sync_error' => null,
+                ])->save();
+
+                $syncMessage = 'Fresh Plyomat performance data was pulled immediately.';
+            } catch (Throwable $exception) {
+                $booking->forceFill([
+                    'last_sync_error' => $exception->getMessage(),
+                ])->save();
+
+                $syncMessage = 'The override was saved, but immediate sync failed: ' . $exception->getMessage();
+            }
+        }
+
         unset($this->plyrLabManualConnections[$bookingId]);
         Cache::forget('superadmin:control-center:v6');
 
         Notification::make()
             ->title('Athlete ID overridden')
-            ->body($this->userName($booking->player) . ' now uses Athlete ID ' . $athleteId . '. API verification was intentionally bypassed.')
+            ->body($this->userName($booking->player) . ' now uses Athlete ID ' . $athleteId . '. ' . $syncMessage)
             ->warning()
             ->send();
     }
