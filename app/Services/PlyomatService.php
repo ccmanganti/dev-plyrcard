@@ -953,6 +953,11 @@ class PlyomatService
 
                 if (is_array($json)) {
                     $this->performanceDiagnostics[$diagIndex]['keys'] = array_slice(array_keys($json), 0, 8);
+
+                    $firstRow = data_get($json, 'data.0');
+                    if (is_array($firstRow)) {
+                        $this->performanceDiagnostics[$diagIndex]['row_keys'] = array_slice(array_keys($firstRow), 0, 16);
+                    }
                 }
 
                 if (! is_array($json) || ! $this->performancePayloadBelongsToAthlete($json, $athleteId, $resolved)) {
@@ -975,9 +980,116 @@ class PlyomatService
                     return [$payload];
                 }
 
+                // Plyomat's athlete performance history exposes a working sets
+                // collection. Sets can be metadata containers while the actual
+                // jump measurements live in their reps/detail records, so follow
+                // each returned set before falling back to unrelated endpoints.
+                if (preg_match('#/v1/sets(?:\?|$)#', $resolved)) {
+                    $setPayloads = $this->performancePayloadsFromSets(
+                        $trainer,
+                        $base,
+                        $auth,
+                        $json,
+                        $athleteId,
+                    );
+
+                    foreach ($setPayloads as $setPayload) {
+                        $payloads[] = $setPayload;
+
+                        if ($this->hasPerformanceMeasurements($this->normalizeStats($setPayload['data']))) {
+                            return [$setPayload];
+                        }
+                    }
+                }
+
                 // A successful JSON response does not guarantee it contains
                 // measurements. Keep probing other resource types when needed.
                 break;
+            }
+        }
+
+        return $payloads;
+    }
+
+    protected function performancePayloadsFromSets(
+        PlyrLabTrainer $trainer,
+        string $base,
+        array $auth,
+        array $setsPayload,
+        string $athleteId,
+    ): array {
+        $rows = data_get($setsPayload, 'data');
+
+        if (! is_array($rows) || ! array_is_list($rows)) {
+            return [];
+        }
+
+        $payloads = [];
+
+        foreach (array_slice($rows, 0, 50) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            $setId = data_get($row, 'id')
+                ?? data_get($row, 'set_id')
+                ?? data_get($row, 'setId')
+                ?? data_get($row, 'uuid');
+
+            if (! is_scalar($setId) || trim((string) $setId) === '') {
+                continue;
+            }
+
+            $setId = trim((string) $setId);
+
+            $paths = [
+                '/v1/sets/' . rawurlencode($setId),
+                '/v1/sets/' . rawurlencode($setId) . '/reps',
+                '/v1/reps?set_id=' . rawurlencode($setId),
+                '/v1/reps?setId=' . rawurlencode($setId),
+                '/v1/reps?set=' . rawurlencode($setId),
+            ];
+
+            foreach ($paths as $resolved) {
+                $url = rtrim($base, '/') . '/' . ltrim($resolved, '/');
+                $response = $this->request($trainer, $auth)->get($url);
+
+                $diagIndex = count($this->performanceDiagnostics);
+                $this->performanceDiagnostics[$diagIndex] = [
+                    'path' => $resolved,
+                    'status' => $response->status(),
+                    'content_type' => strtolower((string) $response->header('Content-Type')),
+                ];
+
+                if (! $response->successful()) {
+                    continue;
+                }
+
+                $json = $response->json();
+
+                if (! is_array($json)) {
+                    continue;
+                }
+
+                $this->performanceDiagnostics[$diagIndex]['keys'] = array_slice(array_keys($json), 0, 8);
+
+                $firstRow = data_get($json, 'data.0');
+                if (is_array($firstRow)) {
+                    $this->performanceDiagnostics[$diagIndex]['row_keys'] = array_slice(array_keys($firstRow), 0, 16);
+                }
+
+                $payload = [
+                    'data' => $json,
+                    'path' => $resolved,
+                    'base_url' => $base,
+                    'auth' => $auth,
+                ];
+
+                $payloads[] = $payload;
+
+                if ($this->hasPerformanceMeasurements($this->normalizeStats($json))) {
+                    return [$payload];
+                }
             }
         }
 
@@ -1042,9 +1154,11 @@ class PlyomatService
                 $path = (string) ($attempt['path'] ?? 'unknown');
                 $status = (string) ($attempt['status'] ?? '?');
                 $keys = (array) ($attempt['keys'] ?? []);
+                $rowKeys = (array) ($attempt['row_keys'] ?? []);
 
                 return $path . ' → HTTP ' . $status
-                    . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '');
+                    . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '')
+                    . ($rowKeys !== [] ? ' · data[0]: ' . implode(', ', $rowKeys) : '');
             })
             ->implode(' | ');
     }
