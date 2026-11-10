@@ -120,7 +120,7 @@ class PlyrLabController extends Controller
         $message = match ($booking->status) {
             'active' => 'Trainer booked and your Plyomat athlete profile is connected.',
             'awaiting_athlete_id' => 'Trainer booked. Plyomat reports an existing profile, so enter the existing Athlete ID to connect it.',
-            'awaiting_integration' => 'Trainer booked, but the trainer\'s Plyomat API connection needs attention.',
+            'awaiting_integration' => 'Trainer booked. We are waiting for your trainer to connect Plyomat. Your booking is saved—come back soon or cancel it from PLYRLab.',
             'provisioning_failed' => 'Trainer booked, but automatic Plyomat creation could not complete. You can connect an existing Athlete ID instead.',
             default => 'Trainer booked. PLYRCard is connecting your Plyomat athlete profile.',
         };
