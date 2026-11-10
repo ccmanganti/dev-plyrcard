@@ -405,37 +405,30 @@ class PlyomatService
             'https://api.plyomat.com',
         ])));
 
-        $paths = array_values(array_unique(array_filter([
-            // Athlete profile discovery and performance-data discovery are
-            // intentionally separate. plyomat_stats_path belongs only to the
-            // sessions/results side and must never be reused here.
-            trim((string) config('services.plyomat.athlete_read_path')),
-            '/v1/athletes/{athlete_id}',
-            '/v1/athlete/{athlete_id}',
-            '/athletes/{athlete_id}',
-            '/athlete/{athlete_id}',
-            '/api/v1/athletes/{athlete_id}',
-            '/api/v1/athlete/{athlete_id}',
-            '/api/athletes/{athlete_id}',
-            '/api/athlete/{athlete_id}',
-            '/v1/athletes?athlete_id={athlete_id}',
-            '/v1/athletes?id={athlete_id}',
-            '/v1/athlete?athlete_id={athlete_id}',
-            '/v1/athlete?id={athlete_id}',
-            '/athletes?athlete_id={athlete_id}',
-            '/athletes?id={athlete_id}',
-            '/api/v1/athletes?athlete_id={athlete_id}',
-            '/api/v1/athletes?id={athlete_id}',
-            '/api/athletes?athlete_id={athlete_id}',
-            '/api/athletes?id={athlete_id}',
-            // Some read APIs expose a collection only. We can safely fetch the
-            // accessible athlete list and select the exact ID locally.
-            '/v1/athletes',
-            '/athletes',
-            '/api/v1/athletes',
-            '/api/athletes',
-        ])));
+        $isUuid = (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+            $athleteId,
+        );
 
+        // Plyomat documents GET /v1/athletes/{id} for the primary UUID.
+        // The create schema separately exposes external_id, so short IDs should
+        // be resolved through the collection/filter API instead of being passed
+        // into the UUID route (which currently returns HTTP 500 for short IDs).
+        $paths = $isUuid
+            ? [
+                '/v1/athletes/{athlete_id}',
+                trim((string) config('services.plyomat.athlete_read_path')),
+                '/v1/athletes?id={athlete_id}',
+                '/v1/athletes',
+            ]
+            : [
+                '/v1/athletes?external_id={athlete_id}',
+                '/v1/athletes?id={athlete_id}',
+                '/v1/athletes?athlete_id={athlete_id}',
+                '/v1/athletes',
+            ];
+
+        $paths = array_values(array_unique(array_filter($paths)));
         $candidates = [];
 
         foreach ($paths as $path) {
@@ -507,12 +500,20 @@ class PlyomatService
                         return false;
                     }
 
-                    $id = data_get($row, 'id')
-                        ?? data_get($row, 'athlete_id')
-                        ?? data_get($row, 'athleteId')
-                        ?? data_get($row, 'uuid');
+                    foreach ([
+                        data_get($row, 'id'),
+                        data_get($row, 'athlete_id'),
+                        data_get($row, 'athleteId'),
+                        data_get($row, 'uuid'),
+                        data_get($row, 'external_id'),
+                        data_get($row, 'externalId'),
+                    ] as $id) {
+                        if (is_scalar($id) && (string) $id === $athleteId) {
+                            return true;
+                        }
+                    }
 
-                    return is_scalar($id) && (string) $id === $athleteId;
+                    return false;
                 });
 
                 if (is_array($match)) {
@@ -526,11 +527,20 @@ class PlyomatService
                 continue;
             }
 
+            $identifierValues = [
+                data_get($candidate, 'id'),
+                data_get($candidate, 'athlete_id'),
+                data_get($candidate, 'athleteId'),
+                data_get($candidate, 'uuid'),
+                data_get($candidate, 'external_id'),
+                data_get($candidate, 'externalId'),
+            ];
+
+            $hasIdentifier = collect($identifierValues)->contains(
+                fn ($value): bool => is_scalar($value) && (string) $value === $athleteId
+            );
+
             $hasAthleteShape = collect([
-                'id',
-                'athlete_id',
-                'athleteId',
-                'uuid',
                 'first_name',
                 'firstName',
                 'last_name',
@@ -542,7 +552,7 @@ class PlyomatService
                 'results',
             ])->contains(fn (string $key): bool => data_get($candidate, $key) !== null);
 
-            if ($hasAthleteShape) {
+            if ($hasIdentifier || ($hasAthleteShape && collect($identifierValues)->filter(fn ($v) => is_scalar($v) && (string) $v !== '')->isEmpty())) {
                 return $candidate;
             }
         }
