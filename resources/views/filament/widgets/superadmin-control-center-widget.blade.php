@@ -738,7 +738,13 @@
                                 <td>
                                     <div class="pc-person">
                                         <span class="pc-avatar">{{ $booking['initials'] }}</span>
-                                        <span><b>{{ $booking['player'] }}</b><small>{{ $booking['sport'] }}{{ $booking['athlete_id'] ? ' · ID '.$booking['athlete_id'] : '' }}</small></span>
+                                        <span>
+                                            <b>{{ $booking['player'] }}</b>
+                                            <small>{{ $booking['sport'] }}</small>
+                                            @if($booking['athlete_id'])
+                                                <small class="pc-plyrlab-full-id" title="{{ $booking['athlete_id'] }}">Plyomat UUID: {{ $booking['athlete_id'] }}</small>
+                                            @endif
+                                        </span>
                                     </div>
                                     @if($booking['connection_error'])
                                         <small class="pc-plyrlab-error">{{ \Illuminate\Support\Str::limit($booking['connection_error'], 130) }}</small>
@@ -1298,6 +1304,7 @@
 
 .pc-plyrlab-manual-connect.is-reconnect{border-style:solid;border-color:rgba(34,192,138,.38);background:rgba(34,192,138,.05)}
 .pc-plyrlab-manual-connect.is-reconnect:before{content:"RECONNECT PLAYER";grid-column:1/-1;color:var(--pc-green);font-size:.54rem;font-weight:900;letter-spacing:.1em}
+.pc-plyrlab-full-id{display:block;margin-top:.18rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace!important;font-size:.54rem!important;color:var(--pc-dim)!important;white-space:normal;overflow-wrap:anywhere;max-width:22rem}
 </style>
 </div>
 </x-filament-widgets::widget>
