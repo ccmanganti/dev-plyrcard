@@ -16,7 +16,50 @@ class PlyomatService
 {
     public function isConfigured(PlyrLabTrainer $trainer): bool
     {
-        return $trainer->hasPlyomatConnection();
+        return $trainer->hasPlyomatApiKey();
+    }
+
+    public function verifyConnection(PlyrLabTrainer $trainer): array
+    {
+        if (! $trainer->hasPlyomatApiKey()) {
+            throw new RuntimeException('Enter a Plyomat API key first.');
+        }
+
+        $base = rtrim((string) config('services.plyomat.base_url', 'https://api.plyomat.com'), '/');
+        $path = trim((string) config('services.plyomat.athlete_read_path', '/v1/athletes'));
+        $url = $base . '/' . ltrim($path, '/');
+
+        $auth = [
+            'header' => 'Authorization',
+            'prefix' => 'Bearer',
+        ];
+
+        $response = $this->request($trainer, $auth)->get($url);
+
+        if ($response->status() === 401) {
+            throw new RuntimeException('Plyomat rejected this Bearer token.');
+        }
+
+        if ($response->status() === 403) {
+            throw new RuntimeException('This Plyomat token does not have Athlete Read access.');
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Plyomat API verification failed: HTTP ' . $response->status() . '.');
+        }
+
+        $json = $response->json();
+
+        if (! is_array($json)) {
+            throw new RuntimeException('Plyomat returned a non-JSON response while verifying the API token.');
+        }
+
+        $this->rememberWorkingConnection($trainer, [
+            'base_url' => $base,
+            'path' => $path,
+        ], $auth);
+
+        return $json;
     }
 
     public function createAthlete(PlyrLabBooking $booking): array
@@ -71,6 +114,14 @@ class PlyomatService
         if (! is_array($json)) {
             throw new RuntimeException('Plyomat created the athlete but did not return a JSON athlete record.');
         }
+
+        $this->rememberWorkingConnection($trainer, [
+            'base_url' => rtrim((string) config('services.plyomat.base_url', 'https://api.plyomat.com'), '/'),
+            'path' => $path,
+        ], [
+            'header' => 'Authorization',
+            'prefix' => 'Bearer',
+        ]);
 
         $athlete = $this->extractCreatedAthletePayload($json);
         $athleteId = $this->athleteIdentifier($athlete);
