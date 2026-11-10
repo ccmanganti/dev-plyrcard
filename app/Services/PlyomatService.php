@@ -949,6 +949,7 @@ class PlyomatService
         $token = preg_replace('/^Authorization\s*:\s*/i', '', $token) ?: $token;
         $token = preg_replace('/^Bearer\s+/i', '', $token) ?: $token;
         $token = trim($token, " \t\n\r\0\x0B\"'");
+        $token = preg_replace('/\s+/', '', $token) ?: $token;
 
         return $token;
     }
