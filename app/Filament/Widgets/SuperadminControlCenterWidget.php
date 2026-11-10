@@ -1287,7 +1287,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 ->latest('created_at')
                 ->limit(30)
                 ->get()
-                ->map(function (PlyrLabBooking $booking): array {
+                ->map(function (PlyrLabBooking $booking) use ($isSuperadmin, $viewerTrainer): array {
                     $player = $booking->player;
                     $playerName = $this->userName($player);
                     $status = trim((string) $booking->status) ?: 'pending';
