@@ -490,6 +490,69 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             ->send();
     }
 
+    public function syncPlyrLabBooking(int $bookingId): void
+    {
+        $booking = PlyrLabBooking::query()
+            ->with(['player', 'trainer'])
+            ->findOrFail($bookingId);
+
+        abort_unless($this->canManagePlyrLabBooking($booking), 403);
+
+        if (blank($booking->plyomat_athlete_id)) {
+            Notification::make()
+                ->title('No Athlete ID connected')
+                ->body('Connect or override a Plyomat Athlete ID before syncing data.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (! $booking->trainer || ! $booking->trainer->hasPlyomatApiKey()) {
+            Notification::make()
+                ->title('Trainer API key required')
+                ->body('The selected trainer needs a Plyomat API key before PLYRCard can pull performance data.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $plyomat = app(PlyomatService::class);
+            $stats = $plyomat->fetchStats($booking);
+            $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
+
+            $booking->forceFill([
+                'plyomat_stats' => $stats,
+                'plyomat_last_synced_at' => now(),
+                'last_sync_error' => $hasMeasurements
+                    ? null
+                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+            ])->save();
+
+            Cache::forget('superadmin:control-center:v6');
+
+            Notification::make()
+                ->title($hasMeasurements ? 'PLYRLab data synced' : 'Athlete connected, but no measurements returned')
+                ->body($hasMeasurements
+                    ? $this->userName($booking->player) . ''s latest available Plyomat performance data was saved.'
+                    : 'The Athlete ID is valid/assigned, but no supported jump/session measurements were returned by the available Plyomat endpoints.')
+                ->{$hasMeasurements ? 'success' : 'warning'}()
+                ->send();
+        } catch (Throwable $exception) {
+            $booking->forceFill([
+                'last_sync_error' => $exception->getMessage(),
+            ])->save();
+
+            Notification::make()
+                ->title('Plyomat data sync failed')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
     public function setPlyrLabBookingStatus(int $bookingId, string $status): void
     {
         abort_unless(in_array($status, ['active', 'completed', 'cancelled'], true), 422);
@@ -1498,6 +1561,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                             default => Str::headline($status),
                         },
                         'plyomat_ready' => filled($booking->plyomat_athlete_id),
+                        'data_synced' => is_array($booking->plyomat_stats)
+                            && app(PlyomatService::class)->hasPerformanceMeasurements($booking->plyomat_stats),
                         'last_sync' => $booking->plyomat_last_synced_at?->diffForHumans()
                             ?? ($booking->plyomat_provisioned_at?->diffForHumans() ?? 'Not synced'),
                         'needs_attention' => in_array($status, ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true),
