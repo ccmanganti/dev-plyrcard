@@ -821,6 +821,18 @@ class PlyomatService
             }
         }
 
+        // Plyomat/history payloads may represent measurements as records rather
+        // than named JSON properties, for example:
+        // { "name": "RSI", "value": 2.4 } or
+        // { "metric": "Jump Height", "result": 37.8 }.
+        // Flattening alone cannot associate the label with its value, so build
+        // an additional lookup from those structured measurement rows.
+        foreach ($this->structuredMeasurementLookup($payload) as $key => $candidate) {
+            if (! array_key_exists($key, $lookup)) {
+                $lookup[$key] = $candidate;
+            }
+        }
+
         $value = function (array $aliases) use ($lookup) {
             foreach ($aliases as $alias) {
                 $needle = preg_replace('/[^a-z0-9]+/', '', strtolower($alias)) ?: '';
@@ -876,16 +888,19 @@ class PlyomatService
             'jump' => [
                 'vertical_jump_cm' => $number($value([
                     'vertical_jump_cm', 'vertical_jump', 'jump_height_cm', 'jumpheightcm',
-                    'standing_vertical_jump_cm', 'jump_height', 'jumpheight', 'svj',
+                    'standing_vertical_jump_cm', 'jump_height', 'jumpheight', 'jump height',
+                    'countermovement_jump_height', 'cmj_height', 'cmjheight', 'svj',
                 ])),
                 'rsi' => $number($value([
-                    'reactive_strength_index', 'reactivestrengthindex', 'rsi_value', 'rsi_score', 'rsi',
+                    'reactive_strength_index', 'reactivestrengthindex', 'reactive strength index',
+                    'rsi_value', 'rsi_score', 'rsi',
                 ])),
                 'bounce_height_cm' => $number($value([
-                    'bounce_height_cm', 'bounce_height', 'repeated_hop_height_cm', 'repeated_jump_height_cm',
+                    'bounce_height_cm', 'bounce_height', 'bounce height',
+                    'repeated_hop_height_cm', 'repeated_jump_height_cm',
                 ])),
                 'bounce_factor' => $number($value([
-                    'bounce_factor', 'bouncefactor', 'bounce_index', 'bounceindex',
+                    'bounce_factor', 'bouncefactor', 'bounce factor', 'bounce_index', 'bounceindex',
                 ])),
                 'ground_contact_ms' => $milliseconds($value([
                     'ground_contact_ms', 'ground_contact_time_ms', 'contact_time_ms',
@@ -899,12 +914,87 @@ class PlyomatService
                 'balance_gap_percent' => $gap,
             ],
             'speed' => [
-                'sprint_10m_seconds' => $number($value(['sprint_10m_seconds', '10m_seconds', 't10', '10m'])),
-                'sprint_20m_seconds' => $number($value(['sprint_20m_seconds', '20m_seconds', 't20', '20m'])),
-                'sprint_30m_seconds' => $number($value(['sprint_30m_seconds', '30m_seconds', 't30', '30m'])),
-                'top_speed_kph' => $number($value(['top_speed_kph', 'max_speed_kph', 'vmax_kph', 'vmax', 'top_speed'])),
+                'sprint_10m_seconds' => $number($value([
+                    'sprint_10m_seconds', '10m_seconds', '10m sprint', '10 m sprint', '10 meter sprint', '10 metre sprint', 't10', '10m',
+                ])),
+                'sprint_20m_seconds' => $number($value([
+                    'sprint_20m_seconds', '20m_seconds', '20m sprint', '20 m sprint', '20 meter sprint', '20 metre sprint', 't20', '20m',
+                ])),
+                'sprint_30m_seconds' => $number($value([
+                    'sprint_30m_seconds', '30m_seconds', '30m sprint', '30 m sprint', '30 meter sprint', '30 metre sprint', 't30', '30m',
+                ])),
+                'top_speed_kph' => $number($value([
+                    'top_speed_kph', 'max_speed_kph', 'top speed', 'max speed', 'vmax_kph', 'vmax', 'top_speed',
+                ])),
             ],
         ];
+    }
+
+    protected function structuredMeasurementLookup(array $payload): array
+    {
+        $lookup = [];
+
+        $walk = function ($node) use (&$walk, &$lookup): void {
+            if (! is_array($node)) {
+                return;
+            }
+
+            if (! array_is_list($node)) {
+                $label = data_get($node, 'metric_name')
+                    ?? data_get($node, 'metricName')
+                    ?? data_get($node, 'metric')
+                    ?? data_get($node, 'measurement_name')
+                    ?? data_get($node, 'measurementName')
+                    ?? data_get($node, 'measurement')
+                    ?? data_get($node, 'test_name')
+                    ?? data_get($node, 'testName')
+                    ?? data_get($node, 'name')
+                    ?? data_get($node, 'slug')
+                    ?? data_get($node, 'key')
+                    ?? data_get($node, 'type');
+
+                $candidate = data_get($node, 'value')
+                    ?? data_get($node, 'result')
+                    ?? data_get($node, 'measurement_value')
+                    ?? data_get($node, 'measurementValue')
+                    ?? data_get($node, 'score')
+                    ?? data_get($node, 'average')
+                    ?? data_get($node, 'avg')
+                    ?? data_get($node, 'mean')
+                    ?? data_get($node, 'best')
+                    ?? data_get($node, 'max');
+
+                if (is_scalar($label) && is_scalar($candidate)) {
+                    $key = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $label)) ?: '';
+
+                    if ($key !== '' && ! array_key_exists($key, $lookup)) {
+                        $lookup[$key] = $candidate;
+                    }
+
+                    $unit = data_get($node, 'unit')
+                        ?? data_get($node, 'units')
+                        ?? data_get($node, 'uom');
+
+                    if ($key !== '' && is_scalar($unit)) {
+                        $unitKey = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $unit)) ?: '';
+
+                        if ($unitKey !== '' && ! array_key_exists($key . $unitKey, $lookup)) {
+                            $lookup[$key . $unitKey] = $candidate;
+                        }
+                    }
+                }
+            }
+
+            foreach ($node as $value) {
+                if (is_array($value)) {
+                    $walk($value);
+                }
+            }
+        };
+
+        $walk($payload);
+
+        return $lookup;
     }
 
     protected function request(PlyrLabTrainer $trainer, ?array $auth = null): PendingRequest
