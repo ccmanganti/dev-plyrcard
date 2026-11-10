@@ -790,10 +790,10 @@
                                         @endif
                                     </div>
 
-                                    @if($plyrlab_is_superadmin && $booking['status'] !== 'cancelled')
-                                        <div class="pc-plyrlab-manual-connect">
+                                    @if($plyrlab_is_superadmin)
+                                        <div class="pc-plyrlab-manual-connect {{ $booking['status'] === 'cancelled' ? 'is-reconnect' : '' }}">
                                             <select wire:model.defer="plyrLabManualConnections.{{ (int)$booking['id'] }}.trainer_id">
-                                                <option value="">Select trainer</option>
+                                                <option value="">{{ $booking['trainer'] ? 'Keep current trainer: '.$booking['trainer'] : 'Select trainer' }}</option>
                                                 @foreach($plyrlab_trainers as $trainer)
                                                     <option value="{{ $trainer['id'] }}">{{ $trainer['name'] }}{{ $trainer['plyomat_connected'] ? '' : ' · API pending' }}</option>
                                                 @endforeach
@@ -801,7 +801,7 @@
                                             <input type="text" wire:model.defer="plyrLabManualConnections.{{ (int)$booking['id'] }}.athlete_id" placeholder="Plyomat Athlete ID">
                                             <div class="pc-plyrlab-connect-buttons is-row">
                                                 <button type="button" class="pc-btn is-small is-primary" wire:click="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})" wire:loading.attr="disabled" wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">
-                                                    <span wire:loading.remove wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">Connect ID</span>
+                                                    <span wire:loading.remove wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">{{ $booking['status'] === 'cancelled' ? 'Reconnect ID' : 'Connect ID' }}</span>
                                                     <span class="pc-btn-working" wire:loading wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})"><i class="pc-inline-spinner"></i> Connecting…</span>
                                                 </button>
                                                 <button type="button" class="pc-btn is-small is-warning" wire:click="overridePlyrLabBooking({{ (int)$booking['id'] }})" wire:confirm="Override {{ $booking['player'] }}'s Athlete ID without Plyomat API verification? Cached stats from the previous ID will be cleared." wire:loading.attr="disabled" wire:target="overridePlyrLabBooking({{ (int)$booking['id'] }})">
@@ -1296,6 +1296,8 @@
 .pc-btn[disabled]{cursor:wait;opacity:.72}
 @media(prefers-reduced-motion:reduce){.pc-inline-spinner{animation-duration:1.5s}}
 
+.pc-plyrlab-manual-connect.is-reconnect{border-style:solid;border-color:rgba(34,192,138,.38);background:rgba(34,192,138,.05)}
+.pc-plyrlab-manual-connect.is-reconnect:before{content:"RECONNECT PLAYER";grid-column:1/-1;color:var(--pc-green);font-size:.54rem;font-weight:900;letter-spacing:.1em}
 </style>
 </div>
 </x-filament-widgets::widget>
