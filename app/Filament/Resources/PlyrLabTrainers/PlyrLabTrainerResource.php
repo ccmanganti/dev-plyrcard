@@ -124,9 +124,8 @@ class PlyrLabTrainerResource extends Resource
                         ->label('API key')
                         ->password()
                         ->revealable()
-                        ->required(fn (string $operation): bool => $operation === 'create')
                         ->dehydrated(fn (?string $state): bool => filled($state))
-                        ->helperText('Use a key with Athlete Read + Athlete Write access. Leave blank when editing to keep the current encrypted key.'),
+                        ->helperText('Optional at first. Without a key, players can still book this trainer but remain in Awaiting Trainer Setup until a valid Athlete Read + Athlete Write token is connected. Leave blank when editing to keep the current encrypted key.'),
                 ]),
        ]);
     }
