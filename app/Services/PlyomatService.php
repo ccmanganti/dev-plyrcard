@@ -1008,6 +1008,16 @@ class PlyomatService
             ->implode(' | ');
     }
 
+    public function performanceSyncMessage(array $stats): string
+    {
+        $message = 'Athlete ID is connected, but Plyomat did not return supported personal-record/session measurements for this athlete yet.';
+        $diagnostics = trim((string) data_get($stats, 'sync_diagnostics', ''));
+
+        return $diagnostics !== ''
+            ? $message . ' Performance API diagnostics: ' . $diagnostics
+            : $message;
+    }
+
     public function hasPerformanceMeasurements(array $stats): bool
     {
         $values = [
