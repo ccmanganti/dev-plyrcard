@@ -274,10 +274,10 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         $player = User::query()->findOrFail($playerId);
         $trainer = PlyrLabTrainer::query()->with('user')->findOrFail($trainerId);
 
-        if (! $trainer->hasPlyomatConnection()) {
+        if (! $trainer->hasPlyomatApiKey()) {
             Notification::make()
-                ->title('Trainer API key is not connected')
-                ->body('Select a trainer whose Plyomat API key is configured.')
+                ->title('Trainer API key is missing')
+                ->body('Select a trainer with a Plyomat API key, or use Override ID if you intentionally need to reconnect without API verification.')
                 ->danger()
                 ->send();
 
@@ -383,10 +383,10 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
         $trainer = PlyrLabTrainer::query()->findOrFail($trainerId);
 
-        if (! $trainer->hasPlyomatConnection()) {
+        if (! $trainer->hasPlyomatApiKey()) {
             Notification::make()
-                ->title('Trainer API key is not connected')
-                ->body('Choose a trainer with a configured Plyomat API key.')
+                ->title('Trainer API key is missing')
+                ->body('Choose a trainer with a Plyomat API key, or use Override ID if API verification is intentionally being bypassed.')
                 ->danger()
                 ->send();
 
