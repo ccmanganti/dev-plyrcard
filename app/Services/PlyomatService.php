@@ -1165,12 +1165,9 @@ class PlyomatService
 
     public function performanceSyncMessage(array $stats): string
     {
-        $message = 'Athlete ID is connected, but Plyomat did not return supported personal-record/session measurements for this athlete yet.';
-        $diagnostics = trim((string) data_get($stats, 'sync_diagnostics', ''));
-
-        return $diagnostics !== ''
-            ? $message . ' Performance API diagnostics: ' . $diagnostics
-            : $message;
+        // Keep endpoint diagnostics inside plyomat_stats for troubleshooting,
+        // but never dump them into the normal admin/player experience.
+        return 'No performance data available yet. The athlete is connected, and PLYRLab will populate once Plyomat has session or personal-record data for this athlete.';
     }
 
     public function hasPerformanceMeasurements(array $stats): bool
