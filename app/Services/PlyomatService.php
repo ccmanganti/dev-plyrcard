@@ -600,16 +600,207 @@ class PlyomatService
     protected function rememberWorkingConnection(PlyrLabTrainer $trainer, array $candidate, array $auth): void
     {
         $trainer->forceFill([
-            'plyomat_base_url' => $candidate['base_url'] ?? null,
-            'plyomat_stats_path' => $candidate['path'] ?? null,
+            'plyomat_base_url' => $candidate['base_url'] ?? config('services.plyomat.base_url', 'https://api.plyomat.com'),
             'plyomat_auth_header' => $auth['header'] ?? 'Authorization',
-            'plyomat_auth_prefix' => $auth['prefix'] ?? '',
+            'plyomat_auth_prefix' => $auth['prefix'] ?? 'Bearer',
+        ])->saveQuietly();
+    }
+
+    protected function rememberWorkingStatsConnection(PlyrLabTrainer $trainer, array $candidate, array $auth): void
+    {
+        $this->rememberWorkingConnection($trainer, $candidate, $auth);
+
+        $trainer->forceFill([
+            'plyomat_stats_path' => $candidate['path'] ?? null,
         ])->saveQuietly();
     }
 
     public function fetchStats(PlyrLabBooking $booking): array
     {
-        return $this->normalizeStats($this->readAthlete($booking));
+        // Athlete endpoints primarily describe the roster/profile. Performance
+        // measurements may live under sessions/results/assessments instead, so
+        // start with the athlete payload and then probe the read-only performance
+        // resources until one actually contains supported metrics.
+        $profile = $this->readAthlete($booking);
+        $profileStats = $this->normalizeStats($profile);
+
+        if ($this->hasNormalizedMeasurements($profileStats)) {
+            return $profileStats;
+        }
+
+        foreach ($this->performancePayloadCandidates($booking) as $payload) {
+            $stats = $this->normalizeStats($payload['data']);
+
+            if (! $this->hasNormalizedMeasurements($stats)) {
+                continue;
+            }
+
+            $stats['source_endpoint'] = $payload['path'];
+            $this->rememberWorkingStatsConnection(
+                $booking->trainer,
+                [
+                    'base_url' => $payload['base_url'],
+                    'path' => $payload['path'],
+                ],
+                $payload['auth'],
+            );
+
+            return $stats;
+        }
+
+        // Keep the normalized profile shape so the UI can clearly show that
+        // the athlete exists but no supported measurements were returned.
+        return $profileStats;
+    }
+
+    protected function performancePayloadCandidates(PlyrLabBooking $booking): array
+    {
+        $booking->loadMissing('trainer');
+        $trainer = $booking->trainer;
+
+        if (! $trainer || blank($booking->plyomat_athlete_id) || ! $this->isConfigured($trainer)) {
+            return [];
+        }
+
+        $athleteId = trim((string) $booking->plyomat_athlete_id);
+        $base = rtrim(trim((string) ($trainer->plyomat_base_url ?: config('services.plyomat.base_url', 'https://api.plyomat.com'))), '/');
+
+        $savedStatsPath = trim((string) $trainer->plyomat_stats_path);
+        if ($savedStatsPath !== '' && ! preg_match('/(session|assessment|result|test|measurement|rep)/i', $savedStatsPath)) {
+            // Older builds accidentally stored /v1/athletes here. Ignore that
+            // roster endpoint when discovering actual performance data.
+            $savedStatsPath = '';
+        }
+
+        $paths = array_values(array_unique(array_filter([
+            $savedStatsPath,
+            '/v1/athletes/{athlete_id}/results',
+            '/v1/athletes/{athlete_id}/assessments',
+            '/v1/athletes/{athlete_id}/sessions',
+            '/v1/athletes/{athlete_id}/measurements',
+            '/v1/athletes/{athlete_id}/tests',
+            '/v1/results?athlete_id={athlete_id}',
+            '/v1/assessments?athlete_id={athlete_id}',
+            '/v1/sessions?athlete_id={athlete_id}',
+            '/v1/measurements?athlete_id={athlete_id}',
+            '/v1/tests?athlete_id={athlete_id}',
+            '/v1/reps?athlete_id={athlete_id}',
+        ])));
+
+        $payloads = [];
+        $authCandidates = $this->authCandidates($trainer);
+
+        // Official developer examples use Authorization: Bearer, so put it first
+        // even for trainers created before that format was saved.
+        usort($authCandidates, static function (array $a, array $b): int {
+            $score = static fn (array $auth): int => (
+                strtolower((string) ($auth['header'] ?? '')) === 'authorization'
+                && strtolower((string) ($auth['prefix'] ?? '')) === 'bearer'
+            ) ? 0 : 1;
+
+            return $score($a) <=> $score($b);
+        });
+
+        foreach ($paths as $path) {
+            $resolved = str_replace(
+                ['{athlete}', '{athlete_id}', '{id}'],
+                rawurlencode($athleteId),
+                $path,
+            );
+            $url = Str::startsWith($resolved, ['http://', 'https://'])
+                ? $resolved
+                : $base . '/' . ltrim($resolved, '/');
+
+            foreach ($authCandidates as $auth) {
+                $response = $this->request($trainer, $auth)->get($url);
+
+                if (in_array($response->status(), [401, 403], true)) {
+                    continue;
+                }
+
+                if (in_array($response->status(), [404, 405], true)) {
+                    break;
+                }
+
+                if (! $response->successful()) {
+                    continue;
+                }
+
+                $json = $response->json();
+
+                if (! is_array($json) || ! $this->performancePayloadBelongsToAthlete($json, $athleteId, $resolved)) {
+                    break;
+                }
+
+                $payloads[] = [
+                    'data' => $json,
+                    'path' => $path,
+                    'base_url' => $base,
+                    'auth' => $auth,
+                ];
+
+                // A successful JSON response does not guarantee it contains
+                // measurements. Keep probing other resource types when needed.
+                break;
+            }
+        }
+
+        return $payloads;
+    }
+
+    protected function performancePayloadBelongsToAthlete(array $payload, string $athleteId, string $resolvedPath): bool
+    {
+        // A nested athlete endpoint is already scoped by the requested ID.
+        if (str_contains($resolvedPath, '/' . rawurlencode($athleteId) . '/')) {
+            return true;
+        }
+
+        $flat = Arr::dot($payload);
+        $foundAthleteId = false;
+
+        foreach ($flat as $key => $value) {
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            $normalizedKey = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $key)) ?: '';
+
+            if (! str_ends_with($normalizedKey, 'athleteid') && $normalizedKey !== 'athleteid') {
+                continue;
+            }
+
+            $foundAthleteId = true;
+
+            if ((string) $value === $athleteId) {
+                return true;
+            }
+        }
+
+        // Filtered endpoints sometimes omit athlete_id from each returned row.
+        // In that case trust the explicit athlete_id query parameter.
+        return ! $foundAthleteId && str_contains($resolvedPath, 'athlete_id=' . rawurlencode($athleteId));
+    }
+
+    protected function hasNormalizedMeasurements(array $stats): bool
+    {
+        $values = [
+            data_get($stats, 'overall_score'),
+            data_get($stats, 'pace_score'),
+            data_get($stats, 'jump.vertical_jump_cm'),
+            data_get($stats, 'jump.rsi'),
+            data_get($stats, 'jump.bounce_height_cm'),
+            data_get($stats, 'jump.bounce_factor'),
+            data_get($stats, 'jump.ground_contact_ms'),
+            data_get($stats, 'jump.flight_time_ms'),
+            data_get($stats, 'jump.left_jump_cm'),
+            data_get($stats, 'jump.right_jump_cm'),
+            data_get($stats, 'speed.sprint_10m_seconds'),
+            data_get($stats, 'speed.sprint_20m_seconds'),
+            data_get($stats, 'speed.sprint_30m_seconds'),
+            data_get($stats, 'speed.top_speed_kph'),
+        ];
+
+        return collect($values)->contains(fn ($value): bool => is_numeric($value));
     }
 
     public function normalizeStats(array $payload): array
@@ -653,6 +844,19 @@ class PlyomatService
             return (float) $candidate;
         };
 
+        $milliseconds = static function ($candidate) use ($number): ?float {
+            $value = $number($candidate);
+
+            if ($value === null) {
+                return null;
+            }
+
+            // Plyomat-style timing payloads may expose seconds while the PLYRLab
+            // interface displays milliseconds. Values below 10 are safely time
+            // durations in seconds rather than realistic millisecond counts.
+            return $value > 0 && $value < 10 ? $value * 1000 : $value;
+        };
+
         $left = $number($value(['left_jump_cm', 'left_jump_height', 'left_cm', 'single_leg_left_cm', 'left']));
         $right = $number($value(['right_jump_cm', 'right_jump_height', 'right_cm', 'single_leg_right_cm', 'right']));
         $gap = $number($value(['balance_gap_percent', 'left_right_diff_percent', 'asymmetry_percent', 'symmetry_gap_percent']));
@@ -668,10 +872,26 @@ class PlyomatService
             'jump_profile' => $value(['jump_profile', 'reactive_strength_profile', 'profile']),
             'latest_test_at' => $value(['last_tested_on', 'latest_test_at', 'tested_at', 'test_date', 'date']),
             'jump' => [
-                'vertical_jump_cm' => $number($value(['vertical_jump_cm', 'vertical_jump', 'jump_height_cm', 'standing_vertical_jump_cm', 'svj'])),
-                'rsi' => $number($value(['reactive_strength_index', 'rsi'])),
-                'bounce_height_cm' => $number($value(['bounce_height_cm', 'bounce_height', 'repeated_hop_height_cm', 'bounce'])),
-                'ground_contact_ms' => $number($value(['ground_contact_ms', 'ground_contact_time_ms', 'contact_time_ms', 'gct'])),
+                'vertical_jump_cm' => $number($value([
+                    'vertical_jump_cm', 'vertical_jump', 'jump_height_cm', 'jumpheightcm',
+                    'standing_vertical_jump_cm', 'jump_height', 'jumpheight', 'svj',
+                ])),
+                'rsi' => $number($value([
+                    'reactive_strength_index', 'reactivestrengthindex', 'rsi_value', 'rsi_score', 'rsi',
+                ])),
+                'bounce_height_cm' => $number($value([
+                    'bounce_height_cm', 'bounce_height', 'repeated_hop_height_cm', 'repeated_jump_height_cm',
+                ])),
+                'bounce_factor' => $number($value([
+                    'bounce_factor', 'bouncefactor', 'bounce_index', 'bounceindex',
+                ])),
+                'ground_contact_ms' => $milliseconds($value([
+                    'ground_contact_ms', 'ground_contact_time_ms', 'contact_time_ms',
+                    'ground_contact_time', 'groundcontacttime', 'contact_time', 'contacttime', 'gct',
+                ])),
+                'flight_time_ms' => $milliseconds($value([
+                    'flight_time_ms', 'flighttime_ms', 'flight_time', 'flighttime',
+                ])),
                 'left_jump_cm' => $left,
                 'right_jump_cm' => $right,
                 'balance_gap_percent' => $gap,
