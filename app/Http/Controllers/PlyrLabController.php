@@ -202,6 +202,7 @@ class PlyrLabController extends Controller
             // data separately because Plyomat roster responses may not contain
             // sessions/assessment measurements.
             $stats = $plyomat->fetchStats($booking);
+            $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
             $booking->forceFill([
                 'status' => 'active',
@@ -209,7 +210,9 @@ class PlyrLabController extends Controller
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
                 'plyomat_stats' => $stats,
-                'last_sync_error' => null,
+                'last_sync_error' => $hasMeasurements
+                    ? null
+                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
             ])->save();
         } catch (Throwable $exception) {
             $booking->forceFill([
