@@ -940,6 +940,19 @@ class PlyomatService
         return $lookup;
     }
 
+    protected function normalizeSecretToken(string $token): string
+    {
+        $token = trim($token);
+
+        // Be tolerant of values copied from curl snippets, browser fields, or
+        // headers instead of only the bare secret.
+        $token = preg_replace('/^Authorization\s*:\s*/i', '', $token) ?: $token;
+        $token = preg_replace('/^Bearer\s+/i', '', $token) ?: $token;
+        $token = trim($token, " \t\n\r\0\x0B\"'");
+
+        return $token;
+    }
+
     protected function request(PlyrLabTrainer $trainer, ?array $auth = null): PendingRequest
     {
         $auth ??= [
@@ -949,11 +962,7 @@ class PlyomatService
 
         $header = trim((string) ($auth['header'] ?? 'Authorization'));
         $prefix = trim((string) ($auth['prefix'] ?? ''));
-        $key = trim((string) $trainer->plyomat_api_key);
-
-        // Accept either a raw secret token or a value pasted as
-        // "Bearer <token>" without accidentally sending "Bearer Bearer ...".
-        $key = preg_replace('/^Bearer\s+/i', '', $key) ?: $key;
+        $key = $this->normalizeSecretToken((string) $trainer->plyomat_api_key);
 
         $credential = trim(($prefix !== '' ? $prefix . ' ' : '') . $key);
 
