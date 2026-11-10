@@ -56,6 +56,10 @@ class AdminPanelProvider extends PanelProvider
             ->homeUrl(function (): string {
                 $user = auth()->user();
 
+                if ($user && $user->plyrLabTrainerProfile()->exists()) {
+                    return url('/admin/plyrlab');
+                }
+
                 if ($user && method_exists($user, 'hasRole') && $user->hasRole('Free') && ! $user->hasRole('My Journey')) {
                     try {
                         return ProfileResource::getUrl('index');
