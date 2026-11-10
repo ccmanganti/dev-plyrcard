@@ -91,13 +91,22 @@ class PlyrLabController extends Controller
             ], 422);
         }
 
-        $booking = DB::transaction(function () use ($player, $trainer, $validated): PlyrLabBooking {
+        $previousConnection = PlyrLabBooking::query()
+            ->where('player_user_id', $player->getKey())
+            ->where('trainer_id', $trainer->getKey())
+            ->where('status', 'cancelled')
+            ->whereNotNull('plyomat_athlete_id')
+            ->latest('id')
+            ->first();
+
+        $booking = DB::transaction(function () use ($player, $trainer, $validated, $previousConnection): PlyrLabBooking {
             return PlyrLabBooking::query()->create([
                 'player_user_id' => $player->getKey(),
                 'trainer_id' => $trainer->getKey(),
                 'scheduled_for' => $validated['scheduled_for'],
                 'status' => 'provisioning',
                 'notes' => $validated['notes'] ?? null,
+                'plyomat_athlete_id' => $previousConnection?->plyomat_athlete_id,
             ]);
         });
 
