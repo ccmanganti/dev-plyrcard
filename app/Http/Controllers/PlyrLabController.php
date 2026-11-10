@@ -21,17 +21,31 @@ class PlyrLabController extends Controller
         abort_unless($player, 403);
 
         $booking = PlyrLabBooking::query()
+            ->with('trainer')
             ->where('player_user_id', $player->getKey())
             ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
             ->latest('id')
             ->first();
 
         if ($booking) {
-            if ($booking->status === 'provisioning' && blank($booking->plyomat_athlete_id)) {
-                // Provisioning is automatic. Re-dispatching here makes the status
-                // self-healing if the initial queue dispatch was interrupted.
+            $canProvision = $booking->trainer?->hasPlyomatConnection() === true;
+
+            if (
+                blank($booking->plyomat_athlete_id)
+                && (
+                    $booking->status === 'provisioning'
+                    || ($booking->status === 'awaiting_integration' && $canProvision)
+                )
+            ) {
+                // Self-heal both interrupted provisioning and bookings that were
+                // waiting for a trainer to connect an API key.
+                $booking->forceFill([
+                    'status' => 'provisioning',
+                    'last_sync_error' => null,
+                ])->save();
+
                 ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
-                $booking = $booking->fresh();
+                $booking = $booking->fresh(['trainer']);
             } elseif (
                 filled($booking->plyomat_athlete_id)
                 && (! $booking->plyomat_last_synced_at || $booking->plyomat_last_synced_at->lt(now()->subMinutes(10)))
@@ -193,6 +207,73 @@ class PlyrLabController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Plyomat profile connected. Your available performance data has been synced.',
+            'data' => $dataService->payload($player),
+        ]);
+    }
+
+    public function updateBooking(Request $request, PlyrLabDataService $dataService): JsonResponse
+    {
+        $player = $request->user();
+        abort_unless($player, 403);
+
+        $validated = $request->validate([
+            'scheduled_for' => ['required', 'date', 'after:now'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $booking = PlyrLabBooking::query()
+            ->where('player_user_id', $player->getKey())
+            ->whereIn('status', PlyrLabBooking::OPEN_STATUSES)
+            ->latest('id')
+            ->first();
+
+        if (! $booking) {
+            return response()->json([
+                'success' => false,
+                'message' => 'There is no active PLYRLab booking to update.',
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
+
+        $booking->forceFill([
+            'scheduled_for' => $validated['scheduled_for'],
+            'notes' => $validated['notes'] ?? null,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your PLYRLab trainer booking has been updated.',
+            'data' => $dataService->payload($player),
+        ]);
+    }
+
+    public function cancelBooking(Request $request, PlyrLabDataService $dataService): JsonResponse
+    {
+        $player = $request->user();
+        abort_unless($player, 403);
+
+        $booking = PlyrLabBooking::query()
+            ->where('player_user_id', $player->getKey())
+            ->whereIn('status', PlyrLabBooking::OPEN_STATUSES)
+            ->latest('id')
+            ->first();
+
+        if (! $booking) {
+            return response()->json([
+                'success' => false,
+                'message' => 'There is no active PLYRLab booking to cancel.',
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
+
+        $booking->forceFill([
+            'status' => 'cancelled',
+            'last_sync_error' => null,
+        ])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Your PLYRLab trainer booking has been cancelled. You can choose another trainer whenever you are ready.',
             'data' => $dataService->payload($player),
         ]);
     }
