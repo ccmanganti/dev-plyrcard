@@ -624,14 +624,14 @@ class PlyomatService
         $profile = $this->readAthlete($booking);
         $profileStats = $this->normalizeStats($profile);
 
-        if ($this->hasNormalizedMeasurements($profileStats)) {
+        if ($this->hasPerformanceMeasurements($profileStats)) {
             return $profileStats;
         }
 
         foreach ($this->performancePayloadCandidates($booking) as $payload) {
             $stats = $this->normalizeStats($payload['data']);
 
-            if (! $this->hasNormalizedMeasurements($stats)) {
+            if (! $this->hasPerformanceMeasurements($stats)) {
                 continue;
             }
 
@@ -781,7 +781,7 @@ class PlyomatService
         return ! $foundAthleteId && str_contains($resolvedPath, 'athlete_id=' . rawurlencode($athleteId));
     }
 
-    protected function hasNormalizedMeasurements(array $stats): bool
+    public function hasPerformanceMeasurements(array $stats): bool
     {
         $values = [
             data_get($stats, 'overall_score'),
