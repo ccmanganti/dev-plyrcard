@@ -14,6 +14,8 @@ use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
 use App\Models\User;
 use App\Services\ProfileCompletionService;
+use App\Services\PlyomatService;
+use App\Jobs\ProvisionPlyrLabAthlete;
 use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
@@ -32,6 +34,211 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
     protected const LOGIN_TRACKING_STARTED_AT = '2026-11-03 00:00:00';
 
     public string $initialTab = 'overview';
+
+    public array $plyrLabManualConnections = [];
+
+    public string $plyrLabTrainerApiKey = '';
+
+    protected function currentUserIsSuperadmin(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            ));
+    }
+
+    protected function currentTrainerProfile(): ?PlyrLabTrainer
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return null;
+        }
+
+        return $user->plyrLabTrainerProfile()->with('user')->first();
+    }
+
+    protected function canManagePlyrLabBooking(PlyrLabBooking $booking): bool
+    {
+        if ($this->currentUserIsSuperadmin()) {
+            return true;
+        }
+
+        $trainer = $this->currentTrainerProfile();
+
+        return $trainer && (int) $booking->trainer_id === (int) $trainer->getKey();
+    }
+
+    public function manualConnectPlyrLabBooking(int $bookingId): void
+    {
+        abort_unless($this->currentUserIsSuperadmin(), 403);
+
+        $state = (array) ($this->plyrLabManualConnections[$bookingId] ?? []);
+        $trainerId = (int) ($state['trainer_id'] ?? 0);
+        $athleteId = trim((string) ($state['athlete_id'] ?? ''));
+
+        if ($trainerId < 1 || $athleteId === '') {
+            Notification::make()
+                ->title('Trainer and Athlete ID are required')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $booking = PlyrLabBooking::query()
+            ->with(['player', 'trainer'])
+            ->findOrFail($bookingId);
+
+        $trainer = PlyrLabTrainer::query()->findOrFail($trainerId);
+
+        if (! $trainer->hasPlyomatConnection()) {
+            Notification::make()
+                ->title('Trainer API key is not connected')
+                ->body('Choose a trainer with a configured Plyomat API key.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $previousTrainerId = $booking->trainer_id;
+        $previousAthleteId = $booking->plyomat_athlete_id;
+        $previousStatus = $booking->status;
+
+        try {
+            $booking->setAttribute('trainer_id', $trainer->getKey());
+            $booking->setAttribute('plyomat_athlete_id', $athleteId);
+            $booking->setRelation('trainer', $trainer);
+
+            $plyomat = app(PlyomatService::class);
+            $athlete = $plyomat->readAthlete($booking);
+
+            $booking->forceFill([
+                'trainer_id' => $trainer->getKey(),
+                'status' => 'active',
+                'plyomat_athlete_id' => $athleteId,
+                'plyomat_provisioned_at' => now(),
+                'plyomat_last_synced_at' => now(),
+                'plyomat_stats' => $plyomat->normalizeStats($athlete),
+                'last_sync_error' => null,
+            ])->save();
+
+            unset($this->plyrLabManualConnections[$bookingId]);
+
+            Cache::forget('superadmin:control-center:v5');
+
+            Notification::make()
+                ->title('PLYRLab connected')
+                ->body($this->userName($booking->player) . ' is now connected to Plyomat through ' . $trainer->displayName() . '.')
+                ->success()
+                ->send();
+        } catch (Throwable $exception) {
+            $booking->forceFill([
+                'trainer_id' => $previousTrainerId,
+                'plyomat_athlete_id' => $previousAthleteId,
+                'status' => $previousStatus,
+                'last_sync_error' => $exception->getMessage(),
+            ])->save();
+
+            Notification::make()
+                ->title('Could not connect athlete')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function saveMyPlyrLabApiKey(): void
+    {
+        $trainer = $this->currentTrainerProfile();
+        abort_unless($trainer, 403);
+
+        $key = trim($this->plyrLabTrainerApiKey);
+
+        if ($key === '') {
+            Notification::make()
+                ->title('Enter your Plyomat API key')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $trainer->forceFill([
+            'plyomat_api_key' => $key,
+        ])->save();
+
+        $this->plyrLabTrainerApiKey = '';
+
+        $waiting = PlyrLabBooking::query()
+            ->where('trainer_id', $trainer->getKey())
+            ->where('status', 'awaiting_integration')
+            ->latest('id')
+            ->limit(20)
+            ->get();
+
+        foreach ($waiting as $booking) {
+            $booking->forceFill([
+                'status' => 'provisioning',
+                'last_sync_error' => null,
+            ])->save();
+
+            try {
+                ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        Cache::forget('superadmin:control-center:v5');
+
+        Notification::make()
+            ->title('Plyomat API key connected')
+            ->body($waiting->isNotEmpty()
+                ? 'Waiting player profiles were retried automatically.'
+                : 'Your trainer account is ready for automatic athlete creation.')
+            ->success()
+            ->send();
+    }
+
+    public function setPlyrLabBookingStatus(int $bookingId, string $status): void
+    {
+        abort_unless(in_array($status, ['active', 'completed', 'cancelled'], true), 422);
+
+        $booking = PlyrLabBooking::query()
+            ->with('player')
+            ->findOrFail($bookingId);
+
+        abort_unless($this->canManagePlyrLabBooking($booking), 403);
+
+        if ($status === 'active' && blank($booking->plyomat_athlete_id)) {
+            Notification::make()
+                ->title('Player is not connected yet')
+                ->body('A verified Plyomat Athlete ID is required before marking this booking active.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $booking->forceFill([
+            'status' => $status,
+        ])->save();
+
+        Cache::forget('superadmin:control-center:v5');
+
+        Notification::make()
+            ->title('Booking updated')
+            ->body($this->userName($booking->player) . ' is now ' . Str::headline($status) . '.')
+            ->success()
+            ->send();
+    }
 
     public static function navigationMetrics(): array
     {
