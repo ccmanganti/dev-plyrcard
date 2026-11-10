@@ -272,6 +272,7 @@ class PlyrLabDataService
             'specialties' => array_values(array_filter($trainer->specialties ?? [])),
             'bio' => $trainer->bio,
             'duration_minutes' => $trainer->booking_duration_minutes,
+            'api_connected' => $trainer->hasPlyomatConnection(),
             'photo_url' => $this->publicAssetUrl($user?->player_image ?: $user?->plyrcard_image),
         ];
     }
