@@ -64,7 +64,14 @@ class SuperadminPlyrLab extends SuperadminAthletes
     {
         $user = auth()->user();
 
-        if ($user && $user->plyrLabTrainerProfile()->exists()) {
+        $isSuperadmin = $user && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+
+        if ($user && ! $isSuperadmin && $user->plyrLabTrainerProfile()->exists()) {
             $trainer = $user->plyrLabTrainerProfile;
 
             $count = PlyrLabBooking::query()
