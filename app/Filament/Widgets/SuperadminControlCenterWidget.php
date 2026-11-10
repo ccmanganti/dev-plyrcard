@@ -33,6 +33,24 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
     protected const LOGIN_TRACKING_STARTED_AT = '2026-11-03 00:00:00';
 
+    public static function canView(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        $isSuperadmin = method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+
+        return $isSuperadmin || $user->plyrLabTrainerProfile()->exists();
+    }
+
     public string $initialTab = 'overview';
 
     public array $plyrLabManualConnections = [];
