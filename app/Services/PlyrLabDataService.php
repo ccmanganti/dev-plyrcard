@@ -33,10 +33,15 @@ class PlyrLabDataService
             ->values()
             ->all();
 
+        $connected = $booking
+            && filled($booking->plyomat_athlete_id)
+            && in_array($booking->status, ['active', 'completed'], true);
+
         return [
             'player' => $this->playerPayload($player),
             'access' => [
-                'unlocked' => (bool) $booking,
+                'unlocked' => (bool) $connected,
+                'has_booking' => (bool) $booking,
                 'state' => $booking?->status ?? 'locked',
                 'message' => $this->accessMessage($booking),
             ],
@@ -288,6 +293,7 @@ class PlyrLabDataService
             'plyomat_ready' => filled($booking->plyomat_athlete_id),
             'plyomat_athlete_id' => $booking->plyomat_athlete_id,
             'last_synced_at' => $booking->plyomat_last_synced_at?->toIso8601String(),
+            'connection_error' => $booking->last_sync_error,
             'trainer' => $trainer ? $this->trainerPayload($trainer) : null,
         ];
     }
