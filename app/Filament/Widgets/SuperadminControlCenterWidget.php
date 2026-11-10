@@ -156,12 +156,12 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'plyomat_last_synced_at' => now(),
                     'last_sync_error' => $hasMeasurements
                         ? null
-                        : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                        : $plyomat->performanceSyncMessage($stats),
                 ])->save();
 
                 $syncMessage = $hasMeasurements
                     ? 'The override was saved and PLYRCard immediately pulled the available Plyomat performance data.'
-                    : 'The Athlete ID is linked, but Plyomat returned no supported session/assessment measurements yet.';
+                    : $plyomat->performanceSyncMessage($stats);
             } catch (Throwable $exception) {
                 $booking->forceFill([
                     'last_sync_error' => $exception->getMessage(),
@@ -228,12 +228,12 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'plyomat_last_synced_at' => now(),
                     'last_sync_error' => $hasMeasurements
                         ? null
-                        : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                        : $plyomat->performanceSyncMessage($stats),
                 ])->save();
 
                 $syncMessage = $hasMeasurements
                     ? 'Fresh Plyomat performance data was pulled immediately.'
-                    : 'The Athlete ID is linked, but Plyomat returned no supported session/assessment measurements yet.';
+                    : $plyomat->performanceSyncMessage($stats);
             } catch (Throwable $exception) {
                 $booking->forceFill([
                     'last_sync_error' => $exception->getMessage(),
@@ -331,7 +331,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_stats' => $stats,
                 'last_sync_error' => $hasMeasurements
                     ? null
-                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                    : $plyomat->performanceSyncMessage($stats),
             ])->save();
 
             $this->plyrLabAdminConnect = [];
@@ -422,7 +422,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_stats' => $stats,
                 'last_sync_error' => $hasMeasurements
                     ? null
-                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                    : $plyomat->performanceSyncMessage($stats),
             ])->save();
 
             unset($this->plyrLabManualConnections[$bookingId]);
@@ -553,7 +553,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_last_synced_at' => now(),
                 'last_sync_error' => $hasMeasurements
                     ? null
-                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                    : $plyomat->performanceSyncMessage($stats),
             ])->save();
 
             Cache::forget('superadmin:control-center:v6');
@@ -562,7 +562,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 ->title($hasMeasurements ? 'PLYRLab data synced' : 'Athlete connected, but no measurements returned')
                 ->body($hasMeasurements
                     ? $this->userName($booking->player) . '\'s latest available Plyomat performance data was saved.'
-                    : 'The Athlete ID is valid/assigned, but no supported jump/session measurements were returned by the available Plyomat endpoints.');
+                    : $plyomat->performanceSyncMessage($stats));
 
             if ($hasMeasurements) {
                 $notification->success();
