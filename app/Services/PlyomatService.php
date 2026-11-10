@@ -398,7 +398,9 @@ class PlyomatService
         ])));
 
         $paths = array_values(array_unique(array_filter([
-            trim((string) $trainer->plyomat_stats_path),
+            // Athlete profile discovery and performance-data discovery are
+            // intentionally separate. plyomat_stats_path belongs only to the
+            // sessions/results side and must never be reused here.
             trim((string) config('services.plyomat.athlete_read_path')),
             '/v1/athletes/{athlete_id}',
             '/v1/athlete/{athlete_id}',
