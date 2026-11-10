@@ -335,6 +335,11 @@ class PlyomatService
 
                 if (is_array($json)) {
                     $attempts[array_key_last($attempts)]['json_keys'] = array_slice(array_keys($json), 0, 8);
+
+                    $identifierFields = $this->identifierFieldNames($json);
+                    if ($identifierFields !== []) {
+                        $attempts[array_key_last($attempts)]['identifier_fields'] = array_slice($identifierFields, 0, 12);
+                    }
                 }
 
                 if (! is_array($json)) {
@@ -390,11 +395,13 @@ class PlyomatService
                 $target = $host . $path . ($query ? '?' . $query : '');
                 $type = trim((string) ($attempt['content_type'] ?? '')) ?: 'unknown content type';
                 $keys = $attempt['json_keys'] ?? ($attempt['error_keys'] ?? []);
+                $identifierFields = $attempt['identifier_fields'] ?? [];
                 $message = $this->diagnosticText($attempt['error_message'] ?? null);
 
                 return $target . ' → HTTP ' . ($attempt['status'] ?? '?')
                     . ' · ' . $type
                     . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '')
+                    . ($identifierFields !== [] ? ' · athlete identifier fields: ' . implode(', ', $identifierFields) : '')
                     . ($message !== '' ? ' · ' . Str::limit($message, 120) : '');
             })
             ->implode(' | ');
@@ -569,24 +576,8 @@ class PlyomatService
 
             if (array_is_list($candidate)) {
                 $match = collect($candidate)->first(function ($row) use ($athleteId): bool {
-                    if (! is_array($row)) {
-                        return false;
-                    }
-
-                    foreach ([
-                        data_get($row, 'id'),
-                        data_get($row, 'athlete_id'),
-                        data_get($row, 'athleteId'),
-                        data_get($row, 'uuid'),
-                        data_get($row, 'external_id'),
-                        data_get($row, 'externalId'),
-                    ] as $id) {
-                        if (is_scalar($id) && (string) $id === $athleteId) {
-                            return true;
-                        }
-                    }
-
-                    return false;
+                    return is_array($row)
+                        && $this->athleteRowMatchesIdentifier($row, $athleteId);
                 });
 
                 if (is_array($match)) {
@@ -607,11 +598,14 @@ class PlyomatService
                 data_get($candidate, 'uuid'),
                 data_get($candidate, 'external_id'),
                 data_get($candidate, 'externalId'),
+                data_get($candidate, 'public_id'),
+                data_get($candidate, 'publicId'),
+                data_get($candidate, 'short_id'),
+                data_get($candidate, 'shortId'),
+                data_get($candidate, 'code'),
             ];
 
-            $hasIdentifier = collect($identifierValues)->contains(
-                fn ($value): bool => is_scalar($value) && (string) $value === $athleteId
-            );
+            $hasIdentifier = $this->athleteRowMatchesIdentifier($candidate, $athleteId);
 
             $hasAthleteShape = collect([
                 'first_name',
@@ -631,6 +625,85 @@ class PlyomatService
         }
 
         return null;
+    }
+
+    protected function athleteRowMatchesIdentifier(array $row, string $athleteId): bool
+    {
+        $needle = trim($athleteId);
+
+        if ($needle === '') {
+            return false;
+        }
+
+        foreach (Arr::dot($row) as $key => $value) {
+            if (! is_scalar($value) || trim((string) $value) !== $needle) {
+                continue;
+            }
+
+            $segments = preg_split('/[.\[\]]+/', strtolower((string) $key)) ?: [];
+            $last = preg_replace('/[^a-z0-9]+/', '', (string) end($segments)) ?: '';
+
+            // Plyomat's web UI may expose a compact/public identifier while the
+            // API primary key is UUID-shaped. Match exact values only on fields
+            // that clearly look like identifiers/codes.
+            if (
+                $last === 'id'
+                || $last === 'uuid'
+                || $last === 'code'
+                || $last === 'key'
+                || $last === 'identifier'
+                || str_ends_with($last, 'id')
+                || str_ends_with($last, 'uuid')
+                || str_ends_with($last, 'code')
+                || str_ends_with($last, 'identifier')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function identifierFieldNames(array $payload): array
+    {
+        $rows = data_get($payload, 'data');
+
+        if (! is_array($rows) || ! array_is_list($rows)) {
+            return [];
+        }
+
+        $fields = [];
+
+        foreach (array_slice($rows, 0, 5) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            foreach (Arr::dot($row) as $key => $value) {
+                if (! is_scalar($value)) {
+                    continue;
+                }
+
+                $segments = preg_split('/[.\[\]]+/', strtolower((string) $key)) ?: [];
+                $last = preg_replace('/[^a-z0-9]+/', '', (string) end($segments)) ?: '';
+
+                if (
+                    $last === 'id'
+                    || $last === 'uuid'
+                    || $last === 'code'
+                    || $last === 'key'
+                    || $last === 'identifier'
+                    || str_ends_with($last, 'id')
+                    || str_ends_with($last, 'uuid')
+                    || str_ends_with($last, 'code')
+                    || str_ends_with($last, 'identifier')
+                ) {
+                    $fields[] = (string) $key;
+                }
+            }
+        }
+
+        return array_values(array_unique($fields));
     }
 
     protected function rememberWorkingConnection(PlyrLabTrainer $trainer, array $candidate, array $auth): void
