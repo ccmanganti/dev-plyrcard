@@ -131,7 +131,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
             unset($this->plyrLabManualConnections[$bookingId]);
 
-            Cache::forget('superadmin:control-center:v5');
+            Cache::forget('superadmin:control-center:v6');
 
             Notification::make()
                 ->title('PLYRLab connected')
@@ -196,7 +196,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             }
         }
 
-        Cache::forget('superadmin:control-center:v5');
+        Cache::forget('superadmin:control-center:v6');
 
         Notification::make()
             ->title('Plyomat API key connected')
@@ -231,7 +231,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'status' => $status,
         ])->save();
 
-        Cache::forget('superadmin:control-center:v5');
+        Cache::forget('superadmin:control-center:v6');
 
         Notification::make()
             ->title('Booking updated')
@@ -295,7 +295,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'last_sync_error' => null,
         ])->save();
 
-        Cache::forget('superadmin:control-center:v5');
+        Cache::forget('superadmin:control-center:v6');
 
         Notification::make()
             ->title('PLYRLab reset')
@@ -306,8 +306,30 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
     public function getViewData(): array
     {
+        if (! $this->currentUserIsSuperadmin() && $this->currentTrainerProfile()) {
+            $base = parent::getViewData();
+            $data = array_merge($base, $this->buildOperationalData());
+
+            // Trainer accounts share the PLYRLab view shell, but must never
+            // receive the broader superadmin athlete/support datasets.
+            $data['athletes'] = [];
+            $data['athlete_count'] = 0;
+            $data['attention_all'] = [];
+            $data['follow_up_queues'] = [];
+            $data['plan_summary'] = [];
+            $data['billing_rows'] = [];
+            $data['amplify_credit_rows'] = [];
+            $data['amplify_credit_services'] = [];
+            $data['new_signups'] = [];
+            $data['reminders_this_week'] = [];
+            $data['service_activity'] = ['items' => [], 'open' => 0, 'week' => 0];
+            $data['payment_activity'] = ['items' => [], 'week_count' => 0, 'week_amount' => '$0'];
+
+            return $data;
+        }
+
         return Cache::remember(
-            'superadmin:control-center:v5',
+            'superadmin:control-center:v6',
             now()->addSeconds(45),
             function (): array {
                 $base = parent::getViewData();
