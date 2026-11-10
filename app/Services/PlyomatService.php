@@ -658,6 +658,21 @@ class PlyomatService
         // start with the athlete payload and then probe the read-only performance
         // resources until one actually contains supported metrics.
         $profile = $this->readAthlete($booking);
+
+        $canonicalAthleteId = $this->athleteIdentifier($profile);
+        if (
+            $canonicalAthleteId !== null
+            && $canonicalAthleteId !== (string) $booking->plyomat_athlete_id
+        ) {
+            // Short/external IDs are useful for admin/player entry, but the
+            // sessions/results API should receive Plyomat's primary athlete UUID.
+            $booking->forceFill([
+                'plyomat_athlete_id' => $canonicalAthleteId,
+            ])->save();
+
+            $booking->setAttribute('plyomat_athlete_id', $canonicalAthleteId);
+        }
+
         $profileStats = $this->normalizeStats($profile);
 
         if ($this->hasPerformanceMeasurements($profileStats)) {
