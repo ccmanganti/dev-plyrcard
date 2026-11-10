@@ -750,8 +750,10 @@
                                 <td>
                                     @if($booking['status'] === 'cancelled')
                                         <span class="pc-state is-churned">Disconnected</span>
+                                    @elseif($booking['plyomat_ready'] && $booking['data_synced'])
+                                        <span class="pc-state is-active">Data synced</span>
                                     @elseif($booking['plyomat_ready'])
-                                        <span class="pc-state is-active">Connected</span>
+                                        <span class="pc-state is-needs_push">ID linked · Data pending</span>
                                     @elseif($booking['status'] === 'awaiting_integration')
                                         <span class="pc-state is-past_due">Trainer API pending</span>
                                     @else
@@ -762,6 +764,19 @@
                                 <td>
                                     <div class="pc-plyrlab-row-actions">
                                         @if($booking['user_url'])<a href="{{ $booking['user_url'] }}" class="pc-btn is-small">View player</a>@endif
+
+                                        @if($booking['can_manage'] && $booking['plyomat_ready'] && $booking['status'] !== 'cancelled')
+                                            <button
+                                                type="button"
+                                                class="pc-btn is-small {{ $booking['data_synced'] ? '' : 'is-primary' }}"
+                                                wire:click="syncPlyrLabBooking({{ (int)$booking['id'] }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="syncPlyrLabBooking({{ (int)$booking['id'] }})"
+                                            >
+                                                <span wire:loading.remove wire:target="syncPlyrLabBooking({{ (int)$booking['id'] }})">{{ $booking['data_synced'] ? 'Sync Data' : 'Pull Data' }}</span>
+                                                <span class="pc-btn-working" wire:loading wire:target="syncPlyrLabBooking({{ (int)$booking['id'] }})"><i class="pc-inline-spinner"></i> Syncing…</span>
+                                            </button>
+                                        @endif
 
                                         @if($booking['can_manage'] && $booking['status'] !== 'completed' && $booking['status'] !== 'cancelled')
                                             <button type="button" class="pc-btn is-small" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'completed')">Complete</button>
@@ -818,7 +833,9 @@
                                 <span><b>{{ $playerBooking['player'] }}</b><small>{{ $playerBooking['sport'] }}</small></span>
                             </div>
                             <div class="pc-plyrlab-player-status">
-                                <span class="pc-state is-{{ $playerBooking['plyomat_ready'] ? 'active' : 'needs_push' }}">{{ $playerBooking['plyomat_ready'] ? 'Plyomat connected' : 'Not connected' }}</span>
+                                <span class="pc-state is-{{ $playerBooking['data_synced'] ? 'active' : ($playerBooking['plyomat_ready'] ? 'needs_push' : 'past_due') }}">
+                                    {{ $playerBooking['data_synced'] ? 'Performance data synced' : ($playerBooking['plyomat_ready'] ? 'Athlete ID linked · Data pending' : 'Not connected') }}
+                                </span>
                                 <span class="pc-state is-{{ $playerBooking['needs_attention'] ? 'past_due' : 'active' }}">{{ $playerBooking['status_label'] }}</span>
                             </div>
                             <div class="pc-kv"><span>Athlete ID</span><b>{{ $playerBooking['athlete_id'] ?: 'Pending' }}</b></div>
