@@ -56,8 +56,14 @@ class PlyrLabTrainer extends Model
         return trim((string) ($this->display_name ?: $this->user?->getFilamentName())) ?: 'PLYRLab Trainer';
     }
 
-    public function hasPlyomatConnection(): bool
+    public function hasPlyomatApiKey(): bool
     {
         return filled($this->plyomat_api_key);
+    }
+
+    public function hasPlyomatConnection(): bool
+    {
+        return $this->hasPlyomatApiKey()
+            && filled($this->plyomat_base_url);
     }
 }
