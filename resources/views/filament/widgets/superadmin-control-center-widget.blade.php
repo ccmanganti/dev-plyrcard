@@ -667,6 +667,42 @@
         @endif
 
         <div x-show="plyrLabTab === 'bookings'" x-cloak>
+            @if($plyrlab_is_superadmin)
+                <section class="pc-panel pc-plyrlab-admin-connect">
+                    <header class="pc-panel-head">
+                        <div>
+                            <h3>Manual player connection</h3>
+                            <p>Use this when a Plyomat athlete already exists or automatic provisioning cannot be used. The Athlete ID is verified through the selected trainer before PLYRLab is unlocked.</p>
+                        </div>
+                    </header>
+                    <div class="pc-plyrlab-admin-connect-form">
+                        <label>
+                            <span>Player</span>
+                            <select wire:model.defer="plyrLabAdminConnect.player_id">
+                                <option value="">Select player</option>
+                                @foreach($athletes as $athlete)
+                                    <option value="{{ $athlete['id'] }}">{{ $athlete['name'] }} · {{ $athlete['sport'] }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label>
+                            <span>Trainer</span>
+                            <select wire:model.defer="plyrLabAdminConnect.trainer_id">
+                                <option value="">Select trainer</option>
+                                @foreach($plyrlab_trainers as $trainer)
+                                    <option value="{{ $trainer['id'] }}">{{ $trainer['name'] }}{{ $trainer['plyomat_connected'] ? '' : ' · API pending' }}</option>
+                                @endforeach
+                            </select>
+                        </label>
+                        <label>
+                            <span>Plyomat Athlete ID</span>
+                            <input type="text" wire:model.defer="plyrLabAdminConnect.athlete_id" placeholder="Existing Athlete ID">
+                        </label>
+                        <button type="button" class="pc-btn is-primary" wire:click="manualConnectPlyrLabPlayer" wire:loading.attr="disabled" wire:target="manualConnectPlyrLabPlayer">Verify & Connect</button>
+                    </div>
+                </section>
+            @endif
+
             <section class="pc-panel">
                 <header class="pc-panel-head">
                     <div>
@@ -1205,6 +1241,14 @@
 .pc-plyrlab-api-panel{max-width:760px}.pc-plyrlab-api-body{display:grid;gap:.75rem;padding:.9rem}
 .pc-plyrlab-field{display:grid;gap:.3rem}.pc-plyrlab-field span{color:var(--pc-muted);font-size:.62rem;font-weight:800}
 @media(max-width:900px){.pc-plyrlab-health-grid{grid-template-columns:1fr}.pc-plyrlab-manual-connect{grid-template-columns:1fr}.pc-plyrlab-bookings-table{min-width:860px}}
+
+
+.pc-plyrlab-admin-connect{margin-bottom:.8rem;border-color:rgba(255,100,72,.28)}
+.pc-plyrlab-admin-connect-form{display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr) minmax(190px,1fr) auto;gap:.55rem;align-items:end;padding:.85rem}
+.pc-plyrlab-admin-connect-form label{display:grid;gap:.3rem}.pc-plyrlab-admin-connect-form label span{color:var(--pc-muted);font-size:.58rem;font-weight:850;letter-spacing:.04em}
+.pc-plyrlab-admin-connect-form select,.pc-plyrlab-admin-connect-form input{min-height:2.3rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);padding:.35rem .5rem;font-size:.65rem}
+@media(max-width:1050px){.pc-plyrlab-admin-connect-form{grid-template-columns:1fr 1fr}.pc-plyrlab-admin-connect-form .pc-btn{width:100%}}
+@media(max-width:640px){.pc-plyrlab-admin-connect-form{grid-template-columns:1fr}}
 
 </style>
 </div>
