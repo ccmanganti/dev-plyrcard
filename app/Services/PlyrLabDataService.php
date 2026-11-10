@@ -223,14 +223,15 @@ class PlyrLabDataService
         }
 
         $stats = $this->plyomat->fetchStats($booking);
+        $hasMeasurements = $this->plyomat->hasPerformanceMeasurements($stats);
 
-        if ($stats !== []) {
-            $booking->forceFill([
-                'plyomat_stats' => $stats,
-                'plyomat_last_synced_at' => now(),
-                'last_sync_error' => null,
-            ])->save();
-        }
+        $booking->forceFill([
+            'plyomat_stats' => $stats,
+            'plyomat_last_synced_at' => now(),
+            'last_sync_error' => $hasMeasurements
+                ? null
+                : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+        ])->save();
 
         return $booking->fresh(['trainer.user']) ?? $booking;
     }
@@ -298,6 +299,8 @@ class PlyrLabDataService
             'plyomat_ready' => filled($booking->plyomat_athlete_id),
             'plyomat_athlete_id' => $booking->plyomat_athlete_id,
             'last_synced_at' => $booking->plyomat_last_synced_at?->toIso8601String(),
+            'data_synced' => is_array($booking->plyomat_stats)
+                && $this->plyomat->hasPerformanceMeasurements($booking->plyomat_stats),
             'connection_error' => $booking->last_sync_error,
             'trainer' => $trainer ? $this->trainerPayload($trainer) : null,
         ];
