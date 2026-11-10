@@ -816,7 +816,7 @@ class PlyomatService
         $base = rtrim(trim((string) ($trainer->plyomat_base_url ?: config('services.plyomat.base_url', 'https://api.plyomat.com'))), '/');
 
         $savedStatsPath = trim((string) $trainer->plyomat_stats_path);
-        if ($savedStatsPath !== '' && ! preg_match('/(session|assessment|result|test|measurement|rep)/i', $savedStatsPath)) {
+        if ($savedStatsPath !== '' && ! preg_match('/(session|assessment|result|test|measurement|rep|record|pr|jump|set)/i', $savedStatsPath)) {
             // Older builds accidentally stored /v1/athletes here. Ignore that
             // roster endpoint when discovering actual performance data.
             $savedStatsPath = '';
@@ -824,17 +824,42 @@ class PlyomatService
 
         $paths = array_values(array_unique(array_filter([
             $savedStatsPath,
+
+            // Athlete-scoped endpoints.
+            '/v1/athletes/{athlete_id}/personal-records',
+            '/v1/athletes/{athlete_id}/personal_records',
+            '/v1/athletes/{athlete_id}/records',
+            '/v1/athletes/{athlete_id}/prs',
+            '/v1/athletes/{athlete_id}/sessions',
+            '/v1/athletes/{athlete_id}/reps',
+            '/v1/athletes/{athlete_id}/sets',
+            '/v1/athletes/{athlete_id}/jumps',
             '/v1/athletes/{athlete_id}/results',
             '/v1/athletes/{athlete_id}/assessments',
-            '/v1/athletes/{athlete_id}/sessions',
             '/v1/athletes/{athlete_id}/measurements',
             '/v1/athletes/{athlete_id}/tests',
+
+            // Collection endpoints using the documented athlete UUID.
+            '/v1/personal-records?athlete_id={athlete_id}',
+            '/v1/personal_records?athlete_id={athlete_id}',
+            '/v1/records?athlete_id={athlete_id}',
+            '/v1/prs?athlete_id={athlete_id}',
+            '/v1/sessions?athlete_id={athlete_id}',
+            '/v1/reps?athlete_id={athlete_id}',
+            '/v1/sets?athlete_id={athlete_id}',
+            '/v1/jumps?athlete_id={athlete_id}',
             '/v1/results?athlete_id={athlete_id}',
             '/v1/assessments?athlete_id={athlete_id}',
-            '/v1/sessions?athlete_id={athlete_id}',
             '/v1/measurements?athlete_id={athlete_id}',
             '/v1/tests?athlete_id={athlete_id}',
-            '/v1/reps?athlete_id={athlete_id}',
+
+            // Some APIs use camelCase or a generic athlete query key.
+            '/v1/sessions?athleteId={athlete_id}',
+            '/v1/reps?athleteId={athlete_id}',
+            '/v1/jumps?athleteId={athlete_id}',
+            '/v1/sessions?athlete={athlete_id}',
+            '/v1/reps?athlete={athlete_id}',
+            '/v1/jumps?athlete={athlete_id}',
         ])));
 
         $payloads = [];
@@ -915,7 +940,14 @@ class PlyomatService
 
             $normalizedKey = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $key)) ?: '';
 
-            if (! str_ends_with($normalizedKey, 'athleteid') && $normalizedKey !== 'athleteid') {
+            $looksLikeAthleteIdentifier = (
+                $normalizedKey === 'athleteid'
+                || str_ends_with($normalizedKey, 'athleteid')
+                || $normalizedKey === 'athleteuuid'
+                || str_ends_with($normalizedKey, 'athleteuuid')
+            );
+
+            if (! $looksLikeAthleteIdentifier) {
                 continue;
             }
 
@@ -926,9 +958,15 @@ class PlyomatService
             }
         }
 
-        // Filtered endpoints sometimes omit athlete_id from each returned row.
-        // In that case trust the explicit athlete_id query parameter.
-        return ! $foundAthleteId && str_contains($resolvedPath, 'athlete_id=' . rawurlencode($athleteId));
+        // Filtered endpoints sometimes omit the athlete identifier from each row.
+        // Trust the request when it explicitly scopes the collection to this UUID.
+        $encoded = rawurlencode($athleteId);
+
+        return ! $foundAthleteId && (
+            str_contains($resolvedPath, 'athlete_id=' . $encoded)
+            || str_contains($resolvedPath, 'athleteId=' . $encoded)
+            || str_contains($resolvedPath, 'athlete=' . $encoded)
+        );
     }
 
     public function hasPerformanceMeasurements(array $stats): bool
@@ -1019,8 +1057,27 @@ class PlyomatService
             return $value > 0 && $value < 10 ? $value * 1000 : $value;
         };
 
-        $left = $number($value(['left_jump_cm', 'left_jump_height', 'left_cm', 'single_leg_left_cm', 'left']));
-        $right = $number($value(['right_jump_cm', 'right_jump_height', 'right_cm', 'single_leg_right_cm', 'right']));
+        $inchesToCm = static function ($candidate) use ($number): ?float {
+            $value = $number($candidate);
+
+            return $value === null ? null : round($value * 2.54, 2);
+        };
+
+        $left = $number($value([
+            'left_jump_cm', 'left_jump_height_cm', 'left_cm', 'single_leg_left_cm',
+            'sl_jh_l_cm', 'sljhlcm',
+        ])) ?? $inchesToCm($value([
+            'left_jump_in', 'left_jump_inches', 'single_leg_left_in',
+            'sl_jh_l', 'sl jh l', 'sljhl', 'single leg jump height left',
+        ]));
+
+        $right = $number($value([
+            'right_jump_cm', 'right_jump_height_cm', 'right_cm', 'single_leg_right_cm',
+            'sl_jh_r_cm', 'sljhrcm',
+        ])) ?? $inchesToCm($value([
+            'right_jump_in', 'right_jump_inches', 'single_leg_right_in',
+            'sl_jh_r', 'sl jh r', 'sljhr', 'single leg jump height right',
+        ]));
         $gap = $number($value(['balance_gap_percent', 'left_right_diff_percent', 'asymmetry_percent', 'symmetry_gap_percent']));
 
         if ($gap === null && $left !== null && $right !== null && max($left, $right) > 0) {
@@ -1035,12 +1092,20 @@ class PlyomatService
             'latest_test_at' => $value(['last_tested_on', 'latest_test_at', 'tested_at', 'test_date', 'date']),
             'jump' => [
                 'vertical_jump_cm' => $number($value([
-                    'vertical_jump_cm', 'vertical_jump', 'jump_height_cm', 'jumpheightcm',
-                    'standing_vertical_jump_cm', 'jump_height', 'jumpheight', 'jump height',
+                    'vertical_jump_cm', 'jump_height_cm', 'jumpheightcm',
+                    'standing_vertical_jump_cm', 'countermovement_jump_height_cm',
+                    'cmj_height_cm', 'cmjheightcm',
+                ])) ?? $inchesToCm($value([
+                    'vertical_jump_in', 'vertical_jump_inches',
+                    'jump_height_in', 'jump_height_inches',
+                    'best_jh', 'best jh', 'bestjh', 'jh',
+                    'best_jump_height', 'best jump height',
+                    'vertical_jump', 'jump_height', 'jumpheight', 'jump height',
                     'countermovement_jump_height', 'cmj_height', 'cmjheight', 'svj',
                 ])),
                 'rsi' => $number($value([
                     'reactive_strength_index', 'reactivestrengthindex', 'reactive strength index',
+                    'best_rsi', 'best rsi', 'bestrsi',
                     'rsi_value', 'rsi_score', 'rsi',
                 ])),
                 'bounce_height_cm' => $number($value([
@@ -1082,29 +1147,46 @@ class PlyomatService
     {
         $lookup = [];
 
-        $walk = function ($node) use (&$walk, &$lookup): void {
+        $walk = function ($node, string $path = '') use (&$walk, &$lookup): void {
             if (! is_array($node)) {
                 return;
             }
 
             if (! array_is_list($node)) {
+                $pathLabel = $path !== '' ? basename(str_replace('.', '/', $path)) : null;
+
                 $label = data_get($node, 'metric_name')
                     ?? data_get($node, 'metricName')
+                    ?? data_get($node, 'metric_key')
+                    ?? data_get($node, 'metricKey')
                     ?? data_get($node, 'metric')
                     ?? data_get($node, 'measurement_name')
                     ?? data_get($node, 'measurementName')
                     ?? data_get($node, 'measurement')
                     ?? data_get($node, 'test_name')
                     ?? data_get($node, 'testName')
+                    ?? data_get($node, 'display_name')
+                    ?? data_get($node, 'displayName')
+                    ?? data_get($node, 'label')
+                    ?? data_get($node, 'stat_name')
+                    ?? data_get($node, 'statName')
+                    ?? data_get($node, 'stat')
                     ?? data_get($node, 'name')
                     ?? data_get($node, 'slug')
                     ?? data_get($node, 'key')
-                    ?? data_get($node, 'type');
+                    ?? data_get($node, 'type')
+                    ?? $pathLabel;
 
                 $candidate = data_get($node, 'value')
                     ?? data_get($node, 'result')
+                    ?? data_get($node, 'display_value')
+                    ?? data_get($node, 'displayValue')
                     ?? data_get($node, 'measurement_value')
                     ?? data_get($node, 'measurementValue')
+                    ?? data_get($node, 'record_value')
+                    ?? data_get($node, 'recordValue')
+                    ?? data_get($node, 'best_value')
+                    ?? data_get($node, 'bestValue')
                     ?? data_get($node, 'score')
                     ?? data_get($node, 'average')
                     ?? data_get($node, 'avg')
@@ -1115,27 +1197,39 @@ class PlyomatService
                 if (is_scalar($label) && is_scalar($candidate)) {
                     $key = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $label)) ?: '';
 
-                    if ($key !== '' && ! array_key_exists($key, $lookup)) {
-                        $lookup[$key] = $candidate;
-                    }
-
-                    $unit = data_get($node, 'unit')
+                    $unit = data_get($node, 'display_unit')
+                        ?? data_get($node, 'displayUnit')
+                        ?? data_get($node, 'unit')
                         ?? data_get($node, 'units')
                         ?? data_get($node, 'uom');
 
-                    if ($key !== '' && is_scalar($unit)) {
+                    $normalizedCandidate = $candidate;
+
+                    if (is_numeric($candidate) && is_scalar($unit)) {
                         $unitKey = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $unit)) ?: '';
 
-                        if ($unitKey !== '' && ! array_key_exists($key . $unitKey, $lookup)) {
+                        if (in_array($unitKey, ['in', 'inch', 'inches'], true)) {
+                            $normalizedCandidate = round(((float) $candidate) * 2.54, 2);
+                        } elseif (in_array($unitKey, ['s', 'sec', 'secs', 'second', 'seconds'], true)
+                            && preg_match('/(contact|flight|time)/i', (string) $label)) {
+                            $normalizedCandidate = ((float) $candidate) * 1000;
+                        }
+
+                        if ($key !== '' && $unitKey !== '' && ! array_key_exists($key . $unitKey, $lookup)) {
                             $lookup[$key . $unitKey] = $candidate;
                         }
+                    }
+
+                    if ($key !== '' && ! array_key_exists($key, $lookup)) {
+                        $lookup[$key] = $normalizedCandidate;
                     }
                 }
             }
 
-            foreach ($node as $value) {
+            foreach ($node as $childKey => $value) {
                 if (is_array($value)) {
-                    $walk($value);
+                    $childPath = $path === '' ? (string) $childKey : $path . '.' . $childKey;
+                    $walk($value, $childPath);
                 }
             }
         };
