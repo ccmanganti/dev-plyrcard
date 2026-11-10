@@ -364,8 +364,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         abort_unless($this->currentUserIsSuperadmin(), 403);
 
         $state = (array) ($this->plyrLabManualConnections[$bookingId] ?? []);
-        $trainerId = (int) ($state['trainer_id'] ?? 0);
         $athleteId = trim((string) ($state['athlete_id'] ?? ''));
+
+        $booking = PlyrLabBooking::query()
+            ->with(['player', 'trainer'])
+            ->findOrFail($bookingId);
+
+        $trainerId = (int) ($state['trainer_id'] ?? $booking->trainer_id ?? 0);
 
         if ($trainerId < 1 || $athleteId === '') {
             Notification::make()
@@ -375,10 +380,6 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
             return;
         }
-
-        $booking = PlyrLabBooking::query()
-            ->with(['player', 'trainer'])
-            ->findOrFail($bookingId);
 
         $trainer = PlyrLabTrainer::query()->findOrFail($trainerId);
 
