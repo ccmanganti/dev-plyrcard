@@ -315,14 +315,17 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $booking->setRelation('trainer', $trainer);
 
             $plyomat = app(PlyomatService::class);
-            $plyomat->readAthlete($booking);
+            $athlete = $plyomat->readAthlete($booking);
+            $canonicalAthleteId = $plyomat->athleteIdentifier($athlete) ?: $athleteId;
+
+            $booking->setAttribute('plyomat_athlete_id', $canonicalAthleteId);
             $stats = $plyomat->fetchStats($booking);
             $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
             $booking->forceFill([
                 'trainer_id' => $trainer->getKey(),
                 'status' => 'active',
-                'plyomat_athlete_id' => $athleteId,
+                'plyomat_athlete_id' => $canonicalAthleteId,
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
                 'plyomat_stats' => $stats,
@@ -403,14 +406,17 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $booking->setRelation('trainer', $trainer);
 
             $plyomat = app(PlyomatService::class);
-            $plyomat->readAthlete($booking);
+            $athlete = $plyomat->readAthlete($booking);
+            $canonicalAthleteId = $plyomat->athleteIdentifier($athlete) ?: $athleteId;
+
+            $booking->setAttribute('plyomat_athlete_id', $canonicalAthleteId);
             $stats = $plyomat->fetchStats($booking);
             $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
             $booking->forceFill([
                 'trainer_id' => $trainer->getKey(),
                 'status' => 'active',
-                'plyomat_athlete_id' => $athleteId,
+                'plyomat_athlete_id' => $canonicalAthleteId,
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
                 'plyomat_stats' => $stats,
