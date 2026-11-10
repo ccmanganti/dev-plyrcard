@@ -15,7 +15,7 @@ use Throwable;
 
 class PlyrLabController extends Controller
 {
-    public function index(Request $request, PlyrLabDataService $dataService): JsonResponse
+    public function index(Request $request, PlyrLabDataService $dataService, PlyomatService $plyomat): JsonResponse
     {
         $player = $request->user();
         abort_unless($player, 403);
@@ -48,11 +48,18 @@ class PlyrLabController extends Controller
                 $booking = $booking->fresh(['trainer']);
             } elseif (
                 filled($booking->plyomat_athlete_id)
-                && ! is_array($booking->plyomat_stats)
+                && (
+                    ! is_array($booking->plyomat_stats)
+                    || ! $plyomat->hasPerformanceMeasurements($booking->plyomat_stats)
+                )
+                && (
+                    ! $booking->plyomat_last_synced_at
+                    || $booking->plyomat_last_synced_at->lt(now()->subMinute())
+                )
             ) {
-                // Admin overrides intentionally clear stale stats. Pull the newly
-                // assigned athlete immediately when the player opens PLYRLab so
-                // this does not depend on a queue worker.
+                // Existing/manual connections created before the performance
+                // endpoint fix may have an Athlete ID with empty normalized data.
+                // Retry synchronously on open so they recover without reconnecting.
                 ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
                 $booking = $booking->fresh(['trainer']);
             } elseif (
