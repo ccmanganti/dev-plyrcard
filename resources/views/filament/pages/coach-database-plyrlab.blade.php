@@ -1027,7 +1027,7 @@
 
         var step2=(connecting||apiIssue)?'is-active':(duplicate||failed?'is-error':'');
         var step3=duplicate||failed?'is-active':(connecting?'':'');
-        var fallback=(duplicate||failed)?connectionPanel():(apiIssue?connectionPanel():'');
+        var fallback=(duplicate||failed)?connectionPanel():'';
         var error=(!apiIssue&&b&&b.connection_error)?'<div class="plab-connection-error"><b>Connection detail:</b> '+esc(b.connection_error)+'</div>':'';
 
         root().innerHTML=shell(
