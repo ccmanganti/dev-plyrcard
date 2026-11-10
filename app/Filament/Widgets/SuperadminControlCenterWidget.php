@@ -259,7 +259,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $booking->setRelation('trainer', $trainer);
 
             $plyomat = app(PlyomatService::class);
-            $athlete = $plyomat->readAthlete($booking);
+            $plyomat->readAthlete($booking);
+            $stats = $plyomat->fetchStats($booking);
 
             $booking->forceFill([
                 'trainer_id' => $trainer->getKey(),
@@ -267,7 +268,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_athlete_id' => $athleteId,
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
-                'plyomat_stats' => $plyomat->normalizeStats($athlete),
+                'plyomat_stats' => $stats,
                 'last_sync_error' => null,
             ])->save();
 
@@ -342,7 +343,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $booking->setRelation('trainer', $trainer);
 
             $plyomat = app(PlyomatService::class);
-            $athlete = $plyomat->readAthlete($booking);
+            $plyomat->readAthlete($booking);
+            $stats = $plyomat->fetchStats($booking);
 
             $booking->forceFill([
                 'trainer_id' => $trainer->getKey(),
@@ -350,7 +352,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_athlete_id' => $athleteId,
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
-                'plyomat_stats' => $plyomat->normalizeStats($athlete),
+                'plyomat_stats' => $stats,
                 'last_sync_error' => null,
             ])->save();
 
