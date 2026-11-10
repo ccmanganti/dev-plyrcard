@@ -952,7 +952,7 @@
 
         if(pollTimer){clearTimeout(pollTimer);pollTimer=null}
         if(connecting||apiIssue){
-            pollTimer=setTimeout(function(){loaded=false;load(true)},8000);
+            pollTimer=setTimeout(function(){load(true)},8000);
         }
     }
 
