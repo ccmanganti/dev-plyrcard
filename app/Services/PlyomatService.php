@@ -927,12 +927,21 @@ class PlyomatService
                     break;
                 }
 
-                $payloads[] = [
+                $payload = [
                     'data' => $json,
                     'path' => $path,
                     'base_url' => $base,
                     'auth' => $auth,
                 ];
+
+                $payloads[] = $payload;
+
+                // Once an endpoint actually exposes a supported PR/session
+                // measurement, stop discovery immediately. The working path is
+                // persisted by fetchStats() and will be tried first next time.
+                if ($this->hasPerformanceMeasurements($this->normalizeStats($json))) {
+                    return [$payload];
+                }
 
                 // A successful JSON response does not guarantee it contains
                 // measurements. Keep probing other resource types when needed.
@@ -1153,9 +1162,11 @@ class PlyomatService
                     'best_jh_in', 'best_jh_inches', 'bestjhin', 'bestjhinches',
                     'jh_in', 'jh_inches', 'jhin', 'jhinches',
                     'best_jh', 'best jh', 'bestjh', 'jh',
-                    'best_jump_height', 'best jump height',
+                    'best_jump_height_in', 'best_jump_height_inches',
+                ])) ?? $number($value([
                     'vertical_jump', 'jump_height', 'jumpheight', 'jump height',
                     'countermovement_jump_height', 'cmj_height', 'cmjheight', 'svj',
+                    'best_jump_height', 'best jump height',
                 ])),
                 'rsi' => $number($value([
                     'reactive_strength_index', 'reactivestrengthindex', 'reactive strength index',
