@@ -15,6 +15,7 @@ use App\Models\PlyrLabTrainer;
 use App\Models\User;
 use App\Services\ProfileCompletionService;
 use Carbon\Carbon;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -53,6 +54,47 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'amplify' => 0,
             ];
         }
+    }
+
+    public function resetPlyrLabBooking(int $bookingId): void
+    {
+        $user = auth()->user();
+
+        abort_unless(
+            $user
+            && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            ),
+            403
+        );
+
+        $booking = PlyrLabBooking::query()
+            ->with('player:id,first_name,last_name,email,personal_email')
+            ->findOrFail($bookingId);
+
+        $playerName = $this->userName($booking->player);
+
+        $booking->forceFill([
+            // Keep the booking row as history, but remove it from all open/access
+            // states so the player can start again with a fresh trainer booking.
+            'status' => 'cancelled',
+            'plyomat_athlete_id' => null,
+            'plyomat_provisioned_at' => null,
+            'plyomat_last_synced_at' => null,
+            'plyomat_stats' => null,
+            'last_sync_error' => null,
+        ])->save();
+
+        Cache::forget('superadmin:control-center:v5');
+
+        Notification::make()
+            ->title('PLYRLab reset')
+            ->body($playerName . ' has been disconnected from Plyomat in PLYRCard and can book/connect again.')
+            ->success()
+            ->send();
     }
 
     public function getViewData(): array
@@ -912,6 +954,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'last_sync' => $booking->plyomat_last_synced_at?->diffForHumans()
                             ?? ($booking->plyomat_provisioned_at?->diffForHumans() ?? 'Not synced'),
                         'needs_attention' => in_array($status, ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true),
+                        'can_reset' => $status !== 'cancelled'
+                            || filled($booking->plyomat_athlete_id)
+                            || is_array($booking->plyomat_stats),
                         'user_url' => $player ? $this->userUrl($player) : null,
                     ];
                 })
