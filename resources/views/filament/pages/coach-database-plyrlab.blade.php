@@ -630,7 +630,7 @@
     }
     function hasStats(){
         var j=jump(),s=speed();
-        return [stats().overall_score,stats().pace_score,j.vertical_jump_cm,j.rsi,j.bounce_height_cm,j.ground_contact_ms,j.left_jump_cm,j.right_jump_cm,s.sprint_10m_seconds,s.sprint_20m_seconds,s.sprint_30m_seconds,s.top_speed_kph].some(function(v){return num(v)!==null});
+        return [stats().overall_score,stats().pace_score,j.vertical_jump_cm,j.rsi,j.bounce_height_cm,j.bounce_factor,j.ground_contact_ms,j.flight_time_ms,j.left_jump_cm,j.right_jump_cm,s.sprint_10m_seconds,s.sprint_20m_seconds,s.sprint_30m_seconds,s.top_speed_kph].some(function(v){return num(v)!==null});
     }
     async function api(url,options){
         options=options||{};var headers=Object.assign({'Accept':'application/json','X-Requested-With':'XMLHttpRequest','X-CSRF-TOKEN':csrf()},options.headers||{});
@@ -841,8 +841,13 @@
         var p=player(),b=booking(),t=trainer(),j=jump(),s=speed(),ov=rating('overall'),latest=stats().latest_test_at,
             zones=bodyZones(),rated=zones.filter(function(z){return z.rating!==null}).sort(function(a,b){return a.rating-b.rating}),weak=rated[0]||null;
         var measured=[
-            ['Jump',val(j.vertical_jump_cm,1,'cm')],['Pop (RSI)',val(j.rsi,2,'')],['Bounce',val(j.bounce_height_cm,1,'cm')],
-            ['Quick Feet',val(j.ground_contact_ms,0,'ms')],['10 m',val(s.sprint_10m_seconds,2,'s')],['Top Speed',val(s.top_speed_kph,1,'km/h')]
+            ['Jump',val(j.vertical_jump_cm,1,'cm')],
+            ['Pop (RSI)',val(j.rsi,2,'')],
+            ['Bounce',num(j.bounce_height_cm)!==null?val(j.bounce_height_cm,1,'cm'):val(j.bounce_factor,2,'')],
+            ['Contact',val(j.ground_contact_ms,0,'ms')],
+            ['Flight',val(j.flight_time_ms,0,'ms')],
+            ['10 m',val(s.sprint_10m_seconds,2,'s')],
+            ['Top Speed',val(s.top_speed_kph,1,'km/h')]
         ].filter(function(x){return x[1]!=='–'});
         return notice()+'<div class="plab-match-home">'+
             '<section class="plab-hero2"><div>'+cardHtml()+'</div><div class="plab-hero-main">'+
@@ -886,8 +891,11 @@
         var cards=[
             statCard('Vertical Jump','jump',val(j.vertical_jump_cm,1,''),'cm',bench.svj+' cm D1 target'),
             statCard('Reactive Strength','rsi',val(j.rsi,2,''),'','RSI is shown as an exact measured value'),
-            statCard('Bounce','bounce',val(j.bounce_height_cm,1,''),'cm','Higher is better'),
+            (num(j.bounce_height_cm)!==null
+                ? statCard('Bounce Height','bounce',val(j.bounce_height_cm,1,''),'cm','Higher is better')
+                : statCard('Bounce Factor','bounce',val(j.bounce_factor,2,''),'','Plyomat measured bounce factor')),
             statCard('Quick Feet','quick',val(j.ground_contact_ms,0,''),'ms','Lower ground contact is better'),
+            statCard('Flight Time','quick',val(j.flight_time_ms,0,''),'ms','Measured Plyomat flight time'),
             statCard('Balance','balance',val(j.balance_gap_percent,1,''),'%','Lower left/right gap is better'),
             statCard('10 m Sprint','t10',val(s.sprint_10m_seconds,2,''),'s',bench.t10.toFixed(2)+' s D1 target'),
             statCard('30 m Sprint','t30',val(s.sprint_30m_seconds,2,''),'s',bench.t30.toFixed(2)+' s D1 target'),
