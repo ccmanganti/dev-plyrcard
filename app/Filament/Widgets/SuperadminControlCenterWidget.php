@@ -687,6 +687,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'plyrlab_stats' => $plyrLabAdmin['stats'],
             'plyrlab_trainers_url' => $plyrLabAdmin['trainers_url'],
             'plyrlab_add_trainer_url' => $plyrLabAdmin['add_trainer_url'],
+            'plyrlab_is_superadmin' => (bool) ($plyrLabAdmin['is_superadmin'] ?? false),
+            'plyrlab_is_trainer_portal' => (bool) ($plyrLabAdmin['is_trainer_portal'] ?? false),
+            'plyrlab_viewer_trainer' => $plyrLabAdmin['viewer_trainer'] ?? null,
             'coach_outreach_sent' => $coachOutreachSent,
             'reminders_this_week' => $this->recentReminderActivity($athleteIds),
             'service_activity' => $serviceActivity,
@@ -1077,6 +1080,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             ],
             'trainers_url' => null,
             'add_trainer_url' => null,
+            'is_superadmin' => false,
+            'is_trainer_portal' => false,
+            'viewer_trainer' => null,
         ];
 
         if (
@@ -1089,8 +1095,21 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         }
 
         try {
-            $trainers = PlyrLabTrainer::query()
-                ->with('user:id,first_name,last_name,email,player_image,plyrcard_image')
+            $isSuperadmin = $this->currentUserIsSuperadmin();
+            $viewerTrainer = $this->currentTrainerProfile();
+
+            if (! $isSuperadmin && ! $viewerTrainer) {
+                return $empty;
+            }
+
+            $trainerQuery = PlyrLabTrainer::query()
+                ->with('user:id,first_name,last_name,email,player_image,plyrcard_image');
+
+            if (! $isSuperadmin && $viewerTrainer) {
+                $trainerQuery->whereKey($viewerTrainer->getKey());
+            }
+
+            $trainers = $trainerQuery
                 ->withCount('bookings')
                 ->orderByDesc('is_active')
                 ->orderBy('display_name')
@@ -1134,11 +1153,17 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 ->values()
                 ->all();
 
-            $bookings = PlyrLabBooking::query()
+            $bookingRowsQuery = PlyrLabBooking::query()
                 ->with([
                     'player:id,first_name,last_name,email,personal_email,sport,team_name',
                     'trainer.user:id,first_name,last_name,email',
-                ])
+                ]);
+
+            if (! $isSuperadmin && $viewerTrainer) {
+                $bookingRowsQuery->where('trainer_id', $viewerTrainer->getKey());
+            }
+
+            $bookings = $bookingRowsQuery
                 ->latest('created_at')
                 ->limit(30)
                 ->get()
@@ -1161,15 +1186,25 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'last_sync' => $booking->plyomat_last_synced_at?->diffForHumans()
                             ?? ($booking->plyomat_provisioned_at?->diffForHumans() ?? 'Not synced'),
                         'needs_attention' => in_array($status, ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true),
-                        'can_reset' => $status !== 'cancelled'
+                        'can_reset' => $isSuperadmin && (
+                            $status !== 'cancelled'
                             || filled($booking->plyomat_athlete_id)
-                            || is_array($booking->plyomat_stats),
+                            || is_array($booking->plyomat_stats)
+                        ),
+                        'can_manage' => $isSuperadmin
+                            || ($viewerTrainer && (int) $booking->trainer_id === (int) $viewerTrainer->getKey()),
+                        'athlete_id' => (string) ($booking->plyomat_athlete_id ?? ''),
+                        'connection_error' => (string) ($booking->last_sync_error ?? ''),
                         'user_url' => $player ? $this->userUrl($player) : null,
                     ];
                 })
                 ->all();
 
             $bookingQuery = PlyrLabBooking::query();
+
+            if (! $isSuperadmin && $viewerTrainer) {
+                $bookingQuery->where('trainer_id', $viewerTrainer->getKey());
+            }
 
             return [
                 'trainers' => $trainerRows,
@@ -1187,8 +1222,17 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         ->whereIn('status', ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'])
                         ->count(),
                 ],
-                'trainers_url' => $this->plyrLabTrainerIndexUrl(),
-                'add_trainer_url' => $this->plyrLabTrainerCreateUrl(),
+                'trainers_url' => $isSuperadmin ? $this->plyrLabTrainerIndexUrl() : null,
+                'add_trainer_url' => $isSuperadmin ? $this->plyrLabTrainerCreateUrl() : null,
+                'is_superadmin' => $isSuperadmin,
+                'is_trainer_portal' => ! $isSuperadmin && (bool) $viewerTrainer,
+                'viewer_trainer' => $viewerTrainer ? [
+                    'id' => (int) $viewerTrainer->getKey(),
+                    'name' => $viewerTrainer->displayName(),
+                    'headline' => trim((string) ($viewerTrainer->headline ?? '')) ?: 'PLYRLab Performance Trainer',
+                    'api_connected' => $viewerTrainer->hasPlyomatConnection(),
+                    'location' => trim((string) ($viewerTrainer->location ?? '')),
+                ] : null,
             ];
         } catch (Throwable) {
             return $empty;
