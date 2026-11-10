@@ -179,7 +179,13 @@ class PlyomatService
         $weight = $this->weightKg($player->weight);
 
         if ($height === null) {
-            throw new RuntimeException('The player needs a valid height before PLYRCard can create the Plyomat athlete.');
+            $shownHeight = trim((string) $player->height);
+
+            throw new RuntimeException(
+                'The player needs a valid height before PLYRCard can create the Plyomat athlete.'
+                . ($shownHeight !== '' ? ' Current PLYRCard height: "' . $shownHeight . '".' : '')
+                . ' Use a value such as 6 ft 2 in, 6\'2", 74 in, 188 cm, or 1.88 m.'
+            );
         }
 
         if ($weight === null) {
@@ -226,38 +232,64 @@ class PlyomatService
         }
 
         $raw = strtolower(trim((string) $value));
+        $raw = str_replace([',', '’', '′'], ["", "'", "'"], $raw);
+        $raw = str_replace(['“', '”', '″'], '"', $raw);
+        $raw = preg_replace('/\s+/', ' ', $raw) ?: $raw;
 
-        if (preg_match('/^(\d+)\s*[\'′]\s*(\d+(?:\.\d+)?)?\s*(?:[\\"″])?$/u', $raw, $match)) {
+        $cm = null;
+
+        // 6'2", 6' 2, 6 ft 2 in, 6 feet 2 inches, 6ft2in
+        if (preg_match(
+            '/^(\d{1,2})(?:\s*(?:ft|feet|foot|\'))\s*(\d{1,2}(?:\.\d+)?)?\s*(?:in|inch|inches|\")?$/i',
+            $raw,
+            $match,
+        )) {
             $feet = (float) $match[1];
             $inches = isset($match[2]) && $match[2] !== '' ? (float) $match[2] : 0.0;
+            $cm = ($feet * 12 + $inches) * 2.54;
+        }
+        // Explicit centimeters.
+        elseif (preg_match('/^(\d+(?:\.\d+)?)\s*(?:cm|centimeter|centimeters|centimetre|centimetres)$/i', $raw, $match)) {
+            $cm = (float) $match[1];
+        }
+        // Explicit meters.
+        elseif (preg_match('/^(\d+(?:\.\d+)?)\s*(?:m|meter|meters|metre|metres)$/i', $raw, $match)) {
+            $cm = (float) $match[1] * 100;
+        }
+        // Explicit inches.
+        elseif (preg_match('/^(\d+(?:\.\d+)?)\s*(?:in|inch|inches|\")$/i', $raw, $match)) {
+            $cm = (float) $match[1] * 2.54;
+        }
+        // Bare numeric legacy values:
+        // 1.75 => meters, 5.11/6.2 => decimal feet, 72 => inches,
+        // 150-250 => centimeters.
+        elseif (is_numeric($raw)) {
+            $number = (float) $raw;
 
-            return round(($feet * 12 + $inches) * 2.54, 2);
+            if ($number > 0 && $number < 3) {
+                $cm = $number * 100;
+            } elseif ($number >= 3 && $number <= 8) {
+                $cm = $number * 30.48;
+            } elseif ($number >= 48 && $number <= 96) {
+                $cm = $number * 2.54;
+            } elseif ($number >= 100 && $number <= 299.99) {
+                $cm = $number;
+            }
         }
 
-        $number = preg_replace('/[^0-9.]+/', '', $raw);
-        if ($number === '' || ! is_numeric($number)) {
+        if ($cm === null) {
             return null;
         }
 
-        $number = (float) $number;
+        $cm = round($cm, 2);
 
-        if (str_contains($raw, 'ft') || str_contains($raw, 'feet')) {
-            return round($number * 30.48, 2);
+        // Plyomat's API accepts 0.01-299.99, but an athlete height outside a
+        // realistic human range is almost certainly malformed PLYRCard input.
+        if ($cm < 90 || $cm > 250) {
+            return null;
         }
 
-        if (str_contains($raw, 'in')) {
-            return round($number * 2.54, 2);
-        }
-
-        if ($number > 0 && $number < 3) {
-            return round($number * 100, 2);
-        }
-
-        if ($number >= 3 && $number <= 8) {
-            return round($number * 30.48, 2);
-        }
-
-        return $number > 0 ? round($number, 2) : null;
+        return $cm;
     }
 
     protected function weightKg(mixed $value): ?float
