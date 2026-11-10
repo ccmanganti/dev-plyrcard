@@ -110,13 +110,21 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
         try {
             $stats = $plyomat->fetchStats($booking);
 
-            if ($stats !== []) {
-                $booking->forceFill([
-                    'plyomat_stats' => $stats,
-                    'plyomat_last_synced_at' => now(),
-                    'last_sync_error' => null,
-                ])->save();
+            $updates = [
+                'plyomat_last_synced_at' => now(),
+                'last_sync_error' => null,
+            ];
+
+            if (in_array($booking->status, ['pending', 'provisioning', 'awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true)) {
+                $updates['status'] = 'active';
+                $updates['plyomat_provisioned_at'] = $booking->plyomat_provisioned_at ?: now();
             }
+
+            if ($stats !== []) {
+                $updates['plyomat_stats'] = $stats;
+            }
+
+            $booking->forceFill($updates)->save();
         } catch (Throwable $exception) {
             $booking->forceFill([
                 'last_sync_error' => $exception->getMessage(),
