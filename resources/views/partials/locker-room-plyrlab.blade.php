@@ -690,10 +690,10 @@
         var t=trainer(),trainerName=t&&t.name?t.name:'your trainer';
         return '<section class="plab-connect">'+
             '<div class="plab-connect-head"><div><span class="plab-connect-k">Existing Plyomat profile</span><h3 class="plab-connect-title">Connect an existing Athlete ID</h3>'+
-                '<p class="plab-connect-copy">Automatic creation could not complete or Plyomat may already have this athlete. Ask '+esc(trainerName)+' for the existing <b>Plyomat Athlete ID</b> and enter it below.</p></div>'+
+                '<p class="plab-connect-copy">Automatic creation could not complete or Plyomat may already have this athlete. Ask '+esc(trainerName)+' for the existing <b>Plyomat Athlete ID</b> and enter it below. If Plyomat only shows the first 8 characters, you can paste that short ID and PLYRCard will resolve the full UUID automatically.</p></div>'+
                 '<span class="plab-connect-state">Manual fallback</span></div>'+
             '<form class="plab-connect-form" data-plab-connect-form>'+
-                '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Enter the existing Plyomat Athlete ID" required></label>'+
+                '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Full UUID or Plyomat short ID" required></label>'+
                 '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Verifying…':'Connect Profile')+'</button>'+
             '</form>'+
             '<div class="plab-connect-help">Use Athlete ID only when a Plyomat profile already exists. Automatic creation is triggered immediately when the trainer booking is made.</div>'+
