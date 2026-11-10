@@ -30,7 +30,8 @@ class PlyrLabController extends Controller
             if ($booking->status === 'provisioning' && blank($booking->plyomat_athlete_id)) {
                 // Provisioning is automatic. Re-dispatching here makes the status
                 // self-healing if the initial queue dispatch was interrupted.
-                ProvisionPlyrLabAthlete::dispatch($booking->getKey());
+                ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
+                $booking = $booking->fresh();
             } elseif (
                 filled($booking->plyomat_athlete_id)
                 && (! $booking->plyomat_last_synced_at || $booking->plyomat_last_synced_at->lt(now()->subMinutes(10)))
@@ -94,11 +95,25 @@ class PlyrLabController extends Controller
             }
         }
 
-        ProvisionPlyrLabAthlete::dispatch($booking->getKey())->afterCommit();
+        // The initial Plyomat creation is intentionally synchronous here.
+        // This makes booking reliable even when a queue worker is not running.
+        // The frontend immediately renders a "Connecting to Plyomat" state while
+        // this request is in flight.
+        ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
+
+        $booking = $booking->fresh(['trainer.user']) ?? $booking;
+
+        $message = match ($booking->status) {
+            'active' => 'Trainer booked and your Plyomat athlete profile is connected.',
+            'awaiting_athlete_id' => 'Trainer booked. Plyomat reports an existing profile, so enter the existing Athlete ID to connect it.',
+            'awaiting_integration' => 'Trainer booked, but the trainer\'s Plyomat API connection needs attention.',
+            'provisioning_failed' => 'Trainer booked, but automatic Plyomat creation could not complete. You can connect an existing Athlete ID instead.',
+            default => 'Trainer booked. PLYRCard is connecting your Plyomat athlete profile.',
+        };
 
         return response()->json([
             'success' => true,
-            'message' => 'Trainer booked. PLYRCard is creating your Plyomat athlete profile automatically. If an existing profile is detected, you can connect it with the Athlete ID instead.',
+            'message' => $message,
             'data' => $dataService->payload($player),
         ]);
     }
