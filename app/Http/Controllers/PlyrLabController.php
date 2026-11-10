@@ -48,6 +48,15 @@ class PlyrLabController extends Controller
                 $booking = $booking->fresh(['trainer']);
             } elseif (
                 filled($booking->plyomat_athlete_id)
+                && ! is_array($booking->plyomat_stats)
+            ) {
+                // Admin overrides intentionally clear stale stats. Pull the newly
+                // assigned athlete immediately when the player opens PLYRLab so
+                // this does not depend on a queue worker.
+                ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
+                $booking = $booking->fresh(['trainer']);
+            } elseif (
+                filled($booking->plyomat_athlete_id)
                 && (! $booking->plyomat_last_synced_at || $booking->plyomat_last_synced_at->lt(now()->subMinutes(10)))
             ) {
                 ProvisionPlyrLabAthlete::dispatch($booking->getKey());
@@ -189,7 +198,10 @@ class PlyrLabController extends Controller
                 throw new \RuntimeException('Plyomat returned an empty athlete record for that ID.');
             }
 
-            $stats = $plyomat->normalizeStats($athlete);
+            // The athlete profile proves the ID is valid. Pull performance
+            // data separately because Plyomat roster responses may not contain
+            // sessions/assessment measurements.
+            $stats = $plyomat->fetchStats($booking);
 
             $booking->forceFill([
                 'status' => 'active',
