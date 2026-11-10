@@ -6,6 +6,7 @@
         tab: @js($initialTab),
         athleteDrawer: null,
         activityDrawer: null,
+        plyrLabTab: @js(($plyrlab_is_trainer_portal ?? false) ? 'bookings' : 'overview'),
         search: @js((string) request()->query('q', '')),
         sport: @js((string) request()->query('sport', 'all')),
         plan: @js((string) request()->query('plan', 'all')),
@@ -545,190 +546,271 @@
     @endif
 
     @if($initialTab === 'plyrlab')
-    <section class="pc-view">
-        <div class="pc-view-head">
+    <section class="pc-view pc-plyrlab-hub">
+        <div class="pc-view-head pc-plyrlab-head">
             <div>
-                <span class="pc-kicker">PERFORMANCE OPERATIONS</span>
-                <h2>PLYRLab</h2>
-                <p>Manage PLYRLab trainers, Plyomat connections, and player bookings from the Recruiting Center.</p>
+                <span class="pc-kicker">{{ $plyrlab_is_trainer_portal ? 'TRAINER PORTAL' : 'PERFORMANCE OPERATIONS' }}</span>
+                <h2>{{ $plyrlab_is_trainer_portal ? ($plyrlab_viewer_trainer['name'] ?? 'PLYRLab Trainer') : 'PLYRLab Management' }}</h2>
+                <p>
+                    @if($plyrlab_is_trainer_portal)
+                        Manage your player bookings, monitor Plyomat connection status, and keep your trainer API connection ready.
+                    @else
+                        Manage trainers, manually connect athletes, monitor Plyomat provisioning, and reset player connections when needed.
+                    @endif
+                </p>
             </div>
-            <div class="pc-view-actions">
-                @if($plyrlab_add_trainer_url)<a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-primary">+ Add trainer</a>@endif
-                @if($plyrlab_trainers_url)<a href="{{ $plyrlab_trainers_url }}" class="pc-btn">Manage trainers</a>@endif
-            </div>
-        </div>
-
-        <div class="pc-stat-grid pc-stat-grid-four">
-            <div class="pc-stat">
-                <span class="pc-stat-icon is-coral">⚗</span>
-                <small>PLYRLab trainers</small>
-                <strong>{{ number_format($plyrlab_stats['trainers'] ?? 0) }}</strong>
-                <span>{{ number_format($plyrlab_stats['bookable'] ?? 0) }} currently available for booking</span>
-            </div>
-            <div class="pc-stat">
-                <span class="pc-stat-icon is-green">✓</span>
-                <small>Plyomat connected</small>
-                <strong>{{ number_format($plyrlab_stats['connected'] ?? 0) }}</strong>
-                <span>trainers with API credentials and athlete provisioning configured</span>
-            </div>
-            <div class="pc-stat">
-                <span class="pc-stat-icon is-blue">◎</span>
-                <small>Active PLYRLab players</small>
-                <strong>{{ number_format($plyrlab_stats['active_athletes'] ?? 0) }}</strong>
-                <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }} total trainer bookings</span>
-            </div>
-            <div class="pc-stat">
-                <span class="pc-stat-icon is-amber">!</span>
-                <small>Needs attention</small>
-                <strong>{{ number_format($plyrlab_stats['needs_attention'] ?? 0) }}</strong>
-                <span>bookings waiting for Plyomat setup or retry</span>
-            </div>
-        </div>
-
-        <section class="pc-panel">
-            <header class="pc-panel-head">
-                <div>
-                    <h3>Trainer management</h3>
-                    <p>Registered PLYRCARD trainers and the Plyomat account used when a player books them.</p>
-                </div>
+            @if($plyrlab_is_superadmin)
                 <div class="pc-view-actions">
-                    @if($plyrlab_add_trainer_url)<a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-small is-primary">Add trainer</a>@endif
-                    @if($plyrlab_trainers_url)<a href="{{ $plyrlab_trainers_url }}" class="pc-btn is-small">Open full manager</a>@endif
+                    @if($plyrlab_add_trainer_url)<a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-primary">+ Add trainer</a>@endif
+                    @if($plyrlab_trainers_url)<a href="{{ $plyrlab_trainers_url }}" class="pc-btn">Manage trainers</a>@endif
                 </div>
-            </header>
-            <div class="pc-table-wrap">
-                <table class="pc-table">
-                    <thead>
-                        <tr>
-                            <th>Trainer</th>
-                            <th>Specialties</th>
-                            <th>Booking</th>
-                            <th>Plyomat</th>
-                            <th>Players</th>
-                            <th>Bookings</th>
-                            <th>Last booking</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @forelse($plyrlab_trainers as $trainer)
-                        <tr>
-                            <td>
-                                <div class="pc-person">
-                                    <span class="pc-avatar">{{ $trainer['initials'] }}</span>
-                                    <span>
-                                        <b>{{ $trainer['name'] }}</b>
-                                        <small>{{ $trainer['headline'] }}{{ $trainer['location'] ? ' · '.$trainer['location'] : '' }}</small>
-                                    </span>
-                                </div>
-                            </td>
-                            <td>
-                                @if(count($trainer['specialties']))
-                                    <div class="pc-chip-row">
-                                        @foreach(array_slice($trainer['specialties'], 0, 3) as $specialty)
-                                            <span class="pc-pill">{{ $specialty }}</span>
-                                        @endforeach
-                                    </div>
-                                @else
-                                    <span class="pc-muted-value">Not set</span>
-                                @endif
-                            </td>
-                            <td>
-                                <span class="pc-state is-{{ $trainer['bookable'] ? 'active' : 'churned' }}">{{ $trainer['bookable'] ? 'Bookable' : 'Hidden' }}</span>
-                            </td>
-                            <td>
-                                <span class="pc-state is-{{ $trainer['plyomat_connected'] ? 'active' : 'past_due' }}">{{ $trainer['plyomat_connected'] ? 'Connected' : 'Setup needed' }}</span>
-                            </td>
-                            <td class="pc-mono">{{ number_format($trainer['active_athletes']) }}</td>
-                            <td class="pc-mono">{{ number_format($trainer['bookings']) }}</td>
-                            <td>{{ $trainer['last_booking'] }}</td>
-                            <td>
-                                @if($trainer['edit_url'])<a href="{{ $trainer['edit_url'] }}" class="pc-btn is-small">Edit trainer</a>@endif
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="8">
-                                <div class="pc-empty">
-                                    No PLYRLab trainers have been configured yet.
-                                    @if($plyrlab_add_trainer_url)<br><br><a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-primary">Add the first trainer</a>@endif
-                                </div>
-                            </td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                </table>
-            </div>
-        </section>
+            @else
+                <div class="pc-plyrlab-api-badge is-{{ ($plyrlab_viewer_trainer['api_connected'] ?? false) ? 'ok' : 'wait' }}">
+                    <span></span>
+                    {{ ($plyrlab_viewer_trainer['api_connected'] ?? false) ? 'Plyomat API connected' : 'API key required' }}
+                </div>
+            @endif
+        </div>
 
-        <section class="pc-panel">
-            <header class="pc-panel-head">
-                <div>
-                    <h3>Recent PLYRLab bookings</h3>
-                    <p>Player-to-trainer bookings and their current Plyomat provisioning state.</p>
+        <nav class="pc-plyrlab-tabs" aria-label="PLYRLab management sections">
+            @if($plyrlab_is_superadmin)
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'overview' }" x-on:click="plyrLabTab='overview'">Overview</button>
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'bookings' }" x-on:click="plyrLabTab='bookings'">Bookings <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }}</span></button>
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'trainers' }" x-on:click="plyrLabTab='trainers'">Trainers <span>{{ number_format($plyrlab_stats['trainers'] ?? 0) }}</span></button>
+            @else
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'bookings' }" x-on:click="plyrLabTab='bookings'">Bookings <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }}</span></button>
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'players' }" x-on:click="plyrLabTab='players'">Players <span>{{ number_format($plyrlab_stats['active_athletes'] ?? 0) }}</span></button>
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'api' }" x-on:click="plyrLabTab='api'">API Connection</button>
+            @endif
+        </nav>
+
+        <div x-show="plyrLabTab === 'overview'" x-cloak>
+            <div class="pc-stat-grid pc-stat-grid-four">
+                <div class="pc-stat">
+                    <span class="pc-stat-icon is-coral">⚗</span>
+                    <small>PLYRLab trainers</small>
+                    <strong>{{ number_format($plyrlab_stats['trainers'] ?? 0) }}</strong>
+                    <span>{{ number_format($plyrlab_stats['bookable'] ?? 0) }} currently available for booking</span>
                 </div>
-            </header>
-            <div class="pc-table-wrap">
-                <table class="pc-table">
-                    <thead>
-                        <tr>
-                            <th>Player</th>
-                            <th>Trainer</th>
-                            <th>Session</th>
-                            <th>Status</th>
-                            <th>Plyomat profile</th>
-                            <th>Last sync</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    @forelse($plyrlab_bookings as $booking)
-                        <tr>
-                            <td>
-                                <div class="pc-person">
-                                    <span class="pc-avatar">{{ $booking['initials'] }}</span>
-                                    <span><b>{{ $booking['player'] }}</b><small>{{ $booking['sport'] }}</small></span>
-                                </div>
-                            </td>
-                            <td>{{ $booking['trainer'] }}</td>
-                            <td>{{ $booking['scheduled_for'] }}</td>
-                            <td>
-                                <span class="pc-state is-{{ $booking['needs_attention'] ? 'past_due' : ($booking['status'] === 'active' || $booking['status'] === 'completed' ? 'active' : 'needs_push') }}">{{ $booking['status_label'] }}</span>
-                            </td>
-                            <td>
-                                @if($booking['status'] === 'cancelled')
-                                    <span class="pc-state is-churned">Disconnected</span>
-                                @else
-                                    <span class="pc-state is-{{ $booking['plyomat_ready'] ? 'active' : 'needs_push' }}">{{ $booking['plyomat_ready'] ? 'Connected' : 'Pending' }}</span>
-                                @endif
-                            </td>
-                            <td>{{ $booking['last_sync'] }}</td>
-                            <td>
-                                <span class="pc-quick-actions">
-                                    @if($booking['user_url'])<a href="{{ $booking['user_url'] }}" class="pc-btn is-small">View player</a>@endif
-                                    @if($booking['can_reset'])
-                                        <button
-                                            type="button"
-                                            class="pc-btn is-small is-danger"
-                                            wire:click="resetPlyrLabBooking({{ (int) $booking['id'] }})"
-                                            wire:confirm="Reset PLYRLab for {{ $booking['player'] }}? This disconnects the Plyomat Athlete ID, clears synced PLYRLab stats, cancels this booking for access purposes, and lets the player start again. It does not delete the athlete inside Plyomat."
-                                            wire:loading.attr="disabled"
-                                            wire:target="resetPlyrLabBooking({{ (int) $booking['id'] }})"
-                                        >Reset PLYRLab</button>
-                                    @endif
-                                </span>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr><td colspan="7"><div class="pc-empty">No PLYRLab bookings have been made yet.</div></td></tr>
-                    @endforelse
-                    </tbody>
-                </table>
+                <div class="pc-stat">
+                    <span class="pc-stat-icon is-green">✓</span>
+                    <small>Plyomat connected</small>
+                    <strong>{{ number_format($plyrlab_stats['connected'] ?? 0) }}</strong>
+                    <span>trainers with API credentials ready for read/write athlete access</span>
+                </div>
+                <div class="pc-stat">
+                    <span class="pc-stat-icon is-blue">◎</span>
+                    <small>Connected players</small>
+                    <strong>{{ number_format($plyrlab_stats['active_athletes'] ?? 0) }}</strong>
+                    <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }} total trainer bookings</span>
+                </div>
+                <div class="pc-stat">
+                    <span class="pc-stat-icon is-amber">!</span>
+                    <small>Needs attention</small>
+                    <strong>{{ number_format($plyrlab_stats['needs_attention'] ?? 0) }}</strong>
+                    <span>waiting for API setup, Athlete ID, or provisioning recovery</span>
+                </div>
             </div>
-        </section>
+
+            <section class="pc-panel pc-plyrlab-overview-panel">
+                <header class="pc-panel-head">
+                    <div><h3>Connection health</h3><p>Operational state across trainer APIs and recent player bookings.</p></div>
+                    <button type="button" class="pc-btn is-small" x-on:click="plyrLabTab='bookings'">Open bookings</button>
+                </header>
+                <div class="pc-plyrlab-health-grid">
+                    <div><small>CONNECTED PLAYERS</small><b>{{ number_format($plyrlab_stats['active_athletes'] ?? 0) }}</b><span>Verified Athlete ID + active access</span></div>
+                    <div><small>TRAINER API READY</small><b>{{ number_format($plyrlab_stats['connected'] ?? 0) }}/{{ number_format($plyrlab_stats['trainers'] ?? 0) }}</b><span>API key available</span></div>
+                    <div><small>NEEDS ATTENTION</small><b>{{ number_format($plyrlab_stats['needs_attention'] ?? 0) }}</b><span>Review in Bookings</span></div>
+                </div>
+            </section>
+        </div>
+
+        @if($plyrlab_is_superadmin)
+        <div x-show="plyrLabTab === 'trainers'" x-cloak>
+            <section class="pc-panel">
+                <header class="pc-panel-head">
+                    <div><h3>Trainer management</h3><p>Registered PLYRCARD trainer accounts and their Plyomat readiness.</p></div>
+                    <div class="pc-view-actions">
+                        @if($plyrlab_add_trainer_url)<a href="{{ $plyrlab_add_trainer_url }}" class="pc-btn is-small is-primary">Add trainer</a>@endif
+                        @if($plyrlab_trainers_url)<a href="{{ $plyrlab_trainers_url }}" class="pc-btn is-small">Open full manager</a>@endif
+                    </div>
+                </header>
+                <div class="pc-table-wrap">
+                    <table class="pc-table">
+                        <thead><tr><th>Trainer</th><th>Specialties</th><th>Booking</th><th>Plyomat</th><th>Players</th><th>Bookings</th><th>Last booking</th><th>Action</th></tr></thead>
+                        <tbody>
+                        @forelse($plyrlab_trainers as $trainer)
+                            <tr>
+                                <td><div class="pc-person"><span class="pc-avatar">{{ $trainer['initials'] }}</span><span><b>{{ $trainer['name'] }}</b><small>{{ $trainer['headline'] }}{{ $trainer['location'] ? ' · '.$trainer['location'] : '' }}</small></span></div></td>
+                                <td>
+                                    @if(count($trainer['specialties']))
+                                        <div class="pc-chip-row">@foreach(array_slice($trainer['specialties'],0,3) as $specialty)<span class="pc-pill">{{ $specialty }}</span>@endforeach</div>
+                                    @else
+                                        <span class="pc-muted-value">Not set</span>
+                                    @endif
+                                </td>
+                                <td><span class="pc-state is-{{ $trainer['bookable'] ? 'active' : 'churned' }}">{{ $trainer['bookable'] ? 'Bookable' : 'Hidden' }}</span></td>
+                                <td><span class="pc-state is-{{ $trainer['plyomat_connected'] ? 'active' : 'past_due' }}">{{ $trainer['plyomat_connected'] ? 'Connected' : 'API needed' }}</span></td>
+                                <td class="pc-mono">{{ number_format($trainer['active_athletes']) }}</td>
+                                <td class="pc-mono">{{ number_format($trainer['bookings']) }}</td>
+                                <td>{{ $trainer['last_booking'] }}</td>
+                                <td>@if($trainer['edit_url'])<a href="{{ $trainer['edit_url'] }}" class="pc-btn is-small">Edit trainer</a>@endif</td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="8"><div class="pc-empty">No PLYRLab trainers have been configured yet.</div></td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+        @endif
+
+        <div x-show="plyrLabTab === 'bookings'" x-cloak>
+            <section class="pc-panel">
+                <header class="pc-panel-head">
+                    <div>
+                        <h3>{{ $plyrlab_is_trainer_portal ? 'My player bookings' : 'Player bookings & connections' }}</h3>
+                        <p>{{ $plyrlab_is_trainer_portal ? 'Manage your scheduled players and monitor whether each Plyomat profile is ready.' : 'Manual connect, reset, and troubleshoot every player-to-trainer connection.' }}</p>
+                    </div>
+                </header>
+                <div class="pc-table-wrap">
+                    <table class="pc-table pc-plyrlab-bookings-table">
+                        <thead>
+                            <tr>
+                                <th>Player</th>
+                                @if($plyrlab_is_superadmin)<th>Trainer</th>@endif
+                                <th>Session</th>
+                                <th>Booking</th>
+                                <th>Plyomat</th>
+                                <th>Last sync</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        @forelse($plyrlab_bookings as $booking)
+                            <tr>
+                                <td>
+                                    <div class="pc-person">
+                                        <span class="pc-avatar">{{ $booking['initials'] }}</span>
+                                        <span><b>{{ $booking['player'] }}</b><small>{{ $booking['sport'] }}{{ $booking['athlete_id'] ? ' · ID '.$booking['athlete_id'] : '' }}</small></span>
+                                    </div>
+                                    @if($booking['connection_error'])
+                                        <small class="pc-plyrlab-error">{{ \Illuminate\Support\Str::limit($booking['connection_error'], 130) }}</small>
+                                    @endif
+                                </td>
+                                @if($plyrlab_is_superadmin)<td>{{ $booking['trainer'] }}</td>@endif
+                                <td>{{ $booking['scheduled_for'] }}</td>
+                                <td><span class="pc-state is-{{ $booking['needs_attention'] ? 'past_due' : ($booking['status'] === 'active' || $booking['status'] === 'completed' ? 'active' : ($booking['status'] === 'cancelled' ? 'churned' : 'needs_push')) }}">{{ $booking['status_label'] }}</span></td>
+                                <td>
+                                    @if($booking['status'] === 'cancelled')
+                                        <span class="pc-state is-churned">Disconnected</span>
+                                    @elseif($booking['plyomat_ready'])
+                                        <span class="pc-state is-active">Connected</span>
+                                    @elseif($booking['status'] === 'awaiting_integration')
+                                        <span class="pc-state is-past_due">Trainer API pending</span>
+                                    @else
+                                        <span class="pc-state is-needs_push">Awaiting connection</span>
+                                    @endif
+                                </td>
+                                <td>{{ $booking['last_sync'] }}</td>
+                                <td>
+                                    <div class="pc-plyrlab-row-actions">
+                                        @if($booking['user_url'])<a href="{{ $booking['user_url'] }}" class="pc-btn is-small">View player</a>@endif
+
+                                        @if($booking['can_manage'] && $booking['status'] !== 'completed' && $booking['status'] !== 'cancelled')
+                                            <button type="button" class="pc-btn is-small" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'completed')">Complete</button>
+                                            <button type="button" class="pc-btn is-small is-danger" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'cancelled')" wire:confirm="Cancel this PLYRLab booking?">Cancel</button>
+                                        @elseif($booking['can_manage'] && $booking['status'] === 'completed' && $booking['plyomat_ready'])
+                                            <button type="button" class="pc-btn is-small" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'active')">Reopen</button>
+                                        @endif
+
+                                        @if($booking['can_reset'])
+                                            <button type="button" class="pc-btn is-small is-danger" wire:click="resetPlyrLabBooking({{ (int)$booking['id'] }})" wire:confirm="Reset PLYRLab for {{ $booking['player'] }}? This clears the local Athlete ID and synced data, then lets the player start again. The Plyomat athlete itself is not deleted.">Reset</button>
+                                        @endif
+                                    </div>
+
+                                    @if($plyrlab_is_superadmin && $booking['status'] !== 'cancelled')
+                                        <div class="pc-plyrlab-manual-connect">
+                                            <select wire:model.defer="plyrLabManualConnections.{{ (int)$booking['id'] }}.trainer_id">
+                                                <option value="">Select trainer</option>
+                                                @foreach($plyrlab_trainers as $trainer)
+                                                    <option value="{{ $trainer['id'] }}">{{ $trainer['name'] }}{{ $trainer['plyomat_connected'] ? '' : ' · API pending' }}</option>
+                                                @endforeach
+                                            </select>
+                                            <input type="text" wire:model.defer="plyrLabManualConnections.{{ (int)$booking['id'] }}.athlete_id" placeholder="Plyomat Athlete ID">
+                                            <button type="button" class="pc-btn is-small is-primary" wire:click="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">Connect ID</button>
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="{{ $plyrlab_is_superadmin ? 7 : 6 }}"><div class="pc-empty">No PLYRLab bookings are available yet.</div></td></tr>
+                        @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        @if($plyrlab_is_trainer_portal)
+            <div x-show="plyrLabTab === 'players'" x-cloak>
+                @php($trainerPlayers = collect($plyrlab_bookings)->unique('player_id')->values())
+                <div class="pc-plyrlab-player-grid">
+                    @forelse($trainerPlayers as $playerBooking)
+                        <article class="pc-panel pc-plyrlab-player-card">
+                            <div class="pc-person">
+                                <span class="pc-avatar is-large">{{ $playerBooking['initials'] }}</span>
+                                <span><b>{{ $playerBooking['player'] }}</b><small>{{ $playerBooking['sport'] }}</small></span>
+                            </div>
+                            <div class="pc-plyrlab-player-status">
+                                <span class="pc-state is-{{ $playerBooking['plyomat_ready'] ? 'active' : 'needs_push' }}">{{ $playerBooking['plyomat_ready'] ? 'Plyomat connected' : 'Not connected' }}</span>
+                                <span class="pc-state is-{{ $playerBooking['needs_attention'] ? 'past_due' : 'active' }}">{{ $playerBooking['status_label'] }}</span>
+                            </div>
+                            <div class="pc-kv"><span>Athlete ID</span><b>{{ $playerBooking['athlete_id'] ?: 'Pending' }}</b></div>
+                            <div class="pc-kv"><span>Session</span><b>{{ $playerBooking['scheduled_for'] }}</b></div>
+                            <div class="pc-kv"><span>Last sync</span><b>{{ $playerBooking['last_sync'] }}</b></div>
+                            @if($playerBooking['user_url'])<a href="{{ $playerBooking['user_url'] }}" class="pc-btn is-small">Open player</a>@endif
+                        </article>
+                    @empty
+                        <div class="pc-empty">No players have booked you yet.</div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div x-show="plyrLabTab === 'api'" x-cloak>
+                <section class="pc-panel pc-plyrlab-api-panel">
+                    <header class="pc-panel-head">
+                        <div>
+                            <h3>Plyomat API Connection</h3>
+                            <p>Your secret token is encrypted at rest and is never shown back after saving.</p>
+                        </div>
+                        <span class="pc-state is-{{ ($plyrlab_viewer_trainer['api_connected'] ?? false) ? 'active' : 'past_due' }}">{{ ($plyrlab_viewer_trainer['api_connected'] ?? false) ? 'Connected' : 'Connection required' }}</span>
+                    </header>
+                    <div class="pc-plyrlab-api-body">
+                        @if(!($plyrlab_viewer_trainer['api_connected'] ?? false))
+                            <div class="pc-note">Players may still book you, but their PLYRLab stays locked in <b>Awaiting Trainer Setup</b> until you connect a valid Plyomat token with Athlete Read + Athlete Write access.</div>
+                        @else
+                            <div class="pc-note">Your API connection is active. Saving a new token below replaces the current encrypted token.</div>
+                        @endif
+                        <label class="pc-plyrlab-field">
+                            <span>Plyomat secret token</span>
+                            <input type="password" wire:model.defer="plyrLabTrainerApiKey" placeholder="Paste Bearer token">
+                        </label>
+                        <button type="button" class="pc-btn is-primary" wire:click="saveMyPlyrLabApiKey" wire:loading.attr="disabled" wire:target="saveMyPlyrLabApiKey">
+                            {{ ($plyrlab_viewer_trainer['api_connected'] ?? false) ? 'Replace API Key' : 'Connect API Key' }}
+                        </button>
+                    </div>
+                </section>
+            </div>
+        @endif
 
         <div class="pc-note">
-            Trainer API keys stay encrypted and are never shown here. <b>Reset PLYRLab</b> disconnects only the PLYRCard-side athlete link and clears synced PLYRLab data; it does not delete the athlete record inside Plyomat. Trainers only need their API key configured in the trainer manager.
+            @if($plyrlab_is_trainer_portal)
+                Your trainer login uses your normal PLYRCard account. Player data shown here is limited to athletes who booked your PLYRLab trainer profile.
+            @else
+                Manual connection verifies the Athlete ID using the selected trainer's API key before saving it. Reset only disconnects PLYRCard; it does not delete the athlete from Plyomat.
+            @endif
         </div>
     </section>
 
@@ -1099,6 +1181,31 @@
 .pc-credit-service span{font-size:.61rem}
 .pc-credit-cell{font-weight:800}
 .pc-credit-cell small{font-size:.56rem}
+
+.pc-plyrlab-hub{gap:1rem}
+.pc-plyrlab-head{padding-bottom:.2rem}
+.pc-plyrlab-api-badge{display:flex;align-items:center;gap:.45rem;padding:.48rem .7rem;border:1px solid var(--pc-line2);border-radius:999px;font-size:.65rem;font-weight:800}
+.pc-plyrlab-api-badge span{width:.5rem;height:.5rem;border-radius:50%;background:var(--pc-amber)}
+.pc-plyrlab-api-badge.is-ok{color:var(--pc-green);border-color:rgba(34,192,138,.3);background:rgba(34,192,138,.07)}.pc-plyrlab-api-badge.is-ok span{background:var(--pc-green)}
+.pc-plyrlab-api-badge.is-wait{color:var(--pc-amber);background:rgba(240,169,59,.07)}
+.pc-plyrlab-tabs{display:flex;gap:.35rem;flex-wrap:wrap;padding:.35rem;border:1px solid var(--pc-line);border-radius:.72rem;background:var(--pc-panel2)}
+.pc-plyrlab-tabs button{display:flex;align-items:center;gap:.42rem;padding:.48rem .75rem;border:0;border-radius:.5rem;background:transparent;color:var(--pc-muted);font-size:.66rem;font-weight:850;cursor:pointer}
+.pc-plyrlab-tabs button:hover{color:var(--pc-text);background:var(--pc-panel)}
+.pc-plyrlab-tabs button.is-active{background:var(--pc-coral);color:#fff;box-shadow:0 4px 12px rgba(255,100,72,.18)}
+.pc-plyrlab-tabs button span{padding:.1rem .3rem;border-radius:999px;background:rgba(255,255,255,.13);font-size:.56rem}
+.pc-plyrlab-health-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.7rem;padding:.85rem}
+.pc-plyrlab-health-grid>div{padding:.85rem;border:1px solid var(--pc-line);border-radius:.68rem;background:var(--pc-panel2)}
+.pc-plyrlab-health-grid small{display:block;color:var(--pc-dim);font-size:.56rem;font-weight:900;letter-spacing:.1em}.pc-plyrlab-health-grid b{display:block;margin:.28rem 0;font-size:1.45rem}.pc-plyrlab-health-grid span{color:var(--pc-muted);font-size:.6rem}
+.pc-plyrlab-row-actions{display:flex;gap:.35rem;flex-wrap:wrap}
+.pc-plyrlab-manual-connect{display:grid;grid-template-columns:minmax(9rem,.9fr) minmax(10rem,1fr) auto;gap:.35rem;margin-top:.45rem;padding:.45rem;border:1px dashed var(--pc-line2);border-radius:.55rem;background:var(--pc-panel2)}
+.pc-plyrlab-manual-connect select,.pc-plyrlab-manual-connect input,.pc-plyrlab-field input{min-height:2rem;border:1px solid var(--pc-line2);border-radius:.45rem;background:var(--pc-panel);color:var(--pc-text);padding:.35rem .5rem;font-size:.62rem}
+.pc-plyrlab-error{display:block;margin-top:.28rem;max-width:32rem;color:var(--pc-red);font-size:.55rem;line-height:1.35}
+.pc-plyrlab-player-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem}
+.pc-plyrlab-player-card{padding:.85rem}.pc-plyrlab-player-status{display:flex;gap:.35rem;flex-wrap:wrap;margin:.7rem 0}
+.pc-plyrlab-api-panel{max-width:760px}.pc-plyrlab-api-body{display:grid;gap:.75rem;padding:.9rem}
+.pc-plyrlab-field{display:grid;gap:.3rem}.pc-plyrlab-field span{color:var(--pc-muted);font-size:.62rem;font-weight:800}
+@media(max-width:900px){.pc-plyrlab-health-grid{grid-template-columns:1fr}.pc-plyrlab-manual-connect{grid-template-columns:1fr}.pc-plyrlab-bookings-table{min-width:860px}}
+
 </style>
 </div>
 </x-filament-widgets::widget>
