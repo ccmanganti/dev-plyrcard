@@ -672,7 +672,7 @@
                     <header class="pc-panel-head">
                         <div>
                             <h3>Manual player connection</h3>
-                            <p>Use this when a Plyomat athlete already exists or automatic provisioning cannot be used. The Athlete ID is verified through the selected trainer before PLYRLab is unlocked.</p>
+                            <p><b>Verify & Connect</b> checks the Athlete ID through the selected trainer's Plyomat API. <b>Override ID</b> is a Superadmin-only fallback that saves/replaces the Athlete ID even when the trainer API is currently rejecting requests.</p>
                         </div>
                     </header>
                     <div class="pc-plyrlab-admin-connect-form">
@@ -698,7 +698,16 @@
                             <span>Plyomat Athlete ID</span>
                             <input type="text" wire:model.defer="plyrLabAdminConnect.athlete_id" placeholder="Existing Athlete ID">
                         </label>
-                        <button type="button" class="pc-btn is-primary" wire:click="manualConnectPlyrLabPlayer" wire:loading.attr="disabled" wire:target="manualConnectPlyrLabPlayer">Verify & Connect</button>
+                        <div class="pc-plyrlab-connect-buttons">
+                            <button type="button" class="pc-btn is-primary" wire:click="manualConnectPlyrLabPlayer" wire:loading.attr="disabled" wire:target="manualConnectPlyrLabPlayer">
+                                <span wire:loading.remove wire:target="manualConnectPlyrLabPlayer">Verify & Connect</span>
+                                <span class="pc-btn-working" wire:loading wire:target="manualConnectPlyrLabPlayer"><i class="pc-inline-spinner"></i> Verifying…</span>
+                            </button>
+                            <button type="button" class="pc-btn is-warning" wire:click="overridePlyrLabPlayer" wire:confirm="Override this player's Athlete ID without Plyomat API verification? This clears cached PLYRLab stats from the previous ID and trusts the ID entered by the admin." wire:loading.attr="disabled" wire:target="overridePlyrLabPlayer">
+                                <span wire:loading.remove wire:target="overridePlyrLabPlayer">Override ID</span>
+                                <span class="pc-btn-working" wire:loading wire:target="overridePlyrLabPlayer"><i class="pc-inline-spinner"></i> Overriding…</span>
+                            </button>
+                        </div>
                     </div>
                 </section>
             @endif
@@ -775,7 +784,16 @@
                                                 @endforeach
                                             </select>
                                             <input type="text" wire:model.defer="plyrLabManualConnections.{{ (int)$booking['id'] }}.athlete_id" placeholder="Plyomat Athlete ID">
-                                            <button type="button" class="pc-btn is-small is-primary" wire:click="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">Connect ID</button>
+                                            <div class="pc-plyrlab-connect-buttons is-row">
+                                                <button type="button" class="pc-btn is-small is-primary" wire:click="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})" wire:loading.attr="disabled" wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">
+                                                    <span wire:loading.remove wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})">Connect ID</span>
+                                                    <span class="pc-btn-working" wire:loading wire:target="manualConnectPlyrLabBooking({{ (int)$booking['id'] }})"><i class="pc-inline-spinner"></i> Connecting…</span>
+                                                </button>
+                                                <button type="button" class="pc-btn is-small is-warning" wire:click="overridePlyrLabBooking({{ (int)$booking['id'] }})" wire:confirm="Override {{ $booking['player'] }}'s Athlete ID without Plyomat API verification? Cached stats from the previous ID will be cleared." wire:loading.attr="disabled" wire:target="overridePlyrLabBooking({{ (int)$booking['id'] }})">
+                                                    <span wire:loading.remove wire:target="overridePlyrLabBooking({{ (int)$booking['id'] }})">Override ID</span>
+                                                    <span class="pc-btn-working" wire:loading wire:target="overridePlyrLabBooking({{ (int)$booking['id'] }})"><i class="pc-inline-spinner"></i> Saving…</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     @endif
                                 </td>
@@ -1249,6 +1267,17 @@
 .pc-plyrlab-admin-connect-form select,.pc-plyrlab-admin-connect-form input{min-height:2.3rem;border:1px solid var(--pc-line2);border-radius:.5rem;background:var(--pc-panel);color:var(--pc-text);padding:.35rem .5rem;font-size:.65rem}
 @media(max-width:1050px){.pc-plyrlab-admin-connect-form{grid-template-columns:1fr 1fr}.pc-plyrlab-admin-connect-form .pc-btn{width:100%}}
 @media(max-width:640px){.pc-plyrlab-admin-connect-form{grid-template-columns:1fr}}
+
+
+.pc-plyrlab-connect-buttons{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.pc-plyrlab-connect-buttons.is-row{grid-column:1/-1;justify-content:flex-end}
+.pc-btn.is-warning{border-color:rgba(240,169,59,.46);background:rgba(240,169,59,.1);color:var(--pc-amber)}
+.pc-btn.is-warning:hover{border-color:rgba(240,169,59,.7);background:rgba(240,169,59,.17)}
+.pc-btn-working{display:inline-flex;align-items:center;gap:.38rem}
+.pc-inline-spinner{display:inline-block;width:.78rem;height:.78rem;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:pc-inline-spin .72s linear infinite}
+@keyframes pc-inline-spin{to{transform:rotate(360deg)}}
+.pc-btn[disabled]{cursor:wait;opacity:.72}
+@media(prefers-reduced-motion:reduce){.pc-inline-spinner{animation-duration:1.5s}}
 
 </style>
 </div>
