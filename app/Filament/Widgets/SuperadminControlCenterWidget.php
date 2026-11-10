@@ -94,6 +94,109 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         return $trainer && (int) $booking->trainer_id === (int) $trainer->getKey();
     }
 
+    public function overridePlyrLabPlayer(): void
+    {
+        abort_unless($this->currentUserIsSuperadmin(), 403);
+
+        $state = (array) $this->plyrLabAdminConnect;
+        $playerId = (int) ($state['player_id'] ?? 0);
+        $trainerId = (int) ($state['trainer_id'] ?? 0);
+        $athleteId = trim((string) ($state['athlete_id'] ?? ''));
+
+        if ($playerId < 1 || $trainerId < 1 || $athleteId === '') {
+            Notification::make()
+                ->title('Player, trainer, and Athlete ID are required')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $player = User::query()->findOrFail($playerId);
+        $trainer = PlyrLabTrainer::query()->findOrFail($trainerId);
+
+        $booking = PlyrLabBooking::query()
+            ->where('player_user_id', $player->getKey())
+            ->whereIn('status', array_merge(PlyrLabBooking::ACCESS_STATUSES, ['cancelled']))
+            ->latest('id')
+            ->first();
+
+        if (! $booking) {
+            $booking = PlyrLabBooking::query()->create([
+                'player_user_id' => $player->getKey(),
+                'trainer_id' => $trainer->getKey(),
+                'scheduled_for' => null,
+                'status' => 'active',
+                'notes' => 'Athlete ID assigned by PLYRLab admin override.',
+            ]);
+        }
+
+        $booking->forceFill([
+            'trainer_id' => $trainer->getKey(),
+            'status' => 'active',
+            'plyomat_athlete_id' => $athleteId,
+            'plyomat_provisioned_at' => now(),
+            'plyomat_last_synced_at' => null,
+            // Never carry measurements from the previous Athlete ID into an
+            // admin override. The next successful API sync repopulates them.
+            'plyomat_stats' => null,
+            'last_sync_error' => null,
+        ])->save();
+
+        $this->plyrLabAdminConnect = [];
+        Cache::forget('superadmin:control-center:v6');
+
+        Notification::make()
+            ->title('Athlete ID overridden')
+            ->body($this->userName($player) . ' now uses Athlete ID ' . $athleteId . ' through ' . $trainer->displayName() . '. API verification was intentionally bypassed.')
+            ->warning()
+            ->send();
+    }
+
+    public function overridePlyrLabBooking(int $bookingId): void
+    {
+        abort_unless($this->currentUserIsSuperadmin(), 403);
+
+        $state = (array) ($this->plyrLabManualConnections[$bookingId] ?? []);
+        $athleteId = trim((string) ($state['athlete_id'] ?? ''));
+
+        $booking = PlyrLabBooking::query()
+            ->with(['player', 'trainer'])
+            ->findOrFail($bookingId);
+
+        $trainerId = (int) ($state['trainer_id'] ?? $booking->trainer_id ?? 0);
+
+        if ($trainerId < 1 || $athleteId === '') {
+            Notification::make()
+                ->title('Trainer and Athlete ID are required')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $trainer = PlyrLabTrainer::query()->findOrFail($trainerId);
+
+        $booking->forceFill([
+            'trainer_id' => $trainer->getKey(),
+            'status' => 'active',
+            'plyomat_athlete_id' => $athleteId,
+            'plyomat_provisioned_at' => now(),
+            'plyomat_last_synced_at' => null,
+            'plyomat_stats' => null,
+            'last_sync_error' => null,
+        ])->save();
+
+        unset($this->plyrLabManualConnections[$bookingId]);
+        Cache::forget('superadmin:control-center:v6');
+
+        Notification::make()
+            ->title('Athlete ID overridden')
+            ->body($this->userName($booking->player) . ' now uses Athlete ID ' . $athleteId . '. API verification was intentionally bypassed.')
+            ->warning()
+            ->send();
+    }
+
     public function manualConnectPlyrLabPlayer(): void
     {
         abort_unless($this->currentUserIsSuperadmin(), 403);
