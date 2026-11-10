@@ -356,7 +356,7 @@ class PlyomatService
         ]);
 
         if ($lastAuthStatus === 401) {
-            throw new RuntimeException('The trainer\'s Plyomat API key was rejected. Check that the key is valid and has Athlete Read access.');
+            throw new RuntimeException('Plyomat returned HTTP 401 for Authorization: Bearer. PLYRCard used the trainer\'s saved secret token exactly once (and automatically removed a pasted "Bearer " prefix if present). Replace the trainer token if this continues.');
         }
 
         if ($lastAuthStatus === 403) {
@@ -463,71 +463,14 @@ class PlyomatService
 
     protected function authCandidates(PlyrLabTrainer $trainer): array
     {
-        $configuredHeader = trim((string) config('services.plyomat.auth_header', 'Authorization'));
-        $configuredPrefix = trim((string) config('services.plyomat.auth_prefix', 'Bearer'));
-        $savedHeader = trim((string) ($trainer->plyomat_auth_header ?: ''));
-        $savedPrefix = trim((string) ($trainer->plyomat_auth_prefix ?? ''));
-
-        $candidates = [
-            [
-                'label' => 'saved',
-                'header' => $savedHeader,
-                'prefix' => $savedPrefix,
-            ],
-            [
-                'label' => 'authorization_bearer',
-                'header' => 'Authorization',
-                'prefix' => 'Bearer',
-            ],
-            [
-                'label' => 'configured',
-                'header' => $configuredHeader,
-                'prefix' => $configuredPrefix,
-            ],
-            [
-                'label' => 'authorization_token',
-                'header' => 'Authorization',
-                'prefix' => 'Token',
-            ],
-            [
-                'label' => 'authorization_api_key',
-                'header' => 'Authorization',
-                'prefix' => 'Api-Key',
-            ],
-            [
-                'label' => 'authorization_raw',
-                'header' => 'Authorization',
-                'prefix' => '',
-            ],
-            [
-                'label' => 'x_api_key',
-                'header' => 'X-API-Key',
-                'prefix' => '',
-            ],
-            [
-                'label' => 'api_key_header',
-                'header' => 'API-Key',
-                'prefix' => '',
-            ],
-        ];
-
-        $seen = [];
-
-        return array_values(array_filter($candidates, function (array $candidate) use (&$seen): bool {
-            if (blank($candidate['header'] ?? null)) {
-                return false;
-            }
-
-            $signature = strtolower((string) $candidate['header']) . '|' . (string) ($candidate['prefix'] ?? '');
-
-            if (isset($seen[$signature])) {
-                return false;
-            }
-
-            $seen[$signature] = true;
-
-            return true;
-        }));
+        // Plyomat's developer example uses Authorization: Bearer <secret token>.
+        // Keep Athlete Read deterministic and do not let stale auth metadata from
+        // earlier integration experiments override the documented scheme.
+        return [[
+            'label' => 'authorization_bearer',
+            'header' => 'Authorization',
+            'prefix' => 'Bearer',
+        ]];
     }
 
     protected function extractAthletePayload(array $payload, string $athleteId): ?array
@@ -1007,6 +950,11 @@ class PlyomatService
         $header = trim((string) ($auth['header'] ?? 'Authorization'));
         $prefix = trim((string) ($auth['prefix'] ?? ''));
         $key = trim((string) $trainer->plyomat_api_key);
+
+        // Accept either a raw secret token or a value pasted as
+        // "Bearer <token>" without accidentally sending "Bearer Bearer ...".
+        $key = preg_replace('/^Bearer\s+/i', '', $key) ?: $key;
+
         $credential = trim(($prefix !== '' ? $prefix . ' ' : '') . $key);
 
         return Http::acceptJson()
