@@ -533,13 +533,19 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
             Cache::forget('superadmin:control-center:v6');
 
-            Notification::make()
+            $notification = Notification::make()
                 ->title($hasMeasurements ? 'PLYRLab data synced' : 'Athlete connected, but no measurements returned')
                 ->body($hasMeasurements
-                    ? $this->userName($booking->player) . ''s latest available Plyomat performance data was saved.'
-                    : 'The Athlete ID is valid/assigned, but no supported jump/session measurements were returned by the available Plyomat endpoints.')
-                ->{$hasMeasurements ? 'success' : 'warning'}()
-                ->send();
+                    ? $this->userName($booking->player) . '\'s latest available Plyomat performance data was saved.'
+                    : 'The Athlete ID is valid/assigned, but no supported jump/session measurements were returned by the available Plyomat endpoints.');
+
+            if ($hasMeasurements) {
+                $notification->success();
+            } else {
+                $notification->warning();
+            }
+
+            $notification->send();
         } catch (Throwable $exception) {
             $booking->forceFill([
                 'last_sync_error' => $exception->getMessage(),
