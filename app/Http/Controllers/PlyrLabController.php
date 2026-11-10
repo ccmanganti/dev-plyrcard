@@ -26,12 +26,17 @@ class PlyrLabController extends Controller
             ->latest('id')
             ->first();
 
-        if (
-            $booking
-            && filled($booking->plyomat_athlete_id)
-            && (! $booking->plyomat_last_synced_at || $booking->plyomat_last_synced_at->lt(now()->subMinutes(10)))
-        ) {
-            ProvisionPlyrLabAthlete::dispatch($booking->getKey());
+        if ($booking) {
+            if ($booking->status === 'provisioning' && blank($booking->plyomat_athlete_id)) {
+                // Provisioning is automatic. Re-dispatching here makes the status
+                // self-healing if the initial queue dispatch was interrupted.
+                ProvisionPlyrLabAthlete::dispatch($booking->getKey());
+            } elseif (
+                filled($booking->plyomat_athlete_id)
+                && (! $booking->plyomat_last_synced_at || $booking->plyomat_last_synced_at->lt(now()->subMinutes(10)))
+            ) {
+                ProvisionPlyrLabAthlete::dispatch($booking->getKey());
+            }
         }
 
         return response()->json([
@@ -94,56 +99,6 @@ class PlyrLabController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Trainer booked. PLYRCard is creating your Plyomat athlete profile automatically. If an existing profile is detected, you can connect it with the Athlete ID instead.',
-            'data' => $dataService->payload($player),
-        ]);
-    }
-
-    public function provision(Request $request, PlyrLabDataService $dataService): JsonResponse
-    {
-        $player = $request->user();
-        abort_unless($player, 403);
-
-        $booking = PlyrLabBooking::query()
-            ->with(['trainer.user'])
-            ->where('player_user_id', $player->getKey())
-            ->whereIn('status', PlyrLabBooking::ACCESS_STATUSES)
-            ->latest('id')
-            ->first();
-
-        if (! $booking) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Book a PLYRLab trainer before creating a Plyomat athlete profile.',
-                'data' => $dataService->payload($player),
-            ], 422);
-        }
-
-        if (filled($booking->plyomat_athlete_id)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'This PLYRLab booking is already connected to a Plyomat athlete.',
-                'data' => $dataService->payload($player),
-            ], 422);
-        }
-
-        if (! $booking->trainer?->hasPlyomatConnection()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'The trainer\'s Plyomat API key is not configured.',
-                'data' => $dataService->payload($player),
-            ], 422);
-        }
-
-        $booking->forceFill([
-            'status' => 'provisioning',
-            'last_sync_error' => null,
-        ])->save();
-
-        ProvisionPlyrLabAthlete::dispatch($booking->getKey());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'PLYRCard is creating your athlete profile in Plyomat.',
             'data' => $dataService->payload($player),
         ]);
     }
