@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Widgets\SuperadminControlCenterWidget;
 use App\Support\SuperadminWidgets\SuperadminPlyrLabControlCenterWidget;
+use App\Models\PlyrLabBooking;
 use BackedEnum;
 
 class SuperadminPlyrLab extends SuperadminAthletes
@@ -22,8 +23,58 @@ class SuperadminPlyrLab extends SuperadminAthletes
 
     protected static string $controlCenterWidgetClass = SuperadminPlyrLabControlCenterWidget::class;
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        $isSuperadmin = method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+
+        return $isSuperadmin || $user->plyrLabTrainerProfile()->exists();
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        $user = auth()->user();
+        $isTrainer = $user && $user->plyrLabTrainerProfile()->exists();
+        $isSuperadmin = $user && method_exists($user, 'hasRole')
+            && (
+                $user->hasRole('Superadmin')
+                || $user->hasRole('superadmin')
+                || $user->hasRole('Super Admin')
+            );
+
+        return $isTrainer && ! $isSuperadmin ? 'PLYRLab Trainer' : 'PLYRLab Management';
+    }
+
     public static function getNavigationBadge(): ?string
     {
+        $user = auth()->user();
+
+        if ($user && $user->plyrLabTrainerProfile()->exists()) {
+            $trainer = $user->plyrLabTrainerProfile;
+
+            $count = PlyrLabBooking::query()
+                ->where('trainer_id', $trainer->getKey())
+                ->whereIn('status', PlyrLabBooking::OPEN_STATUSES)
+                ->count();
+
+            return $count > 0 ? number_format($count) : null;
+        }
+
         $count = (int) (SuperadminControlCenterWidget::navigationMetrics()['plyrlab'] ?? 0);
 
         return $count > 0 ? number_format($count) : null;
