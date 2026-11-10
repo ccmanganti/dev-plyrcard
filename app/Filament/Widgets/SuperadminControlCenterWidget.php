@@ -292,9 +292,21 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             return;
         }
 
-        $trainer->forceFill([
-            'plyomat_api_key' => $key,
-        ])->save();
+        $trainer->setAttribute('plyomat_api_key', $key);
+
+        try {
+            app(PlyomatService::class)->verifyConnection($trainer);
+        } catch (Throwable $exception) {
+            $trainer->refresh();
+
+            Notification::make()
+                ->title('Plyomat API connection failed')
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         $this->plyrLabTrainerApiKey = '';
 
