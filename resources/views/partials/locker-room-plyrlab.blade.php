@@ -723,9 +723,20 @@
     }
 
     function notice(){
-        var b=booking();if(!b||b.status==='active'||b.status==='awaiting_athlete_id')return'';
+        var b=booking();if(!b)return'';
+
+        if(b.status==='active'&&b.connection_error){
+            return '<div class="plab-notice"><i class="fa-solid fa-circle-info"></i><span>'+esc(b.connection_error)+' You can use Refresh Stats again once more Plyomat data is available.</span></div>';
+        }
+
+        if(b.status==='active'&&b.data_synced===false){
+            return '<div class="plab-notice"><i class="fa-solid fa-circle-info"></i><span>Your Plyomat Athlete ID is linked, but performance data has not synced yet. Use Refresh Stats to retry.</span></div>';
+        }
+
+        if(b.status==='active'||b.status==='awaiting_athlete_id')return'';
+
         var text=(lab.access&&lab.access.message)||'Your Plyomat connection needs attention.';
-        if(b.status==='awaiting_integration')text='Your Athlete ID is saved, but your trainer\'s Plyomat Athlete Read connection needs attention.';
+        if(b.status==='awaiting_integration')text='Your trainer is still connecting their Plyomat API. Your booking is saved and PLYRLab will retry automatically.';
         return '<div class="plab-notice"><i class="fa-solid fa-circle-info"></i><span>'+esc(text)+'</span></div>';
     }
 
