@@ -147,15 +147,21 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
         if ($trainer->hasPlyomatApiKey()) {
             try {
-                $stats = app(PlyomatService::class)->fetchStats($booking->fresh(['trainer']) ?? $booking);
+                $plyomat = app(PlyomatService::class);
+                $stats = $plyomat->fetchStats($booking->fresh(['trainer']) ?? $booking);
+                $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
                 $booking->forceFill([
                     'plyomat_stats' => $stats,
                     'plyomat_last_synced_at' => now(),
-                    'last_sync_error' => null,
+                    'last_sync_error' => $hasMeasurements
+                        ? null
+                        : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
                 ])->save();
 
-                $syncMessage = 'The override was saved and PLYRCard immediately pulled the available Plyomat performance data.';
+                $syncMessage = $hasMeasurements
+                    ? 'The override was saved and PLYRCard immediately pulled the available Plyomat performance data.'
+                    : 'The Athlete ID is linked, but Plyomat returned no supported session/assessment measurements yet.';
             } catch (Throwable $exception) {
                 $booking->forceFill([
                     'last_sync_error' => $exception->getMessage(),
@@ -213,15 +219,21 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
         if ($trainer->hasPlyomatApiKey()) {
             try {
-                $stats = app(PlyomatService::class)->fetchStats($booking->fresh(['trainer']) ?? $booking);
+                $plyomat = app(PlyomatService::class);
+                $stats = $plyomat->fetchStats($booking->fresh(['trainer']) ?? $booking);
+                $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
                 $booking->forceFill([
                     'plyomat_stats' => $stats,
                     'plyomat_last_synced_at' => now(),
-                    'last_sync_error' => null,
+                    'last_sync_error' => $hasMeasurements
+                        ? null
+                        : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
                 ])->save();
 
-                $syncMessage = 'Fresh Plyomat performance data was pulled immediately.';
+                $syncMessage = $hasMeasurements
+                    ? 'Fresh Plyomat performance data was pulled immediately.'
+                    : 'The Athlete ID is linked, but Plyomat returned no supported session/assessment measurements yet.';
             } catch (Throwable $exception) {
                 $booking->forceFill([
                     'last_sync_error' => $exception->getMessage(),
@@ -305,6 +317,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $plyomat = app(PlyomatService::class);
             $plyomat->readAthlete($booking);
             $stats = $plyomat->fetchStats($booking);
+            $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
             $booking->forceFill([
                 'trainer_id' => $trainer->getKey(),
@@ -313,7 +326,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
                 'plyomat_stats' => $stats,
-                'last_sync_error' => null,
+                'last_sync_error' => $hasMeasurements
+                    ? null
+                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
             ])->save();
 
             $this->plyrLabAdminConnect = [];
@@ -389,6 +404,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $plyomat = app(PlyomatService::class);
             $plyomat->readAthlete($booking);
             $stats = $plyomat->fetchStats($booking);
+            $hasMeasurements = $plyomat->hasPerformanceMeasurements($stats);
 
             $booking->forceFill([
                 'trainer_id' => $trainer->getKey(),
@@ -397,7 +413,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 'plyomat_provisioned_at' => now(),
                 'plyomat_last_synced_at' => now(),
                 'plyomat_stats' => $stats,
-                'last_sync_error' => null,
+                'last_sync_error' => $hasMeasurements
+                    ? null
+                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
             ])->save();
 
             unset($this->plyrLabManualConnections[$bookingId]);
