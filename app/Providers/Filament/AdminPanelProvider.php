@@ -56,7 +56,18 @@ class AdminPanelProvider extends PanelProvider
             ->homeUrl(function (): string {
                 $user = auth()->user();
 
-                if ($user && $user->plyrLabTrainerProfile()->exists()) {
+                if (
+                    $user
+                    && $user->plyrLabTrainerProfile()->exists()
+                    && ! (
+                        method_exists($user, 'hasRole')
+                        && (
+                            $user->hasRole('Superadmin')
+                            || $user->hasRole('superadmin')
+                            || $user->hasRole('Super Admin')
+                        )
+                    )
+                ) {
                     return url('/admin/plyrlab');
                 }
 
