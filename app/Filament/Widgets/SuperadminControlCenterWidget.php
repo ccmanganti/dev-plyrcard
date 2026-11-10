@@ -1559,8 +1559,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
             $bookings = $bookingRowsQuery
                 ->latest('created_at')
-                ->limit(30)
+                ->latest('id')
                 ->get()
+                // Management is a current-state view, not a booking-history log.
+                // Keep only the newest PLYRLab record for each player so reset /
+                // cancel / reconnect cycles do not appear as duplicate rows.
+                ->unique('player_user_id')
+                ->take(30)
                 ->map(function (PlyrLabBooking $booking) use ($isSuperadmin, $viewerTrainer): array {
                     $player = $booking->player;
                     $playerName = $this->userName($player);
@@ -1618,7 +1623,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'trainers' => $trainers->count(),
                     'bookable' => $trainers->where('is_active', true)->count(),
                     'connected' => $trainers->filter(fn (PlyrLabTrainer $trainer): bool => $trainer->hasPlyomatConnection())->count(),
-                    'bookings' => (clone $bookingQuery)->count(),
+                    'bookings' => (clone $bookingQuery)->distinct('player_user_id')->count('player_user_id'),
                     'active_athletes' => (clone $bookingQuery)
                         ->whereIn('status', ['active', 'completed'])
                         ->whereNotNull('plyomat_athlete_id')
