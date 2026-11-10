@@ -678,7 +678,7 @@
                             <th>Status</th>
                             <th>Plyomat profile</th>
                             <th>Last sync</th>
-                            <th>Player</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -696,11 +696,27 @@
                                 <span class="pc-state is-{{ $booking['needs_attention'] ? 'past_due' : ($booking['status'] === 'active' || $booking['status'] === 'completed' ? 'active' : 'needs_push') }}">{{ $booking['status_label'] }}</span>
                             </td>
                             <td>
-                                <span class="pc-state is-{{ $booking['plyomat_ready'] ? 'active' : 'needs_push' }}">{{ $booking['plyomat_ready'] ? 'Created' : 'Pending' }}</span>
+                                @if($booking['status'] === 'cancelled')
+                                    <span class="pc-state is-churned">Disconnected</span>
+                                @else
+                                    <span class="pc-state is-{{ $booking['plyomat_ready'] ? 'active' : 'needs_push' }}">{{ $booking['plyomat_ready'] ? 'Connected' : 'Pending' }}</span>
+                                @endif
                             </td>
                             <td>{{ $booking['last_sync'] }}</td>
                             <td>
-                                @if($booking['user_url'])<a href="{{ $booking['user_url'] }}" class="pc-btn is-small">View player</a>@endif
+                                <span class="pc-quick-actions">
+                                    @if($booking['user_url'])<a href="{{ $booking['user_url'] }}" class="pc-btn is-small">View player</a>@endif
+                                    @if($booking['can_reset'])
+                                        <button
+                                            type="button"
+                                            class="pc-btn is-small is-danger"
+                                            wire:click="resetPlyrLabBooking({{ (int) $booking['id'] }})"
+                                            wire:confirm="Reset PLYRLab for {{ $booking['player'] }}? This disconnects the Plyomat Athlete ID, clears synced PLYRLab stats, cancels this booking for access purposes, and lets the player start again. It does not delete the athlete inside Plyomat."
+                                            wire:loading.attr="disabled"
+                                            wire:target="resetPlyrLabBooking({{ (int) $booking['id'] }})"
+                                        >Reset PLYRLab</button>
+                                    @endif
+                                </span>
                             </td>
                         </tr>
                     @empty
@@ -712,7 +728,7 @@
         </section>
 
         <div class="pc-note">
-            Trainer API keys stay encrypted and are never shown here. Use <b>Manage trainers</b> to update each trainer's Plyomat account, API key, authentication format, athlete-creation endpoint, stats endpoint, booking availability, specialties, and public trainer information.
+            Trainer API keys stay encrypted and are never shown here. <b>Reset PLYRLab</b> disconnects only the PLYRCard-side athlete link and clears synced PLYRLab data; it does not delete the athlete record inside Plyomat. Trainers only need their API key configured in the trainer manager.
         </div>
     </section>
 
@@ -973,6 +989,7 @@
 .pc-btn:hover{border-color:#b9c1cc}
 .dark .pc-btn:hover{border-color:#4b5563}
 .pc-btn.is-small{padding:.35rem .52rem;font-size:.63rem}
+.pc-btn.is-danger{border-color:rgba(242,86,79,.38);background:rgba(242,86,79,.08);color:var(--pc-red)}.pc-btn.is-danger:hover{border-color:rgba(242,86,79,.62);background:rgba(242,86,79,.14)}
 
 .pc-table th{
     padding:.64rem .78rem;
