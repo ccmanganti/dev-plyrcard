@@ -1068,6 +1068,7 @@ class PlyomatService
             'sl_jh_l_cm', 'sljhlcm',
         ])) ?? $inchesToCm($value([
             'left_jump_in', 'left_jump_inches', 'single_leg_left_in',
+            'sl_jh_l_in', 'sl_jh_l_inches', 'sljhlin', 'sljhlinches',
             'sl_jh_l', 'sl jh l', 'sljhl', 'single leg jump height left',
         ]));
 
@@ -1076,6 +1077,7 @@ class PlyomatService
             'sl_jh_r_cm', 'sljhrcm',
         ])) ?? $inchesToCm($value([
             'right_jump_in', 'right_jump_inches', 'single_leg_right_in',
+            'sl_jh_r_in', 'sl_jh_r_inches', 'sljhrin', 'sljhrinches',
             'sl_jh_r', 'sl jh r', 'sljhr', 'single leg jump height right',
         ]));
         $gap = $number($value(['balance_gap_percent', 'left_right_diff_percent', 'asymmetry_percent', 'symmetry_gap_percent']));
@@ -1095,9 +1097,12 @@ class PlyomatService
                     'vertical_jump_cm', 'jump_height_cm', 'jumpheightcm',
                     'standing_vertical_jump_cm', 'countermovement_jump_height_cm',
                     'cmj_height_cm', 'cmjheightcm',
+                    'best_jh_cm', 'bestjhcm', 'jh_cm', 'jhcm',
                 ])) ?? $inchesToCm($value([
                     'vertical_jump_in', 'vertical_jump_inches',
                     'jump_height_in', 'jump_height_inches',
+                    'best_jh_in', 'best_jh_inches', 'bestjhin', 'bestjhinches',
+                    'jh_in', 'jh_inches', 'jhin', 'jhinches',
                     'best_jh', 'best jh', 'bestjh', 'jh',
                     'best_jump_height', 'best jump height',
                     'vertical_jump', 'jump_height', 'jumpheight', 'jump height',
@@ -1203,17 +1208,8 @@ class PlyomatService
                         ?? data_get($node, 'units')
                         ?? data_get($node, 'uom');
 
-                    $normalizedCandidate = $candidate;
-
-                    if (is_numeric($candidate) && is_scalar($unit)) {
+                    if (is_scalar($unit)) {
                         $unitKey = preg_replace('/[^a-z0-9]+/', '', strtolower((string) $unit)) ?: '';
-
-                        if (in_array($unitKey, ['in', 'inch', 'inches'], true)) {
-                            $normalizedCandidate = round(((float) $candidate) * 2.54, 2);
-                        } elseif (in_array($unitKey, ['s', 'sec', 'secs', 'second', 'seconds'], true)
-                            && preg_match('/(contact|flight|time)/i', (string) $label)) {
-                            $normalizedCandidate = ((float) $candidate) * 1000;
-                        }
 
                         if ($key !== '' && $unitKey !== '' && ! array_key_exists($key . $unitKey, $lookup)) {
                             $lookup[$key . $unitKey] = $candidate;
@@ -1221,7 +1217,9 @@ class PlyomatService
                     }
 
                     if ($key !== '' && ! array_key_exists($key, $lookup)) {
-                        $lookup[$key] = $normalizedCandidate;
+                        // Keep the base value raw. Unit-specific aliases above let
+                        // normalizeStats decide whether conversion is required.
+                        $lookup[$key] = $candidate;
                     }
                 }
             }
