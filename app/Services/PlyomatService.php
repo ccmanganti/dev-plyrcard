@@ -1170,6 +1170,24 @@ class PlyomatService
         return 'No performance data available yet. The athlete is connected, and PLYRLab will populate once Plyomat has session or personal-record data for this athlete.';
     }
 
+    public function userFacingSyncError(?string $error): string
+    {
+        $error = trim((string) $error);
+
+        if ($error === '') {
+            return '';
+        }
+
+        if (
+            str_contains($error, 'Performance API diagnostics:')
+            || str_starts_with($error, 'Athlete ID is connected, but Plyomat did not return supported')
+        ) {
+            return 'No performance data available yet. The athlete is connected, and PLYRLab will populate once Plyomat has session or personal-record data for this athlete.';
+        }
+
+        return $error;
+    }
+
     public function hasPerformanceMeasurements(array $stats): bool
     {
         $values = [
