@@ -575,17 +575,23 @@ class PlyomatService
             }
 
             if (array_is_list($candidate)) {
-                $match = collect($candidate)->first(function ($row) use ($athleteId): bool {
-                    return is_array($row)
-                        && $this->athleteRowMatchesIdentifier($row, $athleteId);
-                });
+                $ranked = collect($candidate)
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(fn (array $row): array => [
+                        'row' => $row,
+                        'score' => $this->athleteIdentifierMatchScore($row, $athleteId),
+                    ])
+                    ->filter(fn (array $item): bool => $item['score'] > 0);
 
-                if (is_array($match)) {
-                    return $match;
-                }
+                if ($ranked->isNotEmpty()) {
+                    $bestScore = (int) $ranked->max('score');
+                    $best = $ranked->where('score', $bestScore)->values();
 
-                if (count($candidate) === 1 && is_array($candidate[0])) {
-                    return $candidate[0];
+                    // Never guess when a shortened prefix resolves to more than
+                    // one athlete. Exact matches outrank prefix matches.
+                    if ($best->count() === 1) {
+                        return $best->first()['row'];
+                    }
                 }
 
                 continue;
@@ -605,7 +611,7 @@ class PlyomatService
                 data_get($candidate, 'code'),
             ];
 
-            $hasIdentifier = $this->athleteRowMatchesIdentifier($candidate, $athleteId);
+            $hasIdentifier = $this->athleteIdentifierMatchScore($candidate, $athleteId) > 0;
 
             $hasAthleteShape = collect([
                 'first_name',
@@ -627,26 +633,31 @@ class PlyomatService
         return null;
     }
 
-    protected function athleteRowMatchesIdentifier(array $row, string $athleteId): bool
+    protected function athleteIdentifierMatchScore(array $row, string $athleteId): int
     {
-        $needle = trim($athleteId);
+        $needle = strtolower(trim($athleteId));
 
         if ($needle === '') {
-            return false;
+            return 0;
         }
 
+        $canUseUuidPrefix = (bool) preg_match('/^[0-9a-f]{8,31}$/', $needle);
+        $best = 0;
+
         foreach (Arr::dot($row) as $key => $value) {
-            if (! is_scalar($value) || trim((string) $value) !== $needle) {
+            if (! is_scalar($value)) {
+                continue;
+            }
+
+            $candidate = strtolower(trim((string) $value));
+            if ($candidate === '') {
                 continue;
             }
 
             $segments = preg_split('/[.\[\]]+/', strtolower((string) $key)) ?: [];
             $last = preg_replace('/[^a-z0-9]+/', '', (string) end($segments)) ?: '';
 
-            // Plyomat's web UI may expose a compact/public identifier while the
-            // API primary key is UUID-shaped. Match exact values only on fields
-            // that clearly look like identifiers/codes.
-            if (
+            $looksLikeIdentifier = (
                 $last === 'id'
                 || $last === 'uuid'
                 || $last === 'code'
@@ -656,12 +667,27 @@ class PlyomatService
                 || str_ends_with($last, 'uuid')
                 || str_ends_with($last, 'code')
                 || str_ends_with($last, 'identifier')
+            );
+
+            if (! $looksLikeIdentifier) {
+                continue;
+            }
+
+            if ($candidate === $needle) {
+                $best = max($best, 100);
+                continue;
+            }
+
+            if (
+                $canUseUuidPrefix
+                && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/', $candidate)
+                && str_starts_with($candidate, $needle)
             ) {
-                return true;
+                $best = max($best, 50);
             }
         }
 
-        return false;
+        return $best;
     }
 
     protected function identifierFieldNames(array $payload): array
