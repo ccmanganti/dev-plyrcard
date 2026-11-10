@@ -88,7 +88,11 @@ class PlyomatService
         if (! $response->successful()) {
             $json = $response->json();
             $message = is_array($json)
-                ? (data_get($json, 'message') ?? data_get($json, 'detail') ?? data_get($json, 'error'))
+                ? $this->diagnosticText(
+                    data_get($json, 'message')
+                        ?? data_get($json, 'detail')
+                        ?? data_get($json, 'error')
+                )
                 : null;
 
             if ($response->status() === 401) {
@@ -105,7 +109,7 @@ class PlyomatService
 
             throw new RuntimeException(
                 'Plyomat athlete creation failed: HTTP ' . $response->status()
-                . ($message ? ' · ' . Str::limit((string) $message, 180) : '')
+                . ($message ? ' · ' . Str::limit($message, 180) : '')
             );
         }
 
@@ -140,11 +144,13 @@ class PlyomatService
             ?? data_get($athlete, 'athleteId')
             ?? data_get($athlete, 'uuid');
 
-        if ($id === null || trim((string) $id) === '') {
+        if (! is_scalar($id)) {
             return null;
         }
 
-        return trim((string) $id);
+        $id = trim((string) $id);
+
+        return $id !== '' ? $id : null;
     }
 
     public function athleteCreatePayload(User $player): array
@@ -315,9 +321,11 @@ class PlyomatService
 
                     if (is_array($errorJson)) {
                         $attempts[array_key_last($attempts)]['error_keys'] = array_slice(array_keys($errorJson), 0, 8);
-                        $attempts[array_key_last($attempts)]['error_message'] = data_get($errorJson, 'message')
-                            ?? data_get($errorJson, 'detail')
-                            ?? data_get($errorJson, 'error');
+                        $attempts[array_key_last($attempts)]['error_message'] = $this->diagnosticText(
+                            data_get($errorJson, 'message')
+                                ?? data_get($errorJson, 'detail')
+                                ?? data_get($errorJson, 'error')
+                        );
                     }
 
                     continue;
@@ -372,7 +380,7 @@ class PlyomatService
                 $target = $host . $path . ($query ? '?' . $query : '');
                 $type = trim((string) ($attempt['content_type'] ?? '')) ?: 'unknown content type';
                 $keys = $attempt['json_keys'] ?? ($attempt['error_keys'] ?? []);
-                $message = trim((string) ($attempt['error_message'] ?? ''));
+                $message = $this->diagnosticText($attempt['error_message'] ?? null);
 
                 return $target . ' → HTTP ' . ($attempt['status'] ?? '?')
                     . ' · ' . $type
@@ -504,7 +512,7 @@ class PlyomatService
                         ?? data_get($row, 'athleteId')
                         ?? data_get($row, 'uuid');
 
-                    return $id !== null && (string) $id === $athleteId;
+                    return is_scalar($id) && (string) $id === $athleteId;
                 });
 
                 if (is_array($match)) {
@@ -938,6 +946,40 @@ class PlyomatService
         $walk($payload);
 
         return $lookup;
+    }
+
+    protected function diagnosticText(mixed $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_scalar($value)) {
+            return trim((string) $value);
+        }
+
+        if (is_array($value)) {
+            // Prefer common validation/error leaves when available.
+            foreach (['message', 'detail', 'error', 'errors', 'non_field_errors'] as $key) {
+                if (array_key_exists($key, $value)) {
+                    $nested = $this->diagnosticText($value[$key]);
+
+                    if ($nested !== '') {
+                        return $nested;
+                    }
+                }
+            }
+
+            $encoded = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            return $encoded !== false ? $encoded : 'Structured API error';
+        }
+
+        if ($value instanceof \Stringable) {
+            return trim((string) $value);
+        }
+
+        return get_debug_type($value);
     }
 
     protected function normalizeSecretToken(string $token): string
