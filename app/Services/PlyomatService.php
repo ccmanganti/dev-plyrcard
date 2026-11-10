@@ -14,6 +14,8 @@ use RuntimeException;
 
 class PlyomatService
 {
+    protected array $performanceDiagnostics = [];
+
     public function isConfigured(PlyrLabTrainer $trainer): bool
     {
         return $trainer->hasPlyomatApiKey();
@@ -752,6 +754,8 @@ class PlyomatService
 
     public function fetchStats(PlyrLabBooking $booking): array
     {
+        $this->performanceDiagnostics = [];
+
         // Athlete endpoints primarily describe the roster/profile. Performance
         // measurements may live under sessions/results/assessments instead, so
         // start with the athlete payload and then probe the read-only performance
@@ -800,6 +804,11 @@ class PlyomatService
 
         // Keep the normalized profile shape so the UI can clearly show that
         // the athlete exists but no supported measurements were returned.
+        $diagnostics = $this->performanceDiagnosticsSummary();
+        if ($diagnostics !== '') {
+            $profileStats['sync_diagnostics'] = $diagnostics;
+        }
+
         return $profileStats;
     }
 
@@ -889,6 +898,13 @@ class PlyomatService
             foreach ($authCandidates as $auth) {
                 $response = $this->request($trainer, $auth)->get($url);
 
+                $diagIndex = count($this->performanceDiagnostics);
+                $this->performanceDiagnostics[$diagIndex] = [
+                    'path' => $resolved,
+                    'status' => $response->status(),
+                    'content_type' => strtolower((string) $response->header('Content-Type')),
+                ];
+
                 if (in_array($response->status(), [401, 403], true)) {
                     continue;
                 }
@@ -902,6 +918,10 @@ class PlyomatService
                 }
 
                 $json = $response->json();
+
+                if (is_array($json)) {
+                    $this->performanceDiagnostics[$diagIndex]['keys'] = array_slice(array_keys($json), 0, 8);
+                }
 
                 if (! is_array($json) || ! $this->performancePayloadBelongsToAthlete($json, $athleteId, $resolved)) {
                     break;
@@ -967,6 +987,25 @@ class PlyomatService
             || str_contains($resolvedPath, 'athleteId=' . $encoded)
             || str_contains($resolvedPath, 'athlete=' . $encoded)
         );
+    }
+
+    public function performanceDiagnosticsSummary(): string
+    {
+        if ($this->performanceDiagnostics === []) {
+            return '';
+        }
+
+        return collect($this->performanceDiagnostics)
+            ->take(12)
+            ->map(function (array $attempt): string {
+                $path = (string) ($attempt['path'] ?? 'unknown');
+                $status = (string) ($attempt['status'] ?? '?');
+                $keys = (array) ($attempt['keys'] ?? []);
+
+                return $path . ' → HTTP ' . $status
+                    . ($keys !== [] ? ' · keys: ' . implode(', ', $keys) : '');
+            })
+            ->implode(' | ');
     }
 
     public function hasPerformanceMeasurements(array $stats): bool
