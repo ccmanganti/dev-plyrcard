@@ -125,7 +125,7 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
                 'plyomat_stats' => $stats,
                 'last_sync_error' => $hasMeasurements
                     ? null
-                    : 'Athlete ID is connected, but Plyomat did not return supported session/assessment measurements for this athlete yet.',
+                    : $plyomat->performanceSyncMessage($stats),
             ];
 
             if (in_array($booking->status, ['pending', 'provisioning', 'awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true)) {
