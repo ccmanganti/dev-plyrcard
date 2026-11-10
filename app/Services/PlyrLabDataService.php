@@ -301,7 +301,7 @@ class PlyrLabDataService
             'last_synced_at' => $booking->plyomat_last_synced_at?->toIso8601String(),
             'data_synced' => is_array($booking->plyomat_stats)
                 && $this->plyomat->hasPerformanceMeasurements($booking->plyomat_stats),
-            'connection_error' => $booking->last_sync_error,
+            'connection_error' => $this->plyomat->userFacingSyncError($booking->last_sync_error),
             'trainer' => $trainer ? $this->trainerPayload($trainer) : null,
         ];
     }
