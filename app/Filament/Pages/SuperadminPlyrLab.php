@@ -17,7 +17,7 @@ class SuperadminPlyrLab extends SuperadminAthletes
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-beaker';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Operations & Support';
+    protected static string | \UnitEnum | null $navigationGroup = 'PLYRLab';
 
     protected static ?int $navigationSort = 14;
 
