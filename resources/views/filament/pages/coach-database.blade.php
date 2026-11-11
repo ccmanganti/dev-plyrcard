@@ -17327,25 +17327,30 @@ window.rcCollectCoachDatabaseTemplateHtml = function (editor) {
     const plainHtml = window.rcTextToTemplateParagraphHtml(plain);
     const htmlText = String(clone.textContent || '').replace(/\u00a0/g, ' ').replace(/\r\n?/g, '\n').trim();
     const losslessText = String(losslessHtml || '').replace(/<br\s*\/?\s*>/gi, '\n').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-    const htmlLines = htmlText.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
-    const plainLines = plain.split(/\n+/).map((line) => line.trim()).filter(Boolean).length;
     const htmlTokens = (String(html || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
     const losslessTokens = (String(losslessHtml || '').match(/\{\{\s*[A-Za-z][A-Za-z0-9_. ]{0,90}\s*\}\}/g) || []).length;
-    const hasRealHtml = /<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i.test(html);
+
+    // Rich editor HTML is authoritative whenever it contains real structure or formatting.
+    // The previous plain-text recovery path could replace valid multiline HTML just because
+    // innerText reported more lines, which stripped bold/italic/underline and blank lines.
+    const hasMeaningfulHtml = /<\s*(p|div|h1|h2|h3|h4|ul|ol|li|blockquote|img|a|table|span|strong|b|em|i|u|br)\b/i.test(html);
+    const losslessHasFormatting = /<\s*(strong|b|em|i|u|ul|ol|li|blockquote|h1|h2|h3|h4|a|img|table)\b/i.test(losslessHtml);
+
     if (losslessHtml && (
         losslessTokens > htmlTokens
-        || losslessText.length > htmlText.length + 8
+        || (!hasMeaningfulHtml && losslessText.length > htmlText.length + 8)
+        || (losslessHasFormatting && !/<\s*(strong|b|em|i|u|ul|ol|li|blockquote|h1|h2|h3|h4|a|img|table)\b/i.test(html))
         || (!html && losslessHtml)
     )) {
         html = losslessHtml;
     }
-    if (plainHtml && (
-        !hasRealHtml
-        || plainLines > htmlLines
-        || (plain.length > htmlText.length + 8 && !/<\s*img\b/i.test(html))
-    )) {
+
+    // Only recover from plain text when the DOM genuinely has no useful HTML at all.
+    // Never flatten a valid rich-text DOM merely because it contains extra visual lines.
+    if (plainHtml && !/<\s*(p|div|h1|h2|h3|h4|ul|ol|li|blockquote|img|a|table|span|strong|b|em|i|u|br)\b/i.test(html)) {
         html = plainHtml;
     }
+
     return html || '<p><br></p>';
 };
 window.rcResetCoachDatabaseTemplateEditor = function () {
