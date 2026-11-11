@@ -14402,13 +14402,11 @@ CSS;
              interaction state. Favorite/list calls only persist the already-applied state in
              the background and use skipRender(), so this drawer is never replaced or flickered. --}}
         <div class="rc-drawer rc-school-optimistic-shell-v106"
-             data-rc-school-drawer-version="10.112.3"
+             data-rc-school-drawer-version="10.112.4"
              wire:ignore
-             hidden
              x-cloak
-             x-bind:hidden="!isValidOpenSchool()"
-             x-show="isValidOpenSchool()"
-             x-bind:style="isValidOpenSchool() ? 'display:flex !important;z-index:9999' : 'display:none !important;z-index:9999'"
+             x-show.important="schoolDrawerOpen && isValidOpenSchool()"
+             x-bind:aria-hidden="(schoolDrawerOpen && isValidOpenSchool()) ? 'false' : 'true'"
              x-effect="if (schoolDrawerOpen && !isValidOpenSchool()) { closeDiscoverSchool(); }"
              x-on:click.self="window.__rcInboxFollowSchoolDrawer = false; closeDiscoverSchool()" x-on:keydown.escape.window="window.__rcInboxFollowSchoolDrawer = false; closeDiscoverSchool()">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop>
@@ -14607,6 +14605,14 @@ CSS;
             backdrop-filter: blur(3px) !important;
             -webkit-backdrop-filter: blur(3px) !important;
             isolation: isolate !important;
+        }
+        /* v10.112.4: x-show.important is the single source of truth for the drawer's
+           interaction plane. When closed, the shell must not remain as an invisible
+           full-screen layer that intercepts a second View School click. */
+        .rc-wrap .rc-school-optimistic-shell-v106[aria-hidden="true"] {
+            display: none !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
         }
         .rc-wrap .rc-school-optimistic-panel-v106,
         .rc-wrap .rc-discover-drawer-panel-v111 {
