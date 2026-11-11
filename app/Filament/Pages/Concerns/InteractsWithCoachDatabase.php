@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
@@ -8589,6 +8590,19 @@ HTML;
             return '';
         }
 
+        // Editor/template values can occasionally be returned as entity-escaped
+        // HTML. Decode only when the decoded value clearly reveals supported
+        // email markup so normal text containing ampersands is not altered.
+        for ($i = 0; $i < 3 && ! str_contains($text, '<'); $i++) {
+            $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+            if ($decoded === $text || ! preg_match('/<\s*(?:p|div|br|strong|b|em|i|u|ul|ol|li|a|blockquote|span|h[1-6]|table|img)\b/i', $decoded)) {
+                break;
+            }
+
+            $text = $this->normalizeTemplateMergeTokensForStorage($decoded);
+        }
+
         // Quill stores the message as HTML. Keep that HTML intact so images,
         // links, buttons, lists, colors, and headings remain compatible with Recruiting Center.
         if (preg_match('/<\s*(p|div|h1|h2|h3|ul|ol|li|blockquote|img|a|table|span|strong|em|br)\b/i', $text)) {
@@ -8605,6 +8619,8 @@ HTML;
         $html = preg_replace('/<\s*(script|iframe|object|embed|form|input|button)[^>]*>.*?<\s*\/\s*\1\s*>/is', '', $html) ?? $html;
         $html = preg_replace("/\s+on[a-z]+\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]+)/i", '', $html) ?? $html;
         $html = preg_replace('/javascript\s*:/i', '', $html) ?? $html;
+        $html = preg_replace('/<div([^>]*)>\s*<br\s*\/?>\s*<\/div>/i', '<div$1><br></div>', $html) ?? $html;
+        $html = preg_replace('/<p([^>]*)>\s*<\/p>/i', '<p$1><br></p>', $html) ?? $html;
 
         return $this->normalizeTemplateMergeTokensForStorage($html);
     }
@@ -13940,6 +13956,97 @@ protected function ensureComposeBodyHasFooter(): void
         $message = 'Sent to ' . number_format($sent) . ' coach' . ($sent === 1 ? '' : 'es') . ($failed ? '. Failed: ' . number_format($failed) . '.' : '.');
         $notification = Notification::make()->title('Compose Email')->body($message);
         ($failed ? $notification->warning() : $notification->success())->send();
+    }
+
+    public function sendComposeTestEmailFromClient(array $payload = []): array
+    {
+        $user = Auth::user();
+
+        if (! $user) {
+            return ['ok' => false, 'message' => 'Your session has expired. Please sign in again.'];
+        }
+
+        $to = trim((string) ($user->personal_email ?: $user->email));
+        if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
+            Notification::make()
+                ->title('Test Email')
+                ->body('Add a valid personal/account email before sending a test.')
+                ->danger()
+                ->send();
+
+            return ['ok' => false, 'message' => 'No valid test email address is available.'];
+        }
+
+        $subject = trim((string) ($payload['subject'] ?? $this->campaignSubject));
+        $body = trim((string) ($payload['body'] ?? $this->campaignBody));
+
+        if ($subject === '' || ($body === '' && ! str_contains(strtolower($body), '<img'))) {
+            Notification::make()
+                ->title('Test Email')
+                ->body('Add a subject and message before sending a test.')
+                ->danger()
+                ->send();
+
+            return ['ok' => false, 'message' => 'Subject and message are required.'];
+        }
+
+        // Keep the server model in sync with the exact browser editor state used
+        // for this test, without altering recipient selections.
+        $this->campaignSubject = $subject;
+        $this->campaignBody = $body;
+        $this->resolveComposeGraphicUpload();
+
+        $coach = $this->campaignRecipientCoaches()->first()
+            ?: collect($this->allCoaches())->first(fn (array $row): bool => filled($row['email'] ?? null))
+            ?: [
+                'name' => 'Coach Preview',
+                'first_name' => 'Coach',
+                'last_name' => 'Preview',
+                'school' => 'Preview School',
+                'school_name' => 'Preview School',
+                'title' => 'Head Coach',
+                'email' => $to,
+            ];
+
+        $coach = is_array($coach) ? $coach : [];
+        $html = $this->ensurePlyrcardEmailSignature(
+            $this->normalizeTemplateLinksForCurrentTracking(
+                $this->buildComposeHtml($body)
+            )
+        );
+
+        $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
+        $personalizedBody = $this->replaceCampaignTokens($html, $coach);
+
+        try {
+            Mail::html($personalizedBody, function ($message) use ($to, $personalizedSubject): void {
+                $message
+                    ->to($to)
+                    ->subject('[TEST] ' . $personalizedSubject);
+            });
+        } catch (\Throwable $exception) {
+            Log::warning('Compose test email failed.', [
+                'user_id' => $user->getKey(),
+                'email' => $to,
+                'error' => $exception->getMessage(),
+            ]);
+
+            Notification::make()
+                ->title('Test Email')
+                ->body('Unable to send the test email right now.')
+                ->danger()
+                ->send();
+
+            return ['ok' => false, 'message' => 'Unable to send the test email right now.'];
+        }
+
+        Notification::make()
+            ->title('Test Email')
+            ->body('Sent to ' . $to . ' using the current Compose content and PLYRCard signature.')
+            ->success()
+            ->send();
+
+        return ['ok' => true, 'message' => 'Test email sent to ' . $to . '.'];
     }
 
     public function sendComposedEmailWithCoachIds(array $coachIds = []): void
