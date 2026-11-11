@@ -399,6 +399,8 @@ discoverSelectedIds: [],
             discoverSchoolComms: [],
             discoverSchoolCommsLoading: false,
             discoverSchoolCommsLoadedFor: '',
+            discoverSchoolCommsRefreshingFor: '',
+            discoverSchoolCommsRefreshedAt: {},
             dashboardDetail: @js(in_array($section, ['profile-views', 'coach-engagement'], true) ? $section : ''),
             discoverLists: @js(collect($this->lists ?? [])->filter(fn($list) => is_array($list))->values()->all()),
             discoverBulkNotice: '',
@@ -790,36 +792,75 @@ discoverSelectedIds: [],
                     this.$nextTick(() => this.hydrateDiscoverSchoolDetails(drawerId));
                 }
             },
+            normalizeDiscoverCommunications(id, rows) {
+                return Array.isArray(rows)
+                    ? rows
+                        .filter(row => row && typeof row === 'object')
+                        .map((row, index) => ({
+                            ...row,
+                            __renderKey: `${id}:${String(row.id || 'row')}:${index}`,
+                        }))
+                    : [];
+            },
+            async refreshDiscoverCommunications(id, force = false) {
+                id = String(id || '').trim();
+                if (!id) return;
+                const now = Date.now();
+                const last = Number(this.discoverSchoolCommsRefreshedAt?.[id] || 0);
+                if (!force && last && (now - last) < 60000) return;
+                if (this.discoverSchoolCommsRefreshingFor === id) return;
+                this.discoverSchoolCommsRefreshingFor = id;
+                try {
+                    const rows = await this.$wire.call('refreshSchoolCommunicationHistoryForClient', id);
+                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (currentId !== id) return;
+                    const normalizedRows = this.normalizeDiscoverCommunications(id, rows);
+                    if (normalizedRows.length > 0 || this.discoverSchoolComms.length === 0) {
+                        this.discoverSchoolComms = [...normalizedRows];
+                        this.discoverSchoolCommsLoadedFor = id;
+                    }
+                    this.discoverSchoolCommsRefreshedAt = {
+                        ...this.discoverSchoolCommsRefreshedAt,
+                        [id]: Date.now(),
+                    };
+                } catch (error) {
+                    console.error('Unable to refresh school communication history.', error);
+                } finally {
+                    if (this.discoverSchoolCommsRefreshingFor === id) {
+                        this.discoverSchoolCommsRefreshingFor = '';
+                    }
+                }
+            },
             async loadDiscoverCommunications(force = false) {
                 const id = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                 if (!id || this.discoverSchoolCommsLoading) return;
-                if (!force && this.discoverSchoolCommsLoadedFor === id && this.discoverSchoolComms.length > 0) return;
+
+                if (!force && this.discoverSchoolCommsLoadedFor === id && this.discoverSchoolComms.length > 0) {
+                    this.refreshDiscoverCommunications(id, false);
+                    return;
+                }
+
                 this.discoverSchoolCommsLoading = true;
                 try {
+                    // Render Inbox/cached history first. This call is intentionally local-only.
                     const rows = await this.$wire.call('schoolCommunicationHistoryForClient', id);
-                    // Ignore a late response if the user already opened a different school.
                     const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
                     if (currentId !== id) return;
-                    // Normalize the returned Livewire payload into fresh plain objects and
-                    // give every row a guaranteed unique browser render key. This changes
-                    // only the school-drawer Communications renderer.
-                    const normalizedRows = Array.isArray(rows)
-                        ? rows
-                            .filter(row => row && typeof row === 'object')
-                            .map((row, index) => ({
-                                ...row,
-                                __renderKey: `${id}:${String(row.id || 'row')}:${index}`,
-                            }))
-                        : [];
-                    this.discoverSchoolComms = [...normalizedRows];
+                    this.discoverSchoolComms = this.normalizeDiscoverCommunications(id, rows);
                     this.discoverSchoolCommsLoadedFor = id;
                 } catch (error) {
-                    console.error('Unable to load school communication history.', error);
-                    this.discoverSchoolComms = [];
-                    this.discoverSchoolCommsLoadedFor = id;
+                    console.error('Unable to load cached school communication history.', error);
+                    const currentId = String(this.optimisticSchool?.id ?? this.optimisticSchool?.school_id ?? '').trim();
+                    if (currentId === id) {
+                        this.discoverSchoolComms = [];
+                        this.discoverSchoolCommsLoadedFor = id;
+                    }
                 } finally {
                     this.discoverSchoolCommsLoading = false;
                 }
+
+                // Do not block the visible list on the remote historical refresh.
+                window.setTimeout(() => this.refreshDiscoverCommunications(id, force), 0);
             },
             discoverListKey(list) {
                 return String(list?.key || list?.slug || list?.id || '').trim();
@@ -14400,7 +14441,7 @@ CSS;
                 <div class="rc-school-tabbar-v72 rc-discover-tabbar-v111" role="tablist" aria-label="School detail tabs">
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'coaches' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='coaches'">Coaching Staff</button>
                     <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'roster' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='roster'">Roster &amp; Stats</button>
-                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications(true)">Communications</button>
+                    <button type="button" class="rc-school-tab-v72" x-bind:class="discoverDrawerTab === 'comms' ? 'is-active' : ''" x-on:click.stop="discoverDrawerTab='comms'; loadDiscoverCommunications(false)">Communications</button>
                 </div>
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'coaches'">
                     <div class="rc-school-coach-list rc-school-modal-coaches" style="max-height:22rem;overflow:auto;padding-right:.15rem;">
