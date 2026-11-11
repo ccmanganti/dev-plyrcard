@@ -40,7 +40,7 @@ class PlyrLabController extends Controller
                 // Self-heal both interrupted provisioning and bookings that were
                 // waiting for a trainer to connect an API key.
                 $booking->forceFill([
-                    'status' => 'provisioning',
+                    'status' => 'pending_approval',
                     'last_sync_error' => null,
                 ])->save();
 
@@ -126,29 +126,10 @@ class PlyrLabController extends Controller
             ]);
         });
 
-        if ($trainer->user) {
-            try {
-                $trainer->user->notify(new PlyrLabTrainerBookedNotification($booking->getKey()));
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
-
-        // The initial Plyomat creation is intentionally synchronous here.
-        // This makes booking reliable even when a queue worker is not running.
-        // The frontend immediately renders a "Connecting to Plyomat" state while
-        // this request is in flight.
-        ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
+        $booking->notifyStakeholders('booking_requested');
 
         $booking = $booking->fresh(['trainer.user']) ?? $booking;
-
-        $message = match ($booking->status) {
-            'active' => 'Trainer booked and your Plyomat athlete profile is connected.',
-            'awaiting_athlete_id' => 'Trainer booked. Plyomat reports an existing profile, so enter the existing Athlete ID to connect it.',
-            'awaiting_integration' => 'Trainer booked. We are waiting for your trainer to connect Plyomat. Your booking is saved—come back soon or cancel it from PLYRLab.',
-            'provisioning_failed' => 'Trainer booked, but automatic Plyomat creation could not complete. You can connect an existing Athlete ID instead.',
-            default => 'Trainer booked. PLYRCard is connecting your Plyomat athlete profile.',
-        };
+        $message = 'Booking request sent to your trainer for approval. PLYRLab will stay pending until the trainer accepts it.';
 
         return response()->json([
             'success' => true,
@@ -179,6 +160,14 @@ class PlyrLabController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Book a PLYRLab trainer before connecting a Plyomat Athlete ID.',
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
+
+        if (in_array($booking->status, ['pending_approval', 'reschedule_pending'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wait for your trainer to approve the booking before connecting a Plyomat Athlete ID.',
                 'data' => $dataService->payload($player),
             ], 422);
         }
@@ -273,14 +262,39 @@ class PlyrLabController extends Controller
             ], 422);
         }
 
+        $oldScheduled = $booking->scheduled_for?->toIso8601String();
+        $newScheduled = \Illuminate\Support\Carbon::parse($validated['scheduled_for'])->toIso8601String();
+        $scheduleChanged = $oldScheduled !== $newScheduled;
+        $wasAlreadyApproved = ! in_array($booking->status, ['pending_approval', 'pending'], true);
+
+        $nextStatus = $booking->status;
+        $event = null;
+
+        if ($scheduleChanged && $wasAlreadyApproved) {
+            $nextStatus = 'reschedule_pending';
+            $event = 'reschedule_requested';
+        } elseif ($scheduleChanged || $booking->status === 'pending') {
+            $nextStatus = 'pending_approval';
+            $event = 'booking_requested';
+        }
+
         $booking->forceFill([
             'scheduled_for' => $validated['scheduled_for'],
             'notes' => $validated['notes'] ?? null,
+            'status' => $nextStatus,
         ])->save();
+
+        if ($event) {
+            $booking->notifyStakeholders($event);
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'Your PLYRLab trainer booking has been updated.',
+            'message' => $nextStatus === 'reschedule_pending'
+                ? 'Your new session time was sent to the trainer for approval.'
+                : ($nextStatus === 'pending_approval'
+                    ? 'Your booking request was updated and is still awaiting trainer approval.'
+                    : 'Your PLYRLab trainer booking has been updated.'),
             'data' => $dataService->payload($player),
         ]);
     }
@@ -304,10 +318,14 @@ class PlyrLabController extends Controller
             ], 422);
         }
 
+        $wasPending = in_array($booking->status, ['pending_approval', 'reschedule_pending', 'pending'], true);
+
         $booking->forceFill([
             'status' => 'cancelled',
             'last_sync_error' => null,
         ])->save();
+
+        $booking->notifyStakeholders($wasPending ? 'booking_declined' : 'booking_cancelled');
 
         return response()->json([
             'success' => true,
