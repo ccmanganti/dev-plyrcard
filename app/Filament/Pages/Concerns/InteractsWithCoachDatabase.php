@@ -29,6 +29,7 @@ use Symfony\Component\Process\PhpExecutableFinder;
 use Symfony\Component\Process\Process;
 use Livewire\WithFileUploads;
 use Livewire\Attributes\Renderless;
+use App\Models\CoachDatabaseEmailMessage;
 use App\Models\CoachDatabaseEmailTemplate;
 
 trait InteractsWithCoachDatabase
