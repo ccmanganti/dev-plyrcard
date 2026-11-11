@@ -327,14 +327,13 @@ class PlyrLabController extends Controller
             ], 422);
         }
 
-        $wasPending = in_array($booking->status, ['pending_approval', 'reschedule_pending', 'pending'], true);
-
         $booking->forceFill([
             'status' => 'cancelled',
+            'requested_scheduled_for' => null,
             'last_sync_error' => null,
         ])->save();
 
-        $booking->notifyStakeholders($wasPending ? 'booking_declined' : 'booking_cancelled');
+        $booking->notifyStakeholders('booking_cancelled');
 
         return response()->json([
             'success' => true,
