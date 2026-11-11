@@ -11410,8 +11410,6 @@ CSS;
                                             const last = Number(window.__plyrInboxSchoolOpenAt || 0);
                                             if (this.openingSchool || (now - last) < 500) return;
                                             window.__plyrInboxSchoolOpenAt = now;
-                                            window.__rcInboxSchoolConversationId = @js((string) ($selectedConversationId ?? ''));
-                                            window.__rcInboxFollowSchoolDrawer = false;
                                             this.openingSchool = true;
                                             this.listsOpen = false;
                                             const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
@@ -16788,19 +16786,28 @@ body.rc-account-preparing .rc-account-impersonation-bar {
     }
     .rc-inbox-search-v56 svg { left:.62rem !important; width:.95rem !important; height:.95rem !important; color:#98a2b3 !important; }
     .rc-inbox-quick-filters-v56 {
+        display:grid !important;
+        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+        align-items:center !important;
         padding:0 .9rem .62rem !important;
-        gap:.38rem !important;
+        gap:.28rem !important;
         border-bottom:1px solid #edf0f3 !important;
+        overflow:visible !important;
     }
     .rc-inbox-quick-filters-v56 button {
+        width:100% !important;
+        min-width:0 !important;
         min-height:2rem !important;
-        padding:.35rem .68rem !important;
+        padding:.35rem .34rem !important;
         border:1px solid #e1e5ea !important;
         border-radius:999px !important;
         background:#fff !important;
         color:#667085 !important;
-        font-size:.7rem !important;
+        font-size:.64rem !important;
         font-weight:750 !important;
+        white-space:nowrap !important;
+        justify-content:center !important;
+        gap:.2rem !important;
     }
     .rc-inbox-quick-filters-v56 button.is-active {
         border-color:rgba(255,99,56,.42) !important;
@@ -16808,9 +16815,9 @@ body.rc-account-preparing .rc-account-impersonation-bar {
         color:#ff6338 !important;
     }
     .rc-inbox-quick-filters-v56 button span {
-        min-width:1.2rem !important;
-        height:1.2rem !important;
-        padding:0 .3rem !important;
+        min-width:1rem !important;
+        height:1rem !important;
+        padding:0 .22rem !important;
         background:#ff6338 !important;
         color:#fff !important;
         font-size:.61rem !important;
