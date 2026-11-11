@@ -14244,15 +14244,18 @@ CSS;
                         <div class="rc-school-comms-list-v123" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length > 0" x-cloak>
                             <template x-for="(row, rowIndex) in discoverSchoolComms" :key="row.__renderKey || `${discoverSchoolCommsLoadedFor}:${rowIndex}`">
                                 <div class="rc-school-comms-row-v123">
-                                    <span class="rc-school-comms-direction-v123" x-bind:class="row.direction === 'inbound' ? 'is-inbound' : 'is-outbound'" x-text="row.direction === 'inbound' ? '↙' : '↗'"></span>
+                                    <span
+                                        class="rc-school-comms-direction-v123"
+                                        x-bind:class="row.direction === 'inbound' ? 'is-inbound' : 'is-outbound'"
+                                        x-bind:title="row.direction === 'inbound' ? 'Incoming email' : 'Outgoing email'"
+                                        aria-hidden="true"
+                                    >
+                                        <svg x-show="row.direction === 'inbound'" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15.5 5.5 9 12l6.5 6.5M9.5 12H20" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                        <svg x-show="row.direction !== 'inbound'" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="m8.5 5.5 6.5 6.5-6.5 6.5M14.5 12H4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </span>
                                     <div class="rc-school-comms-copy-v123">
-                                        <strong x-text="row.title || 'Conversation activity'"></strong>
-                                        <span x-text="row.preview || 'No message preview available.'"></span>
-                                        <small>
-                                            <span x-text="row.date_label || ''"></span>
-                                            <span x-show="!!row.opened"> · Opened</span>
-                                            <span x-show="!!row.reply"> · Reply</span>
-                                        </small>
+                                        <strong x-text="row.title || ((row.direction === 'inbound' ? 'Email received from ' : 'Email sent to ') + (row.contact_name || 'Coach'))"></strong>
+                                        <small x-text="row.date_time_label || row.date_label || ''"></small>
                                     </div>
                                 </div>
                             </template>
@@ -14304,7 +14307,7 @@ CSS;
         .rc-school-coaches-error-v112{display:grid;justify-items:start;gap:.45rem;text-align:left}.rc-school-coaches-error-v112 span{font-size:.78rem;line-height:1.45;color:var(--rc-muted)}.rc-school-coaches-retry-v112{display:inline-flex;align-items:center;justify-content:center;min-height:2rem;padding:.42rem .75rem;border:1px solid var(--rc-border);border-radius:.65rem;background:var(--rc-surface);color:var(--rc-text);font-size:.75rem;font-weight:800;cursor:pointer}.rc-school-coaches-retry-v112:hover{border-color:rgba(255,99,56,.45);color:var(--rc-accent)}
     </style>
     <style id="rc-school-comms-v123">
-        .rc-school-comms-history-v123{min-height:14rem;padding:.15rem 0}.rc-school-comms-loading-v123{min-height:10rem;display:flex;align-items:center;justify-content:center;gap:.55rem;color:var(--rc-muted);font-size:.84rem}.rc-school-comms-list-v123{display:grid;gap:.65rem}.rc-school-comms-row-v123{display:grid;grid-template-columns:2.15rem minmax(0,1fr);gap:.7rem;align-items:start;padding:.8rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface)}.rc-school-comms-direction-v123{width:2.15rem;height:2.15rem;display:grid;place-items:center;border-radius:.65rem;background:#fff1ed;color:#ff6338;font-weight:900}.rc-school-comms-direction-v123.is-inbound{background:#ecfdf5;color:#16a34a}.rc-school-comms-copy-v123{min-width:0;display:grid;gap:.18rem}.rc-school-comms-copy-v123 strong{font-size:.82rem;color:var(--rc-text)}.rc-school-comms-copy-v123 span{font-size:.75rem;color:var(--rc-muted);line-height:1.42}.rc-school-comms-copy-v123 small{font-size:.68rem;color:#9aa3b2}
+        .rc-school-comms-history-v123{min-height:14rem;padding:.15rem 0}.rc-school-comms-loading-v123{min-height:10rem;display:flex;align-items:center;justify-content:center;gap:.55rem;color:var(--rc-muted);font-size:.84rem}.rc-school-comms-list-v123{display:grid;gap:.65rem}.rc-school-comms-row-v123{display:grid;grid-template-columns:2.15rem minmax(0,1fr);gap:.7rem;align-items:start;padding:.8rem;border:1px solid var(--rc-border);border-radius:.85rem;background:var(--rc-surface)}.rc-school-comms-direction-v123{width:2.15rem;height:2.15rem;display:grid;place-items:center;border-radius:.65rem;background:#fff1ed;color:#ff6338;font-weight:900}.rc-school-comms-direction-v123.is-inbound{background:#ecfdf5;color:#16a34a}.rc-school-comms-copy-v123{min-width:0;display:grid;gap:.22rem;align-content:center}.rc-school-comms-copy-v123 strong{font-size:.82rem;color:var(--rc-text);line-height:1.35}.rc-school-comms-copy-v123 small{font-size:.69rem;color:#9aa3b2}
     </style>
     <style>
         /* v111: Discover drawer owns the interaction plane. The backdrop catches clicks and
