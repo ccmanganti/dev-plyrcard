@@ -727,38 +727,71 @@ discoverSelectedIds: [],
                 const sourceId = String(source?.id ?? source?.school_id ?? source?.business_id ?? source?.company_id ?? source?.ghl_business_id ?? '').trim();
                 const sourceName = this.normalizeGlobalSchoolName(source?.name ?? source?.school ?? source?.school_name ?? source?.company_name ?? '');
                 const rows = Array.isArray(this.globalSchoolCatalog) ? this.globalSchoolCatalog : [];
-                // Never open from a generic/placeholder payload.
+
+                // Never open a generic/placeholder payload.
                 if ((!sourceId && !sourceName) || sourceName === 'school') {
                     this.closeDiscoverSchool();
                     return;
                 }
-                const local = rows.find(row => {
+
+                const matchesSchool = (row) => {
                     const ids = [row?.id, row?.school_id, row?.business_id, row?.company_id, row?.ghl_business_id]
                         .map(value => String(value ?? '').trim())
                         .filter(Boolean);
                     if (sourceId && ids.includes(sourceId)) return true;
                     const rowName = this.normalizeGlobalSchoolName(row?.name ?? row?.school ?? row?.school_name ?? row?.company_name ?? '');
                     return !!sourceName && sourceName !== 'school' && rowName === sourceName;
-                }) || null;
-                // Critical: do not fall back to rendering the incoming object. The
-                // canonical catalog is the only valid source for an Admin school drawer.
+                };
+
+                let local = rows.find(matchesSchool) || null;
+
+                /*
+                 * Inbox intentionally does not seed the full Discover catalog because doing
+                 * so makes conversation loads much heavier. resolveInboxSchoolForConversation()
+                 * already gives us the canonical local DB school for the selected thread.
+                 * Register only that authoritative school into the browser catalog so the
+                 * drawer has the same validation contract without depending on a previous
+                 * visit to Discover Schools or stale browser cache.
+                 */
+                if (!local && source?.__drawer_authoritative === true) {
+                    local = { ...source };
+
+                    const nextRows = [...rows];
+                    const existingIndex = nextRows.findIndex(matchesSchool);
+                    if (existingIndex >= 0) {
+                        nextRows[existingIndex] = { ...nextRows[existingIndex], ...local };
+                    } else {
+                        nextRows.push(local);
+                    }
+
+                    this.globalSchoolCatalog = nextRows;
+                    window.__plyrRcSchoolCatalogByUser = window.__plyrRcSchoolCatalogByUser || {};
+                    window.__plyrRcSchoolCatalogByUser[@js($rcCatalogUserKey)] = nextRows;
+                }
+
                 if (!local) {
                     this.closeDiscoverSchool();
                     return;
                 }
+
                 const merged = { ...source, ...local };
-                merged.id = local.id;
-                merged.school_id = local.school_id ?? local.id;
-                merged.name = local.name;
-                merged.logo_url = local.logo_url || '';
-                merged.city = local.city ?? '';
-                merged.state = local.state ?? '';
-                merged.division = local.division ?? '';
-                merged.conference = local.conference ?? '';
-                merged.coaches = Array.isArray(local.coaches) ? local.coaches : [];
-                merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? merged.coaches.length ?? 0);
-                merged.is_favorite = !!local.is_favorite;
-                merged.list_keys = Array.isArray(local.list_keys) ? [...local.list_keys] : [];
+                merged.id = local.id ?? local.school_id ?? sourceId;
+                merged.school_id = local.school_id ?? local.id ?? sourceId;
+                merged.name = local.name ?? source.name ?? sourceName;
+                merged.logo_url = local.logo_url || source.logo_url || '';
+                merged.city = local.city ?? source.city ?? '';
+                merged.state = local.state ?? source.state ?? '';
+                merged.division = local.division ?? source.division ?? '';
+                merged.conference = local.conference ?? source.conference ?? '';
+                merged.coaches = Array.isArray(local.coaches)
+                    ? local.coaches
+                    : (Array.isArray(source.coaches) ? source.coaches : []);
+                merged.coach_count = Number(local.coach_count ?? local.coaches_count ?? source.coach_count ?? source.coaches_count ?? merged.coaches.length ?? 0);
+                merged.is_favorite = !!(local.is_favorite ?? source.is_favorite);
+                merged.list_keys = Array.isArray(local.list_keys)
+                    ? [...local.list_keys]
+                    : (Array.isArray(source.list_keys) ? [...source.list_keys] : []);
+
                 // Invalidate any in-flight detail request from a previous open before
                 // exposing this school. This also covers close -> reopen of the same school.
                 this.discoverSchoolDetailRequestToken = '';
@@ -766,18 +799,17 @@ discoverSelectedIds: [],
                 this.discoverSchoolCoachesError = '';
                 this.optimisticSchool = merged;
                 this.schoolDrawerOpen = true;
-                const drawerId = String(merged.id ?? merged.school_id ?? '');
+
+                const drawerId = String(merged.id ?? merged.school_id ?? '').trim();
                 const hasCatalogRoster = Array.isArray(merged.coaches) && merged.coaches.length > 0;
                 const declaredCoachCount = Math.max(0, Number(merged.coach_count ?? merged.coaches_count ?? 0));
-                const needsRosterFetch = !hasCatalogRoster && declaredCoachCount > 0;
-                // v10.112.3: the canonical Discover catalog already contains the complete
-                // gender-scoped local roster. If it is present, opening the school is 100%
-                // browser-local: no Livewire request, no queue wait, and no chance for a
-                // later response to temporarily clear the Coaching Staff pane.
+                const needsRosterFetch = drawerId !== '' && !hasCatalogRoster && declaredCoachCount > 0;
+
                 this.discoverSchoolCoachesLoading = needsRosterFetch;
                 this.discoverSchoolCoachesLoadedFor = needsRosterFetch ? '' : drawerId;
                 this.discoverSchoolScoreLoadedFor = drawerId;
                 this.discoverSchoolScoreLoading = false;
+
                 // Keep the legacy global empty so Livewire/browser state cannot reopen it.
                 window.__plyrSchoolDrawerOptimistic = null;
                 this.discoverDrawerTab = 'coaches';
@@ -786,8 +818,7 @@ discoverSelectedIds: [],
                 this.discoverSchoolCommsLoadedFor = '';
                 this.discoverListsOpen = false;
                 this.discoverNewDrawerListName = '';
-                // Only fall back to the one-school endpoint when a stale/legacy catalog row
-                // says coaches exist but does not actually carry the roster array.
+
                 if (needsRosterFetch) {
                     this.$nextTick(() => this.hydrateDiscoverSchoolDetails(drawerId));
                 }
@@ -10081,6 +10112,7 @@ discoverSelectedIds: [],
                         'list_keys' => [],
                     ];
                 }
+                $selectedInboxSchool['__drawer_authoritative'] = true;
                 $selectedInboxSchoolId = trim((string) ($selectedInboxSchool['id'] ?? $selectedInboxSchool['school_id'] ?? ''));
                 $selectedInboxFavorite = (bool) ($selectedInboxSchool['is_favorite'] ?? false);
                 $selectedInboxListKeys = collect($selectedInboxSchool['list_keys'] ?? $selectedInboxSchool['lists'] ?? [])
