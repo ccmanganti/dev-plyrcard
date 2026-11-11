@@ -939,7 +939,7 @@
                             </header>
 
                             <div class="pc-plyrlab-weekly-list">
-                                @foreach(AppServicesPlyrLabAvailabilityService::DAY_LABELS as $dayNumber => $dayLabel)
+                                @foreach([0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday'] as $dayNumber => $dayLabel)
                                     <div class="pc-plyrlab-weekly-row">
                                         <label class="pc-plyrlab-day-toggle">
                                             <input type="checkbox" wire:model.defer="plyrLabAvailability.{{ $dayNumber }}.enabled">
