@@ -305,7 +305,7 @@ class LockerRoomRecruitingController extends Controller
         $subject = trim((string) $data['subject']);
         $body = $this->sanitizeEmailHtml((string) $data['body']);
 
-        if (trim(strip_tags($body)) === '') {
+        if (trim(strip_tags($body)) === '' && ! str_contains(strtolower($body), '<img')) {
             throw ValidationException::withMessages(['body' => 'Enter an email message.']);
         }
 
