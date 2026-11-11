@@ -12,7 +12,7 @@ class PlyrLabTrainerBookedNotification extends Notification implements ShouldQue
 {
     use Queueable;
 
-    public function __construct(public int $bookingId) {}
+    public function __construct(public int $bookingId, public string $event = 'booking_requested') {}
 
     public function via(object $notifiable): array
     {
@@ -22,28 +22,70 @@ class PlyrLabTrainerBookedNotification extends Notification implements ShouldQue
     public function toMail(object $notifiable): MailMessage
     {
         $booking = PlyrLabBooking::query()
-            ->with(['player.team', 'player.club', 'trainer'])
+            ->with(['player.team', 'player.club', 'trainer.user'])
             ->find($this->bookingId);
 
         $player = $booking?->player;
-        $playerName = trim((string) ($player?->first_name . ' ' . $player?->last_name)) ?: 'A PLYRCARD player';
-        $team = $player?->team?->name ?: $player?->team_name ?: $player?->club?->name;
+        $trainerUser = $booking?->trainer?->user;
+        $playerName = trim((string) ($player?->first_name . ' ' . $player?->last_name)) ?: 'PLYRCARD player';
+        $trainerName = trim((string) ($trainerUser?->first_name . ' ' . $trainerUser?->last_name)) ?: ($booking?->trainer?->displayName() ?: 'PLYRLab trainer');
         $when = $booking?->scheduled_for?->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A');
+        $isPlayer = $player && (int) ($notifiable->getKey() ?? 0) === (int) $player->getKey();
+        $isTrainer = $trainerUser && (int) ($notifiable->getKey() ?? 0) === (int) $trainerUser->getKey();
 
-        $mail = (new MailMessage)
-            ->subject('New PLYRLab trainer booking')
-            ->greeting('Hi ' . ($notifiable->first_name ?: 'Trainer') . ',')
-            ->line($playerName . ' booked a PLYRLab training/performance session with you.');
+        $event = $this->event;
+        $subject = match ($event) {
+            'booking_requested' => 'PLYRLab booking awaiting approval',
+            'booking_approved' => 'PLYRLab booking approved',
+            'reschedule_requested' => 'PLYRLab reschedule awaiting approval',
+            'reschedule_approved' => 'PLYRLab reschedule approved',
+            'booking_cancelled' => 'PLYRLab booking cancelled',
+            'booking_declined' => 'PLYRLab booking declined',
+            default => 'PLYRLab booking update',
+        };
+
+        $mail = (new MailMessage)->subject($subject);
+
+        if ($isPlayer) {
+            $mail->greeting('Hi ' . ($player?->first_name ?: 'Player') . ',');
+
+            match ($event) {
+                'booking_requested' => $mail->line('Your PLYRLab booking with ' . $trainerName . ' was submitted and is waiting for trainer approval.'),
+                'booking_approved' => $mail->line($trainerName . ' approved your PLYRLab booking. PLYRCard can now connect or create your Plyomat athlete profile.'),
+                'reschedule_requested' => $mail->line('Your updated PLYRLab schedule was sent to ' . $trainerName . ' for approval.'),
+                'reschedule_approved' => $mail->line($trainerName . ' approved your updated PLYRLab schedule.'),
+                'booking_cancelled' => $mail->line('Your PLYRLab booking with ' . $trainerName . ' has been cancelled.'),
+                'booking_declined' => $mail->line($trainerName . ' declined the pending PLYRLab booking request. You can choose another trainer or schedule.'),
+                default => $mail->line('Your PLYRLab booking was updated.'),
+            };
+        } elseif ($isTrainer) {
+            $mail->greeting('Hi ' . ($trainerUser?->first_name ?: 'Trainer') . ',');
+
+            match ($event) {
+                'booking_requested' => $mail->line($playerName . ' requested a PLYRLab session. Approve the booking before PLYRCard creates or connects the athlete in your Plyomat account.'),
+                'booking_approved' => $mail->line('You approved ' . $playerName . '\'s PLYRLab booking.'),
+                'reschedule_requested' => $mail->line($playerName . ' requested a new PLYRLab session time. Review and approve the change.'),
+                'reschedule_approved' => $mail->line('You approved ' . $playerName . '\'s updated PLYRLab schedule.'),
+                'booking_cancelled' => $mail->line($playerName . ' cancelled the PLYRLab booking.'),
+                'booking_declined' => $mail->line('The pending PLYRLab booking for ' . $playerName . ' was declined.'),
+                default => $mail->line($playerName . '\'s PLYRLab booking was updated.'),
+            };
+        } else {
+            $mail->greeting('PLYRLab Admin Update');
+
+            match ($event) {
+                'booking_requested' => $mail->line($playerName . ' requested a PLYRLab booking with ' . $trainerName . '.'),
+                'booking_approved' => $mail->line($trainerName . ' approved ' . $playerName . '\'s PLYRLab booking.'),
+                'reschedule_requested' => $mail->line($playerName . ' requested a schedule change with ' . $trainerName . '.'),
+                'reschedule_approved' => $mail->line($trainerName . ' approved ' . $playerName . '\'s schedule change.'),
+                'booking_cancelled' => $mail->line($playerName . '\'s PLYRLab booking with ' . $trainerName . ' was cancelled.'),
+                'booking_declined' => $mail->line($playerName . '\'s pending PLYRLab booking with ' . $trainerName . ' was declined.'),
+                default => $mail->line($playerName . '\'s PLYRLab booking was updated.'),
+            };
+        }
 
         if ($when) {
             $mail->line('Scheduled for: ' . $when);
-        }
-
-        if (filled($player?->sport) || filled($team)) {
-            $mail->line('Player: ' . implode(' · ', array_filter([
-                $player?->sport,
-                $team,
-            ])));
         }
 
         if (filled($booking?->notes)) {
@@ -51,7 +93,10 @@ class PlyrLabTrainerBookedNotification extends Notification implements ShouldQue
         }
 
         return $mail
-            ->action('Open PLYRCARD', url('/admin'))
-            ->line('PLYRCard will create the athlete in your connected Plyomat account automatically. If Plyomat reports that the athlete already exists, provide the player with the existing Athlete ID so they can connect it instead.');
+            ->action($isPlayer ? 'Open PLYRLab' : 'Open PLYRLab Management', $isPlayer ? url('/admin/coach-database/plyrlab') : url('/admin/plyrlab'))
+            ->line($event === 'booking_requested' || $event === 'reschedule_requested'
+                ? 'The booking remains pending until the trainer approves it.'
+                : 'This is an automated PLYRLab booking notification.');
     }
+
 }
