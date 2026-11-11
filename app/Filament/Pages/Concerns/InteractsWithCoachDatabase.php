@@ -6406,10 +6406,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $conversationChanged = (string) $this->selectedConversationId !== $conversationId;
         $this->selectedConversationId = $conversationId;
 
-        // Keep the global View School drawer synchronized with the active Inbox thread.
-        // The browser clears the previous drawer immediately; this response supplies the
-        // canonical school for the newly selected conversation so an already-open drawer
-        // can reopen with fresh content instead of retaining the previous school.
         if ($conversationChanged) {
             $selectedConversation = collect($this->conversations ?? [])
                 ->firstWhere('id', $conversationId);
@@ -6435,7 +6431,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
             if (is_array($row) && (string) ($row['id'] ?? '') === $conversationId) {
-                // Opening a thread clears unread, but does not clear the Incoming/needs-reply state.
                 $row = $this->withInboxUnreadCount($row, 0);
             }
 
@@ -6443,19 +6438,30 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         })->values()->all();
         $this->cacheInboxConversations($this->conversations);
 
-        $hasFreshCache = ! $force
-            && $this->hydrateCachedConversationMessages($conversationId)
-            && $this->inboxMessageCacheIsFresh($conversationId, 3600);
+        /*
+         * v10.115: render any known-good thread cache immediately, even when it is
+         * older than the normal freshness window. Previously a stale cache was thrown
+         * away and the click waited on HighLevel before Livewire could paint anything.
+         * A stale cached thread is still far better than a frozen/blank thread; refresh
+         * it after the response has already been sent.
+         */
+        $loadedFromCache = ! $force && $this->hydrateCachedConversationMessages($conversationId);
 
-        if (! $hasFreshCache) {
-            $this->loadConversationMessages(true, false);
-        } else {
+        if ($loadedFromCache) {
+            $cacheFresh = $this->inboxMessageCacheIsFresh($conversationId, 300);
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
             $this->activeUiOperation = null;
+
+            if (! $cacheFresh) {
+                $this->queueDetachedConversationMessageRefresh($user, $conversationId);
+            }
+        } else {
+            // First-ever open still needs one direct HighLevel request. Subsequent opens
+            // use the cache-first path above.
+            $this->loadConversationMessages(true, false);
         }
 
-        // Keep the remote read-state update outside the visible UI path.
         if ($hadUnread) {
             app()->terminating(function () use ($user, $conversationId): void {
                 try {
@@ -6471,6 +6477,89 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 }
             });
         }
+    }
+
+    protected function queueDetachedConversationMessageRefresh($user, string $conversationId): void
+    {
+        $conversationId = trim($conversationId);
+        if (! $user || $conversationId === '') {
+            return;
+        }
+
+        $lockKey = 'coach-database:message-cache-warm:' . $user->getKey() . ':' . md5($conversationId);
+        if (! Cache::add($lockKey, 1, now()->addSeconds(30))) {
+            return;
+        }
+
+        app()->terminating(function () use ($user, $conversationId, $lockKey): void {
+            try {
+                $result = app(GoHighLevelService::class)->getConversationMessagesForUser(
+                    $user,
+                    $conversationId,
+                    null,
+                    $this->messagePageSize
+                );
+
+                if (! ($result['success'] ?? false)) {
+                    return;
+                }
+
+                $normalizedRows = collect($result['messages'] ?? [])
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->map(fn (array $row): array => $this->normalizeConversationMessageRow($row));
+
+                $normalizedRows = $this->enrichConversationMessageRowsWithLocalSentBodies(
+                    $normalizedRows,
+                    $user,
+                    $conversationId
+                );
+
+                $rows = $normalizedRows
+                    ->map(fn (array $row): array => $this->compactConversationMessageForLivewire($row))
+                    ->sortBy(function (array $row): int {
+                        $value = $row['created_at'] ?? $row['date'] ?? $row['messageDate'] ?? $row['dateAdded'] ?? $row['createdAt'] ?? null;
+
+                        if (is_numeric($value)) {
+                            $number = (int) $value;
+                            return $number > 9999999999 ? (int) floor($number / 1000) : $number;
+                        }
+
+                        try {
+                            return $value ? \Illuminate\Support\Carbon::parse($value)->getTimestamp() : 0;
+                        } catch (\Throwable) {
+                            return 0;
+                        }
+                    })
+                    ->take(-18)
+                    ->values()
+                    ->all();
+
+                if (empty($rows)) {
+                    return;
+                }
+
+                $payload = [
+                    'body_render_version' => $this->inboxMessageCacheRenderVersion(),
+                    'rows' => $rows,
+                    'last_message_id' => filled($result['last_message_id'] ?? null)
+                        ? (string) $result['last_message_id']
+                        : null,
+                    'has_more' => (bool) ($result['has_more'] ?? false),
+                    'cached_at' => now()->toIso8601String(),
+                ];
+
+                Cache::put($this->deferredUiCacheKey('messages', $conversationId), $payload, now()->addMinutes(30));
+                $this->writePersistentRecruitingUiCache('messages', $payload, $conversationId);
+            } catch (\Throwable $exception) {
+                Log::debug('Detached Inbox message cache refresh failed.', [
+                    'user_id' => $user->getKey(),
+                    'conversation_id' => $conversationId,
+                    'error' => $exception->getMessage(),
+                ]);
+            } finally {
+                Cache::forget($lockKey);
+            }
+        });
     }
 
     /**
