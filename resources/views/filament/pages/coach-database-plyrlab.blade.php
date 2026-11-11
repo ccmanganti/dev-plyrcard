@@ -765,7 +765,7 @@
             '<form class="plab-booking-form" data-plab-booking-manage-form>'+
                 '<label>Session time<input class="plab-in" name="scheduled_for" type="datetime-local" value="'+esc(localDateTime(b.scheduled_for))+'" required></label>'+
                 '<label>Notes<input class="plab-in" name="notes" type="text" maxlength="1000" value="'+esc(b.notes||'')+'" placeholder="Optional note for your trainer"></label>'+
-                '<div class="plab-booking-actions"><button class="plab-btn is-ghost" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Saving…':'Save Booking')+'</button>'+
+                '<div class="plab-booking-actions"><button class="plab-btn is-ghost" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Saving…':(b.status==='pending_approval'||b.status==='pending'?'Update Request':b.status==='reschedule_pending'?'Update Reschedule':'Request Reschedule'))+'</button>'+
                 '<button class="plab-btn is-danger" type="button" data-plab-cancel-booking '+(busy?'disabled':'')+'>Cancel Booking</button></div>'+
             '</form>'+
         '</section>';
@@ -775,7 +775,7 @@
         var b=booking();if(!b||b.plyomat_ready)return'';
         var state=String(b.status||'');
 
-        if(state==='provisioning'||state==='pending'){
+        if(state==='provisioning'){
             return '<section class="plab-connect">'+
                 '<div class="plab-connect-head"><div><span class="plab-connect-k">Plyomat setup</span><h3 class="plab-connect-title">Creating your athlete profile</h3>'+
                 '<p class="plab-connect-copy">PLYRCard is creating your athlete directly in Plyomat using your booked trainer\'s API connection. You do not need to enter an Athlete ID unless an existing Plyomat profile is detected.</p></div>'+
@@ -802,7 +802,7 @@
                 '<label>Plyomat Athlete ID<input class="plab-in" name="athlete_id" type="text" maxlength="255" autocomplete="off" spellcheck="false" placeholder="Full UUID or Plyomat short ID" required></label>'+
                 '<button class="plab-btn" type="submit" '+(busy?'disabled':'')+'>'+(busy?'Verifying…':'Connect Profile')+'</button>'+
             '</form>'+
-            '<div class="plab-connect-help">Use Athlete ID only when a Plyomat profile already exists. Automatic creation is triggered immediately when the trainer booking is made.</div>'+
+            '<div class="plab-connect-help">Use Athlete ID only when a Plyomat profile already exists. Athlete creation or connection only starts after the trainer approves the booking.</div>'+
         '</section>';
     }
 
@@ -830,6 +830,10 @@
 
     function notice(){
         var b=booking();if(!b)return'';
+
+        if(b.status==='reschedule_pending'){
+            return '<div class="plab-notice"><i class="fa-solid fa-clock"></i><span>Your new session time is waiting for trainer approval. Your existing PLYRLab stats remain available while the trainer reviews it.</span></div>';
+        }
 
         if(b.status==='active'&&b.connection_error){
             return '<div class="plab-notice"><i class="fa-solid fa-circle-info"></i><span>'+esc(b.connection_error)+' You can use Refresh Stats again once more Plyomat data is available.</span></div>';
@@ -1024,28 +1028,37 @@
 
 
     function renderPendingConnection(){
-        var p=player(),b=booking(),t=trainer(),state=String(b&&b.status||'provisioning'),
-            connecting=state==='provisioning'||state==='pending',
+        var p=player(),b=booking(),t=trainer(),state=String(b&&b.status||'pending_approval'),
+            waitingApproval=state==='pending_approval'||state==='pending',
+            reschedulePending=state==='reschedule_pending',
+            connecting=state==='provisioning',
             duplicate=state==='awaiting_athlete_id',
             apiIssue=state==='awaiting_integration',
             failed=state==='provisioning_failed',
-            status=b&&b.status_label?b.status_label:'Connecting to Plyomat';
+            status=b&&b.status_label?b.status_label:'Awaiting Trainer Approval';
 
-        var title=connecting?'Connecting your Plyomat profile'
+        var title=waitingApproval?'Waiting for trainer approval'
+            :reschedulePending?'Waiting for reschedule approval'
+            :connecting?'Trainer approved · Connecting Plyomat'
             :duplicate?'Existing Plyomat profile detected'
             :apiIssue?'Awaiting trainer setup'
-            :'Automatic connection needs attention';
+            :'Connection needs attention';
 
-        var copy=connecting
-            ? 'Your trainer is booked. PLYRCard is creating your athlete inside Plyomat and verifying the returned Athlete ID. PLYRLab stays locked until that connection is confirmed.'
-            :duplicate
-                ? 'Plyomat indicates that this athlete may already exist. Enter the existing Athlete ID below and PLYRCard will verify it before unlocking PLYRLab.'
-                :apiIssue
-                    ? 'Your booking is confirmed, but your trainer has not connected their Plyomat API key yet. PLYRLab stays locked while we wait. Come back soon or cancel the booking below.'
-                    : 'Automatic athlete creation did not complete. If your trainer already has your Plyomat profile, you can still connect it using the existing Athlete ID below.';
+        var copy=waitingApproval
+            ? 'Your booking request was sent to '+esc(t&&t.name?t.name:'your trainer')+'. Nothing will be created in Plyomat until the trainer accepts it. You can update the requested time or cancel below.'
+            :reschedulePending
+                ? 'Your updated session time was sent to '+esc(t&&t.name?t.name:'your trainer')+' for approval. You can update the request again or cancel it while you wait.'
+                :connecting
+                    ? 'Your trainer approved the booking. PLYRCard is now creating or verifying your athlete in Plyomat.'
+                    :duplicate
+                        ? 'Plyomat indicates that this athlete may already exist. Enter the existing Athlete ID below and PLYRCard will verify it before unlocking PLYRLab.'
+                        :apiIssue
+                            ? 'Your trainer approved the booking, but their Plyomat API connection is not ready yet. Your approved booking is saved and will continue once the trainer connects the API.'
+                            : 'Plyomat setup did not complete. If your trainer already has your Plyomat profile, you can connect the existing Athlete ID below.';
 
-        var step2=(connecting||apiIssue)?'is-active':(duplicate||failed?'is-error':'');
-        var step3=duplicate||failed?'is-active':(connecting?'':'');
+        var step1=waitingApproval?'is-active':'is-done';
+        var step2=waitingApproval?'':(reschedulePending?'is-active':'is-done');
+        var step3=(connecting||apiIssue)?'is-active':(duplicate||failed?'is-error':(!waitingApproval&&!reschedulePending?'is-done':''));
         var fallback=(duplicate||failed)?connectionPanel():'';
         var error=(!apiIssue&&b&&b.connection_error)?'<div class="plab-connection-error"><b>Connection detail:</b> '+esc(b.connection_error)+'</div>':'';
 
@@ -1053,30 +1066,30 @@
             '<div class="plab-pending">'+
                 '<section class="plab-pending-card">'+
                     '<div class="plab-pending-main">'+
-                        ((connecting||apiIssue)?'<div class="plab-connection-spinner" aria-label="Waiting"></div>':'<div class="plab-connection-lock"><i class="fa-solid fa-lock"></i></div>')+
-                        '<div><span class="plab-pending-eyebrow">PLYRLab locked · '+esc(status)+'</span><h3 class="plab-pending-title">'+esc(title)+'</h3><p class="plab-pending-copy">'+esc(copy)+'</p></div>'+
+                        ((waitingApproval||reschedulePending||connecting||apiIssue)?'<div class="plab-connection-spinner" aria-label="Waiting"></div>':'<div class="plab-connection-lock"><i class="fa-solid fa-lock"></i></div>')+
+                        '<div><span class="plab-pending-eyebrow">PLYRLab · '+esc(status)+'</span><h3 class="plab-pending-title">'+esc(title)+'</h3><p class="plab-pending-copy">'+copy+'</p></div>'+
                     '</div>'+
                     '<div class="plab-connect-steps">'+
-                        '<div class="plab-connect-step is-done"><b>1 · Trainer booked</b><small>Your session with '+esc(t&&t.name?t.name:'your trainer')+' is reserved.</small></div>'+
-                        '<div class="plab-connect-step '+step2+'"><b>2 · Create athlete</b><small>PLYRCard sends your profile to Plyomat automatically.</small></div>'+
-                        '<div class="plab-connect-step '+step3+'"><b>3 · Verify connection</b><small>A valid Plyomat Athlete ID must be confirmed.</small></div>'+
-                        '<div class="plab-connect-step"><b>4 · Unlock PLYRLab</b><small>Stats, Body Map and VS D1 stay locked until connected.</small></div>'+
+                        '<div class="plab-connect-step '+step1+'"><b>1 · Booking requested</b><small>Your requested session with '+esc(t&&t.name?t.name:'your trainer')+' is submitted.</small></div>'+
+                        '<div class="plab-connect-step '+step2+'"><b>2 · Trainer approval</b><small>The trainer must accept the booking or schedule change first.</small></div>'+
+                        '<div class="plab-connect-step '+step3+'"><b>3 · Plyomat setup</b><small>Only after approval does PLYRCard create or connect your athlete.</small></div>'+
+                        '<div class="plab-connect-step"><b>4 · PLYRLab ready</b><small>Your stats unlock after the Plyomat connection is confirmed.</small></div>'+
                     '</div>'+
                     '<div class="plab-pending-trainer">'+
                         avatarHtml(t||{})+
                         '<div><strong>'+esc(t&&t.name?t.name:'PLYRLab trainer')+'</strong><small>'+esc(t&&t.headline?t.headline:'PLYRLab Performance Trainer')+'</small></div>'+
-                        '<em>'+esc(b&&b.scheduled_for?fmtDateTime(b.scheduled_for):'Session booked')+'</em>'+
+                        '<em>'+esc(b&&b.scheduled_for?fmtDateTime(b.scheduled_for):'Requested session')+'</em>'+
                     '</div>'+
                     error+
                 '</section>'+
                 fallback+
                 bookingManager()+
             '</div>',
-            '<b>'+esc(status)+'</b><br>PLYRLab unlocks after Plyomat verification'
+            '<b>'+esc(status)+'</b><br>'+(waitingApproval||reschedulePending?'Waiting for trainer decision':'PLYRLab unlocks after Plyomat verification')
         );
 
         if(pollTimer){clearTimeout(pollTimer);pollTimer=null}
-        if(connecting||apiIssue){
+        if(waitingApproval||reschedulePending||connecting||apiIssue){
             pollTimer=setTimeout(function(){load(true)},8000);
         }
     }
@@ -1135,9 +1148,9 @@
 
         busy=true;
         lab=Object.assign({},lab||{},{
-            access:{unlocked:false,has_booking:true,state:'provisioning',message:'PLYRCard is creating and verifying your Plyomat athlete profile.'},
+            access:{unlocked:false,has_booking:true,state:'pending_approval',message:'Your booking request is waiting for trainer approval.'},
             booking:{
-                id:null,status:'provisioning',status_label:'Connecting to Plyomat',scheduled_for:payload.scheduled_for,
+                id:null,status:'pending_approval',status_label:'Awaiting Trainer Approval',scheduled_for:payload.scheduled_for,
                 notes:payload.notes,plyomat_ready:false,plyomat_athlete_id:null,last_synced_at:null,connection_error:null,trainer:chosen
             }
         });
