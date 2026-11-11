@@ -14026,6 +14026,7 @@ protected function ensureComposeBodyHasFooter(): void
         ($failed ? $notification->warning() : $notification->success())->send();
     }
 
+    #[Renderless]
     public function sendComposeTestEmailFromClient(array $payload = []): array
     {
         $user = Auth::user();
@@ -14060,10 +14061,9 @@ protected function ensureComposeBodyHasFooter(): void
             return ['ok' => false, 'message' => 'Subject and message are required.'];
         }
 
-        // Keep the server model in sync with the exact browser editor state used
-        // for this test, without altering recipient selections.
-        $this->campaignSubject = $subject;
-        $this->campaignBody = $body;
+        // A test send is read-only with respect to the current Compose draft.
+        // Do not mutate campaignSubject/campaignBody here: the browser editor remains
+        // the source of truth and this Renderless action must never rebuild or clear it.
         $this->resolveComposeGraphicUpload();
 
         $coach = $this->campaignRecipientCoaches()->first()
