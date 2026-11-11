@@ -271,6 +271,11 @@ class PlyrLabController extends Controller
         $oldScheduled = $displayedScheduled?->toIso8601String();
         $newScheduled = \Illuminate\Support\Carbon::parse($validated['scheduled_for'])->toIso8601String();
         $scheduleChanged = $oldScheduled !== $newScheduled;
+
+        $oldNotes = trim((string) ($booking->notes ?? ''));
+        $newNotes = trim((string) ($validated['notes'] ?? ''));
+        $notesChanged = $oldNotes !== $newNotes;
+
         $wasAlreadyApproved = ! in_array($booking->status, ['pending_approval', 'pending'], true);
 
         $nextStatus = $booking->status;
@@ -290,6 +295,10 @@ class PlyrLabController extends Controller
             $updates['requested_scheduled_for'] = null;
             $nextStatus = 'pending_approval';
             $event = 'booking_requested';
+        } elseif ($notesChanged) {
+            // A notes/details-only edit is still meaningful to the trainer and admins,
+            // but it should not be presented as a brand-new booking or reschedule.
+            $event = 'booking_updated';
         }
 
         $updates['status'] = $nextStatus;
@@ -299,13 +308,19 @@ class PlyrLabController extends Controller
             $booking->notifyStakeholders($event);
         }
 
+        $nothingChanged = ! $scheduleChanged && ! $notesChanged;
+
         return response()->json([
             'success' => true,
-            'message' => $nextStatus === 'reschedule_pending'
-                ? 'Your new session time was sent to the trainer for approval.'
-                : ($nextStatus === 'pending_approval'
-                    ? 'Your booking request was updated and is still awaiting trainer approval.'
-                    : 'Your PLYRLab trainer booking has been updated.'),
+            'message' => $nothingChanged
+                ? 'No booking changes were detected.'
+                : ($nextStatus === 'reschedule_pending'
+                    ? 'Your new session time was sent to the trainer for approval.'
+                    : ($nextStatus === 'pending_approval' && $scheduleChanged
+                        ? 'Your booking request was updated and is still awaiting trainer approval.'
+                        : ($notesChanged && ! $scheduleChanged
+                            ? 'Your booking details were updated and the trainer was notified.'
+                            : 'Your PLYRLab trainer booking has been updated.'))),
             'data' => $dataService->payload($player),
         ]);
     }
