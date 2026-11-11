@@ -6817,6 +6817,11 @@ discoverSelectedIds: [],
                 const nextSchool = $event.detail?.school || null;
                 if (nextSchool && (nextSchool.id || nextSchool.school_id || nextSchool.name)) {
                     openGlobalSchool(nextSchool);
+                    // The optimistic conversation-changing payload can be lighter than
+                    // the canonical server-resolved Inbox school. If it cannot open yet,
+                    // preserve follow mode so rc-inbox-school-changed can open the
+                    // authoritative record as soon as Livewire returns it.
+                    if (!schoolDrawerOpen) window.__rcInboxFollowSchoolDrawer = true;
                 }
             }
         "
