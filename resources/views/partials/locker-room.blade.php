@@ -37,6 +37,7 @@
     $lrRecruitingConversationsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.conversations') ? route('locker-room.recruiting.conversations') : null;
     $lrRecruitingTemplatesUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.templates') ? route('locker-room.recruiting.templates') : null;
     $lrRecruitingEmailUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.email.send') ? route('locker-room.recruiting.email.send') : null;
+    $lrRecruitingEmailTestUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.recruiting.email.test') ? route('locker-room.recruiting.email.test') : null;
     $lrPointsUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points') ? route('locker-room.points') : null;
     $lrPointsHistoryUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.points.history') ? route('locker-room.points.history') : null;
     $lrPlyrLabUrl = $lrLoggedIn && \Illuminate\Support\Facades\Route::has('locker-room.plyr-lab') ? route('locker-room.plyr-lab') : null;
@@ -718,6 +719,7 @@
      data-recruiting-conversations-url="{{ $lrRecruitingConversationsUrl }}"
      data-recruiting-templates-url="{{ $lrRecruitingTemplatesUrl }}"
      data-recruiting-email-url="{{ $lrRecruitingEmailUrl }}"
+     data-recruiting-email-test-url="{{ $lrRecruitingEmailTestUrl }}"
      data-points-url="{{ $lrPointsUrl }}"
      data-points-history-url="{{ $lrPointsHistoryUrl }}"
      data-plyr-lab-url="{{ $lrPlyrLabUrl }}"
@@ -1433,7 +1435,11 @@
             return `<div class="lr-school-coach"><div class="lr-school-coach-avatar">${esc(initials)}</div><div class="lr-school-coach-copy"><strong>${esc(coach.name || 'Coach')}</strong><span>${esc(coach.title || 'Coach')}</span>${coach.email ? `<a href="mailto:${esc(coach.email)}">${esc(coach.email)}</a>` : ''}</div>${coach.email ? `<a class="lr-school-mailbtn" href="mailto:${esc(coach.email)}" aria-label="Email ${esc(coach.name || 'coach')}"><i class="fa-regular fa-envelope"></i></a>` : ''}</div>`;
         }).join('') : '<div class="lr-detail-empty"><strong>No local coaches found.</strong></div>';
         const communications = Array.isArray(data.communications) ? data.communications : [];
-        const comms = communications.length ? communications.map(row => `<div class="lr-school-comm"><span class="lr-school-comm-dir${row.direction === 'inbound' ? ' is-inbound' : ''}">${row.direction === 'inbound' ? '↙' : '↗'}</span><div><strong>${esc(row.title || 'Conversation activity')}</strong><span>${esc(row.preview || 'No message preview available.')}</span><small>${esc([row.date_label, row.opened ? 'Opened' : '', row.reply ? 'Reply' : ''].filter(Boolean).join(' · '))}</small></div></div>`).join('') : '<div class="lr-detail-empty"><strong>No conversation history yet.</strong><br>Emails and replies with coaches from this school will appear here.</div>';
+        const comms = communications.length ? communications.map(row => {
+            const inbound = row.direction === 'inbound';
+            const person = row.contact_name || row.title || 'Coach';
+            return `<div class="lr-school-comm"><span class="lr-school-comm-dir${inbound ? ' is-inbound' : ''}"><i class="fa-solid ${inbound ? 'fa-arrow-left' : 'fa-arrow-right'}"></i></span><div><strong>${esc((inbound ? 'Email received from ' : 'Email sent to ') + person)}</strong><small>${esc(row.date_time_label || row.date_label || '')}</small></div></div>`;
+        }).join('') : '<div class="lr-detail-empty"><strong>No conversation history yet.</strong><br>Emails and replies with coaches from this school will appear here.</div>';
         const listMenu = lists.length ? lists.map(list => {
             const key = String(list.key || list.id || '');
             const label = String(list.label || list.name || key || 'List');
