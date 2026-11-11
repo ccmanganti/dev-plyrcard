@@ -12927,6 +12927,7 @@ CSS;
                         }));
                     },
                     sendingFast: false,
+                    testingEmail: false,
                     get schools() { return Array.isArray(this.dataset?.schools) ? this.dataset.schools : []; },
                     get schoolResults() {
                         const q = String(this.schoolQuery || '').trim().toLowerCase();
@@ -13080,6 +13081,53 @@ CSS;
                         this.coachRevision++;
                         this.rememberRecipientState();
                     },
+                    async sendTest(wireInstance = null) {
+                        if (this.testingEmail) return;
+                        if (!this.composeSubjectReady) { toast('Add a subject before sending a test.'); return; }
+                        if (!this.composeBodyReady) { toast('Write a message before sending a test.'); return; }
+
+                        const wire = wireInstance || this.$wire || (() => {
+                            const root = window.rcFindCoachDatabaseLivewireComponent
+                                ? window.rcFindCoachDatabaseLivewireComponent(this.$root || document.querySelector('.rc-livewire-root'))
+                                : document.querySelector('[wire\\:id]');
+                            const id = root?.getAttribute?.('wire:id');
+                            return id && window.Livewire?.find ? window.Livewire.find(id) : null;
+                        })();
+
+                        if (!wire || typeof wire.call !== 'function') {
+                            toast('Composer is still loading. Try again in a second.');
+                            return;
+                        }
+
+                        const composePage = this.$root || document.querySelector('.rc-compose-page-v45') || document;
+                        const subject = String(composePage.querySelector('[data-rc-compose-subject]')?.value || '').trim();
+                        const nativeEditor = window.__plyrNativeEditors?.campaignBody;
+                        const editor = composePage.querySelector('[data-plyr-native-editor=campaign-body]');
+                        const body = String(
+                            (nativeEditor && typeof nativeEditor.serializeEditorHtml === 'function'
+                                ? nativeEditor.serializeEditorHtml()
+                                : '')
+                            || editor?.innerHTML
+                            || ''
+                        ).trim();
+
+                        nativeEditor?.syncNow?.();
+                        this.testingEmail = true;
+
+                        try {
+                            const result = await wire.call('sendComposeTestEmailFromClient', { subject, body });
+                            if (result && result.ok === false) {
+                                toast(String(result.message || 'Unable to send the test email.'));
+                                return;
+                            }
+                            toast(String(result?.message || 'Test email sent.'));
+                        } catch (error) {
+                            console.error(error);
+                            toast('Unable to send the test email right now.');
+                        } finally {
+                            this.testingEmail = false;
+                        }
+                    },
                     async sendFast(wireInstance = null) {
                         if (this.sendingFast) return;
                         if (!this.composeRecipientsReady) { toast('Choose at least one coach.'); return; }
@@ -13205,6 +13253,18 @@ CSS;
                                 </div>
                             </div>
                         </div>
+                        <button
+                            class="rc-btn"
+                            type="button"
+                            x-on:click.prevent.stop="sendTest($wire)"
+                            x-bind:disabled="testingEmail || !composeSubjectReady || !composeBodyReady"
+                            x-bind:class="{ 'is-compose-disabled-v114': !composeSubjectReady || !composeBodyReady }"
+                            title="Send the current email to your own account"
+                        >
+                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75 12 13.5 2.25 6.75M3.75 4.5h16.5A1.5 1.5 0 0 1 21.75 6v12a1.5 1.5 0 0 1-1.5 1.5H3.75A1.5 1.5 0 0 1 2.25 18V6a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
+                            <span x-show="!testingEmail">Test Email</span>
+                            <span x-cloak x-show="testingEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending test</span>
+                        </button>
                         <button class="rc-btn" type="button" data-rc-local-action data-rc-compose-preview-instant-v99 x-on:click.prevent.stop="openPreview()" x-bind:disabled="!composeReady" x-bind:class="{ 'is-compose-disabled-v114': !composeReady }">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
