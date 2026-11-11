@@ -29,7 +29,10 @@ class PlyrLabTrainerBookedNotification extends Notification implements ShouldQue
         $trainerUser = $booking?->trainer?->user;
         $playerName = trim((string) ($player?->first_name . ' ' . $player?->last_name)) ?: 'PLYRCARD player';
         $trainerName = trim((string) ($trainerUser?->first_name . ' ' . $trainerUser?->last_name)) ?: ($booking?->trainer?->displayName() ?: 'PLYRLab trainer');
-        $when = $booking?->scheduled_for?->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A');
+        $displayTime = in_array($this->event, ['reschedule_requested'], true) && $booking?->requested_scheduled_for
+            ? $booking->requested_scheduled_for
+            : $booking?->scheduled_for;
+        $when = $displayTime?->timezone(config('app.timezone'))->format('M j, Y \a\t g:i A');
         $isPlayer = $player && (int) ($notifiable->getKey() ?? 0) === (int) $player->getKey();
         $isTrainer = $trainerUser && (int) ($notifiable->getKey() ?? 0) === (int) $trainerUser->getKey();
 
