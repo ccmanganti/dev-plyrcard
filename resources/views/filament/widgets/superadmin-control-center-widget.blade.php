@@ -553,7 +553,7 @@
                 <h2>{{ $plyrlab_is_trainer_portal ? ($plyrlab_viewer_trainer['name'] ?? 'PLYRLab Trainer') : 'PLYRLab Management' }}</h2>
                 <p>
                     @if($plyrlab_is_trainer_portal)
-                        Manage your player bookings, monitor Plyomat connection status, and keep your trainer API connection ready.
+                        Manage booking requests, your calendar and availability, connected players, and your Plyomat integration.
                     @else
                         Manage trainers, manually connect athletes, monitor Plyomat provisioning, and reset player connections when needed.
                     @endif
