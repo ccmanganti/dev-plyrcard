@@ -262,27 +262,35 @@ class PlyrLabController extends Controller
             ], 422);
         }
 
-        $oldScheduled = $booking->scheduled_for?->toIso8601String();
+        $displayedScheduled = $booking->status === 'reschedule_pending' && $booking->requested_scheduled_for
+            ? $booking->requested_scheduled_for
+            : $booking->scheduled_for;
+        $oldScheduled = $displayedScheduled?->toIso8601String();
         $newScheduled = \Illuminate\Support\Carbon::parse($validated['scheduled_for'])->toIso8601String();
         $scheduleChanged = $oldScheduled !== $newScheduled;
         $wasAlreadyApproved = ! in_array($booking->status, ['pending_approval', 'pending'], true);
 
         $nextStatus = $booking->status;
         $event = null;
+        $updates = [
+            'notes' => $validated['notes'] ?? null,
+        ];
 
         if ($scheduleChanged && $wasAlreadyApproved) {
+            // Keep the already approved session untouched until the trainer
+            // accepts the new requested time.
+            $updates['requested_scheduled_for'] = $validated['scheduled_for'];
             $nextStatus = 'reschedule_pending';
             $event = 'reschedule_requested';
         } elseif ($scheduleChanged || $booking->status === 'pending') {
+            $updates['scheduled_for'] = $validated['scheduled_for'];
+            $updates['requested_scheduled_for'] = null;
             $nextStatus = 'pending_approval';
             $event = 'booking_requested';
         }
 
-        $booking->forceFill([
-            'scheduled_for' => $validated['scheduled_for'],
-            'notes' => $validated['notes'] ?? null,
-            'status' => $nextStatus,
-        ])->save();
+        $updates['status'] = $nextStatus;
+        $booking->forceFill($updates)->save();
 
         if ($event) {
             $booking->notifyStakeholders($event);
