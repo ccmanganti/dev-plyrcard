@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -352,7 +353,7 @@ class LockerRoomRecruitingController extends Controller
                 'subject' => $personalizedSubject,
                 'body' => $personalizedBody,
                 'html' => $personalizedBody,
-                'text' => trim(strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $personalizedBody))),
+                'text' => $this->emailPlainText($personalizedBody),
                 'to' => $email,
                 'emailTo' => $email,
                 'fromName' => trim((string) ($user->name ?? 'PLYRCARD')),
@@ -385,6 +386,91 @@ class LockerRoomRecruitingController extends Controller
                 ? sprintf('Sent to %s coach%s.', number_format($sent), $sent === 1 ? '' : 'es')
                 : sprintf('Sent to %s coach%s. %s failed.', number_format($sent), $sent === 1 ? '' : 'es', number_format(count($failed))),
         ], $sent > 0 ? 200 : 422);
+    }
+
+    public function sendTestEmail(
+        Request $request,
+        LocalRecruitingDatabaseService $database,
+        LocalTemplateMergeValueService $mergeValues,
+    ): JsonResponse {
+        $user = $this->premiumUser($request);
+
+        $data = $request->validate([
+            'school_id' => ['nullable', 'string', 'max:120'],
+            'subject' => ['required', 'string', 'max:250'],
+            'body' => ['required', 'string', 'max:100000'],
+        ]);
+
+        $to = trim((string) ($user->personal_email ?: $user->email));
+
+        if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
+            throw ValidationException::withMessages([
+                'email' => 'Add a valid personal/account email before sending a test email.',
+            ]);
+        }
+
+        $coach = [
+            'name' => 'Coach Preview',
+            'first_name' => 'Coach',
+            'last_name' => 'Preview',
+            'email' => $to,
+            'school' => 'Preview School',
+            'school_name' => 'Preview School',
+        ];
+
+        $schoolId = trim((string) ($data['school_id'] ?? ''));
+        if ($schoolId !== '') {
+            $school = collect($database->schoolRows($user))
+                ->first(function ($row) use ($schoolId): bool {
+                    if (! is_array($row)) {
+                        return false;
+                    }
+
+                    return in_array($schoolId, array_map('strval', array_filter([
+                        $row['id'] ?? null,
+                        $row['school_id'] ?? null,
+                        $row['reference'] ?? null,
+                        $row['business_id'] ?? null,
+                    ])), true);
+                });
+
+            if (is_array($school)) {
+                $coaches = collect((array) ($school['coaches'] ?? []))
+                    ->filter(fn ($row): bool => is_array($row))
+                    ->values();
+
+                $head = $coaches->first(fn (array $row): bool => (bool) ($row['is_head_coach'] ?? $row['head_coach'] ?? false))
+                    ?: $coaches->first();
+
+                if (is_array($head)) {
+                    $coach = array_merge($coach, $head);
+                }
+
+                $coach['school'] = (string) ($school['name'] ?? $coach['school']);
+                $coach['school_name'] = (string) ($school['name'] ?? $coach['school_name']);
+            }
+        }
+
+        $subject = $mergeValues->replace(trim((string) $data['subject']), $user, $coach);
+        $html = $this->sanitizeEmailHtml((string) $data['body']);
+
+        if (trim(strip_tags($html)) === '' && ! str_contains(strtolower($html), '<img')) {
+            throw ValidationException::withMessages(['body' => 'Enter an email message.']);
+        }
+
+        $html = $mergeValues->replace($html, $user, $coach);
+        $html = $this->appendPlayerSignature($html, $user, $mergeValues->profileUrlFor($user));
+
+        Mail::html($html, function ($message) use ($to, $subject): void {
+            $message
+                ->to($to)
+                ->subject('[TEST] ' . $subject);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Test email sent to ' . $to . ' with the current message and PLYRCard signature.',
+        ]);
     }
 
     public function points(
@@ -841,16 +927,50 @@ class LockerRoomRecruitingController extends Controller
             return '';
         }
 
-        if (! preg_match('/<\s*(?:p|div|br|strong|b|em|i|u|ul|ol|li|a|blockquote|span|h[1-6]|table|tr|td|th|img)\b/i', $html)) {
-            return '<p>' . nl2br(e($html)) . '</p>';
+        // Rich-editor values can arrive entity-escaped after a template round trip.
+        // Decode only when doing so reveals actual HTML markup.
+        for ($i = 0; $i < 3; $i++) {
+            if (str_contains($html, '<')) {
+                break;
+            }
+
+            $decoded = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+            if ($decoded === $html || ! str_contains($decoded, '<')) {
+                break;
+            }
+
+            $html = $decoded;
         }
 
+        if (! preg_match('/<\s*(?:p|div|br|strong|b|em|i|u|ul|ol|li|a|blockquote|span|h[1-6]|table|tr|td|th|img)\b/i', $html)) {
+            return '<p>' . nl2br(e(html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8')), false) . '</p>';
+        }
+
+        $html = preg_replace('#<(script|iframe|object|embed|form)[^>]*>.*?</\1>#is', '', $html) ?? $html;
         $html = strip_tags($html, '<p><div><br><strong><b><em><i><u><ul><ol><li><a><blockquote><span><h1><h2><h3><h4><h5><h6><table><tbody><thead><tr><td><th><img>');
         $html = preg_replace('/\son\w+\s*=\s*(["\']).*?\1/is', '', $html) ?? $html;
         $html = preg_replace('/\son\w+\s*=\s*[^\s>]+/is', '', $html) ?? $html;
-        $html = preg_replace('/javascript\s*:/i', '', $html) ?? $html;
+        $html = preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1="#"', $html) ?? $html;
+
+        // Chrome contenteditable occasionally serializes blank lines as empty DIVs.
+        // Preserve those visual breaks rather than collapsing them on send.
+        $html = preg_replace('/<div([^>]*)>\s*<br\s*\/?>\s*<\/div>/i', '<div$1><br></div>', $html) ?? $html;
+        $html = preg_replace('/<p([^>]*)>\s*<\/p>/i', '<p$1><br></p>', $html) ?? $html;
 
         return trim($html);
+    }
+
+    protected function emailPlainText(string $html): string
+    {
+        $text = preg_replace('/<br\s*\/?>/i', "\n", $html) ?? $html;
+        $text = preg_replace('/<\/(?:p|div|li|blockquote|h[1-6]|tr)>/i', "\n", $text) ?? $text;
+        $text = preg_replace('/<li\b[^>]*>/i', '• ', $text) ?? $text;
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t]+\n/u', "\n", $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+
+        return trim($text);
     }
 
     protected function appendPlayerSignature(string $html, User $user, string $profileUrl): string
