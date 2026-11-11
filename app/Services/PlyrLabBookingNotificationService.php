@@ -176,6 +176,9 @@ class PlyrLabBookingNotificationService
         }
 
         return match ($event) {
+            'booking_updated' => $audience === 'player'
+                ? 'Your PLYRLab booking was updated'
+                : 'PLYRLab booking details updated',
             'booking_approved' => 'PLYRLab booking approved',
             'reschedule_requested' => $audience === 'player'
                 ? 'Your PLYRLab reschedule request was sent'
@@ -328,6 +331,36 @@ class PlyrLabBookingNotificationService
                 $playerName . ' requested a new session time with ' . $trainerName . '.',
                 'Review the requested schedule change in PLYRLab Management.',
                 'Review Booking',
+                $managementUrl,
+            ];
+        }
+
+        if ($event === 'booking_updated') {
+            if ($audience === 'player') {
+                return [
+                    'Booking details updated',
+                    'Your PLYRLab booking details with ' . $trainerName . ' were updated successfully.',
+                    'The trainer and PLYRLab administrators were notified of the change.',
+                    'Open PLYRLab',
+                    $playerUrl,
+                ];
+            }
+
+            if ($audience === 'trainer') {
+                return [
+                    'Booking details updated',
+                    $playerName . ' updated the details for their PLYRLab booking with you.',
+                    'Review the latest player note and booking details before the session.',
+                    'Review Booking',
+                    $managementUrl,
+                ];
+            }
+
+            return [
+                'PLYRLab booking details updated',
+                $playerName . ' updated their booking details with ' . $trainerName . '.',
+                'Open PLYRLab Management to review the latest player note and booking information.',
+                'Open PLYRLab Management',
                 $managementUrl,
             ];
         }
