@@ -365,6 +365,19 @@
         #plyrcard-action-drawer .lrm-service-description{-webkit-line-clamp:4}
     }
 
+
+    #plyrcard-action-drawer .lrm-rich-compose{border:1px solid #d0d5dd;border-radius:12px;background:#fff;overflow:hidden}
+    #plyrcard-action-drawer .lrm-rich-toolbar{display:flex;align-items:center;gap:3px;flex-wrap:wrap;padding:7px;border-bottom:1px solid #eaecf0;background:#f8fafc}
+    #plyrcard-action-drawer .lrm-rich-toolbar button{width:30px;height:30px;border:1px solid transparent;border-radius:7px;background:transparent;color:#475467;display:grid;place-items:center;cursor:pointer}
+    #plyrcard-action-drawer .lrm-rich-toolbar button:hover,#plyrcard-action-drawer .lrm-rich-toolbar button.is-active{background:#fff;border-color:#d0d5dd;color:#101828}
+    #plyrcard-action-drawer .lrm-rich-sep{width:1px;height:20px;background:#d0d5dd;margin:0 3px}
+    #plyrcard-action-drawer .lrm-rich-editor{min-height:220px;max-height:430px;overflow:auto;padding:13px 14px;font-size:12px;line-height:1.6;color:#101828;outline:0;white-space:normal;overflow-wrap:anywhere}
+    #plyrcard-action-drawer .lrm-rich-editor:empty:before{content:attr(data-placeholder);color:#98a2b3;pointer-events:none}
+    #plyrcard-action-drawer .lrm-rich-editor p{margin:0 0 10px}
+    #plyrcard-action-drawer .lrm-rich-editor div{margin:0 0 8px}
+    #plyrcard-action-drawer .lrm-rich-editor img{max-width:100%;height:auto;display:block;margin:10px 0;border-radius:8px}
+    #plyrcard-action-drawer .lrm-rich-editor a{color:#175cd3;text-decoration:underline}
+    #plyrcard-action-drawer .lrm-rich-editor ul,#plyrcard-action-drawer .lrm-rich-editor ol{padding-left:22px;margin:8px 0}
 </style>
 
 <section class="lr-view" data-lr-view="schools">
@@ -465,9 +478,31 @@
             <div class="lr-form-grid" style="margin-top:10px;">
                 <div class="lr-field is-full"><label>Template</label><select class="lr-select" data-lrm-template><option value="">Start from scratch</option></select></div>
                 <div class="lr-field is-full"><label>Subject</label><input class="lr-input" name="subject" maxlength="250" required></div>
-                <div class="lr-field is-full"><label>Message</label><textarea class="lr-textarea" name="body" rows="11" required></textarea></div>
+                <div class="lr-field is-full">
+                    <label>Message</label>
+                    <div class="lrm-rich-compose">
+                        <div class="lrm-rich-toolbar" data-lrm-rich-toolbar>
+                            <button type="button" data-lrm-rich-command="bold" title="Bold"><i class="fa-solid fa-bold"></i></button>
+                            <button type="button" data-lrm-rich-command="italic" title="Italic"><i class="fa-solid fa-italic"></i></button>
+                            <button type="button" data-lrm-rich-command="underline" title="Underline"><i class="fa-solid fa-underline"></i></button>
+                            <span class="lrm-rich-sep"></span>
+                            <button type="button" data-lrm-rich-command="insertUnorderedList" title="Bulleted list"><i class="fa-solid fa-list-ul"></i></button>
+                            <button type="button" data-lrm-rich-command="insertOrderedList" title="Numbered list"><i class="fa-solid fa-list-ol"></i></button>
+                            <span class="lrm-rich-sep"></span>
+                            <button type="button" data-lrm-rich-link title="Insert link"><i class="fa-solid fa-link"></i></button>
+                            <button type="button" data-lrm-rich-image title="Insert image"><i class="fa-regular fa-image"></i></button>
+                            <button type="button" data-lrm-rich-command="removeFormat" title="Clear formatting"><i class="fa-solid fa-eraser"></i></button>
+                        </div>
+                        <div class="lrm-rich-editor" contenteditable="true" data-lrm-compose-editor role="textbox" aria-multiline="true" data-placeholder="Write your recruiting email..."></div>
+                        <textarea name="body" data-lrm-compose-body hidden required></textarea>
+                    </div>
+                    <small class="lr-card-copy">Formatting, images, links, spacing, and your PLYRCard signature are preserved in the sent email.</small>
+                </div>
             </div>
-            <div class="lr-actions"><button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-paper-plane"></i> <span data-lrm-send-label>Choose a school</span></button></div>
+            <div class="lr-actions">
+                <button class="lr-btn" type="button" data-lrm-test-email><i class="fa-regular fa-paper-plane"></i> Send Test to Me</button>
+                <button class="lr-btn lr-btn-primary" type="submit"><i class="fa-solid fa-paper-plane"></i> <span data-lrm-send-label>Choose a school</span></button>
+            </div>
         </div>
     </form>
 </section>
@@ -751,6 +786,47 @@
         }catch(e){toast(e.message,true)}
         finally{busy(form,false)}
     }
+
+    var composeRange=null;
+    function composeEditor(){return q('[data-lrm-compose-editor]')}
+    function composeBodyField(){return q('[data-lrm-compose-body]')}
+    function rememberComposeRange(){
+        var editor=composeEditor(),sel=window.getSelection();
+        if(!editor||!sel||!sel.rangeCount||!editor.contains(sel.anchorNode))return;
+        composeRange=sel.getRangeAt(0).cloneRange();
+    }
+    function restoreComposeRange(){
+        var editor=composeEditor(),sel=window.getSelection();
+        if(!editor)return;
+        editor.focus();
+        if(composeRange&&sel){sel.removeAllRanges();sel.addRange(composeRange)}
+    }
+    function syncComposeEditor(){
+        var editor=composeEditor(),field=composeBodyField();
+        if(!editor||!field)return;
+        field.value=editor.innerHTML;
+    }
+    function decodeEditorHtml(value){
+        var html=String(value||'').trim();
+        for(var i=0;i<3;i++){
+            if(/<\s*(p|div|br|strong|em|img|a|table|ul|ol)\b/i.test(html))break;
+            var area=document.createElement('textarea');area.innerHTML=html;var decoded=area.value;
+            if(decoded===html||!/<\s*[a-z][\s\S]*>/i.test(decoded))break;
+            html=decoded;
+        }
+        return html;
+    }
+    function setComposeHtml(html){
+        var editor=composeEditor();if(!editor)return;
+        editor.innerHTML=decodeEditorHtml(html);
+        syncComposeEditor();
+    }
+    function runComposeCommand(command,value){
+        restoreComposeRange();
+        try{document.execCommand('defaultParagraphSeparator',false,'p')}catch(_){}
+        document.execCommand(command,false,value||null);
+        rememberComposeRange();syncComposeEditor();
+    }
     function renderCompose(){
         var template=q('[data-lrm-template]');if(template){var old=template.value;template.innerHTML='<option value="">Start from scratch</option>'+(data.templates||[]).map(function(r){return '<option value="'+esc(r.id||'')+'">'+esc(r.name||'Template')+'</option>'}).join('');if(old)template.value=old}
         renderComposeSchool();
@@ -904,11 +980,23 @@
         var choose=event.target.closest('[data-lrm-choose-school]');if(choose&&drawer.contains(choose)){selectedComposeSchool=(data.schools||[]).find(function(s){return String(s.id||'')===String(choose.dataset.lrmChooseSchool)})||null;q('[data-lrm-compose-school-search]').value='';renderComposeSchool();renderComposeSchoolResults();return}
         var clear=event.target.closest('[data-lrm-clear-compose-school]');if(clear&&drawer.contains(clear)){selectedComposeSchool=null;renderComposeSchool();return}
         var recipientMode=event.target.closest('[data-lrm-recipient-mode]');if(recipientMode&&drawer.contains(recipientMode)){var head=recipientMode.dataset.lrmRecipientMode!=='all';q('[data-lrm-head-only]').value=head?'1':'0';qa('[data-lrm-recipient-mode]').forEach(function(b){b.classList.toggle('is-active',b===recipientMode)});return}
+        var rich=event.target.closest('[data-lrm-rich-command]');if(rich&&drawer.contains(rich)){event.preventDefault();runComposeCommand(rich.dataset.lrmRichCommand);return}
+        var richLink=event.target.closest('[data-lrm-rich-link]');if(richLink&&drawer.contains(richLink)){event.preventDefault();var href=prompt('Enter the link URL:','https://');if(href)runComposeCommand('createLink',href);return}
+        var richImage=event.target.closest('[data-lrm-rich-image]');if(richImage&&drawer.contains(richImage)){event.preventDefault();var src=prompt('Enter the image URL:','https://');if(src)runComposeCommand('insertImage',src);return}
+        var testEmail=event.target.closest('[data-lrm-test-email]');if(testEmail&&drawer.contains(testEmail)){
+            event.preventDefault();var form=q('[data-lrm-compose-form]');if(!form||!drawer.dataset.recruitingEmailTestUrl)return;
+            syncComposeEditor();var fd=new FormData(form),payload={subject:fd.get('subject'),body:fd.get('body'),school_id:fd.get('school_id')||null};
+            if(!String(payload.subject||'').trim()){toast('Add a subject before sending a test.',true);return}
+            if(!String(payload.body||'').replace(/<[^>]*>/g,'').trim()&&!/<img\b/i.test(String(payload.body||''))){toast('Write an email message first.',true);return}
+            testEmail.disabled=true;var oldHtml=testEmail.innerHTML;testEmail.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Sending test…';
+            api(drawer.dataset.recruitingEmailTestUrl,{method:'POST',body:payload}).then(function(j){toast(j.message||'Test email sent.')}).catch(function(e){toast(e.message,true)}).finally(function(){testEmail.disabled=false;testEmail.innerHTML=oldHtml});return
+        }
         var pack=event.target.closest('[data-lrm-point-pack]');if(pack&&drawer.contains(pack)){document.dispatchEvent(new CustomEvent('plyrcard:locker-point-pack',{detail:{pack:pack.dataset.lrmPointPack}}));return}
         var custom=event.target.closest('[data-lrm-custom-buy]');if(custom&&drawer.contains(custom)){var p=data.points||{},cfg=p.custom_purchase||{},input=q('[data-lrm-custom-points]'),amount=Math.round(Number(input?.value||0)),min=Number(cfg.min_points||1),max=Number(cfg.max_points||1000);if(!Number.isFinite(amount)||amount<min||amount>max){toast('Choose between '+min+' and '+max+' points.',true);return}document.dispatchEvent(new CustomEvent('plyrcard:locker-point-pack',{detail:{pack:'custom-'+amount}}));return}
         var service=event.target.closest('[data-lrm-service]');if(service&&drawer.contains(service)){var p2=data.points||{},cost=Number(service.dataset.points||0);if(Number(p2.balance||0)<cost){toast('You do not have enough points.',true);return}if(!confirm('Use '+cost+' points for this service?'))return;var token='locker-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);api(drawer.dataset.creditUseUrl,{method:'POST',body:{request_token:token,confirm_spend:1,items:[{selected:1,item_key:service.dataset.lrmService,quantity:1,rush:0,notes:'Requested from Locker Room'}]}}).then(function(){loaded.points=false;loadPoints(true);toast('Service requested with PLYR Points.')}).catch(function(e){toast(e.message,true)});return}
     },true);
 
+    document.addEventListener('mousedown',function(event){var b=event.target.closest('[data-lrm-rich-toolbar] button');if(b&&drawer.contains(b)){event.preventDefault();restoreComposeRange()}},true);
     document.addEventListener('input',function(event){
         if(event.target.matches('[data-lrm-school-search]'))renderSchools();
         if(event.target.matches('[data-lrm-list-school-search]'))renderListSearch(event.target.dataset.lrmListSchoolSearch);
@@ -927,19 +1015,36 @@
     if(listForm)listForm.addEventListener('submit',async function(event){event.preventDefault();busy(listForm,true,'Creating…');try{var j=await api(drawer.dataset.recruitingListsUrl,{method:'POST',body:new FormData(listForm)});data.lists=j.items||[];loaded.lists=true;listForm.reset();listForm.querySelector('[name="color"]').value='#ff6338';renderLists();toast('List created.')}catch(e){toast(e.message,true)}finally{busy(listForm,false)}});
 
     var template=q('[data-lrm-template]');
-    if(template)template.addEventListener('change',function(){var row=(data.templates||[]).find(function(t){return String(t.id||'')===String(template.value)});if(!row)return;var form=q('[data-lrm-compose-form]');form.querySelector('[name="subject"]').value=row.subject||'';form.querySelector('[name="body"]').value=String(row.body_html||'').replace(/<br\s*\/?>/gi,'\n').replace(/<\/p>/gi,'\n\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim()});
+    if(template)template.addEventListener('change',function(){
+        var row=(data.templates||[]).find(function(t){return String(t.id||'')===String(template.value)}),form=q('[data-lrm-compose-form]');
+        if(!form)return;
+        if(!row){form.querySelector('[name="subject"]').value='';setComposeHtml('');return}
+        form.querySelector('[name="subject"]').value=row.subject||'';
+        setComposeHtml(row.body_html||'');
+    });
 
     var compose=q('[data-lrm-compose-form]');
-    if(compose)compose.addEventListener('submit',async function(event){
-        event.preventDefault();var fd=new FormData(compose),body;
-        if(compose.dataset.conversationId){body={target_mode:'conversation',conversation_id:compose.dataset.conversationId,subject:fd.get('subject'),body:fd.get('body')}}
-        else{
-            if(!selectedComposeSchool){toast('Choose a school before sending.',true);return}
-            body={target_mode:'school',school_id:fd.get('school_id'),head_coach_only:fd.get('head_coach_only')==='1',subject:fd.get('subject'),body:fd.get('body')}
+    if(compose){
+        var editor=composeEditor();
+        try{document.execCommand('defaultParagraphSeparator',false,'p')}catch(_){}
+        if(editor){
+            ['keyup','mouseup','focus','input'].forEach(function(type){editor.addEventListener(type,function(){rememberComposeRange();syncComposeEditor()})});
         }
-        busy(compose,true,'Sending…');
-        try{var j=await api(drawer.dataset.recruitingEmailUrl,{method:'POST',body:body});toast(j.message||'Recruiting email sent.');compose.dataset.conversationId='';compose.querySelector('[name="subject"]').value='';compose.querySelector('[name="body"]').value='';loaded.inbox=false}
-        catch(e){toast(e.message,true)}finally{busy(compose,false)}
-    });
+
+        compose.addEventListener('submit',async function(event){
+            event.preventDefault();syncComposeEditor();var fd=new FormData(compose),body;
+            if(!String(fd.get('body')||'').replace(/<[^>]*>/g,'').trim()&&!/<img\b/i.test(String(fd.get('body')||''))){toast('Write an email message first.',true);return}
+            if(compose.dataset.conversationId){body={target_mode:'conversation',conversation_id:compose.dataset.conversationId,subject:fd.get('subject'),body:fd.get('body')}}
+            else{
+                if(!selectedComposeSchool){toast('Choose a school before sending.',true);return}
+                body={target_mode:'school',school_id:fd.get('school_id'),head_coach_only:fd.get('head_coach_only')==='1',subject:fd.get('subject'),body:fd.get('body')}
+            }
+            busy(compose,true,'Sending…');
+            try{
+                var j=await api(drawer.dataset.recruitingEmailUrl,{method:'POST',body:body});
+                toast(j.message||'Recruiting email sent.');compose.dataset.conversationId='';compose.querySelector('[name="subject"]').value='';setComposeHtml('');loaded.inbox=false
+            }catch(e){toast(e.message,true)}finally{busy(compose,false)}
+        });
+    }
 })();
 </script>
