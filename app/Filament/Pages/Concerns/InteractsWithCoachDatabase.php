@@ -14085,6 +14085,7 @@ protected function ensureComposeBodyHasFooter(): void
                 $this->buildComposeHtml($body)
             )
         );
+        $html = $this->appendAttachmentLinksToHtml($html, $this->composeAttachments);
 
         $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
         $personalizedBody = $this->replaceCampaignTokens($html, $coach);
