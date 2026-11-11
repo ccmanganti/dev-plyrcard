@@ -13444,13 +13444,13 @@ CSS;
                                             <option value="h2">Heading</option>
                                             <option value="h3">Subheading</option>
                                         </select>
-                                        <button type="button" class="rc-rich-tool" x-on:click="format('bold')"><strong>B</strong></button>
-                                        <button type="button" class="rc-rich-tool" x-on:click="format('italic')"><em>I</em></button>
-                                        <button type="button" class="rc-rich-tool" x-on:click="format('underline')"><u>U</u></button>
-                                        <button type="button" class="rc-rich-tool" x-on:click="format('insertUnorderedList')">☷</button>
-                                        <button type="button" class="rc-rich-tool" x-on:click="format('insertOrderedList')">☑</button>
-                                        <button type="button" class="rc-rich-tool" x-on:click="openLinkPanel()">🔗</button>
-                                        <button type="button" class="rc-rich-tool" x-on:click="$refs.imageUpload.click()">▧</button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="format('bold')"><strong>B</strong></button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="format('italic')"><em>I</em></button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="format('underline')"><u>U</u></button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="format('insertUnorderedList')">☷</button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="format('insertOrderedList')">☑</button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="openLinkPanel()">🔗</button>
+                                        <button type="button" class="rc-rich-tool" x-on:mousedown.prevent="captureSelection()" x-on:click="$refs.imageUpload.click()">▧</button>
                                     </div>
                                     <input x-ref="imageUpload" type="file" accept="image/*" multiple style="display:none" x-on:change="uploadInlineImages($event)">
                                     <div
@@ -14544,6 +14544,7 @@ CSS;
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
+                    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {}
                     window.__plyrNativeEditors = window.__plyrNativeEditors || {};
                     if (modelName) window.__plyrNativeEditors[modelName] = this;
                     const captureSelection = typeof this.captureSelection === 'function'
@@ -14741,8 +14742,11 @@ CSS;
                     this.syncNow();
                 },
                 command(name, value = null) {
-                    this.focusEditor();
+                    const restored = this.restoreSelection();
+                    if (!restored) this.focusEditor();
+                    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {}
                     document.execCommand(name, false, value);
+                    this.captureSelection();
                     this.syncNow();
                 },
                 block(tag) {
@@ -14955,6 +14959,7 @@ CSS;
                 mount() {
                     if (this.mounted) return;
                     this.mounted = true;
+                    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {}
                     this.selectionHandler = () => this.captureSelection();
                     document.addEventListener('selectionchange', this.selectionHandler);
                     this.$nextTick(() => {
@@ -15172,8 +15177,11 @@ CSS;
                     try { editor.focus({ preventScroll: true }); } catch (_) { editor.focus(); }
                 },
                 command(name, value = null) {
-                    this.focusEditor();
+                    const restored = this.restoreSelection();
+                    if (!restored) this.focusEditor();
+                    try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) {}
                     document.execCommand(name, false, value);
+                    this.captureSelection();
                     this.syncNow();
                 },
                 block(tag) {
