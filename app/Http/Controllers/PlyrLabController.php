@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\ProvisionPlyrLabAthlete;
 use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
+use App\Services\PlyrLabAvailabilityService;
 use App\Services\PlyrLabDataService;
 use App\Services\PlyomatService;
 use Illuminate\Http\JsonResponse;
@@ -105,6 +106,17 @@ class PlyrLabController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'You already have an active PLYRLab trainer booking.',
+                'data' => $dataService->payload($player),
+            ], 422);
+        }
+
+        $requestedAt = \Illuminate\Support\Carbon::parse($validated['scheduled_for']);
+        $unavailableReason = app(PlyrLabAvailabilityService::class)->unavailableReason($trainer, $requestedAt);
+
+        if ($unavailableReason) {
+            return response()->json([
+                'success' => false,
+                'message' => $unavailableReason,
                 'data' => $dataService->payload($player),
             ], 422);
         }
@@ -252,6 +264,7 @@ class PlyrLabController extends Controller
         ]);
 
         $booking = PlyrLabBooking::query()
+            ->with('trainer')
             ->where('player_user_id', $player->getKey())
             ->whereIn('status', PlyrLabBooking::OPEN_STATUSES)
             ->latest('id')
@@ -271,6 +284,19 @@ class PlyrLabController extends Controller
         $oldScheduled = $displayedScheduled?->toIso8601String();
         $newScheduled = \Illuminate\Support\Carbon::parse($validated['scheduled_for'])->toIso8601String();
         $scheduleChanged = $oldScheduled !== $newScheduled;
+
+        if ($scheduleChanged && $booking->trainer) {
+            $requestedAt = \Illuminate\Support\Carbon::parse($validated['scheduled_for']);
+            $unavailableReason = app(PlyrLabAvailabilityService::class)->unavailableReason($booking->trainer, $requestedAt);
+
+            if ($unavailableReason) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $unavailableReason,
+                    'data' => $dataService->payload($player),
+                ], 422);
+            }
+        }
 
         $oldNotes = trim((string) ($booking->notes ?? ''));
         $newNotes = trim((string) ($validated['notes'] ?? ''));
