@@ -5907,19 +5907,22 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 $merged->put($id, $this->normalizeInboxConversationSummary(array_replace($existing, $row)));
             }
 
-            $this->conversations = $merged
+            $mergedConversations = $merged
                 ->values()
                 ->sortByDesc(fn (array $row): int => $this->communicationTimestamp(
                     $row['last_message_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? null
                 ))
                 ->take(500)
-                ->values()
-                ->all();
+                ->values();
 
+            // Use the broader set only for school-history matching. Keep Livewire's
+            // public Inbox state compact so this background refresh does not inflate
+            // every subsequent request payload.
+            $this->conversations = $mergedConversations->take(100)->values()->all();
             $this->cacheInboxConversations($this->conversations);
 
             $matchedRemote = $this->matchSchoolCommunicationConversations(
-                collect($this->conversations),
+                $mergedConversations,
                 $schoolName,
                 $schoolIds,
                 $coachIds,
