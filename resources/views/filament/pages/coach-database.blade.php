@@ -14488,7 +14488,7 @@ CSS;
                 </section>
                 <section class="rc-school-tab-panel-v72 rc-discover-tab-panel-v111" x-show="discoverDrawerTab === 'comms'" x-cloak>
                     <div class="rc-school-comms-history-v123">
-                        <div class="rc-school-comms-loading-v123" x-show="discoverSchoolCommsLoading">
+                        <div class="rc-school-comms-loading-v123" x-show="discoverSchoolCommsLoading || (discoverSchoolComms.length === 0 && discoverSchoolCommsRefreshingFor !== '')">
                             <span class="rc-spinner-mini"></span><span>Loading conversation history…</span>
                         </div>
                         {{-- Keep the list mounted instead of nesting x-for inside x-if. The
@@ -14512,7 +14512,7 @@ CSS;
                                 </div>
                             </template>
                         </div>
-                        <div class="rc-empty" x-show="!discoverSchoolCommsLoading && discoverSchoolComms.length === 0">
+                        <div class="rc-empty" x-show="!discoverSchoolCommsLoading && discoverSchoolCommsRefreshingFor === '' && discoverSchoolComms.length === 0">
                             <strong>No conversation history yet.</strong>
                             <span>Emails and replies with coaches from this school will appear here.</span>
                         </div>
