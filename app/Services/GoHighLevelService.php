@@ -3881,7 +3881,38 @@ class GoHighLevelService
              * same individual-email endpoint used for outbound messages.
              */
             $emailIds = $items
-                ->flatMap(fn (array $item): array => $this->conversationEmailMessageIds($item))
+                ->flatMap(function (array $item): array {
+                    $ids = $this->conversationEmailMessageIds($item);
+                    if ($ids === []) {
+                        return [];
+                    }
+
+                    // Avoid an extra detail request when HighLevel already returned a
+                    // complete single-email row. Detail lookups are still required for
+                    // flattened rows that represent multiple real emails or are missing
+                    // the body/direction needed by Inbox.
+                    $body = trim((string) (
+                        $item['body']
+                        ?? $item['html']
+                        ?? $item['message']
+                        ?? $item['text']
+                        ?? $item['content']
+                        ?? data_get($item, 'meta.email.body')
+                        ?? data_get($item, 'emailMessage.body')
+                        ?? ''
+                    ));
+                    $direction = trim((string) (
+                        $item['direction']
+                        ?? data_get($item, 'meta.email.direction')
+                        ?? data_get($item, 'emailMessage.direction')
+                        ?? ''
+                    ));
+
+                    $hasUsableBody = $body !== '' && ! str_contains($body, 'Over 9 levels deep');
+                    $needsDetail = count($ids) > 1 || ! $hasUsableBody || $direction === '';
+
+                    return $needsDetail ? $ids : [];
+                })
                 ->filter(fn (string $id): bool => $id !== '' && ! str_contains($id, 'Over 9 levels deep'))
                 ->unique()
                 ->values();
@@ -3898,7 +3929,7 @@ class GoHighLevelService
                                     ->withHeaders(['Version' => $version ?: '2021-04-15'])
                                     ->withToken($token)
                                     ->acceptJson()
-                                    ->timeout((int) config('ghl.message_detail_timeout', 20))
+                                    ->timeout(max(3, min((int) config('ghl.message_detail_timeout', 20), 10)))
                                     ->get($this->baseUrl . '/conversations/messages/email/' . rawurlencode($emailId)),
                             ];
                         })->all();
