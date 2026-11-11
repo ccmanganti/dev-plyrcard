@@ -19,6 +19,7 @@ class PlyrLabBooking extends Model
         'player_user_id',
         'trainer_id',
         'scheduled_for',
+        'requested_scheduled_for',
         'status',
         'notes',
         'plyomat_athlete_id',
@@ -32,6 +33,7 @@ class PlyrLabBooking extends Model
     {
         return [
             'scheduled_for' => 'datetime',
+            'requested_scheduled_for' => 'datetime',
             'plyomat_provisioned_at' => 'datetime',
             'plyomat_last_synced_at' => 'datetime',
             'plyomat_stats' => 'array',
