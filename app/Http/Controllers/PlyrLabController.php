@@ -120,7 +120,8 @@ class PlyrLabController extends Controller
                 'player_user_id' => $player->getKey(),
                 'trainer_id' => $trainer->getKey(),
                 'scheduled_for' => $validated['scheduled_for'],
-                'status' => 'provisioning',
+                'requested_scheduled_for' => null,
+                'status' => 'pending_approval',
                 'notes' => $validated['notes'] ?? null,
                 'plyomat_athlete_id' => $previousConnection?->plyomat_athlete_id,
             ]);
