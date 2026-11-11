@@ -57,7 +57,7 @@ class SuperadminPlyrLab extends SuperadminAthletes
                 || $user->hasRole('Super Admin')
             );
 
-        return $isTrainer && ! $isSuperadmin ? 'PLYRLab Trainer' : 'PLYRLab Management';
+        return $isTrainer && ! $isSuperadmin ? 'Trainer Portal' : 'PLYRLab Management';
     }
 
     public static function getNavigationBadge(): ?string
