@@ -14034,15 +14034,15 @@ protected function ensureComposeBodyHasFooter(): void
             return ['ok' => false, 'message' => 'Your session has expired. Please sign in again.'];
         }
 
-        $to = trim((string) ($user->personal_email ?: $user->email));
+        $to = trim((string) ($payload['to'] ?? ''));
         if ($to === '' || filter_var($to, FILTER_VALIDATE_EMAIL) === false) {
             Notification::make()
                 ->title('Test Email')
-                ->body('Add a valid personal/account email before sending a test.')
+                ->body('Enter a valid email address for the test email.')
                 ->danger()
                 ->send();
 
-            return ['ok' => false, 'message' => 'No valid test email address is available.'];
+            return ['ok' => false, 'message' => 'Enter a valid test email address.'];
         }
 
         $subject = trim((string) ($payload['subject'] ?? $this->campaignSubject));
