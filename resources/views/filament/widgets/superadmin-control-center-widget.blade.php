@@ -578,7 +578,8 @@
                 <button type="button" :class="{ 'is-active': plyrLabTab === 'bookings' }" x-on:click="plyrLabTab='bookings'">Bookings <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }}</span></button>
                 <button type="button" :class="{ 'is-active': plyrLabTab === 'trainers' }" x-on:click="plyrLabTab='trainers'">Trainers <span>{{ number_format($plyrlab_stats['trainers'] ?? 0) }}</span></button>
             @else
-                <button type="button" :class="{ 'is-active': plyrLabTab === 'bookings' }" x-on:click="plyrLabTab='bookings'">Bookings <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }}</span></button>
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'bookings' }" x-on:click="plyrLabTab='bookings'">Booking Management <span>{{ number_format($plyrlab_stats['bookings'] ?? 0) }}</span></button>
+                <button type="button" :class="{ 'is-active': plyrLabTab === 'calendar' }" x-on:click="plyrLabTab='calendar'">Calendar &amp; Availability</button>
                 <button type="button" :class="{ 'is-active': plyrLabTab === 'players' }" x-on:click="plyrLabTab='players'">Players <span>{{ number_format($plyrlab_stats['active_athletes'] ?? 0) }}</span></button>
                 <button type="button" :class="{ 'is-active': plyrLabTab === 'api' }" x-on:click="plyrLabTab='api'">API Connection</button>
             @endif
@@ -850,6 +851,179 @@
         </div>
 
         @if($plyrlab_is_trainer_portal)
+            @php($trainerCalendar = $plyrlab_calendar ?? ['label' => now()->format('F Y'), 'weeks' => [], 'upcoming_blocks' => [], 'configured' => false])
+            <div x-show="plyrLabTab === 'calendar'" x-cloak>
+                <div class="pc-plyrlab-calendar-layout">
+                    <section class="pc-panel pc-plyrlab-calendar-panel">
+                        <header class="pc-panel-head pc-plyrlab-calendar-head">
+                            <div>
+                                <h3>Calendar</h3>
+                                <p>Bookings, blocked dates, and your recurring availability in one view.</p>
+                            </div>
+                            <div class="pc-plyrlab-calendar-nav">
+                                <button type="button" class="pc-btn is-small" wire:click="shiftPlyrLabCalendarMonth(-1)" aria-label="Previous month">←</button>
+                                <strong>{{ $trainerCalendar['label'] ?? now()->format('F Y') }}</strong>
+                                <button type="button" class="pc-btn is-small" wire:click="shiftPlyrLabCalendarMonth(1)" aria-label="Next month">→</button>
+                                <button type="button" class="pc-btn is-small" wire:click="goToCurrentPlyrLabCalendarMonth">Today</button>
+                            </div>
+                        </header>
+
+                        <div class="pc-plyrlab-calendar-weekdays">
+                            @foreach(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $weekday)
+                                <span>{{ $weekday }}</span>
+                            @endforeach
+                        </div>
+
+                        <div class="pc-plyrlab-calendar-grid">
+                            @foreach(($trainerCalendar['weeks'] ?? []) as $week)
+                                @foreach($week as $day)
+                                    <button
+                                        type="button"
+                                        wire:click="selectPlyrLabBlockDate('{{ $day['date'] }}')"
+                                        @class([
+                                            'pc-plyrlab-calendar-day',
+                                            'is-muted' => !($day['in_month'] ?? false),
+                                            'is-today' => $day['today'] ?? false,
+                                            'is-unavailable' => !($day['available'] ?? true),
+                                            'is-selected' => $plyrLabBlockDate === ($day['date'] ?? ''),
+                                        ])
+                                        title="Select {{ $day['date'] }} to manage blocks"
+                                    >
+                                        <span class="pc-plyrlab-calendar-date">
+                                            <b>{{ $day['day'] }}</b>
+                                            @if(!($day['past'] ?? false))
+                                                <small>{{ $day['availability_label'] ?? '' }}</small>
+                                            @endif
+                                        </span>
+
+                                        <span class="pc-plyrlab-calendar-events">
+                                            @foreach(array_slice($day['bookings'] ?? [], 0, 3) as $booking)
+                                                <span class="pc-plyrlab-cal-event is-booking">
+                                                    <b>{{ $booking['time'] }}</b>
+                                                    <span>{{ $booking['player'] }}</span>
+                                                </span>
+                                            @endforeach
+                                            @if(count($day['bookings'] ?? []) > 3)
+                                                <span class="pc-plyrlab-cal-more">+{{ count($day['bookings']) - 3 }} more booking{{ count($day['bookings']) - 3 === 1 ? '' : 's' }}</span>
+                                            @endif
+
+                                            @foreach(array_slice($day['blocks'] ?? [], 0, 2) as $block)
+                                                <span class="pc-plyrlab-cal-event is-blocked">{{ $block['label'] }}</span>
+                                            @endforeach
+                                            @if(count($day['blocks'] ?? []) > 2)
+                                                <span class="pc-plyrlab-cal-more">+{{ count($day['blocks']) - 2 }} more block{{ count($day['blocks']) - 2 === 1 ? '' : 's' }}</span>
+                                            @endif
+                                        </span>
+                                    </button>
+                                @endforeach
+                            @endforeach
+                        </div>
+
+                        <footer class="pc-plyrlab-calendar-legend">
+                            <span><i class="is-booking"></i> Booking</span>
+                            <span><i class="is-blocked"></i> Blocked</span>
+                            <span><i class="is-unavailable"></i> Outside weekly availability</span>
+                        </footer>
+                    </section>
+
+                    <aside class="pc-plyrlab-calendar-sidebar">
+                        <section class="pc-panel pc-plyrlab-availability-panel">
+                            <header class="pc-panel-head">
+                                <div>
+                                    <h3>Weekly availability</h3>
+                                    <p>Set your normal hours for every day of the week.</p>
+                                </div>
+                                <span class="pc-state is-{{ ($trainerCalendar['configured'] ?? false) ? 'active' : 'needs_push' }}">
+                                    {{ ($trainerCalendar['configured'] ?? false) ? 'Active' : 'Open all day by default' }}
+                                </span>
+                            </header>
+
+                            <div class="pc-plyrlab-weekly-list">
+                                @foreach(AppServicesPlyrLabAvailabilityService::DAY_LABELS as $dayNumber => $dayLabel)
+                                    <div class="pc-plyrlab-weekly-row">
+                                        <label class="pc-plyrlab-day-toggle">
+                                            <input type="checkbox" wire:model.defer="plyrLabAvailability.{{ $dayNumber }}.enabled">
+                                            <span>{{ $dayLabel }}</span>
+                                        </label>
+                                        <div class="pc-plyrlab-time-range">
+                                            <input type="time" wire:model.defer="plyrLabAvailability.{{ $dayNumber }}.start">
+                                            <span>to</span>
+                                            <input type="time" wire:model.defer="plyrLabAvailability.{{ $dayNumber }}.end">
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+
+                            <div class="pc-plyrlab-panel-actions">
+                                <button type="button" class="pc-btn is-primary" wire:click="savePlyrLabAvailability" wire:loading.attr="disabled" wire:target="savePlyrLabAvailability">
+                                    <span wire:loading.remove wire:target="savePlyrLabAvailability">Save weekly availability</span>
+                                    <span class="pc-btn-working" wire:loading wire:target="savePlyrLabAvailability"><i class="pc-inline-spinner"></i> Saving…</span>
+                                </button>
+                            </div>
+                        </section>
+
+                        <section class="pc-panel pc-plyrlab-block-panel">
+                            <header class="pc-panel-head">
+                                <div>
+                                    <h3>Block a date</h3>
+                                    <p>Click a calendar day or choose a date below.</p>
+                                </div>
+                            </header>
+
+                            <div class="pc-plyrlab-block-form">
+                                <label>
+                                    <span>Date</span>
+                                    <input type="date" min="{{ now()->format('Y-m-d') }}" wire:model.defer="plyrLabBlockDate">
+                                </label>
+
+                                <label class="pc-plyrlab-block-toggle">
+                                    <input type="checkbox" wire:model.live="plyrLabBlockAllDay">
+                                    <span>Block the full day</span>
+                                </label>
+
+                                @if(!$plyrLabBlockAllDay)
+                                    <div class="pc-plyrlab-block-times">
+                                        <label>
+                                            <span>From</span>
+                                            <input type="time" wire:model.defer="plyrLabBlockStart">
+                                        </label>
+                                        <label>
+                                            <span>Until</span>
+                                            <input type="time" wire:model.defer="plyrLabBlockEnd">
+                                        </label>
+                                    </div>
+                                @endif
+
+                                <label>
+                                    <span>Reason <small>(optional)</small></span>
+                                    <input type="text" maxlength="255" wire:model.defer="plyrLabBlockReason" placeholder="Travel, personal day, tournament…">
+                                </label>
+
+                                <button type="button" class="pc-btn is-warning" wire:click="addPlyrLabBlock" wire:loading.attr="disabled" wire:target="addPlyrLabBlock">
+                                    <span wire:loading.remove wire:target="addPlyrLabBlock">Block selected date</span>
+                                    <span class="pc-btn-working" wire:loading wire:target="addPlyrLabBlock"><i class="pc-inline-spinner"></i> Blocking…</span>
+                                </button>
+                            </div>
+
+                            @if(!empty($trainerCalendar['upcoming_blocks']))
+                                <div class="pc-plyrlab-upcoming-blocks">
+                                    <strong>Upcoming blocks</strong>
+                                    @foreach($trainerCalendar['upcoming_blocks'] as $block)
+                                        <div>
+                                            <span>
+                                                <b>{{ $block['date'] }}</b>
+                                                <small>{{ $block['time'] }}{{ $block['reason'] ? ' · '.$block['reason'] : '' }}</small>
+                                            </span>
+                                            <button type="button" wire:click="removePlyrLabBlock({{ (int)$block['id'] }})" wire:confirm="Remove this blocked date/time?">Remove</button>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </section>
+                    </aside>
+                </div>
+            </div>
+
             <div x-show="plyrLabTab === 'players'" x-cloak>
                 @php($trainerPlayers = collect($plyrlab_bookings)->unique('player_id')->values())
                 <div class="pc-plyrlab-player-grid">
