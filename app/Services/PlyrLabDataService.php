@@ -296,7 +296,11 @@ class PlyrLabDataService
                 'completed' => 'Connected',
                 default => str($booking->status)->replace('_', ' ')->title()->toString(),
             },
-            'scheduled_for' => $booking->scheduled_for?->toIso8601String(),
+            'scheduled_for' => ($booking->status === 'reschedule_pending' && $booking->requested_scheduled_for
+                ? $booking->requested_scheduled_for
+                : $booking->scheduled_for)?->toIso8601String(),
+            'approved_scheduled_for' => $booking->scheduled_for?->toIso8601String(),
+            'requested_scheduled_for' => $booking->requested_scheduled_for?->toIso8601String(),
             'notes' => $booking->notes,
             'plyomat_ready' => filled($booking->plyomat_athlete_id),
             'plyomat_athlete_id' => $booking->plyomat_athlete_id,
