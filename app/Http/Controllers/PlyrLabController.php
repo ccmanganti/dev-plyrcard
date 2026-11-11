@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Jobs\ProvisionPlyrLabAthlete;
 use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
-use App\Notifications\PlyrLabTrainerBookedNotification;
 use App\Services\PlyrLabDataService;
 use App\Services\PlyomatService;
 use Illuminate\Http\JsonResponse;
