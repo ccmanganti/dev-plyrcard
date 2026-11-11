@@ -40,7 +40,10 @@ class PlyrLabController extends Controller
                 // Self-heal both interrupted provisioning and bookings that were
                 // waiting for a trainer to connect an API key.
                 $booking->forceFill([
-                    'status' => 'pending_approval',
+                    // Reaching awaiting_integration means the trainer already
+                    // approved this booking. Resume provisioning when the API
+                    // connection becomes available; never ask for approval twice.
+                    'status' => 'provisioning',
                     'last_sync_error' => null,
                 ])->save();
 
