@@ -4855,6 +4855,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
     public function startNewConversation(): void
     {
+        // A new conversation has no active school yet. Explicitly clear any school
+        // drawer left open from the previously selected Inbox thread.
+        $this->dispatch('rc-inbox-school-clear');
+
         $this->showNewConversationComposer = true;
         $this->selectedConversationId = null;
         $this->selectedCoachId = null;
@@ -6278,6 +6282,24 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         $conversationChanged = (string) $this->selectedConversationId !== $conversationId;
         $this->selectedConversationId = $conversationId;
+
+        // Keep the global View School drawer synchronized with the active Inbox thread.
+        // The browser clears the previous drawer immediately; this response supplies the
+        // canonical school for the newly selected conversation so an already-open drawer
+        // can reopen with fresh content instead of retaining the previous school.
+        if ($conversationChanged) {
+            $selectedConversation = collect($this->conversations ?? [])
+                ->firstWhere('id', $conversationId);
+            $selectedInboxSchool = $this->resolveInboxSchoolForConversation(
+                is_array($selectedConversation) ? $selectedConversation : null
+            );
+
+            $this->dispatch(
+                'rc-inbox-school-changed',
+                conversationId: $conversationId,
+                school: ! empty($selectedInboxSchool) ? $selectedInboxSchool : null,
+            );
+        }
 
         if ($conversationChanged || $force) {
             $this->messageLastId = null;
