@@ -122,12 +122,12 @@ class PlyrLabBookingNotificationService
 
         $player = $booking->player;
         if ($player instanceof User) {
-            $add($player->email ?: $player->personal_email, 'player', $player);
+            $add($this->firstValidEmail([$player->email, $player->personal_email]), 'player', $player);
         }
 
         $trainerUser = $booking->trainer?->user;
         if ($trainerUser instanceof User) {
-            $add($trainerUser->email ?: $trainerUser->personal_email, 'trainer', $trainerUser);
+            $add($this->firstValidEmail([$trainerUser->email, $trainerUser->personal_email]), 'trainer', $trainerUser);
         }
 
         // Use the global configured admin-alert list as the primary internal-recipient
@@ -155,7 +155,7 @@ class PlyrLabBookingNotificationService
                 ->get();
 
             foreach ($admins as $admin) {
-                $add($admin->email ?: $admin->personal_email, 'admin', $admin);
+                $add($this->firstValidEmail([$admin->email, $admin->personal_email]), 'admin', $admin);
             }
         } catch (Throwable $exception) {
             Log::debug('PLYRLab could not resolve Superadmin notification recipients.', [
@@ -348,6 +348,19 @@ class PlyrLabBookingNotificationService
             $audience === 'player' ? 'Open PLYRLab' : 'Open PLYRLab Management',
             $audience === 'player' ? $playerUrl : $managementUrl,
         ];
+    }
+
+    protected function firstValidEmail(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            $email = $this->sanitizeEmail((string) $candidate);
+
+            if ($email !== null) {
+                return $email;
+            }
+        }
+
+        return null;
     }
 
     protected function sanitizeEmail(string $email): ?string
