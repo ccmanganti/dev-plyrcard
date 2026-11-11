@@ -802,8 +802,8 @@
                                             <button
                                                 type="button"
                                                 class="pc-btn is-small is-danger"
-                                                wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'cancelled')"
-                                                wire:confirm="{{ $booking['status'] === 'reschedule_pending' ? 'Decline this reschedule request? This cancels the current booking so the player can choose another time.' : 'Decline this PLYRLab booking request?' }}"
+                                                wire:click="declinePlyrLabBooking({{ (int)$booking['id'] }})"
+                                                wire:confirm="{{ $booking['status'] === 'reschedule_pending' ? 'Decline this reschedule request? The previously approved session will remain active.' : 'Decline this PLYRLab booking request?' }}"
                                             >{{ $booking['status'] === 'reschedule_pending' ? 'Decline Reschedule' : 'Decline' }}</button>
                                         @elseif($booking['can_manage'] && $booking['status'] !== 'completed' && $booking['status'] !== 'cancelled')
                                             <button type="button" class="pc-btn is-small" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'completed')">Complete</button>
