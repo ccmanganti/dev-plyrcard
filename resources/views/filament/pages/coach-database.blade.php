@@ -6726,10 +6726,11 @@ discoverSelectedIds: [],
         x-on:rc-inbox-school-changed.window="
             const follow = !!window.__rcInboxFollowSchoolDrawer;
             window.__rcInboxFollowSchoolDrawer = false;
-            if (!follow) return;
-            const nextSchool = $event.detail?.school || null;
-            if (nextSchool && (nextSchool.id || nextSchool.school_id || nextSchool.name)) openGlobalSchool(nextSchool);
-            else closeDiscoverSchool();
+            if (follow) {
+                const nextSchool = $event.detail?.school || null;
+                if (nextSchool && (nextSchool.id || nextSchool.school_id || nextSchool.name)) openGlobalSchool(nextSchool);
+                else closeDiscoverSchool();
+            }
         "
         x-on:rc-inbox-school-clear.window="
             window.__rcInboxFollowSchoolDrawer = false;
