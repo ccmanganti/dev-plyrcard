@@ -15658,6 +15658,10 @@ HTML;
 
     protected function resetInboxConversationWindow(): void
     {
+        // Resetting Inbox selection must also invalidate any View School drawer that
+        // belonged to the previously selected conversation.
+        $this->dispatch('rc-inbox-school-clear');
+
         $this->inboxConversationDisplayLimit = 10;
         $this->selectedConversationId = null;
         $this->messages = [];
