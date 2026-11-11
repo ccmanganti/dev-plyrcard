@@ -11275,6 +11275,8 @@ CSS;
                                 </div>
                                 <div
                                     class="rc-profile-actions-v56"
+                                    wire:key="rc-inbox-school-actions-{{ $selectedConversationId ?: 'none' }}-{{ $selectedInboxSchoolId ?: 'none' }}"
+                                    data-rc-inbox-school-actions="{{ $selectedConversationId ?: 'none' }}"
                                     x-data="{
                                         school: @js($selectedInboxSchool),
                                         schoolId: @js($selectedInboxSchoolId),
