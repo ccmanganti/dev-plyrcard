@@ -12,7 +12,10 @@ use App\Models\CoachDatabaseEmailMessage;
 use App\Models\PaymentTransaction;
 use App\Models\PlyrLabBooking;
 use App\Models\PlyrLabTrainer;
+use App\Models\PlyrLabTrainerAvailability;
+use App\Models\PlyrLabTrainerBlock;
 use App\Models\User;
+use App\Services\PlyrLabAvailabilityService;
 use App\Services\ProfileCompletionService;
 use App\Services\PlyomatService;
 use App\Jobs\ProvisionPlyrLabAthlete;
@@ -59,6 +62,20 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
     public string $plyrLabTrainerApiKey = '';
 
+    public string $plyrLabCalendarMonth = '';
+
+    public array $plyrLabAvailability = [];
+
+    public string $plyrLabBlockDate = '';
+
+    public bool $plyrLabBlockAllDay = true;
+
+    public string $plyrLabBlockStart = '09:00';
+
+    public string $plyrLabBlockEnd = '17:00';
+
+    public string $plyrLabBlockReason = '';
+
     protected function currentUserIsSuperadmin(): bool
     {
         $user = auth()->user();
@@ -92,6 +109,353 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         $trainer = $this->currentTrainerProfile();
 
         return $trainer && (int) $booking->trainer_id === (int) $trainer->getKey();
+    }
+
+    protected function ensurePlyrLabAvailabilityState(?PlyrLabTrainer $trainer = null): void
+    {
+        $trainer ??= $this->currentTrainerProfile();
+
+        if (! $trainer) {
+            return;
+        }
+
+        if ($this->plyrLabCalendarMonth === '') {
+            $this->plyrLabCalendarMonth = now()->format('Y-m');
+        }
+
+        if ($this->plyrLabBlockDate === '') {
+            $this->plyrLabBlockDate = now()->format('Y-m-d');
+        }
+
+        if ($this->plyrLabAvailability === []) {
+            $schedule = app(PlyrLabAvailabilityService::class)->weeklySchedule($trainer);
+
+            $this->plyrLabAvailability = collect($schedule)
+                ->mapWithKeys(fn (array $row): array => [
+                    (string) $row['day'] => [
+                        'enabled' => (bool) ($row['enabled'] ?? true),
+                        'start' => (string) ($row['start'] ?? '00:00'),
+                        'end' => (string) ($row['end'] ?? '23:59'),
+                    ],
+                ])
+                ->all();
+        }
+    }
+
+    public function shiftPlyrLabCalendarMonth(int $months): void
+    {
+        $trainer = $this->currentTrainerProfile();
+        abort_unless($trainer, 403);
+
+        $months = max(-12, min(12, $months));
+        $base = $this->plyrLabCalendarMonth !== ''
+            ? Carbon::createFromFormat('Y-m-d', $this->plyrLabCalendarMonth . '-01')
+            : now()->startOfMonth();
+
+        $this->plyrLabCalendarMonth = $base
+            ->addMonthsNoOverflow($months)
+            ->format('Y-m');
+    }
+
+    public function goToCurrentPlyrLabCalendarMonth(): void
+    {
+        abort_unless($this->currentTrainerProfile(), 403);
+        $this->plyrLabCalendarMonth = now()->format('Y-m');
+        $this->plyrLabBlockDate = now()->format('Y-m-d');
+    }
+
+    public function selectPlyrLabBlockDate(string $date): void
+    {
+        abort_unless($this->currentTrainerProfile(), 403);
+
+        try {
+            $selected = Carbon::createFromFormat('Y-m-d', trim($date));
+        } catch (Throwable) {
+            return;
+        }
+
+        $this->plyrLabBlockDate = $selected->format('Y-m-d');
+    }
+
+    public function savePlyrLabAvailability(): void
+    {
+        $trainer = $this->currentTrainerProfile();
+        abort_unless($trainer, 403);
+
+        if (! Schema::hasTable('plyr_lab_trainer_availabilities')) {
+            Notification::make()
+                ->title('Availability table is not ready')
+                ->body('Run the latest database migrations before saving trainer availability.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $this->ensurePlyrLabAvailabilityState($trainer);
+        $availabilityService = app(PlyrLabAvailabilityService::class);
+
+        foreach (range(0, 6) as $day) {
+            $state = (array) ($this->plyrLabAvailability[(string) $day] ?? $this->plyrLabAvailability[$day] ?? []);
+            $enabled = (bool) ($state['enabled'] ?? false);
+            $start = $availabilityService->normalizeTime($state['start'] ?? null, '00:00');
+            $end = $availabilityService->normalizeTime($state['end'] ?? null, '23:59');
+
+            if ($enabled && $end <= $start) {
+                Notification::make()
+                    ->title('Check ' . (PlyrLabAvailabilityService::DAY_LABELS[$day] ?? 'availability'))
+                    ->body('End time must be later than the start time.')
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+        }
+
+        foreach (range(0, 6) as $day) {
+            $state = (array) ($this->plyrLabAvailability[(string) $day] ?? $this->plyrLabAvailability[$day] ?? []);
+            $enabled = (bool) ($state['enabled'] ?? false);
+
+            PlyrLabTrainerAvailability::query()->updateOrCreate(
+                [
+                    'trainer_id' => $trainer->getKey(),
+                    'day_of_week' => $day,
+                ],
+                [
+                    'is_available' => $enabled,
+                    'start_time' => $enabled
+                        ? $availabilityService->normalizeTime($state['start'] ?? null, '00:00')
+                        : null,
+                    'end_time' => $enabled
+                        ? $availabilityService->normalizeTime($state['end'] ?? null, '23:59')
+                        : null,
+                ],
+            );
+        }
+
+        $this->plyrLabAvailability = [];
+        $this->ensurePlyrLabAvailabilityState($trainer);
+
+        Notification::make()
+            ->title('Weekly availability saved')
+            ->body('New booking requests will now follow these recurring hours.')
+            ->success()
+            ->send();
+    }
+
+    public function addPlyrLabBlock(): void
+    {
+        $trainer = $this->currentTrainerProfile();
+        abort_unless($trainer, 403);
+
+        if (! Schema::hasTable('plyr_lab_trainer_blocks')) {
+            Notification::make()
+                ->title('Calendar blocks are not ready')
+                ->body('Run the latest database migrations before blocking dates.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $day = Carbon::createFromFormat('Y-m-d', trim($this->plyrLabBlockDate))
+                ->startOfDay();
+        } catch (Throwable) {
+            Notification::make()->title('Choose a valid date')->danger()->send();
+            return;
+        }
+
+        if ($day->lt(now()->startOfDay())) {
+            Notification::make()
+                ->title('Choose today or a future date')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        if ($this->plyrLabBlockAllDay) {
+            $startsAt = $day->copy()->startOfDay();
+            $endsAt = $day->copy()->endOfDay();
+        } else {
+            try {
+                $startsAt = Carbon::parse($day->format('Y-m-d') . ' ' . $this->plyrLabBlockStart);
+                $endsAt = Carbon::parse($day->format('Y-m-d') . ' ' . $this->plyrLabBlockEnd);
+            } catch (Throwable) {
+                Notification::make()->title('Enter valid block times')->danger()->send();
+                return;
+            }
+
+            if ($endsAt->lte($startsAt)) {
+                Notification::make()
+                    ->title('Block end time must be later than start time')
+                    ->danger()
+                    ->send();
+                return;
+            }
+        }
+
+        PlyrLabTrainerBlock::query()->create([
+            'trainer_id' => $trainer->getKey(),
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'all_day' => $this->plyrLabBlockAllDay,
+            'reason' => trim($this->plyrLabBlockReason) ?: null,
+        ]);
+
+        $this->plyrLabBlockReason = '';
+
+        Notification::make()
+            ->title('Calendar blocked')
+            ->body($this->plyrLabBlockAllDay
+                ? $startsAt->format('M j, Y') . ' is unavailable for booking.'
+                : $startsAt->format('M j, Y g:i A') . ' to ' . $endsAt->format('g:i A') . ' is unavailable.')
+            ->success()
+            ->send();
+    }
+
+    public function removePlyrLabBlock(int $blockId): void
+    {
+        $trainer = $this->currentTrainerProfile();
+        abort_unless($trainer, 403);
+
+        $block = PlyrLabTrainerBlock::query()
+            ->where('trainer_id', $trainer->getKey())
+            ->findOrFail($blockId);
+
+        $block->delete();
+
+        Notification::make()
+            ->title('Calendar block removed')
+            ->success()
+            ->send();
+    }
+
+    protected function plyrLabTrainerCalendarData(PlyrLabTrainer $trainer): array
+    {
+        $this->ensurePlyrLabAvailabilityState($trainer);
+
+        try {
+            $month = Carbon::createFromFormat('Y-m-d', $this->plyrLabCalendarMonth . '-01')->startOfMonth();
+        } catch (Throwable) {
+            $month = now()->startOfMonth();
+            $this->plyrLabCalendarMonth = $month->format('Y-m');
+        }
+
+        $gridStart = $month->copy()->startOfWeek(Carbon::SUNDAY);
+        $gridEnd = $month->copy()->endOfMonth()->endOfWeek(Carbon::SATURDAY);
+
+        $bookings = PlyrLabBooking::query()
+            ->with('player:id,first_name,last_name,sport')
+            ->where('trainer_id', $trainer->getKey())
+            ->whereNotIn('status', ['cancelled'])
+            ->where(function (Builder $query) use ($gridStart, $gridEnd): void {
+                $query
+                    ->whereBetween('scheduled_for', [$gridStart, $gridEnd])
+                    ->orWhereBetween('requested_scheduled_for', [$gridStart, $gridEnd]);
+            })
+            ->get()
+            ->map(function (PlyrLabBooking $booking): array {
+                $when = $booking->status === 'reschedule_pending' && $booking->requested_scheduled_for
+                    ? $booking->requested_scheduled_for
+                    : $booking->scheduled_for;
+
+                return [
+                    'id' => (int) $booking->getKey(),
+                    'date' => $when?->format('Y-m-d') ?? '',
+                    'time' => $when?->format('g:i A') ?? '',
+                    'player' => $this->userName($booking->player),
+                    'status' => (string) $booking->status,
+                    'status_label' => Str::headline((string) $booking->status),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['date'] !== '')
+            ->groupBy('date');
+
+        $blocks = Schema::hasTable('plyr_lab_trainer_blocks')
+            ? PlyrLabTrainerBlock::query()
+                ->where('trainer_id', $trainer->getKey())
+                ->where('starts_at', '<=', $gridEnd)
+                ->where('ends_at', '>=', $gridStart)
+                ->orderBy('starts_at')
+                ->get()
+            : collect();
+
+        $blocksByDate = collect();
+
+        foreach ($blocks as $block) {
+            $cursor = $block->starts_at->copy()->startOfDay();
+            $last = $block->ends_at->copy()->startOfDay();
+
+            while ($cursor->lte($last)) {
+                $date = $cursor->format('Y-m-d');
+                $rows = collect($blocksByDate->get($date, []));
+                $rows->push([
+                    'id' => (int) $block->getKey(),
+                    'all_day' => (bool) $block->all_day,
+                    'label' => $block->all_day
+                        ? (trim((string) $block->reason) ?: 'Blocked')
+                        : $block->starts_at->format('g:i A') . '–' . $block->ends_at->format('g:i A')
+                            . (filled($block->reason) ? ' · ' . trim((string) $block->reason) : ''),
+                ]);
+                $blocksByDate->put($date, $rows->values()->all());
+                $cursor->addDay();
+            }
+        }
+
+        $availability = collect($this->plyrLabAvailability)
+            ->mapWithKeys(fn ($row, $key): array => [(int) $key => (array) $row]);
+
+        $days = collect();
+        $cursor = $gridStart->copy();
+
+        while ($cursor->lte($gridEnd)) {
+            $date = $cursor->format('Y-m-d');
+            $dayState = (array) ($availability->get($cursor->dayOfWeek, []));
+            $enabled = (bool) ($dayState['enabled'] ?? true);
+            $dayBlocks = collect($blocksByDate->get($date, []));
+            $fullyBlocked = $dayBlocks->contains(fn (array $block): bool => (bool) ($block['all_day'] ?? false));
+
+            $days->push([
+                'date' => $date,
+                'day' => (int) $cursor->day,
+                'weekday' => $cursor->format('D'),
+                'in_month' => $cursor->month === $month->month,
+                'today' => $cursor->isToday(),
+                'past' => $cursor->lt(now()->startOfDay()),
+                'available' => $enabled && ! $fullyBlocked,
+                'availability_label' => $enabled
+                    ? (($dayState['start'] ?? '00:00') . '–' . ($dayState['end'] ?? '23:59'))
+                    : 'Unavailable',
+                'bookings' => collect($bookings->get($date, []))->values()->all(),
+                'blocks' => $dayBlocks->values()->all(),
+            ]);
+
+            $cursor->addDay();
+        }
+
+        $upcomingBlocks = $blocks
+            ->filter(fn (PlyrLabTrainerBlock $block): bool => $block->ends_at->gte(now()->startOfDay()))
+            ->take(12)
+            ->map(fn (PlyrLabTrainerBlock $block): array => [
+                'id' => (int) $block->getKey(),
+                'date' => $block->starts_at->format('M j, Y'),
+                'time' => $block->all_day
+                    ? 'All day'
+                    : $block->starts_at->format('g:i A') . '–' . $block->ends_at->format('g:i A'),
+                'reason' => trim((string) ($block->reason ?? '')),
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'month' => $month->format('Y-m'),
+            'label' => $month->format('F Y'),
+            'days' => $days->all(),
+            'weeks' => $days->chunk(7)->values()->all(),
+            'upcoming_blocks' => $upcomingBlocks,
+            'configured' => app(PlyrLabAvailabilityService::class)->hasConfiguredSchedule($trainer),
+        ];
     }
 
     public function overridePlyrLabPlayer(): void
