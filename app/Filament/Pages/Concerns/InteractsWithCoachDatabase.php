@@ -14114,28 +14114,29 @@ protected function ensureComposeBodyHasFooter(): void
 
             Notification::make()
                 ->title('Test Email')
-                ->body($error)
+                ->body('The test email could not be sent. Please try again.')
                 ->danger()
                 ->send();
 
             return [
                 'ok' => false,
-                'message' => 'Test email was not delivered: ' . $error,
-                'attempted_transports' => $result['attempted_transports'] ?? [],
+                'message' => 'The test email could not be sent. Please try again.',
             ];
         }
 
-        $transport = trim((string) ($result['transport'] ?? 'mail transport'));
+        $transport = trim((string) ($result['transport'] ?? ''));
 
+        // Keep transport details in the server result/logs for diagnostics, but do
+        // not expose implementation details in the normal user-facing alert.
         Notification::make()
-            ->title('Test Email')
-            ->body('Sent to ' . $to . ' via ' . $transport . ' using the current Compose content and PLYRCard signature.')
+            ->title('Test Email Sent')
+            ->body('Your test email was sent to ' . $to . '.')
             ->success()
             ->send();
 
         return [
             'ok' => true,
-            'message' => 'Test email sent to ' . $to . ' via ' . $transport . '.',
+            'message' => 'Test email sent to ' . $to . '.',
             'transport' => $transport,
         ];
     }
@@ -14668,10 +14669,11 @@ HTML;
 
     protected function buildComposeHtml(string $text): string
     {
-        // Preserve real HTML from the hardcoded templates/editor. The old path
-        // always treated compose content as plain text, which could escape HTML
-        // and make template values look broken in previews/sends.
+        // Preserve the exact rich HTML produced by the Compose editor. Formatting
+        // and intentional blank lines must survive through Preview, Test Email,
+        // and the real coach send.
         $html = $this->buildTemplateHtml($text);
+        $html = $this->normalizeComposeEmailSpacing($html);
         $graphic = trim($this->composeGraphicUrl);
 
         if ($graphic !== '') {
@@ -14693,6 +14695,41 @@ HTML;
                 $html .= '<div style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-family:Arial,Helvetica,sans-serif"><div style="font-weight:700;margin-bottom:8px;color:#111827">Attachments</div><ul style="margin:0;padding-left:18px">' . $links . '</ul></div>';
             }
         }
+
+        return $html;
+    }
+
+    /**
+     * Email clients do not render empty contenteditable blocks consistently.
+     * Turn each intentional blank editor line into an explicit spacer so one,
+     * two, or more blank lines remain visible after the message reaches Gmail,
+     * Outlook, or HighLevel.
+     */
+    protected function normalizeComposeEmailSpacing(string $html): string
+    {
+        $html = trim($html);
+
+        if ($html === '') {
+            return '';
+        }
+
+        $spacer = '<div data-plyrcard-compose-spacer="1" style="height:1em;line-height:1em;font-size:16px;">&nbsp;</div>';
+
+        // Chrome contenteditable commonly represents an empty Enter line as either
+        // <div><br></div> or <p><br></p>. Preserve every occurrence independently.
+        $html = preg_replace(
+            '/<(div|p)\b[^>]*>\s*(?:<br\s*\/?\s*>|&nbsp;|&#160;|\x{00A0})\s*<\/\1>/iu',
+            $spacer,
+            $html
+        ) ?? $html;
+
+        // A top-level BR is also an intentional line break. Do not collapse runs:
+        // two BRs should remain two visible breaks in the delivered email.
+        $html = preg_replace(
+            '/(?<!>)<br\s*\/?\s*>/i',
+            '<br style="line-height:1em;">',
+            $html
+        ) ?? $html;
 
         return $html;
     }
