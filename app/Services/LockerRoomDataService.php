@@ -1081,6 +1081,7 @@ class LockerRoomDataService
                     }
                 }
                 return collect($rows)
+                    ->filter(fn (array $row): bool => ($row['channel'] ?? 'email') === 'email')
                     ->filter(fn (array $row): bool => filled($row['id'] ?? null) || filled($row['contact_name'] ?? null))
                     ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
                     ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
@@ -1104,11 +1105,25 @@ class LockerRoomDataService
         $time = $message['dateAdded'] ?? $message['createdAt'] ?? $message['created_at'] ?? $conversation['last_message_at'] ?? $conversation['updated_at'] ?? $conversation['created_at'] ?? null;
         $carbon = null;
         try { if ($time) $carbon = Carbon::parse($time); } catch (\Throwable) { $carbon = null; }
+        $channelRaw = strtolower(trim((string) (
+            $message['messageType']
+            ?? $message['message_type']
+            ?? $message['type']
+            ?? $message['channel']
+            ?? $conversation['lastMessageType']
+            ?? $conversation['last_message_type']
+            ?? $conversation['type']
+            ?? $conversation['channel']
+            ?? ''
+        )));
+        $channel = $channelRaw === '' || str_contains($channelRaw, 'email') ? 'email' : $channelRaw;
+
         return [
             'id' => (string) ($message['id'] ?? $message['_id'] ?? $conversation['id'] ?? md5($coachName . '|' . $preview . '|' . (string) $time)),
             'direction' => $direction,
+            'channel' => $channel,
             'contact_name' => $coachName,
-            'title' => $coachName,
+            'title' => ($direction === 'inbound' ? 'Email received from ' : 'Email sent to ') . $coachName,
             'preview' => $preview,
             'date_label' => $carbon ? $carbon->diffForHumans() : '',
             'date_time_label' => $carbon ? $carbon->timezone(config('app.timezone'))->format('M j, Y · g:i A') : '',
