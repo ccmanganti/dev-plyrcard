@@ -51,6 +51,16 @@ class PlyrLabTrainer extends Model
         return $this->hasMany(PlyrLabBooking::class, 'trainer_id');
     }
 
+    public function availabilities(): HasMany
+    {
+        return $this->hasMany(PlyrLabTrainerAvailability::class, 'trainer_id');
+    }
+
+    public function blocks(): HasMany
+    {
+        return $this->hasMany(PlyrLabTrainerBlock::class, 'trainer_id');
+    }
+
     public function displayName(): string
     {
         return trim((string) ($this->display_name ?: $this->user?->getFilamentName())) ?: 'PLYRLab Trainer';
