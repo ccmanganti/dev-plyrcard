@@ -5893,7 +5893,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             }
 
             $historyRows = collect($historyRows)
-                ->filter(fn ($row): bool => is_array($row) && trim((string) ($row['preview'] ?? '')) !== '')
+                ->filter(fn ($row): bool => is_array($row) && ($row['channel'] ?? 'email') === 'email')
                 ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
                 ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
                 ->take(30)
@@ -5937,9 +5937,12 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return [
             'id' => 'conversation:' . (string) ($conversation['id'] ?? md5(json_encode($conversation) ?: '')),
             'direction' => $direction,
-            'title' => ($direction === 'inbound' ? 'Received from ' : 'Sent to ') . $coachName,
+            'channel' => $this->communicationChannel($conversation),
+            'contact_name' => $coachName,
+            'title' => ($direction === 'inbound' ? 'Email received from ' : 'Email sent to ') . $coachName,
             'preview' => $preview,
             'date_label' => $this->communicationDateLabel($time),
+            'date_time_label' => $this->communicationDateTimeLabel($time),
             'opened' => (bool) ($conversation['opened'] ?? $conversation['is_opened'] ?? $conversation['email_opened'] ?? false),
             'reply' => $direction === 'inbound' || (bool) ($conversation['replied'] ?? $conversation['has_reply'] ?? false),
             '_timestamp' => $timestamp,
@@ -5966,13 +5969,40 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         return [
             'id' => 'message:' . (string) ($message['id'] ?? $message['messageId'] ?? md5(json_encode($message) ?: '')),
             'direction' => $direction,
-            'title' => ($direction === 'inbound' ? 'Received from ' : 'Sent to ') . $coachName,
+            'channel' => $this->communicationChannel($message, $conversation),
+            'contact_name' => $coachName,
+            'title' => ($direction === 'inbound' ? 'Email received from ' : 'Email sent to ') . $coachName,
             'preview' => $this->communicationPreviewText($body),
             'date_label' => $this->communicationDateLabel($time),
+            'date_time_label' => $this->communicationDateTimeLabel($time),
             'opened' => (bool) ($message['opened'] ?? $message['is_opened'] ?? $message['email_opened'] ?? $conversation['opened'] ?? false),
             'reply' => $direction === 'inbound',
             '_timestamp' => $timestamp,
         ];
+    }
+
+    protected function communicationChannel(array $row, array $fallback = []): string
+    {
+        $raw = strtolower(trim((string) (
+            $row['message_type']
+            ?? $row['messageType']
+            ?? $row['type']
+            ?? $row['channel']
+            ?? $row['last_message_type']
+            ?? $row['lastMessageType']
+            ?? $fallback['message_type']
+            ?? $fallback['messageType']
+            ?? $fallback['type']
+            ?? $fallback['channel']
+            ?? $fallback['last_message_type']
+            ?? ''
+        )));
+
+        if ($raw === '' || str_contains($raw, 'email')) {
+            return 'email';
+        }
+
+        return $raw;
     }
 
     protected function normalizeCommunicationDirection(array $row, array $fallback = []): string
@@ -6170,6 +6200,23 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 : \Illuminate\Support\Carbon::parse($value);
 
             return $date->isCurrentYear() ? $date->format('M j') : $date->format('M j, Y');
+        } catch (\Throwable) {
+            return is_scalar($value) ? (string) $value : '';
+        }
+    }
+
+    protected function communicationDateTimeLabel($value): string
+    {
+        if (! $value) {
+            return '';
+        }
+
+        try {
+            $date = is_numeric($value)
+                ? \Illuminate\Support\Carbon::createFromTimestamp($this->communicationTimestamp($value))
+                : \Illuminate\Support\Carbon::parse($value);
+
+            return $date->timezone(config('app.timezone'))->format('M j, Y · g:i A');
         } catch (\Throwable) {
             return is_scalar($value) ? (string) $value : '';
         }
