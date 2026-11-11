@@ -5683,7 +5683,28 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $this->loadSchoolCommunicationHistory($schoolId);
 
         return collect($this->schoolCommunicationHistories[$schoolId] ?? [])
-            ->filter(fn ($row): bool => is_array($row))
+            ->filter(fn ($row): bool => is_array($row) && ($row['channel'] ?? 'email') === 'email')
+            ->map(function (array $row): array {
+                $direction = ($row['direction'] ?? 'outbound') === 'inbound' ? 'inbound' : 'outbound';
+                $contactName = trim((string) ($row['contact_name'] ?? ''));
+
+                if ($contactName === '') {
+                    $contactName = preg_replace(
+                        '/^(?:Email\s+)?(?:received\s+from|sent\s+to)\s+/i',
+                        '',
+                        trim((string) ($row['title'] ?? 'Coach'))
+                    ) ?: 'Coach';
+                }
+
+                $row['contact_name'] = $contactName;
+                $row['title'] = ($direction === 'inbound' ? 'Email received from ' : 'Email sent to ') . $contactName;
+
+                if (blank($row['date_time_label'] ?? null) && filled($row['_timestamp'] ?? null)) {
+                    $row['date_time_label'] = $this->communicationDateTimeLabel($row['_timestamp']);
+                }
+
+                return $row;
+            })
             ->values()
             ->all();
     }
@@ -14027,7 +14048,9 @@ protected function ensureComposeBodyHasFooter(): void
         $subject = trim((string) ($payload['subject'] ?? $this->campaignSubject));
         $body = trim((string) ($payload['body'] ?? $this->campaignBody));
 
-        if ($subject === '' || ($body === '' && ! str_contains(strtolower($body), '<img'))) {
+        $visibleBody = trim(html_entity_decode(strip_tags($body), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        if ($subject === '' || ($visibleBody === '' && ! str_contains(strtolower($body), '<img'))) {
             Notification::make()
                 ->title('Test Email')
                 ->body('Add a subject and message before sending a test.')
