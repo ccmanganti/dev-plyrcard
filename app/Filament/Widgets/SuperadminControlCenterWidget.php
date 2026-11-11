@@ -574,9 +574,13 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         $isReschedule = $booking->status === 'reschedule_pending';
 
         if ($isReschedule) {
+            $restoreStatus = filled($booking->plyomat_athlete_id)
+                ? 'active'
+                : ($booking->trainer?->hasPlyomatApiKey() ? 'awaiting_athlete_id' : 'awaiting_integration');
+
             $booking->forceFill([
                 'requested_scheduled_for' => null,
-                'status' => filled($booking->plyomat_athlete_id) ? 'active' : 'awaiting_athlete_id',
+                'status' => $restoreStatus,
             ])->save();
 
             $booking->notifyStakeholders('reschedule_declined');
