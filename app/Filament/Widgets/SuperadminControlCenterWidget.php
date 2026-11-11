@@ -1618,7 +1618,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
                     $activeAthletes = PlyrLabBooking::query()
                         ->where('trainer_id', $trainer->getKey())
-                        ->whereIn('status', ['active', 'completed'])
+                        ->whereIn('status', ['active', 'completed', 'reschedule_pending'])
                         ->whereNotNull('plyomat_athlete_id')
                         ->distinct('player_user_id')
                         ->count('player_user_id');
@@ -1730,7 +1730,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'connected' => $trainers->filter(fn (PlyrLabTrainer $trainer): bool => $trainer->hasPlyomatConnection())->count(),
                     'bookings' => (clone $bookingQuery)->distinct('player_user_id')->count('player_user_id'),
                     'active_athletes' => (clone $bookingQuery)
-                        ->whereIn('status', ['active', 'completed'])
+                        ->whereIn('status', ['active', 'completed', 'reschedule_pending'])
                         ->whereNotNull('plyomat_athlete_id')
                         ->distinct('player_user_id')
                         ->count('player_user_id'),
