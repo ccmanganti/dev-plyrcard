@@ -716,7 +716,7 @@
                 <header class="pc-panel-head">
                     <div>
                         <h3>{{ $plyrlab_is_trainer_portal ? 'My player bookings' : 'Player bookings & connections' }}</h3>
-                        <p>{{ $plyrlab_is_trainer_portal ? 'Manage your scheduled players and monitor whether each Plyomat profile is ready.' : 'Manual connect, reset, and troubleshoot every player-to-trainer connection.' }}</p>
+                        <p>{{ $plyrlab_is_trainer_portal ? 'Review pending bookings and reschedule requests before PLYRCard creates or updates anything in Plyomat.' : 'Approve bookings, monitor trainer decisions, manually connect players, and troubleshoot Plyomat connections.' }}</p>
                     </div>
                 </header>
                 <div class="pc-table-wrap">
@@ -756,6 +756,10 @@
                                 <td>
                                     @if($booking['status'] === 'cancelled')
                                         <span class="pc-state is-churned">Disconnected</span>
+                                    @elseif($booking['status'] === 'pending_approval')
+                                        <span class="pc-state is-needs_push">Waiting for approval</span>
+                                    @elseif($booking['status'] === 'reschedule_pending')
+                                        <span class="pc-state is-needs_push">{{ $booking['plyomat_ready'] ? 'Connected · schedule pending' : 'Waiting for approval' }}</span>
                                     @elseif($booking['plyomat_ready'] && $booking['data_synced'])
                                         <span class="pc-state is-active">Data synced</span>
                                     @elseif($booking['plyomat_ready'])
@@ -784,7 +788,24 @@
                                             </button>
                                         @endif
 
-                                        @if($booking['can_manage'] && $booking['status'] !== 'completed' && $booking['status'] !== 'cancelled')
+                                        @if($booking['can_manage'] && in_array($booking['status'], ['pending_approval', 'reschedule_pending', 'pending'], true))
+                                            <button
+                                                type="button"
+                                                class="pc-btn is-small is-primary"
+                                                wire:click="approvePlyrLabBooking({{ (int)$booking['id'] }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="approvePlyrLabBooking({{ (int)$booking['id'] }})"
+                                            >
+                                                <span wire:loading.remove wire:target="approvePlyrLabBooking({{ (int)$booking['id'] }})">{{ $booking['status'] === 'reschedule_pending' ? 'Approve Reschedule' : 'Approve Booking' }}</span>
+                                                <span class="pc-btn-working" wire:loading wire:target="approvePlyrLabBooking({{ (int)$booking['id'] }})"><i class="pc-inline-spinner"></i> Approving…</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                class="pc-btn is-small is-danger"
+                                                wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'cancelled')"
+                                                wire:confirm="{{ $booking['status'] === 'reschedule_pending' ? 'Decline this reschedule request? This cancels the current booking so the player can choose another time.' : 'Decline this PLYRLab booking request?' }}"
+                                            >{{ $booking['status'] === 'reschedule_pending' ? 'Decline Reschedule' : 'Decline' }}</button>
+                                        @elseif($booking['can_manage'] && $booking['status'] !== 'completed' && $booking['status'] !== 'cancelled')
                                             <button type="button" class="pc-btn is-small" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'completed')">Complete</button>
                                             <button type="button" class="pc-btn is-small is-danger" wire:click="setPlyrLabBookingStatus({{ (int)$booking['id'] }}, 'cancelled')" wire:confirm="Cancel this PLYRLab booking?">Cancel</button>
                                         @elseif($booking['can_manage'] && $booking['status'] === 'completed' && $booking['plyomat_ready'])
