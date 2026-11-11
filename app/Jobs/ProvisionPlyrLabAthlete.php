@@ -45,6 +45,12 @@ class ProvisionPlyrLabAthlete implements ShouldQueue, ShouldBeUnique
             return;
         }
 
+        // A booking or reschedule may never touch Plyomat until the trainer
+        // explicitly approves it from the trainer/admin portal.
+        if (in_array($booking->status, ['pending_approval', 'reschedule_pending'], true)) {
+            return;
+        }
+
         $trainer = $booking->trainer;
 
         if (! $trainer || ! $plyomat->isConfigured($trainer)) {
