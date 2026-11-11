@@ -954,6 +954,7 @@ discoverSelectedIds: [],
             },
             closeDiscoverSchool() {
                 window.__plyrSchoolDrawerOptimistic = null;
+                window.__plyrInboxSchoolOpenAt = 0;
                 this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
@@ -11408,13 +11409,15 @@ CSS;
                                             if (!this.schoolId && !this.school?.name) return;
                                             const now = Date.now();
                                             const last = Number(window.__plyrInboxSchoolOpenAt || 0);
-                                            if (this.openingSchool || (now - last) < 500) return;
+                                            // Prevent only an accidental double-click. Do not use openingSchool
+                                            // as a hard lock because the drawer can close before its timer finishes.
+                                            if ((now - last) < 180) return;
                                             window.__plyrInboxSchoolOpenAt = now;
                                             this.openingSchool = true;
                                             this.listsOpen = false;
                                             const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
                                             window.dispatchEvent(new CustomEvent('rc-open-school-global', { detail: { school: payload } }));
-                                            window.setTimeout(() => { this.openingSchool = false; }, 520);
+                                            window.setTimeout(() => { this.openingSchool = false; }, 260);
                                         },
                                         async toggleFavorite() {
                                             if (!this.schoolId || this.favoritePending) return;
@@ -11463,8 +11466,9 @@ CSS;
                                         }
                                     }"
                                     x-on:rc-list-membership-changed.window="applyExternalListMembership($event.detail)"
+                                    x-on:rc-discover-drawer-closed.window="openingSchool = false; window.__plyrInboxSchoolOpenAt = 0"
                                 >
-                                    <button type="button" class="rc-profile-action-v56" x-on:click.stop.prevent="openSchool()" x-bind:disabled="openingSchool" title="View school">
+                                    <button type="button" class="rc-profile-action-v56" x-on:click.stop.prevent="openSchool()" title="View school">
                                         <svg x-show="!openingSchool" viewBox="0 0 24 24" width="19" height="19" fill="none"><path d="M4 21V8l8-4 8 4v13M9 21v-7h6v7" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
                                         <span class="rc-action-spinner-v81" x-cloak x-show="openingSchool"></span>
                                         <span>View School</span>
