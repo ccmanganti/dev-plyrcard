@@ -31,7 +31,7 @@ class PlyrLabTrainerResource extends Resource
     protected static ?string $navigationLabel = 'PLYRLab Trainers';
     protected static ?string $modelLabel = 'PLYRLab Trainer';
     protected static ?string $pluralModelLabel = 'PLYRLab Trainers';
-    protected static string | UnitEnum | null $navigationGroup = 'Operations & Support';
+    protected static string | UnitEnum | null $navigationGroup = 'PLYRLab';
     protected static ?int $navigationSort = 15;
 
     protected static function canManagePlyrLab(): bool
