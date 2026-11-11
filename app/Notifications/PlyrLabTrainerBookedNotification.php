@@ -4,11 +4,10 @@ namespace App\Notifications;
 
 use App\Models\PlyrLabBooking;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class PlyrLabTrainerBookedNotification extends Notification implements ShouldQueue
+class PlyrLabTrainerBookedNotification extends Notification
 {
     use Queueable;
 
