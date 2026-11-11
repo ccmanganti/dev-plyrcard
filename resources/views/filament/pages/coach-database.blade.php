@@ -12906,9 +12906,38 @@ CSS;
                         }
                         return output;
                     },
+                    notify(message) {
+                        const text = String(message || '').trim();
+                        if (!text) return;
+                        const existing = document.getElementById('rc-compose-client-notice');
+                        if (existing) existing.remove();
+                        const notice = document.createElement('div');
+                        notice.id = 'rc-compose-client-notice';
+                        notice.textContent = text;
+                        notice.setAttribute('role', 'status');
+                        notice.style.cssText = [
+                            'position:fixed',
+                            'right:24px',
+                            'bottom:24px',
+                            'z-index:99999',
+                            'max-width:min(420px,calc(100vw - 48px))',
+                            'padding:12px 16px',
+                            'border-radius:10px',
+                            'background:#111827',
+                            'color:#fff',
+                            'font-size:14px',
+                            'font-weight:650',
+                            'line-height:1.4',
+                            'box-shadow:0 16px 40px rgba(0,0,0,.28)'
+                        ].join(';');
+                        document.body.appendChild(notice);
+                        window.setTimeout(() => {
+                            if (notice.isConnected) notice.remove();
+                        }, 3600);
+                    },
                     openPreview() {
                         if (!this.composeReady) {
-                            toast('Choose a school and add a subject and message before previewing.');
+                            this.notify('Choose a school and add a subject and message before previewing.');
                             return;
                         }
                         const coach = this.previewCoach();
@@ -13091,12 +13120,12 @@ CSS;
                         const currentText = String(editor?.innerText || editor?.textContent || '').replace(/\u200B/g, '').trim();
                         const hasCurrentBody = currentText.length > 0 || !!editor?.querySelector('img');
 
-                        if (!currentSubject) { toast('Add a subject before sending a test.'); return false; }
-                        if (!hasCurrentBody) { toast('Write a message before sending a test.'); return false; }
+                        if (!currentSubject) { this.notify('Add a subject before sending a test.'); return false; }
+                        if (!hasCurrentBody) { this.notify('Write a message before sending a test.'); return false; }
 
                         const to = String(recipientEmail || '').trim();
                         if (!to || !to.includes('@')) {
-                            toast('Enter a valid email address for the test email.');
+                            this.notify('Enter a valid email address for the test email.');
                             return false;
                         }
 
@@ -13109,7 +13138,7 @@ CSS;
                         })();
 
                         if (!wire || typeof wire.call !== 'function') {
-                            toast('Composer is still loading. Try again in a second.');
+                            this.notify('Composer is still loading. Try again in a second.');
                             return false;
                         }
 
@@ -13129,14 +13158,14 @@ CSS;
                         try {
                             const result = await wire.call('sendComposeTestEmailFromClient', { to, subject, body });
                             if (result && result.ok === false) {
-                                toast(String(result.message || 'Unable to send the test email.'));
+                                this.notify(String(result.message || 'Unable to send the test email.'));
                                 return false;
                             }
-                            toast(String(result?.message || ('Test email sent to ' + to + '.')));
+                            this.notify(String(result?.message || ('Test email sent to ' + to + '.')));
                             return true;
                         } catch (error) {
                             console.error(error);
-                            toast('Unable to send the test email right now.');
+                            this.notify('Unable to send the test email right now.');
                             return false;
                         } finally {
                             this.testingEmail = false;
@@ -13144,9 +13173,9 @@ CSS;
                     },
                     async sendFast(wireInstance = null) {
                         if (this.sendingFast) return;
-                        if (!this.composeRecipientsReady) { toast('Choose at least one coach.'); return; }
-                        if (!this.composeSubjectReady) { toast('Add a subject before sending.'); return; }
-                        if (!this.composeBodyReady) { toast('Write a message before sending.'); return; }
+                        if (!this.composeRecipientsReady) { this.notify('Choose at least one coach.'); return; }
+                        if (!this.composeSubjectReady) { this.notify('Add a subject before sending.'); return; }
+                        if (!this.composeBodyReady) { this.notify('Write a message before sending.'); return; }
                         const wire = wireInstance || this.$wire || (() => {
                             const root = window.rcFindCoachDatabaseLivewireComponent
                                 ? window.rcFindCoachDatabaseLivewireComponent(this.$root || document.querySelector('.rc-livewire-root'))
@@ -13154,14 +13183,14 @@ CSS;
                             const id = root?.getAttribute?.('wire:id');
                             return id && window.Livewire?.find ? window.Livewire.find(id) : null;
                         })();
-                        if (!wire || typeof wire.call !== 'function') { toast('Composer is still loading. Try again in a second.'); return; }
+                        if (!wire || typeof wire.call !== 'function') { this.notify('Composer is still loading. Try again in a second.'); return; }
                         window.__plyrNativeEditors?.campaignBody?.syncNow?.();
                         this.sendingFast = true;
                         try {
                             await wire.call('sendComposedEmailWithComposeState', this.selectedSchoolId, this.targetMode, this.headCoachOnly, [...this.selectedCoachIds]);
                         } catch (error) {
                             console.error(error);
-                            toast('Unable to send right now. Please try again.');
+                            this.notify('Unable to send right now. Please try again.');
                         } finally { this.sendingFast = false; }
                     },
                 }" x-init="init()" x-on:input="composeValidationRevision++" x-on:rc-compose-editor-refresh.window="composeValidationRevision++" x-on:rc-compose-select-school.window="chooseSchoolById($event.detail?.schoolId || $event.detail?.id || '')">
