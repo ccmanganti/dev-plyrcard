@@ -13095,7 +13095,7 @@ CSS;
                         if (!hasCurrentBody) { toast('Write a message before sending a test.'); return false; }
 
                         const to = String(recipientEmail || '').trim();
-                        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(to)) {
+                        if (!to || !to.includes('@')) {
                             toast('Enter a valid email address for the test email.');
                             return false;
                         }
@@ -13282,9 +13282,10 @@ CSS;
                                 async submit() {
                                     if (testingEmail) return;
                                     const value = String(this.email || '').trim();
-                                    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)) {
+                                    const input = this.$refs.emailInput;
+                                    if (!value || !input || !input.checkValidity()) {
                                         this.error = 'Enter a valid email address.';
-                                        this.$nextTick(() => this.$refs.emailInput?.focus());
+                                        this.$nextTick(() => input?.focus());
                                         return;
                                     }
                                     this.error = '';
