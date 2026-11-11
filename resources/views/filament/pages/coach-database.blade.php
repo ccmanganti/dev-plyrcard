@@ -6720,12 +6720,25 @@ discoverSelectedIds: [],
         x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
         x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
         x-on:rc-inbox-conversation-changing.window="
-            window.__rcInboxFollowSchoolDrawer = !!schoolDrawerOpen;
+            const nextConversationId = String($event.detail?.conversationId || '');
+            const follow = !!schoolDrawerOpen || !!window.__rcInboxFollowSchoolDrawer;
+            window.__rcInboxSchoolConversationId = nextConversationId;
             if (schoolDrawerOpen) closeDiscoverSchool();
+            window.__rcInboxFollowSchoolDrawer = follow;
+            if (follow) {
+                const nextSchool = $event.detail?.school || null;
+                if (nextSchool && (nextSchool.id || nextSchool.school_id || nextSchool.name)) {
+                    openGlobalSchool(nextSchool);
+                }
+            }
         "
         x-on:rc-inbox-school-changed.window="
+            const eventConversationId = String($event.detail?.conversationId || '');
+            const activeConversationId = String(window.__rcInboxSchoolConversationId || '');
+            if (activeConversationId && eventConversationId && activeConversationId !== eventConversationId) return;
             const follow = !!window.__rcInboxFollowSchoolDrawer;
             window.__rcInboxFollowSchoolDrawer = false;
+            if (eventConversationId) window.__rcInboxSchoolConversationId = eventConversationId;
             if (follow) {
                 const nextSchool = $event.detail?.school || null;
                 if (nextSchool && (nextSchool.id || nextSchool.school_id || nextSchool.name)) openGlobalSchool(nextSchool);
@@ -6734,9 +6747,10 @@ discoverSelectedIds: [],
         "
         x-on:rc-inbox-school-clear.window="
             window.__rcInboxFollowSchoolDrawer = false;
-            if (schoolDrawerOpen) closeDiscoverSchool();
+            window.__rcInboxSchoolConversationId = '';
+            closeDiscoverSchool();
         "
-        x-on:rc-school-optimistic-clear.window="closeDiscoverSchool()"
+        x-on:rc-school-optimistic-clear.window="window.__rcInboxFollowSchoolDrawer = false; closeDiscoverSchool()"
         x-on:rc-discover-school-state.window="applyGlobalSchoolState($event.detail)"
         x-on:rc-list-membership-changed.window="applyGlobalListMembership($event.detail)"
         x-on:rc-discover-count.window="discoverClientCount = Number($event.detail?.total || 0); discoverClientShown = Number($event.detail?.shown || 0)"
@@ -9906,6 +9920,62 @@ discoverSelectedIds: [],
                 );
                 $canLoadMoreInboxConversations = (bool) ($this->canLoadMoreInboxConversations ?? false);
                 $allConversationRows = collect($this->conversations ?? [])->filter(fn ($row) => is_array($row))->values();
+                // Keep a lightweight browser-side school reference for every rendered Inbox row.
+                // This lets an already-open View School drawer switch immediately when another
+                // conversation is clicked instead of waiting for the Livewire request to finish.
+                $inboxConversationSchoolRefs = $inboxConversations->mapWithKeys(function ($conversation): array {
+                    if (! is_array($conversation)) {
+                        return [];
+                    }
+
+                    $conversationId = trim((string) ($conversation['id'] ?? ''));
+                    if ($conversationId === '') {
+                        return [];
+                    }
+
+                    $localSchool = is_array($conversation['local_school'] ?? null)
+                        ? $conversation['local_school']
+                        : [];
+
+                    $schoolId = trim((string) (
+                        $localSchool['id']
+                        ?? $localSchool['school_id']
+                        ?? data_get($conversation, 'local_coach.school_id')
+                        ?? $conversation['school_id']
+                        ?? ''
+                    ));
+                    $schoolName = trim((string) (
+                        $localSchool['name']
+                        ?? $conversation['school']
+                        ?? $conversation['company_name']
+                        ?? data_get($conversation, 'local_coach.school')
+                        ?? ''
+                    ));
+
+                    if ($schoolId === '' && ($schoolName === '' || strcasecmp($schoolName, 'School') === 0)) {
+                        return [];
+                    }
+
+                    return [$conversationId => [
+                        'id' => $schoolId,
+                        'school_id' => $schoolId,
+                        'business_id' => trim((string) ($localSchool['business_id'] ?? $conversation['business_id'] ?? '')),
+                        'company_id' => trim((string) ($conversation['company_id'] ?? '')),
+                        'ghl_business_id' => trim((string) ($conversation['ghl_business_id'] ?? '')),
+                        'name' => $schoolName,
+                        'logo_url' => trim((string) (
+                            $localSchool['logo_url']
+                            ?? $conversation['school_logo_url']
+                            ?? $conversation['logo_url']
+                            ?? data_get($conversation, 'local_coach.school_logo_url')
+                            ?? ''
+                        )),
+                        'conference' => (string) ($localSchool['conference'] ?? $conversation['conference'] ?? data_get($conversation, 'local_coach.conference') ?? ''),
+                        'division' => (string) ($localSchool['division'] ?? $conversation['division'] ?? data_get($conversation, 'local_coach.division') ?? ''),
+                        'city' => (string) ($localSchool['city'] ?? data_get($conversation, 'local_coach.city') ?? ''),
+                        'state' => (string) ($localSchool['state'] ?? data_get($conversation, 'local_coach.state') ?? ''),
+                    ]];
+                })->all();
                 $unreadConversationCount = $allConversationRows->filter(fn ($row) => (int) ($row['unread_count'] ?? $row['unreadCount'] ?? $row['unreadMessagesCount'] ?? 0) > 0)->count();
                 $incomingConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['awaiting_reply'] ?? false) || (int) ($row['unread_count'] ?? $row['unreadCount'] ?? $row['unreadMessagesCount'] ?? 0) > 0)->count();
                 $starredConversationCount = $allConversationRows->filter(fn ($row) => (bool) ($row['starred'] ?? $row['is_starred'] ?? false))->count();
@@ -10360,6 +10430,7 @@ CSS;
                             class="rc-inbox-list-v56"
                             x-data="{
                                 selectedConversationId: window.__rcInboxPendingConversationId || @js((string) ($selectedConversationId ?? '')),
+                                conversationSchools: @js($inboxConversationSchoolRefs),
                                 selectedLoadingId: '',
                                 requestToken: 0,
                                 realtimePollBusy: false,
@@ -10551,8 +10622,16 @@ CSS;
                                     if (! id) return;
                                     const previousId = String(this.selectedConversationId || '');
                                     if (previousId !== id) {
+                                        const nextSchool = this.conversationSchools
+                                            && Object.prototype.hasOwnProperty.call(this.conversationSchools, id)
+                                            ? this.conversationSchools[id]
+                                            : null;
                                         window.dispatchEvent(new CustomEvent('rc-inbox-conversation-changing', {
-                                            detail: { conversationId: id, previousConversationId: previousId }
+                                            detail: {
+                                                conversationId: id,
+                                                previousConversationId: previousId,
+                                                school: nextSchool
+                                            }
                                         }));
                                     }
                                     this.selectedConversationId = id;
@@ -11331,6 +11410,8 @@ CSS;
                                             const last = Number(window.__plyrInboxSchoolOpenAt || 0);
                                             if (this.openingSchool || (now - last) < 500) return;
                                             window.__plyrInboxSchoolOpenAt = now;
+                                            window.__rcInboxSchoolConversationId = @js((string) ($selectedConversationId ?? ''));
+                                            window.__rcInboxFollowSchoolDrawer = false;
                                             this.openingSchool = true;
                                             this.listsOpen = false;
                                             const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
@@ -14255,9 +14336,9 @@ CSS;
              x-show="isValidOpenSchool()"
              x-bind:style="isValidOpenSchool() ? 'display:flex !important;z-index:9999' : 'display:none !important;z-index:9999'"
              x-effect="if (schoolDrawerOpen && !isValidOpenSchool()) { closeDiscoverSchool(); }"
-             x-on:click.self="closeDiscoverSchool()" x-on:keydown.escape.window="closeDiscoverSchool()">
+             x-on:click.self="window.__rcInboxFollowSchoolDrawer = false; closeDiscoverSchool()" x-on:keydown.escape.window="window.__rcInboxFollowSchoolDrawer = false; closeDiscoverSchool()">
                 <div class="rc-drawer-panel rc-school-modal-panel rc-school-optimistic-panel-v106 rc-discover-drawer-panel-v111" role="dialog" aria-modal="true" aria-label="School details" x-on:click.stop>
-                    <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="closeDiscoverSchool()" aria-label="Close school details">×</button>
+                    <button class="rc-school-modal-close" type="button" x-on:click.stop.prevent="window.__rcInboxFollowSchoolDrawer = false; closeDiscoverSchool()" aria-label="Close school details">×</button>
                 <div class="rc-school-modal-hero-v72">
                     <div class="rc-school-logo-large-v72">
                         <img x-show="optimisticSchool?.logo_url" x-bind:src="optimisticSchool?.logo_url || ''" x-bind:alt="`${optimisticSchool?.name || 'School'} logo`" referrerpolicy="no-referrer" onerror="this.style.display='none'">
