@@ -4953,8 +4953,17 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ?? ''
         ));
 
+        // Inbox deliberately does not hydrate the full Discover-school catalog. A school
+        // resolved here is therefore the canonical server-side record for this one thread
+        // and may be registered by the browser drawer without requiring the heavy catalog.
+        $authoritative = static function (array $school): array {
+            $school['__drawer_authoritative'] = true;
+
+            return $school;
+        };
+
         if (! $user) {
-            return array_merge($localSchool, ['name' => $fallbackName]);
+            return $authoritative(array_merge($localSchool, ['name' => $fallbackName]));
         }
 
         $candidates = collect([
@@ -4970,7 +4979,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
         foreach ($candidates as $candidate) {
             if (array_key_exists($candidate, $this->inboxSchoolRowMemo)) {
-                return $this->inboxSchoolRowMemo[$candidate];
+                return $authoritative($this->inboxSchoolRowMemo[$candidate]);
             }
 
             try {
@@ -4985,9 +4994,12 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             }
 
             if (is_array($school) && ! empty($school)) {
+                $school = $authoritative($school);
+
                 foreach ($candidates as $memoKey) {
                     $this->inboxSchoolRowMemo[$memoKey] = $school;
                 }
+
                 return $school;
             }
         }
@@ -5000,7 +5012,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ?? ''
         ));
 
-        return array_merge([
+        return $authoritative(array_merge([
             'id' => $fallbackId,
             'school_id' => $fallbackId,
             'name' => $fallbackName,
@@ -5016,7 +5028,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             'coaches' => ! empty($localCoach) ? [$localCoach] : [],
             'is_favorite' => false,
             'list_keys' => [],
-        ], $localSchool);
+        ], $localSchool));
     }
 
     public function openSelectedConversationInComposer(): void
