@@ -304,6 +304,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
         ]);
 
         $this->plyrLabBlockReason = '';
+        $this->plyrLabCalendarMonth = $startsAt->format('Y-m');
+        $this->plyrLabBlockDate = $startsAt->format('Y-m-d');
 
         Notification::make()
             ->title('Calendar blocked')
@@ -434,9 +436,16 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $cursor->addDay();
         }
 
-        $upcomingBlocks = $blocks
-            ->filter(fn (PlyrLabTrainerBlock $block): bool => $block->ends_at->gte(now()->startOfDay()))
-            ->take(12)
+        $upcomingBlockRows = Schema::hasTable('plyr_lab_trainer_blocks')
+            ? PlyrLabTrainerBlock::query()
+                ->where('trainer_id', $trainer->getKey())
+                ->where('ends_at', '>=', now()->startOfDay())
+                ->orderBy('starts_at')
+                ->limit(12)
+                ->get()
+            : collect();
+
+        $upcomingBlocks = $upcomingBlockRows
             ->map(fn (PlyrLabTrainerBlock $block): array => [
                 'id' => (int) $block->getKey(),
                 'date' => $block->starts_at->format('M j, Y'),
