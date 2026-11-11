@@ -5678,6 +5678,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
     }
 
+    #[Renderless]
     public function schoolCommunicationHistoryForClient(string $schoolId): array
     {
         $schoolId = trim($schoolId);
@@ -5685,8 +5686,30 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return [];
         }
 
-        $this->loadSchoolCommunicationHistory($schoolId);
+        // Fast path: build from the already-loaded Inbox conversation index plus any
+        // cached message pages. This avoids blocking the drawer on a fetch-all GHL scan.
+        $this->loadSchoolCommunicationHistory($schoolId, false);
 
+        return $this->formattedSchoolCommunicationHistory($schoolId);
+    }
+
+    #[Renderless]
+    public function refreshSchoolCommunicationHistoryForClient(string $schoolId): array
+    {
+        $schoolId = trim($schoolId);
+        if ($schoolId === '') {
+            return [];
+        }
+
+        // Refresh the conversation index separately. The browser keeps the fast local
+        // history visible while this request runs.
+        $this->loadSchoolCommunicationHistory($schoolId, true);
+
+        return $this->formattedSchoolCommunicationHistory($schoolId);
+    }
+
+    protected function formattedSchoolCommunicationHistory(string $schoolId): array
+    {
         return collect($this->schoolCommunicationHistories[$schoolId] ?? [])
             ->filter(fn ($row): bool => is_array($row) && ($row['channel'] ?? 'email') === 'email')
             ->map(function (array $row): array {
@@ -5695,7 +5718,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
 
                 if ($contactName === '') {
                     $contactName = preg_replace(
-                        '/^(?:Email\s+)?(?:received\s+from|sent\s+to)\s+/i',
+                        '/^(?:Email\\s+)?(?:received\\s+from|sent\\s+to)\\s+/i',
                         '',
                         trim((string) ($row['title'] ?? 'Coach'))
                     ) ?: 'Coach';
@@ -5714,7 +5737,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ->all();
     }
 
-    public function loadSchoolCommunicationHistory(string $schoolId): void
+    public function loadSchoolCommunicationHistory(string $schoolId, bool $refreshRemote = false): void
     {
         $user = Auth::user();
         $schoolId = trim($schoolId);
@@ -5723,8 +5746,8 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             return;
         }
 
-        // The drawer always carries the canonical local school ID. Resolve that
-        // record directly instead of rebuilding/scanning the complete school catalog.
+        // Resolve the canonical school and its local coaches without rebuilding the
+        // entire Recruiting Center catalog when a numeric local school ID is available.
         $school = [];
         if (ctype_digit($schoolId)) {
             $model = \App\Models\School::query()
@@ -5740,6 +5763,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                     'logo_url' => (string) ($model->logo_url ?? ''),
                     'coaches' => $model->coaches->map(fn ($coach): array => [
                         'id' => (string) $coach->getKey(),
+                        'ghl_contact_id' => (string) ($coach->ghl_contact_id ?? ''),
                         'contact_id' => (string) ($coach->ghl_contact_id ?? ''),
                         'name' => trim((string) ($coach->display_name ?: (($coach->first_name ?? '') . ' ' . ($coach->last_name ?? '')))),
                         'first_name' => $coach->first_name,
@@ -5766,13 +5790,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $schoolBusinessId = trim((string) ($school['business_id'] ?? $school['id'] ?? $schoolId));
         $cacheKey = 'coach-database:school-comms-history:' . $user->getKey() . ':' . md5($schoolBusinessId . '|' . $schoolName);
 
-        $cached = Cache::get($cacheKey, []);
-        if (is_array($cached) && is_array($cached['rows'] ?? null)) {
-            $this->schoolCommunicationHistories[$schoolId] = collect($cached['rows'])
-                ->filter(fn ($row): bool => is_array($row))
-                ->values()
-                ->all();
-        }
+        $cachedHistory = Cache::get($cacheKey, []);
+        $cachedHistoryRows = is_array($cachedHistory) && is_array($cachedHistory['rows'] ?? null)
+            ? collect($cachedHistory['rows'])->filter(fn ($row): bool => is_array($row))->values()->all()
+            : [];
 
         $coaches = collect($school['coaches'] ?? [])
             ->filter(fn ($coach): bool => is_array($coach))
@@ -5790,10 +5811,6 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 ->values();
         }
 
-        // v10.53: a local Coach model can have both its numeric Laravel ID and a
-        // completely different GHL contact ID. Conversations are keyed by the GHL
-        // contact ID, so never collapse the coach down to only the first available ID.
-        // Keep every known identifier and allow any of them to match.
         $coachIds = $coaches
             ->flatMap(fn (array $coach): array => [
                 $coach['ghl_contact_id'] ?? null,
@@ -5805,8 +5822,18 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ->filter()
             ->unique()
             ->values();
-        $coachEmails = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? $coach['contact_email'] ?? ''))))->filter()->unique()->values();
-        $coachNames = $coaches->map(fn (array $coach): string => strtolower(trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? ''))))))->filter()->unique()->values();
+
+        $coachEmails = $coaches
+            ->map(fn (array $coach): string => strtolower(trim((string) ($coach['email'] ?? $coach['contact_email'] ?? ''))))
+            ->filter()
+            ->unique()
+            ->values();
+
+        $coachNames = $coaches
+            ->map(fn (array $coach): string => strtolower(trim((string) ($coach['name'] ?? trim(($coach['first_name'] ?? '') . ' ' . ($coach['last_name'] ?? ''))))))
+            ->filter()
+            ->unique()
+            ->values();
 
         $schoolIds = collect([
             $school['id'] ?? null,
@@ -5820,115 +5847,94 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             ->unique()
             ->values();
 
+        // Inbox is the canonical local conversation index. Hydrate it first so old
+        // conversations already available in Inbox are immediately available here too.
+        if (empty($this->conversations)) {
+            $this->hydrateCachedInboxConversations();
+        }
+
+        $matchedLocal = $this->matchSchoolCommunicationConversations(
+            collect($this->conversations ?? []),
+            $schoolName,
+            $schoolIds,
+            $coachIds,
+            $coachEmails,
+            $coachNames
+        );
+
+        $fastRows = $this->schoolCommunicationRowsFromInboxCache($user, $matchedLocal);
+        $this->schoolCommunicationHistories[$schoolId] = $this->finalizeSchoolCommunicationRows(
+            array_merge($cachedHistoryRows, $fastRows),
+            100
+        );
+
+        if (! $refreshRemote) {
+            return;
+        }
+
         try {
+            // Bound the refresh to a useful historical window. The old implementation
+            // could fetch up to 25,000 conversations and then make one message request
+            // after another, which made the Communications tab feel frozen.
             $result = app(GoHighLevelService::class)->getConversationsForUser($user, [
-                'limit' => 200,
+                'limit' => 100,
                 'status' => 'all',
                 'search' => '',
                 'fetch_all' => true,
+                'max_rows' => 500,
+                'max_pages' => 5,
             ]);
 
             if (! ($result['success'] ?? false)) {
-                Notification::make()
-                    ->title('Communications')
-                    ->body((string) ($result['error'] ?? 'Unable to load school communication history from HighLevel.'))
-                    ->warning()
-                    ->send();
-
                 return;
             }
 
-            $this->conversations = $this->enrichConversationRowsWithLocalDatabase((array) ($result['conversations'] ?? []));
-            $this->cacheInboxConversations($this->conversations);
+            $freshRows = $this->enrichConversationRowsWithLocalDatabase((array) ($result['conversations'] ?? []));
 
-            $schoolNameKey = strtolower(trim($schoolName));
-            $matchedConversations = collect($this->conversations)
-                ->filter(function (array $conversation) use ($schoolNameKey, $schoolIds, $coachIds, $coachEmails, $coachNames): bool {
-                    $conversationContactIds = collect([
-                        $conversation['contact_id'] ?? null,
-                        $conversation['contactId'] ?? null,
-                        $conversation['coach_id'] ?? null,
-                        $conversation['coach_contact_id'] ?? null,
-                    ])->map(fn ($value): string => strtolower(trim((string) $value)))
-                        ->filter()
-                        ->unique();
+            // Merge instead of replace so an incomplete upstream page can never erase
+            // older conversations that Inbox already had cached.
+            $merged = collect($this->conversations ?? [])
+                ->filter(fn ($row): bool => is_array($row) && filled($row['id'] ?? null))
+                ->keyBy(fn (array $row): string => (string) $row['id']);
 
-                    $conversationSchoolIds = collect([
-                        $conversation['school_id'] ?? null,
-                        $conversation['school_business_id'] ?? null,
-                        $conversation['business_id'] ?? null,
-                        $conversation['company_id'] ?? null,
-                        $conversation['ghl_business_id'] ?? null,
-                    ])->map(fn ($value): string => strtolower(trim((string) $value)))
-                        ->filter()
-                        ->unique();
-
-                    $email = strtolower(trim((string) ($conversation['email'] ?? $conversation['contact_email'] ?? '')));
-                    $conversationSchool = strtolower(trim((string) (
-                        $conversation['school']
-                        ?? $conversation['school_name']
-                        ?? $conversation['company_name']
-                        ?? $conversation['company']
-                        ?? ''
-                    )));
-                    $name = strtolower(trim((string) ($conversation['contact_name'] ?? $conversation['name'] ?? $conversation['coach_name'] ?? '')));
-
-                    return ($conversationContactIds->isNotEmpty() && $coachIds->intersect($conversationContactIds)->isNotEmpty())
-                        || ($email !== '' && $coachEmails->contains($email))
-                        || ($conversationSchoolIds->isNotEmpty() && $schoolIds->intersect($conversationSchoolIds)->isNotEmpty())
-                        || ($schoolNameKey !== '' && $conversationSchool === $schoolNameKey)
-                        || ($name !== '' && $coachNames->contains($name));
-                })
-                // A school can have several coaches and years of threads. Keep a
-                // wider set here; the final normalized history is still capped below.
-                ->take(50)
-                ->values();
-
-            $historyRows = [];
-
-            foreach ($matchedConversations as $conversation) {
-                $conversationId = (string) ($conversation['id'] ?? '');
-                if ($conversationId === '') {
+            foreach ($freshRows as $row) {
+                if (! is_array($row) || blank($row['id'] ?? null)) {
                     continue;
                 }
 
-                $messageResult = app(GoHighLevelService::class)->getConversationMessagesForUser(
-                    $user,
-                    $conversationId,
-                    null,
-                    25
-                );
-
-                if (! ($messageResult['success'] ?? false)) {
-                    $historyRows[] = $this->schoolCommunicationHistoryRowFromConversation($conversation);
-                    continue;
-                }
-
-                $messages = collect($messageResult['messages'] ?? [])
-                    ->filter(fn ($row): bool => is_array($row))
-                    ->values();
-
-                if ($messages->isEmpty()) {
-                    $historyRows[] = $this->schoolCommunicationHistoryRowFromConversation($conversation);
-                    continue;
-                }
-
-                foreach ($messages as $message) {
-                    $historyRows[] = $this->schoolCommunicationHistoryRowFromMessage($message, $conversation);
-                }
+                $id = (string) $row['id'];
+                $existing = is_array($merged->get($id)) ? $merged->get($id) : [];
+                $merged->put($id, $this->normalizeInboxConversationSummary(array_replace($existing, $row)));
             }
 
-            $historyRows = collect($historyRows)
-                ->filter(fn ($row): bool => is_array($row) && ($row['channel'] ?? 'email') === 'email')
-                ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
-                ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
-                ->take(30)
-                ->map(function (array $row): array {
-                    unset($row['_timestamp']);
-                    return $row;
-                })
+            $this->conversations = $merged
+                ->values()
+                ->sortByDesc(fn (array $row): int => $this->communicationTimestamp(
+                    $row['last_message_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? null
+                ))
+                ->take(500)
                 ->values()
                 ->all();
+
+            $this->cacheInboxConversations($this->conversations);
+
+            $matchedRemote = $this->matchSchoolCommunicationConversations(
+                collect($this->conversations),
+                $schoolName,
+                $schoolIds,
+                $coachIds,
+                $coachEmails,
+                $coachNames
+            );
+
+            // Reuse any cached per-thread messages for full email-level history. For
+            // older threads that were never opened, include the conversation summary
+            // so they still appear instead of silently disappearing.
+            $refreshedRows = $this->schoolCommunicationRowsFromInboxCache($user, $matchedRemote);
+            $historyRows = $this->finalizeSchoolCommunicationRows(
+                array_merge($this->schoolCommunicationHistories[$schoolId] ?? [], $refreshedRows),
+                100
+            );
 
             $this->schoolCommunicationHistories[$schoolId] = $historyRows;
 
@@ -5937,19 +5943,136 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 'cached_at' => now()->toIso8601String(),
             ], now()->addMinutes(10));
         } catch (\Throwable $exception) {
-            Log::warning('Unable to load school communication history from GHL.', [
+            Log::warning('Unable to refresh school communication history from GHL.', [
                 'user_id' => $user->getKey(),
                 'school_id' => $schoolId,
                 'school_name' => $schoolName,
                 'error' => $exception->getMessage(),
             ]);
-
-            Notification::make()
-                ->title('Communications')
-                ->body(app()->isLocal() ? $exception->getMessage() : 'Unable to load school communication history from HighLevel.')
-                ->danger()
-                ->send();
         }
+    }
+
+    protected function matchSchoolCommunicationConversations(
+        Collection $conversations,
+        string $schoolName,
+        Collection $schoolIds,
+        Collection $coachIds,
+        Collection $coachEmails,
+        Collection $coachNames
+    ): Collection {
+        $schoolNameKey = strtolower(trim($schoolName));
+
+        return $conversations
+            ->filter(fn ($conversation): bool => is_array($conversation))
+            ->filter(function (array $conversation) use ($schoolNameKey, $schoolIds, $coachIds, $coachEmails, $coachNames): bool {
+                $conversationContactIds = collect([
+                    $conversation['contact_id'] ?? null,
+                    $conversation['contactId'] ?? null,
+                    $conversation['coach_id'] ?? null,
+                    $conversation['coach_contact_id'] ?? null,
+                    data_get($conversation, 'local_coach.ghl_contact_id'),
+                    data_get($conversation, 'local_coach.id'),
+                ])->map(fn ($value): string => strtolower(trim((string) $value)))
+                    ->filter()
+                    ->unique();
+
+                $conversationSchoolIds = collect([
+                    $conversation['school_id'] ?? null,
+                    $conversation['school_business_id'] ?? null,
+                    $conversation['business_id'] ?? null,
+                    $conversation['company_id'] ?? null,
+                    $conversation['ghl_business_id'] ?? null,
+                    data_get($conversation, 'local_school.id'),
+                    data_get($conversation, 'local_school.business_id'),
+                    data_get($conversation, 'local_coach.school_id'),
+                ])->map(fn ($value): string => strtolower(trim((string) $value)))
+                    ->filter()
+                    ->unique();
+
+                $email = strtolower(trim((string) (
+                    $conversation['email']
+                    ?? $conversation['contact_email']
+                    ?? data_get($conversation, 'local_coach.email')
+                    ?? ''
+                )));
+
+                $conversationSchool = strtolower(trim((string) (
+                    $conversation['school']
+                    ?? $conversation['school_name']
+                    ?? $conversation['company_name']
+                    ?? $conversation['company']
+                    ?? data_get($conversation, 'local_school.name')
+                    ?? data_get($conversation, 'local_coach.school')
+                    ?? ''
+                )));
+
+                $name = strtolower(trim((string) (
+                    $conversation['contact_name']
+                    ?? $conversation['name']
+                    ?? $conversation['coach_name']
+                    ?? data_get($conversation, 'local_coach.name')
+                    ?? ''
+                )));
+
+                return ($conversationContactIds->isNotEmpty() && $coachIds->intersect($conversationContactIds)->isNotEmpty())
+                    || ($email !== '' && $coachEmails->contains($email))
+                    || ($conversationSchoolIds->isNotEmpty() && $schoolIds->intersect($conversationSchoolIds)->isNotEmpty())
+                    || ($schoolNameKey !== '' && $conversationSchool === $schoolNameKey)
+                    || ($name !== '' && $coachNames->contains($name));
+            })
+            ->sortByDesc(fn (array $row): int => $this->communicationTimestamp(
+                $row['last_message_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? null
+            ))
+            ->take(100)
+            ->values();
+    }
+
+    protected function schoolCommunicationRowsFromInboxCache($user, Collection $matchedConversations): array
+    {
+        $historyRows = [];
+
+        foreach ($matchedConversations as $conversation) {
+            $conversationId = trim((string) ($conversation['id'] ?? ''));
+            if ($conversationId === '') {
+                continue;
+            }
+
+            $cached = Cache::get($this->deferredUiCacheKey('messages', $conversationId), []);
+            if (! is_array($cached) || ! is_array($cached['rows'] ?? null)) {
+                $cached = $this->readPersistentRecruitingUiCache('messages', $conversationId);
+            }
+
+            $cachedMessages = is_array($cached) && is_array($cached['rows'] ?? null)
+                ? collect($cached['rows'])->filter(fn ($row): bool => is_array($row))->values()
+                : collect();
+
+            if ($cachedMessages->isNotEmpty()) {
+                foreach ($cachedMessages as $message) {
+                    $historyRows[] = $this->schoolCommunicationHistoryRowFromMessage($message, $conversation);
+                }
+                continue;
+            }
+
+            // Even without a cached message page, keep the old Inbox conversation in
+            // Communications using its last-message metadata.
+            $historyRows[] = $this->schoolCommunicationHistoryRowFromConversation($conversation);
+        }
+
+        return $historyRows;
+    }
+
+    protected function finalizeSchoolCommunicationRows(array $rows, int $limit = 100): array
+    {
+        return collect($rows)
+            ->filter(fn ($row): bool => is_array($row) && ($row['channel'] ?? 'email') === 'email')
+            ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
+            ->sortByDesc(fn (array $row): int => (int) (
+                $row['_timestamp']
+                ?? $this->communicationTimestamp($row['date_time_label'] ?? $row['date_label'] ?? null)
+            ))
+            ->take(max(1, $limit))
+            ->values()
+            ->all();
     }
 
     protected function schoolCommunicationHistoryRowFromConversation(array $conversation): array
