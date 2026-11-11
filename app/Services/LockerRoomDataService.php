@@ -1081,7 +1081,7 @@ class LockerRoomDataService
                     }
                 }
                 return collect($rows)
-                    ->filter(fn (array $row): bool => trim((string) ($row['preview'] ?? '')) !== '')
+                    ->filter(fn (array $row): bool => filled($row['id'] ?? null) || filled($row['contact_name'] ?? null))
                     ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
                     ->sortByDesc(fn (array $row): int => (int) ($row['_timestamp'] ?? 0))
                     ->take(30)
@@ -1107,9 +1107,11 @@ class LockerRoomDataService
         return [
             'id' => (string) ($message['id'] ?? $message['_id'] ?? $conversation['id'] ?? md5($coachName . '|' . $preview . '|' . (string) $time)),
             'direction' => $direction,
+            'contact_name' => $coachName,
             'title' => $coachName,
             'preview' => $preview,
             'date_label' => $carbon ? $carbon->diffForHumans() : '',
+            'date_time_label' => $carbon ? $carbon->timezone(config('app.timezone'))->format('M j, Y · g:i A') : '',
             'opened' => (bool) ($message['opened'] ?? $message['isOpened'] ?? false),
             'reply' => $direction === 'inbound',
             '_timestamp' => $carbon ? $carbon->getTimestamp() : 0,
