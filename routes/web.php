@@ -474,6 +474,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('locker-room.recruiting.template');
     Route::post('/locker-room/recruiting/email', [LockerRoomRecruitingController::class, 'sendEmail'])
         ->name('locker-room.recruiting.email.send');
+    Route::post('/locker-room/recruiting/email/test', [LockerRoomRecruitingController::class, 'sendTestEmail'])
+        ->name('locker-room.recruiting.email.test');
     Route::get('/locker-room/points', [LockerRoomRecruitingController::class, 'points'])
         ->name('locker-room.points');
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
