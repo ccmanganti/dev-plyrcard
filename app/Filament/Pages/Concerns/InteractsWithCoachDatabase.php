@@ -13,6 +13,7 @@ use App\Services\CoachDatabaseBackgroundSyncLauncher;
 use App\Services\CoachDatabaseUiSyncService;
 use App\Services\CoachDatabaseWebFallbackSyncService;
 use App\Services\GoHighLevelService;
+use App\Services\PlyrcardMailTransport;
 use App\Support\TrackingLinkRewriter;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Collection;
@@ -14088,35 +14089,54 @@ protected function ensureComposeBodyHasFooter(): void
         $personalizedSubject = $this->replaceCampaignTokens($subject, $coach);
         $personalizedBody = $this->replaceCampaignTokens($html, $coach);
 
-        try {
-            Mail::html($personalizedBody, function ($message) use ($to, $personalizedSubject): void {
-                $message
-                    ->to($to)
-                    ->subject('[TEST] ' . $personalizedSubject);
-            });
-        } catch (\Throwable $exception) {
+        $result = app(PlyrcardMailTransport::class)->sendHtml(
+            recipient: $to,
+            subject: '[TEST] ' . $personalizedSubject,
+            html: $personalizedBody,
+            replyTo: trim((string) ($user->personal_email ?: $user->email)),
+            context: [
+                'purpose' => 'compose_test_email',
+                'user_id' => $user->getKey(),
+                'source' => 'recruiting_center_compose',
+            ],
+        );
+
+        if (! ($result['success'] ?? false)) {
+            $error = trim((string) ($result['error'] ?? 'No deliverable mail transport is configured.'));
+
             Log::warning('Compose test email failed.', [
                 'user_id' => $user->getKey(),
                 'email' => $to,
-                'error' => $exception->getMessage(),
+                'attempted_transports' => $result['attempted_transports'] ?? [],
+                'error' => $error,
             ]);
 
             Notification::make()
                 ->title('Test Email')
-                ->body('Unable to send the test email right now.')
+                ->body($error)
                 ->danger()
                 ->send();
 
-            return ['ok' => false, 'message' => 'Unable to send the test email right now.'];
+            return [
+                'ok' => false,
+                'message' => 'Test email was not delivered: ' . $error,
+                'attempted_transports' => $result['attempted_transports'] ?? [],
+            ];
         }
+
+        $transport = trim((string) ($result['transport'] ?? 'mail transport'));
 
         Notification::make()
             ->title('Test Email')
-            ->body('Sent to ' . $to . ' using the current Compose content and PLYRCard signature.')
+            ->body('Sent to ' . $to . ' via ' . $transport . ' using the current Compose content and PLYRCard signature.')
             ->success()
             ->send();
 
-        return ['ok' => true, 'message' => 'Test email sent to ' . $to . '.'];
+        return [
+            'ok' => true,
+            'message' => 'Test email sent to ' . $to . ' via ' . $transport . '.',
+            'transport' => $transport,
+        ];
     }
 
     public function sendComposedEmailWithCoachIds(array $coachIds = []): void
