@@ -1552,6 +1552,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'plyrlab_is_superadmin' => (bool) ($plyrLabAdmin['is_superadmin'] ?? false),
             'plyrlab_is_trainer_portal' => (bool) ($plyrLabAdmin['is_trainer_portal'] ?? false),
             'plyrlab_viewer_trainer' => $plyrLabAdmin['viewer_trainer'] ?? null,
+            'plyrlab_calendar' => $plyrLabAdmin['calendar'] ?? null,
             'coach_outreach_sent' => $coachOutreachSent,
             'reminders_this_week' => $this->recentReminderActivity($athleteIds),
             'service_activity' => $serviceActivity,
@@ -1945,6 +1946,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             'is_superadmin' => false,
             'is_trainer_portal' => false,
             'viewer_trainer' => null,
+            'calendar' => null,
         ];
 
         if (
@@ -2089,6 +2091,10 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 $bookingQuery->where('trainer_id', $viewerTrainer->getKey());
             }
 
+            $trainerCalendar = (! $isSuperadmin && $viewerTrainer)
+                ? $this->plyrLabTrainerCalendarData($viewerTrainer)
+                : null;
+
             return [
                 'trainers' => $trainerRows,
                 'bookings' => $bookings,
@@ -2117,6 +2123,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                     'api_connected' => $viewerTrainer->hasPlyomatConnection(),
                     'location' => trim((string) ($viewerTrainer->location ?? '')),
                 ] : null,
+                'calendar' => $trainerCalendar,
             ];
         } catch (Throwable) {
             return $empty;
