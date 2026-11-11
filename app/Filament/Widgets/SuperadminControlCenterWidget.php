@@ -515,6 +515,47 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             ->send();
     }
 
+    public function approvePlyrLabBooking(int $bookingId): void
+    {
+        $booking = PlyrLabBooking::query()
+            ->with(['player', 'trainer.user'])
+            ->findOrFail($bookingId);
+
+        abort_unless($this->canManagePlyrLabBooking($booking), 403);
+        abort_unless(in_array($booking->status, ['pending_approval', 'reschedule_pending', 'pending'], true), 422);
+
+        $isReschedule = $booking->status === 'reschedule_pending';
+
+        if ($isReschedule && filled($booking->plyomat_athlete_id)) {
+            $booking->forceFill([
+                'status' => 'active',
+                'last_sync_error' => null,
+            ])->save();
+
+            $booking->notifyStakeholders('reschedule_approved');
+        } else {
+            $booking->forceFill([
+                'status' => 'provisioning',
+                'last_sync_error' => null,
+            ])->save();
+
+            ProvisionPlyrLabAthlete::dispatchSync($booking->getKey());
+            $booking = $booking->fresh(['player', 'trainer.user']) ?? $booking;
+
+            $booking->notifyStakeholders($isReschedule ? 'reschedule_approved' : 'booking_approved');
+        }
+
+        Cache::forget('superadmin:control-center:v6');
+
+        Notification::make()
+            ->title($isReschedule ? 'Reschedule approved' : 'Booking approved')
+            ->body($this->userName($booking->player) . ($isReschedule
+                ? '\'s updated session time has been approved.'
+                : '\'s booking has been approved. Plyomat provisioning now starts after this approval.'))
+            ->success()
+            ->send();
+    }
+
     public function syncPlyrLabBooking(int $bookingId): void
     {
         $booking = PlyrLabBooking::query()
@@ -604,9 +645,19 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             return;
         }
 
+        $previousStatus = $booking->status;
+
         $booking->forceFill([
             'status' => $status,
         ])->save();
+
+        if ($status === 'cancelled') {
+            $booking->notifyStakeholders(
+                in_array($previousStatus, ['pending_approval', 'reschedule_pending', 'pending'], true)
+                    ? 'booking_declined'
+                    : 'booking_cancelled'
+            );
+        }
 
         Cache::forget('superadmin:control-center:v6');
 
@@ -1587,7 +1638,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'scheduled_for' => $booking->scheduled_for?->format('M j, Y · g:i A') ?? 'Not scheduled',
                         'status' => $status,
                         'status_label' => match ($status) {
-                            'provisioning', 'pending' => 'Connecting to Plyomat',
+                            'pending_approval', 'pending' => 'Awaiting Trainer Approval',
+                            'reschedule_pending' => 'Reschedule Awaiting Approval',
+                            'provisioning' => 'Connecting to Plyomat',
                             'awaiting_athlete_id' => 'Awaiting Athlete ID',
                             'awaiting_integration' => 'Awaiting Trainer API',
                             'provisioning_failed' => 'Connection Failed',
@@ -1601,7 +1654,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                             && app(PlyomatService::class)->hasPerformanceMeasurements($booking->plyomat_stats),
                         'last_sync' => $booking->plyomat_last_synced_at?->diffForHumans()
                             ?? ($booking->plyomat_provisioned_at?->diffForHumans() ?? 'Not synced'),
-                        'needs_attention' => in_array($status, ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true),
+                        'needs_attention' => in_array($status, ['pending_approval', 'reschedule_pending', 'awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'], true),
                         'can_reset' => $isSuperadmin && (
                             $status !== 'cancelled'
                             || filled($booking->plyomat_athlete_id)
@@ -1636,7 +1689,7 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         ->distinct('player_user_id')
                         ->count('player_user_id'),
                     'needs_attention' => (clone $bookingQuery)
-                        ->whereIn('status', ['awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'])
+                        ->whereIn('status', ['pending_approval', 'reschedule_pending', 'awaiting_athlete_id', 'awaiting_integration', 'provisioning_failed'])
                         ->count(),
                 ],
                 'trainers_url' => $isSuperadmin ? $this->plyrLabTrainerIndexUrl() : null,
