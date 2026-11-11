@@ -528,6 +528,8 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
 
         if ($isReschedule && filled($booking->plyomat_athlete_id)) {
             $booking->forceFill([
+                'scheduled_for' => $booking->requested_scheduled_for ?: $booking->scheduled_for,
+                'requested_scheduled_for' => null,
                 'status' => 'active',
                 'last_sync_error' => null,
             ])->save();
@@ -535,6 +537,10 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
             $booking->notifyStakeholders('reschedule_approved');
         } else {
             $booking->forceFill([
+                'scheduled_for' => $isReschedule
+                    ? ($booking->requested_scheduled_for ?: $booking->scheduled_for)
+                    : $booking->scheduled_for,
+                'requested_scheduled_for' => $isReschedule ? null : $booking->requested_scheduled_for,
                 'status' => 'provisioning',
                 'last_sync_error' => null,
             ])->save();
@@ -553,6 +559,44 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                 ? '\'s updated session time has been approved.'
                 : '\'s booking has been approved. Plyomat provisioning now starts after this approval.'))
             ->success()
+            ->send();
+    }
+
+    public function declinePlyrLabBooking(int $bookingId): void
+    {
+        $booking = PlyrLabBooking::query()
+            ->with(['player', 'trainer.user'])
+            ->findOrFail($bookingId);
+
+        abort_unless($this->canManagePlyrLabBooking($booking), 403);
+        abort_unless(in_array($booking->status, ['pending_approval', 'reschedule_pending', 'pending'], true), 422);
+
+        $isReschedule = $booking->status === 'reschedule_pending';
+
+        if ($isReschedule) {
+            $booking->forceFill([
+                'requested_scheduled_for' => null,
+                'status' => filled($booking->plyomat_athlete_id) ? 'active' : 'awaiting_athlete_id',
+            ])->save();
+
+            $booking->notifyStakeholders('reschedule_declined');
+        } else {
+            $booking->forceFill([
+                'status' => 'cancelled',
+                'requested_scheduled_for' => null,
+            ])->save();
+
+            $booking->notifyStakeholders('booking_declined');
+        }
+
+        Cache::forget('superadmin:control-center:v6');
+
+        Notification::make()
+            ->title($isReschedule ? 'Reschedule declined' : 'Booking declined')
+            ->body($isReschedule
+                ? 'The requested time was declined. The previously approved booking remains active.'
+                : 'The booking request was declined and the player can choose another trainer or time.')
+            ->warning()
             ->send();
     }
 
@@ -1635,7 +1679,9 @@ class SuperadminControlCenterWidget extends SuperadminOverviewWidget
                         'initials' => $player ? $this->initials($player) : 'P',
                         'sport' => $player ? $this->sportLabel((string) ($player->sport ?? '')) : 'Athlete',
                         'trainer' => $booking->trainer?->displayName() ?? 'Trainer unavailable',
-                        'scheduled_for' => $booking->scheduled_for?->format('M j, Y · g:i A') ?? 'Not scheduled',
+                        'scheduled_for' => ($status === 'reschedule_pending' && $booking->requested_scheduled_for
+                            ? $booking->requested_scheduled_for
+                            : $booking->scheduled_for)?->format('M j, Y · g:i A') ?? 'Not scheduled',
                         'status' => $status,
                         'status_label' => match ($status) {
                             'pending_approval', 'pending' => 'Awaiting Trainer Approval',
