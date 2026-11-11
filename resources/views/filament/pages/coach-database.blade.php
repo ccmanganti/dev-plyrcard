@@ -6719,6 +6719,22 @@ discoverSelectedIds: [],
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
         x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
         x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
+        x-on:rc-inbox-conversation-changing.window="
+            window.__rcInboxFollowSchoolDrawer = !!schoolDrawerOpen;
+            if (schoolDrawerOpen) closeDiscoverSchool();
+        "
+        x-on:rc-inbox-school-changed.window="
+            const follow = !!window.__rcInboxFollowSchoolDrawer;
+            window.__rcInboxFollowSchoolDrawer = false;
+            if (!follow) return;
+            const nextSchool = $event.detail?.school || null;
+            if (nextSchool && (nextSchool.id || nextSchool.school_id || nextSchool.name)) openGlobalSchool(nextSchool);
+            else closeDiscoverSchool();
+        "
+        x-on:rc-inbox-school-clear.window="
+            window.__rcInboxFollowSchoolDrawer = false;
+            if (schoolDrawerOpen) closeDiscoverSchool();
+        "
         x-on:rc-school-optimistic-clear.window="closeDiscoverSchool()"
         x-on:rc-discover-school-state.window="applyGlobalSchoolState($event.detail)"
         x-on:rc-list-membership-changed.window="applyGlobalListMembership($event.detail)"
@@ -10532,6 +10548,12 @@ CSS;
                                 loadConversation(conversationId, force = false, boot = false) {
                                     const id = String(conversationId || '');
                                     if (! id) return;
+                                    const previousId = String(this.selectedConversationId || '');
+                                    if (previousId !== id) {
+                                        window.dispatchEvent(new CustomEvent('rc-inbox-conversation-changing', {
+                                            detail: { conversationId: id, previousConversationId: previousId }
+                                        }));
+                                    }
                                     this.selectedConversationId = id;
                                     this.setThreadLoading(id);
                                     window.__rcInboxMessageLoader = window.__rcInboxMessageLoader || { busy: false, queued: '', promise: null, lastId: '', lastAt: 0 };
