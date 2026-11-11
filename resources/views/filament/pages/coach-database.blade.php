@@ -13081,10 +13081,16 @@ CSS;
                         this.coachRevision++;
                         this.rememberRecipientState();
                     },
-                    async sendTest(wireInstance = null) {
-                        if (this.testingEmail) return;
-                        if (!this.composeSubjectReady) { toast('Add a subject before sending a test.'); return; }
-                        if (!this.composeBodyReady) { toast('Write a message before sending a test.'); return; }
+                    async sendTest(recipientEmail = '', wireInstance = null) {
+                        if (this.testingEmail) return false;
+                        if (!this.composeSubjectReady) { toast('Add a subject before sending a test.'); return false; }
+                        if (!this.composeBodyReady) { toast('Write a message before sending a test.'); return false; }
+
+                        const to = String(recipientEmail || '').trim();
+                        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(to)) {
+                            toast('Enter a valid email address for the test email.');
+                            return false;
+                        }
 
                         const wire = wireInstance || this.$wire || (() => {
                             const root = window.rcFindCoachDatabaseLivewireComponent
@@ -13096,7 +13102,7 @@ CSS;
 
                         if (!wire || typeof wire.call !== 'function') {
                             toast('Composer is still loading. Try again in a second.');
-                            return;
+                            return false;
                         }
 
                         const composePage = this.$root || document.querySelector('.rc-compose-page-v45') || document;
@@ -13115,15 +13121,17 @@ CSS;
                         this.testingEmail = true;
 
                         try {
-                            const result = await wire.call('sendComposeTestEmailFromClient', { subject, body });
+                            const result = await wire.call('sendComposeTestEmailFromClient', { to, subject, body });
                             if (result && result.ok === false) {
                                 toast(String(result.message || 'Unable to send the test email.'));
-                                return;
+                                return false;
                             }
-                            toast(String(result?.message || 'Test email sent.'));
+                            toast(String(result?.message || ('Test email sent to ' + to + '.')));
+                            return true;
                         } catch (error) {
                             console.error(error);
                             toast('Unable to send the test email right now.');
+                            return false;
                         } finally {
                             this.testingEmail = false;
                         }
@@ -13253,18 +13261,78 @@ CSS;
                                 </div>
                             </div>
                         </div>
-                        <button
-                            class="rc-btn"
-                            type="button"
-                            x-on:click.prevent.stop="sendTest($wire)"
-                            x-bind:disabled="testingEmail || !composeSubjectReady || !composeBodyReady"
-                            x-bind:class="{ 'is-compose-disabled-v114': !composeSubjectReady || !composeBodyReady }"
-                            title="Send the current email to your own account"
+                        <div
+                            class="rc-compose-save-template-wrap-v115"
+                            x-data="{
+                                open:false,
+                                email:'',
+                                error:'',
+                                openPrompt() {
+                                    if (testingEmail) return;
+                                    this.error = '';
+                                    this.open = !this.open;
+                                    if (this.open) this.$nextTick(() => this.$refs.emailInput?.focus());
+                                },
+                                async submit() {
+                                    if (testingEmail) return;
+                                    const value = String(this.email || '').trim();
+                                    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)) {
+                                        this.error = 'Enter a valid email address.';
+                                        this.$nextTick(() => this.$refs.emailInput?.focus());
+                                        return;
+                                    }
+                                    this.error = '';
+                                    const sent = await sendTest(value, $wire);
+                                    if (sent) {
+                                        this.open = false;
+                                        this.email = '';
+                                    }
+                                },
+                            }"
+                            x-on:keydown.escape.window="if (!testingEmail) open=false"
                         >
-                            <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75 12 13.5 2.25 6.75M3.75 4.5h16.5A1.5 1.5 0 0 1 21.75 6v12a1.5 1.5 0 0 1-1.5 1.5H3.75A1.5 1.5 0 0 1 2.25 18V6a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
-                            <span x-show="!testingEmail">Test Email</span>
-                            <span x-cloak x-show="testingEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending test</span>
-                        </button>
+                            <button
+                                class="rc-btn"
+                                type="button"
+                                x-on:click.prevent.stop="openPrompt()"
+                                x-bind:disabled="testingEmail || !composeSubjectReady || !composeBodyReady"
+                                x-bind:class="{ 'is-compose-disabled-v114': !composeSubjectReady || !composeBodyReady }"
+                                title="Send the current email to an address you enter"
+                            >
+                                <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75 12 13.5 2.25 6.75M3.75 4.5h16.5A1.5 1.5 0 0 1 21.75 6v12a1.5 1.5 0 0 1-1.5 1.5H3.75A1.5 1.5 0 0 1 2.25 18V6a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
+                                <span x-show="!testingEmail">Test Email</span>
+                                <span x-cloak x-show="testingEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending test</span>
+                            </button>
+                            <div
+                                x-cloak
+                                x-show="open"
+                                x-on:click.outside="if (!testingEmail) open=false"
+                                class="rc-compose-save-template-popover-v115"
+                            >
+                                <div>
+                                    <strong>Send Test Email</strong>
+                                    <p>Enter the email address that should receive this test.</p>
+                                </div>
+                                <input
+                                    x-ref="emailInput"
+                                    class="rc-input"
+                                    type="email"
+                                    inputmode="email"
+                                    autocomplete="email"
+                                    placeholder="name@example.com"
+                                    x-model.trim="email"
+                                    x-on:keydown.enter.prevent="submit()"
+                                >
+                                <div x-cloak x-show="error" class="rc-compose-save-template-error-v115" x-text="error"></div>
+                                <div class="rc-compose-save-template-popover-actions-v115">
+                                    <button class="rc-btn" type="button" x-bind:disabled="testingEmail" x-on:click.prevent="open=false">Cancel</button>
+                                    <button class="rc-btn rc-btn-primary" type="button" x-bind:disabled="testingEmail" x-on:click.prevent="submit()">
+                                        <span x-show="!testingEmail">Send Test</span>
+                                        <span x-cloak x-show="testingEmail" class="rc-loading-inline"><span class="rc-spinner-mini"></span> Sending</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                         <button class="rc-btn" type="button" data-rc-local-action data-rc-compose-preview-instant-v99 x-on:click.prevent.stop="openPreview()" x-bind:disabled="!composeReady" x-bind:class="{ 'is-compose-disabled-v114': !composeReady }">
                             <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.25 12s3.75-6.75 9.75-6.75S21.75 12 21.75 12 18 18.75 12 18.75 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                             Preview
@@ -14812,9 +14880,18 @@ CSS;
                     this.captureSelection();
                     this.syncNow();
                 },
+                // Toolbar compatibility aliases. The Compose markup calls format()/formatBlock(),
+                // while the native editor implementation uses command()/block(). Keep both names
+                // so bold/italic/underline/lists/headings work without disturbing image insertion.
+                format(name, value = null) {
+                    this.command(name, value);
+                },
                 block(tag) {
                     const safeTag = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tag) ? tag : 'p';
                     this.command('formatBlock', safeTag);
+                },
+                formatBlock(tag) {
+                    this.block(tag);
                 },
                 escapeHtml(value) {
                     return String(value || '')
