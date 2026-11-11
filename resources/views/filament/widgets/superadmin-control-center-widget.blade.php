@@ -1476,7 +1476,47 @@
 .pc-plyrlab-player-card{padding:.85rem}.pc-plyrlab-player-status{display:flex;gap:.35rem;flex-wrap:wrap;margin:.7rem 0}
 .pc-plyrlab-api-panel{max-width:760px}.pc-plyrlab-api-body{display:grid;gap:.75rem;padding:.9rem}
 .pc-plyrlab-field{display:grid;gap:.3rem}.pc-plyrlab-field span{color:var(--pc-muted);font-size:.62rem;font-weight:800}
-@media(max-width:900px){.pc-plyrlab-health-grid{grid-template-columns:1fr}.pc-plyrlab-manual-connect{grid-template-columns:1fr}.pc-plyrlab-bookings-table{min-width:860px}}
+
+.pc-plyrlab-calendar-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.75fr);gap:.85rem;align-items:start}
+.pc-plyrlab-calendar-panel{overflow:hidden}
+.pc-plyrlab-calendar-head{align-items:center}
+.pc-plyrlab-calendar-nav{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;justify-content:flex-end}
+.pc-plyrlab-calendar-nav strong{min-width:8rem;text-align:center;font-size:.76rem}
+.pc-plyrlab-calendar-weekdays{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--pc-line);border-bottom:1px solid var(--pc-line);background:var(--pc-panel2)}
+.pc-plyrlab-calendar-weekdays span{padding:.45rem .35rem;text-align:center;color:var(--pc-dim);font-size:.55rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.pc-plyrlab-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:var(--pc-line);gap:1px}
+.pc-plyrlab-calendar-day{appearance:none;display:flex;min-width:0;min-height:7.25rem;flex-direction:column;gap:.35rem;padding:.45rem;border:0;background:var(--pc-panel);color:var(--pc-text);text-align:left;cursor:pointer;transition:background .15s ease,box-shadow .15s ease}
+.pc-plyrlab-calendar-day:hover{background:var(--pc-panel2);box-shadow:inset 0 0 0 1px rgba(255,100,72,.3)}
+.pc-plyrlab-calendar-day.is-muted{opacity:.46}
+.pc-plyrlab-calendar-day.is-selected{box-shadow:inset 0 0 0 2px var(--pc-coral)}
+.pc-plyrlab-calendar-day.is-today .pc-plyrlab-calendar-date b{display:grid;place-items:center;width:1.5rem;height:1.5rem;border-radius:50%;background:var(--pc-coral);color:#fff}
+.pc-plyrlab-calendar-day.is-unavailable:not(.is-muted){background:repeating-linear-gradient(-45deg,var(--pc-panel),var(--pc-panel) 8px,var(--pc-panel2) 8px,var(--pc-panel2) 16px)}
+.pc-plyrlab-calendar-date{display:flex;align-items:center;justify-content:space-between;gap:.25rem}
+.pc-plyrlab-calendar-date b{font-size:.68rem}
+.pc-plyrlab-calendar-date small{max-width:5.7rem;color:var(--pc-dim);font-size:.48rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pc-plyrlab-calendar-events{display:flex;flex-direction:column;gap:.22rem;min-width:0}
+.pc-plyrlab-cal-event{display:flex;min-width:0;align-items:center;gap:.25rem;padding:.22rem .3rem;border-radius:.35rem;font-size:.49rem;line-height:1.2;overflow:hidden}
+.pc-plyrlab-cal-event b{font-size:.48rem;white-space:nowrap}.pc-plyrlab-cal-event span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pc-plyrlab-cal-event.is-booking{background:rgba(47,128,237,.12);color:#2f80ed;border:1px solid rgba(47,128,237,.18)}
+.pc-plyrlab-cal-event.is-blocked{background:rgba(240,169,59,.13);color:var(--pc-amber);border:1px solid rgba(240,169,59,.2)}
+.pc-plyrlab-cal-more{color:var(--pc-dim);font-size:.48rem;font-weight:750}
+.pc-plyrlab-calendar-legend{display:flex;gap:.85rem;flex-wrap:wrap;padding:.65rem .8rem;border-top:1px solid var(--pc-line);color:var(--pc-muted);font-size:.55rem}
+.pc-plyrlab-calendar-legend span{display:flex;align-items:center;gap:.3rem}.pc-plyrlab-calendar-legend i{width:.55rem;height:.55rem;border-radius:.16rem}.pc-plyrlab-calendar-legend i.is-booking{background:#2f80ed}.pc-plyrlab-calendar-legend i.is-blocked{background:var(--pc-amber)}.pc-plyrlab-calendar-legend i.is-unavailable{background:var(--pc-dim)}
+.pc-plyrlab-calendar-sidebar{display:grid;gap:.85rem}
+.pc-plyrlab-weekly-list{display:grid;padding:.65rem .8rem}
+.pc-plyrlab-weekly-row{display:grid;grid-template-columns:minmax(7.5rem,.8fr) minmax(0,1.2fr);align-items:center;gap:.5rem;padding:.45rem 0;border-bottom:1px solid var(--pc-line)}
+.pc-plyrlab-weekly-row:last-child{border-bottom:0}
+.pc-plyrlab-day-toggle{display:flex;align-items:center;gap:.45rem;color:var(--pc-text);font-size:.62rem;font-weight:800}.pc-plyrlab-day-toggle input{accent-color:var(--pc-coral)}
+.pc-plyrlab-time-range{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:.3rem}.pc-plyrlab-time-range span{color:var(--pc-dim);font-size:.52rem}
+.pc-plyrlab-time-range input,.pc-plyrlab-block-form input{width:100%;min-width:0;min-height:2.05rem;border:1px solid var(--pc-line2);border-radius:.45rem;background:var(--pc-panel);color:var(--pc-text);padding:.3rem .4rem;font-size:.58rem}
+.pc-plyrlab-panel-actions{display:flex;justify-content:flex-end;padding:.7rem .8rem;border-top:1px solid var(--pc-line)}
+.pc-plyrlab-block-form{display:grid;gap:.65rem;padding:.8rem}.pc-plyrlab-block-form>label{display:grid;gap:.3rem}.pc-plyrlab-block-form label>span{color:var(--pc-muted);font-size:.58rem;font-weight:800}.pc-plyrlab-block-form label small{font-weight:600;color:var(--pc-dim)}
+.pc-plyrlab-block-toggle{display:flex!important;grid-template-columns:auto 1fr!important;align-items:center;gap:.45rem}.pc-plyrlab-block-toggle input{width:auto;min-height:auto;accent-color:var(--pc-coral)}
+.pc-plyrlab-block-times{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}.pc-plyrlab-block-times label{display:grid;gap:.3rem}.pc-plyrlab-block-times span{color:var(--pc-muted);font-size:.58rem;font-weight:800}
+.pc-plyrlab-upcoming-blocks{display:grid;gap:.4rem;padding:.7rem .8rem;border-top:1px solid var(--pc-line)}.pc-plyrlab-upcoming-blocks>strong{font-size:.6rem}.pc-plyrlab-upcoming-blocks>div{display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.45rem .5rem;border:1px solid var(--pc-line);border-radius:.5rem;background:var(--pc-panel2)}.pc-plyrlab-upcoming-blocks span{display:grid;gap:.1rem}.pc-plyrlab-upcoming-blocks b{font-size:.57rem}.pc-plyrlab-upcoming-blocks small{color:var(--pc-muted);font-size:.51rem}.pc-plyrlab-upcoming-blocks button{border:0;background:transparent;color:var(--pc-red);font-size:.52rem;font-weight:850;cursor:pointer}
+@media(max-width:1100px){.pc-plyrlab-calendar-layout{grid-template-columns:1fr}.pc-plyrlab-calendar-sidebar{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.pc-plyrlab-health-grid{grid-template-columns:1fr}.pc-plyrlab-manual-connect{grid-template-columns:1fr}.pc-plyrlab-bookings-table{min-width:860px}.pc-plyrlab-calendar-sidebar{grid-template-columns:1fr}.pc-plyrlab-calendar-day{min-height:6rem}.pc-plyrlab-calendar-date small{display:none}}
+@media(max-width:640px){.pc-plyrlab-calendar-grid,.pc-plyrlab-calendar-weekdays{min-width:700px}.pc-plyrlab-calendar-panel{overflow-x:auto}.pc-plyrlab-weekly-row{grid-template-columns:1fr}.pc-plyrlab-calendar-nav{justify-content:flex-start}}
 
 
 .pc-plyrlab-admin-connect{margin-bottom:.8rem;border-color:rgba(255,100,72,.28)}
