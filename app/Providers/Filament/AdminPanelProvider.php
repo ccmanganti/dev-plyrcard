@@ -102,6 +102,7 @@ class AdminPanelProvider extends PanelProvider
                 'Dashboard',
                 'Platform Management',
                 'Operations & Support',
+                'PLYRLab',
                 'Recruiting Center',
             ])
             ->colors([
