@@ -807,7 +807,7 @@ discoverSelectedIds: [],
                 if (!id) return;
                 const now = Date.now();
                 const last = Number(this.discoverSchoolCommsRefreshedAt?.[id] || 0);
-                if (!force && last && (now - last) < 60000) return;
+                if (!force && last && (now - last) < 60000 && this.discoverSchoolComms.length > 0) return;
                 if (this.discoverSchoolCommsRefreshingFor === id) return;
                 this.discoverSchoolCommsRefreshingFor = id;
                 try {
