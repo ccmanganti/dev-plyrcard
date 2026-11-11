@@ -35,7 +35,7 @@ class PlyrLabDataService
 
         $connected = $booking
             && filled($booking->plyomat_athlete_id)
-            && in_array($booking->status, ['active', 'completed'], true);
+            && in_array($booking->status, ['active', 'completed', 'reschedule_pending'], true);
 
         return [
             'player' => $this->playerPayload($player),
@@ -286,7 +286,9 @@ class PlyrLabDataService
             'id' => $booking->getKey(),
             'status' => $booking->status,
             'status_label' => match ($booking->status) {
-                'provisioning', 'pending' => 'Connecting to Plyomat',
+                'pending_approval', 'pending' => 'Awaiting Trainer Approval',
+                'reschedule_pending' => 'Reschedule Awaiting Approval',
+                'provisioning' => 'Connecting to Plyomat',
                 'active' => 'Connected',
                 'awaiting_athlete_id' => 'Existing Profile Detected',
                 'awaiting_integration' => 'Awaiting Trainer Setup',
@@ -314,7 +316,11 @@ class PlyrLabDataService
 
         return match ($booking->status) {
             'active' => 'Your PLYRLab is connected to Plyomat and ready for performance data.',
-            'provisioning', 'pending' => 'Trainer booked. PLYRCard is creating your Plyomat athlete profile automatically.',
+            'pending_approval', 'pending' => 'Your booking request is waiting for trainer approval. PLYRLab stays locked until the trainer accepts it.',
+            'reschedule_pending' => filled($booking->plyomat_athlete_id)
+                ? 'Your new session time is waiting for trainer approval. Your existing PLYRLab performance access remains available.'
+                : 'Your new session time is waiting for trainer approval.',
+            'provisioning' => 'Your trainer approved the booking. PLYRCard is now connecting your Plyomat athlete profile.',
             'awaiting_athlete_id' => 'An existing Plyomat athlete may already exist. Enter the Athlete ID from your trainer to connect that profile instead.',
             'awaiting_integration' => 'Your booking is confirmed. We are waiting for your trainer to connect their Plyomat API key before your athlete profile can be created.',
             'provisioning_failed' => 'Automatic Plyomat creation failed. You can connect an existing Athlete ID instead, or have an admin check the trainer API key.',
