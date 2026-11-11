@@ -13083,8 +13083,16 @@ CSS;
                     },
                     async sendTest(recipientEmail = '', wireInstance = null) {
                         if (this.testingEmail) return false;
-                        if (!this.composeSubjectReady) { toast('Add a subject before sending a test.'); return false; }
-                        if (!this.composeBodyReady) { toast('Write a message before sending a test.'); return false; }
+
+                        const composePage = this.$root || document.querySelector('.rc-compose-page-v45') || document;
+                        const subjectInput = composePage.querySelector('[data-rc-compose-subject]');
+                        const editor = composePage.querySelector('[data-plyr-native-editor=campaign-body]');
+                        const currentSubject = String(subjectInput?.value || '').trim();
+                        const currentText = String(editor?.innerText || editor?.textContent || '').replace(/\u200B/g, '').trim();
+                        const hasCurrentBody = currentText.length > 0 || !!editor?.querySelector('img');
+
+                        if (!currentSubject) { toast('Add a subject before sending a test.'); return false; }
+                        if (!hasCurrentBody) { toast('Write a message before sending a test.'); return false; }
 
                         const to = String(recipientEmail || '').trim();
                         if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(to)) {
@@ -13105,10 +13113,8 @@ CSS;
                             return false;
                         }
 
-                        const composePage = this.$root || document.querySelector('.rc-compose-page-v45') || document;
-                        const subject = String(composePage.querySelector('[data-rc-compose-subject]')?.value || '').trim();
+                        const subject = currentSubject;
                         const nativeEditor = window.__plyrNativeEditors?.campaignBody;
-                        const editor = composePage.querySelector('[data-plyr-native-editor=campaign-body]');
                         const body = String(
                             (nativeEditor && typeof nativeEditor.serializeEditorHtml === 'function'
                                 ? nativeEditor.serializeEditorHtml()
@@ -13295,8 +13301,7 @@ CSS;
                                 class="rc-btn"
                                 type="button"
                                 x-on:click.prevent.stop="openPrompt()"
-                                x-bind:disabled="testingEmail || !composeSubjectReady || !composeBodyReady"
-                                x-bind:class="{ 'is-compose-disabled-v114': !composeSubjectReady || !composeBodyReady }"
+                                x-bind:disabled="testingEmail"
                                 title="Send the current email to an address you enter"
                             >
                                 <svg class="rc-icon-sm" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.75 6.75 12 13.5 2.25 6.75M3.75 4.5h16.5A1.5 1.5 0 0 1 21.75 6v12a1.5 1.5 0 0 1-1.5 1.5H3.75A1.5 1.5 0 0 1 2.25 18V6a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>
