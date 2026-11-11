@@ -996,6 +996,7 @@ discoverSelectedIds: [],
             closeDiscoverSchool() {
                 window.__plyrSchoolDrawerOptimistic = null;
                 window.__plyrInboxSchoolOpenAt = 0;
+                window.__rcInboxFollowSchoolDrawer = false;
                 this.schoolDrawerOpen = false;
                 this.discoverListsOpen = false;
                 this.discoverDrawerTab = 'coaches';
@@ -1007,9 +1008,19 @@ discoverSelectedIds: [],
                 this.discoverSchoolScoreRequest = '';
                 this.discoverSchoolScoreLoadedFor = '';
                 this.discoverSchoolScoreLoading = false;
+
+                // Communications can still have an async HighLevel request in flight.
+                // Clear every browser-side state flag on close so that request can never
+                // leave the invisible drawer in a stale interactive/loading state.
+                this.discoverSchoolComms = [];
+                this.discoverSchoolCommsLoading = false;
+                this.discoverSchoolCommsLoadedFor = '';
+                this.discoverSchoolCommsRefreshingFor = '';
+
                 this.optimisticSchool = this.emptyDrawerSchool();
-                // v110: explicit close event is also consumed by any nested Discover
-                // controller, so a stale Alpine subtree cannot immediately repaint it.
+
+                // Reset all Inbox action rows, including rows that may have survived a
+                // Livewire morph while Communications was loading.
                 window.dispatchEvent(new CustomEvent('rc-discover-drawer-closed'));
             },
             favoriteDiscoverSchool() {
@@ -6757,7 +6768,11 @@ discoverSelectedIds: [],
     </script>
     <div
         class="rc-wrap"
-        x-init="window.initCoachDatabasePage && window.initCoachDatabasePage()"
+        x-init="
+            window.initCoachDatabasePage && window.initCoachDatabasePage();
+            window.__rcOpenSchoolNow = (school) => openGlobalSchool(school);
+            window.__rcCloseSchoolNow = () => closeDiscoverSchool();
+        "
         x-on:rc-discover-selection.window="discoverSelectedIds = Array.isArray($event.detail?.ids) ? $event.detail.ids.map(String) : []"
         x-on:rc-open-school-optimistic.window="openGlobalSchool($event.detail?.school || null)"
         x-on:rc-open-school-global.window="openGlobalSchool($event.detail?.school || $event.detail?.id || null)"
@@ -11448,17 +11463,33 @@ CSS;
                                         },
                                         openSchool() {
                                             if (!this.schoolId && !this.school?.name) return;
-                                            const now = Date.now();
-                                            const last = Number(window.__plyrInboxSchoolOpenAt || 0);
-                                            // Prevent only an accidental double-click. Do not use openingSchool
-                                            // as a hard lock because the drawer can close before its timer finishes.
-                                            if ((now - last) < 180) return;
-                                            window.__plyrInboxSchoolOpenAt = now;
+
+                                            // Do not gate reopen on a timer or a previous drawer lifecycle.
+                                            // Every click should be able to open the currently selected school's
+                                            // already-rendered payload immediately.
+                                            window.__plyrInboxSchoolOpenAt = 0;
                                             this.openingSchool = true;
                                             this.listsOpen = false;
-                                            const payload = { ...this.school, id: this.schoolId || this.school?.id, is_favorite: this.favorite, list_keys: [...this.listKeys] };
-                                            window.dispatchEvent(new CustomEvent('rc-open-school-global', { detail: { school: payload } }));
-                                            window.setTimeout(() => { this.openingSchool = false; }, 260);
+
+                                            const payload = {
+                                                ...this.school,
+                                                id: this.schoolId || this.school?.id,
+                                                is_favorite: this.favorite,
+                                                list_keys: [...this.listKeys],
+                                            };
+
+                                            if (typeof window.__rcOpenSchoolNow === 'function') {
+                                                window.__rcOpenSchoolNow(payload);
+                                            } else {
+                                                window.dispatchEvent(new CustomEvent('rc-open-school-global', {
+                                                    detail: { school: payload }
+                                                }));
+                                            }
+
+                                            // This is visual feedback only; it never disables or locks the button.
+                                            window.requestAnimationFrame(() => {
+                                                this.openingSchool = false;
+                                            });
                                         },
                                         async toggleFavorite() {
                                             if (!this.schoolId || this.favoritePending) return;
