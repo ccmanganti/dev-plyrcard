@@ -13113,7 +13113,7 @@ CSS;
                     async sendTest(recipientEmail = '', wireInstance = null) {
                         if (this.testingEmail) return false;
 
-                        const composePage = this.$root || document.querySelector('.rc-compose-page-v45') || document;
+                        const composePage = document.querySelector('.rc-compose-page-v45') || document;
                         const subjectInput = composePage.querySelector('[data-rc-compose-subject]');
                         const editor = composePage.querySelector('[data-plyr-native-editor=campaign-body]');
                         const currentSubject = String(subjectInput?.value || '').trim();
