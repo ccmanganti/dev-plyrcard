@@ -155,7 +155,29 @@ $reservedWebsiteSlugs = implode('|', [
     'clubs',
     'teams',
     'recruiting',
+    'nva',
 ]);
+/*
+\|--------------------------------------------------------------------------
+\| PLYR ACCESS for NVA
+\|--------------------------------------------------------------------------
+|
+| Keep this explicit route above the public /{websiteName} catch-all. The NVA
+| page is a standalone document and intentionally bypasses the normal player
+| website layout, middleware, and slug lookup.
+|
+*/
+Route::get('/nva', function () {
+    $path = resource_path('static/nva.html');
+
+    abort_unless(is_file($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'text/html; charset=UTF-8',
+        'Cache-Control' => 'public, max-age=300',
+    ]);
+})->name('nva');
+
 /*
 \|--------------------------------------------------------------------------
 \| Public website root
