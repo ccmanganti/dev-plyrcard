@@ -3867,6 +3867,11 @@ class GoHighLevelService
 
             if ($response->failed()) {
                 $lastStatus = $response->status();
+                // Authentication, permission, or rate-limit failures do not
+                // improve by retrying older API versions.
+                if (in_array($lastStatus, [401, 403, 429], true)) {
+                    break;
+                }
                 continue;
             }
 
@@ -4073,7 +4078,21 @@ class GoHighLevelService
             ];
         }
 
-        return ['success' => false, 'messages' => [], 'error' => 'Unable to load messages.', 'status' => $lastStatus, 'raw' => $lastData];
+        $friendlyError = match ($lastStatus) {
+            401 => 'Your email connection needs to be reconnected.',
+            403 => 'This account does not have permission to view the email messages.',
+            404 => 'This conversation could not be found.',
+            429 => 'Email requests are temporarily limited. Please try again shortly.',
+            default => 'Unable to load messages right now. Please use Refresh to try again.',
+        };
+
+        Log::warning('Inbox conversation messages could not be loaded.', [
+            'conversation_id' => $conversationId,
+            'status' => $lastStatus,
+            'attempted_versions' => $versions,
+        ]);
+
+        return ['success' => false, 'messages' => [], 'error' => $friendlyError, 'status' => $lastStatus];
     }
 
     /**
