@@ -4254,11 +4254,10 @@ class GoHighLevelService
 
     protected function trackedPlainTextFromHtml(string $html): string
     {
-        // Keep the plain-text fallback readable. The previous converter expanded
-        // every link into its full tracking URL, producing unreadable strings in
-        // clients that prefer the API's `message` field over `html`.
+        // Preserve readable text. Do not emit long tracking URLs in the
+        // alternate text body when the HTML anchor has a descriptive label.
         $html = preg_replace_callback(
-            '/<a\\b[^>]*\\bhref=["\\\']([^"\\\']+)["\\\'][^>]*>(.*?)<\\/a>/isu',
+            '/<a\b[^>]*\bhref=["\x27]([^"\x27]+)["\x27][^>]*>(.*?)<\/a>/isu',
             static function (array $matches): string {
                 $label = trim(html_entity_decode(strip_tags((string) ($matches[2] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
                 $href = trim(html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
@@ -4268,11 +4267,11 @@ class GoHighLevelService
             $html,
         ) ?? $html;
 
-        $html = preg_replace('/<\\s*br\\s*\\/?>/i', "\\n", $html) ?? $html;
-        $html = preg_replace('/<\\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\\n", $html) ?? $html;
+        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $html) ?? $html;
         $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/[ \\t]+/u', ' ', $text) ?? $text;
-        $text = preg_replace('/\\n{3,}/u', "\\n\\n", $text) ?? $text;
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
 
         return trim($text);
     }
