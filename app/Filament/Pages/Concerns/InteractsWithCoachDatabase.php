@@ -7000,8 +7000,10 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 ! in_array((string) ($row['id'] ?? ''), $existingMessageIds, true)
             )->count();
 
-            $this->messages = collect($this->messages)
-                ->merge($rows)
+            // Newly fetched email content and statuses must take precedence
+            // over older cached rows sharing the same message ID.
+            $this->messages = $rows
+                ->merge(collect($this->messages))
                 ->filter(fn ($row): bool => is_array($row))
                 ->unique(fn (array $row): string => (string) ($row['id'] ?? md5(json_encode($row) ?: '')))
                 ->sortBy(function (array $row): int {
