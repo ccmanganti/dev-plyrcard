@@ -2121,6 +2121,16 @@ class AdminPanelProvider extends PanelProvider
                             $roleNames->contains(fn ($role) => strcasecmp((string) $role, 'Free') === 0) => 'Free',
                             default => $roleNames->first() ?: 'Free',
                         };
+                        // The same owner-visit bridge used by Locker Room also handles
+                        // unpublished pages and player sites on custom domains.
+                        $playerWebsite = \App\Models\Website::query()
+                            ->where('user_id', $user->getKey())
+                            ->where('is_active', true)
+                            ->latest('updated_at')
+                            ->first();
+                        $playerWebsiteUrl = $playerWebsite
+                            ? route('locker-room.website.visit', $playerWebsite)
+                            : null;
                         $creditBalance = (int) ($user->points_available ?? 0);
                         $recentCreditPurchaseLabel = 'None yet';
                         if (\Illuminate\Support\Facades\Schema::hasTable('credit_point_transactions')) {
@@ -2144,14 +2154,23 @@ class AdminPanelProvider extends PanelProvider
                                     </button>
                                     <div class="plyr-top-profile-menu" x-show="profileOpen" x-cloak x-transition.opacity.scale.origin.top.right @click.outside="profileOpen=false" x-on:mouseenter="show()" x-on:mouseleave="hide()">
                                         <div class="plyr-top-profile-user"><span class="plyr-top-profile-avatar"><img src="{{ $avatarUrl }}" alt="{{ $name }}"></span><span class="plyr-top-profile-user-copy"><strong>{{ $name }}</strong><span>{{ $planLabel }}</span></span></div>
-                                        <div class="plyr-top-profile-section"><div class="plyr-top-profile-dual-actions"><a href="{{ $editProfileUrl }}" class="plyr-top-profile-pill is-ghost">Edit Profile</a><a href="{{ $settingsUrl }}" class="plyr-top-profile-pill is-ghost">Settings</a></div></div>
+                                        <div class="plyr-top-profile-section">
+                                            @if($playerWebsiteUrl)
+                                                <a href="{{ $playerWebsiteUrl }}" target="_blank" rel="noopener noreferrer" class="plyr-top-profile-action" style="background:rgba(255,99,56,.08);color:#ff6338;margin-bottom:.48rem;">
+                                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 4.5h18v15H3zM8 4.5v15M3 10h18" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+                                                    <span>View My Website</span>
+                                                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="margin-left:auto;"><path d="M13 5h6v6M19 5l-9 9M19 14v5H5V5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                                </a>
+                                            @endif
+                                            <div class="plyr-top-profile-dual-actions"><a href="{{ $editProfileUrl }}" class="plyr-top-profile-pill is-ghost">Edit Profile</a><a href="{{ $settingsUrl }}" class="plyr-top-profile-pill is-ghost">Settings</a></div>
+                                        </div>
                                         <div class="plyr-top-profile-section"><span class="plyr-top-profile-section-label">Points</span><div class="plyr-top-profile-summary-card"><div class="plyr-top-profile-summary-head"><strong>PLYRCARD Points</strong><a href="{{ url('/admin/coach-database/services') }}" class="plyr-top-profile-pill is-solid">Use Points</a></div><div class="plyr-top-profile-stat"><span>Available</span><strong>{{ number_format($creditBalance) }} points</strong></div><div class="plyr-top-profile-stat"><span>Recently Purchased</span><strong>{{ $recentCreditPurchaseLabel }}</strong></div></div></div>
                                         <div class="plyr-top-profile-section"><span class="plyr-top-profile-section-label">Plan</span><a href="{{ $managePlanUrl }}" class="plyr-top-profile-action"><span class="plyr-top-profile-plan-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M13 2L5 13h6l-1 9l9-12h-6V2Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></span><span class="plyr-top-profile-plan-copy"><strong>{{ $planLabel }}</strong><span>Manage Plan</span></span></a></div>
                                         <div class="plyr-top-profile-section"><form method="POST" action="{{ $logoutUrl }}" style="margin:0;">@csrf<button type="submit" class="plyr-top-profile-action is-danger"><svg viewBox="0 0 24 24" fill="none"><path d="M10 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5M14 8l4 4-4 4M18 12H8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Sign Out</span></button></form></div>
                                     </div>
                                 </div>
                             </div>
-                        BLADE, compact('name', 'editProfileUrl', 'settingsUrl', 'logoutUrl', 'managePlanUrl', 'avatarUrl', 'planLabel', 'creditBalance', 'recentCreditPurchaseLabel'));
+                        BLADE, compact('name', 'editProfileUrl', 'settingsUrl', 'logoutUrl', 'managePlanUrl', 'avatarUrl', 'planLabel', 'creditBalance', 'recentCreditPurchaseLabel', 'playerWebsiteUrl'));
                         $html .= Blade::render('@include("partials.stripe-upgrade-modal")');
                     }
 
