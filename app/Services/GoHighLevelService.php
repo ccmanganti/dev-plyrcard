@@ -3843,11 +3843,13 @@ class GoHighLevelService
             $params['lastMessageId'] = $lastMessageId;
         }
 
+        // Current HighLevel conversations and individual email APIs use v3.
+        // Prefer it first; retain date-version fallbacks for older subaccounts.
         $versions = array_values(array_unique(array_filter([
-            trim((string) config('ghl.conversations_messages_version', '2021-04-15')),
-            '2021-04-15',
-            '2023-02-21',
             'v3',
+            trim((string) config('ghl.conversations_messages_version', 'v3')),
+            '2023-02-21',
+            '2021-04-15',
         ])));
 
         $lastStatus = null;
@@ -3945,6 +3947,15 @@ class GoHighLevelService
 
                         if (! is_array($emailMessage)) {
                             $emailMessage = data_get($detailData, 'message');
+                        }
+
+                        // GET /conversations/messages/email/{id} (v3) returns the
+                        // complete email record as the ROOT response, not necessarily
+                        // wrapped in emailMessage/message.
+                        if (! is_array($emailMessage) && is_array($detailData)
+                            && isset($detailData['id'])
+                            && (array_key_exists('body', $detailData) || array_key_exists('html', $detailData))) {
+                            $emailMessage = $detailData;
                         }
 
                         if (! is_array($emailMessage)) {
@@ -4055,8 +4066,9 @@ class GoHighLevelService
                 'messages' => $messages,
                 // Pagination must continue using the generic conversation-message
                 // cursor, not an individual email ID generated during expansion.
-                'last_message_id' => collect($items)->last()['id'] ?? $lastMessageId,
-                'has_more' => count($items) >= $params['limit'],
+                'last_message_id' => data_get($data, 'messages.lastMessageId')
+                    ?? collect($items)->last()['id'] ?? $lastMessageId,
+                'has_more' => (bool) (data_get($data, 'messages.nextPage') ?? (count($items) >= $params['limit'])),
                 'error' => null,
             ];
         }
@@ -4072,15 +4084,12 @@ class GoHighLevelService
      */
     protected function conversationEmailMessageIds(array $item): array
     {
-        $rawIds = data_get($item, 'meta.email.messageIds', []);
-
-        if (is_string($rawIds) || is_numeric($rawIds)) {
-            $rawIds = [$rawIds];
-        }
-
-        if (! is_array($rawIds)) {
-            $rawIds = [];
-        }
+        // v3 has shipped BOTH meta.email.messageIds and
+        // meta.email.email.messageIds. Ignoring the latter loses inbound replies.
+        $rawIds = array_merge(
+            (array) data_get($item, 'meta.email.messageIds', []),
+            (array) data_get($item, 'meta.email.email.messageIds', [])
+        );
 
         $rawIds[] = data_get($item, 'emailMessageId');
         $rawIds[] = data_get($item, 'email_message_id');
@@ -4245,34 +4254,28 @@ class GoHighLevelService
 
     protected function trackedPlainTextFromHtml(string $html): string
     {
+        // Keep the plain-text fallback readable. The previous converter expanded
+        // every link into its full tracking URL, producing unreadable strings in
+        // clients that prefer the API's `message` field over `html`.
         $html = preg_replace_callback(
-            '/<a\b[^>]*\bhref=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/isu',
+            '/<a\\b[^>]*\\bhref=["\\\']([^"\\\']+)["\\\'][^>]*>(.*?)<\\/a>/isu',
             static function (array $matches): string {
+                $label = trim(html_entity_decode(strip_tags((string) ($matches[2] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
                 $href = trim(html_entity_decode((string) ($matches[1] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-                $label = trim(preg_replace('/\s+/u', ' ', strip_tags((string) ($matches[2] ?? ''))) ?? '');
 
-                if ($href === '') {
-                    return $label;
-                }
-
-                if ($label === '' || filter_var($label, FILTER_VALIDATE_URL)) {
-                    return $href;
-                }
-
-                return $label . ': ' . $href;
+                return $label !== '' ? $label : $href;
             },
             $html,
         ) ?? $html;
 
-        $html = preg_replace('/<\s*br\s*\/?>/i', "\n", $html) ?? $html;
-        $html = preg_replace('/<\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\n", $html) ?? $html;
+        $html = preg_replace('/<\\s*br\\s*\\/?>/i', "\\n", $html) ?? $html;
+        $html = preg_replace('/<\\/(p|div|li|h[1-6]|blockquote|tr)>/i', "\\n", $html) ?? $html;
         $text = html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
-        $text = preg_replace('/\n{3,}/u', "\n\n", $text) ?? $text;
+        $text = preg_replace('/[ \\t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\\n{3,}/u', "\\n\\n", $text) ?? $text;
 
         return trim($text);
     }
-
 
     protected function normalizeEmailRecipientList(mixed $value): array
     {
@@ -4465,7 +4468,7 @@ class GoHighLevelService
             'subject' => $subject,
             'html' => $html,
             'body' => $html,
-            'message' => $html,
+            'message' => $text,
             'text' => $text,
             'emailTo' => $to,
             'emailCc' => $ccEmails !== [] ? array_values($ccEmails) : null,
