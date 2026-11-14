@@ -10990,7 +10990,7 @@ CSS;
                                             $messageDate = $formatMessageDate($message['created_at'] ?? $message['date'] ?? $message['messageDate'] ?? '');
                                             $messageAttachments = collect($message['attachments'] ?? [])->filter(fn($attachment) => is_array($attachment) && filled($attachment['url'] ?? null));
                                         @endphp
-                                        <article wire:key="inbox-message-{{ (string) ($message['id'] ?? $loop->index) }}" class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
+                                        <article wire:key="inbox-message-{{ (string) ($message['id'] ?? $loop->index) }}-{{ substr(sha1((string) $messageBody), 0, 12) }}" class="rc-inbox-message-v56 {{ $isOut ? 'is-out' : '' }}">
                                             <span class="rc-msg-avatar-v56">{{ $isOut ? strtoupper(substr($firstName, 0, 1)) : $selectedInitials }}</span>
                                             <div style="min-width:0">
                                                 <div class="rc-msg-meta-v56"><span><strong>{{ $fromLabel }}</strong> <span>to {{ $isOut ? $selectedName : 'You' }}</span></span><span>{{ $messageDate }}</span></div>
@@ -11026,7 +11026,6 @@ CSS;
                                                         },
                                                         init() { this.measure(); }
                                                     }"
-                                                    x-init="init()"
                                                     x-bind:class="{ 'rc-message-collapsible-v11321': collapsible, 'is-expanded': expanded }"
                                                 >
                                                     <div class="rc-email-direct-v11320" aria-label="Email message">
@@ -11177,7 +11176,6 @@ CSS;
                                         this.sync(false);
                                     }
                                 }"
-                                x-init="init()"
                                 x-effect="applyServerBody($wire.quickReplyBody)"
                                 x-on:keydown.ctrl.enter.prevent="sync(); $el.requestSubmit()"
                                 x-on:keydown.meta.enter.prevent="sync(); $el.requestSubmit()"
