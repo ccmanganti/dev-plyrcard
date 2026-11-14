@@ -502,6 +502,18 @@ Route::middleware(['auth'])->group(function () {
         ->name('locker-room.points');
     Route::post('/locker-room/profile', [LockerRoomController::class, 'updateProfile'])
         ->name('locker-room.profile.update');
+    // Player photo gallery endpoints. The Locker Room already calls these named
+    // routes, but they were never registered, leaving its upload URL empty.
+    Route::post('/locker-room/photos', [LockerRoomController::class, 'uploadPhotos'])
+        ->name('locker-room.photos.upload');
+    Route::post('/locker-room/photos/replace', [LockerRoomController::class, 'replacePhoto'])
+        ->name('locker-room.photos.replace');
+    Route::post('/locker-room/photos/reorder', [LockerRoomController::class, 'reorderPhotos'])
+        ->name('locker-room.photos.reorder');
+    Route::delete('/locker-room/photos/{category}/{index}', [LockerRoomController::class, 'deletePhoto'])
+        ->whereIn('category', ['player', 'plyrcard'])
+        ->whereNumber('index')
+        ->name('locker-room.photos.delete');
     Route::post('/locker-room/schedule', [LockerRoomController::class, 'storeSchedule'])
         ->name('locker-room.schedule.store');
     Route::put('/locker-room/schedule/{schedule}', [LockerRoomController::class, 'updateSchedule'])
