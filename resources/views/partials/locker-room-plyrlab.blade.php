@@ -1,3 +1,14 @@
+@if (request()->getHost() === 'plyrcard.com')
+<section class="lr-view" data-lr-view="plyrlab">
+    <div class="lr-section">
+        <div style="padding:34px 22px;text-align:center;background:#12151a;border-radius:16px;border:1px solid #333840;color:#f3f0ec;">
+            <div style="font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:800;color:#ff6348;">PLYRLab</div>
+            <h2 style="font-size:30px;margin:12px 0 8px;font-weight:900;color:#fff;">Coming Soon</h2>
+            <p style="margin:0 auto;max-width:400px;color:#b9bcc4;line-height:1.6;">Your performance tracking and trainer booking experience is on its way.</p>
+        </div>
+    </div>
+</section>
+@else
 <style>
     #plyrcard-action-drawer .plab-shell{
         --plab-bg:#0c0d10;--plab-panel:#16181d;--plab-panel2:#1d2027;--plab-line:#2b2f37;
@@ -1131,3 +1142,5 @@
     },true);
 })();
 </script>
+
+@endif
