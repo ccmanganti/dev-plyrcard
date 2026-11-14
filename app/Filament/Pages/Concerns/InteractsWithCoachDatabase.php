@@ -229,6 +229,7 @@ trait InteractsWithCoachDatabase
     public bool $isBootingRemoteSection = false;
     public bool $isLoadingConversations = false;
     public bool $isLoadingConversationMessages = false;
+    public ?string $inboxMessageLoadError = null;
     public bool $isLoadingTemplates = false;
     public bool $isLoadingTemplateDetail = false;
     public bool $isRefreshingRemoteData = false;
@@ -6626,13 +6627,19 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             );
         }
 
-        if ($conversationChanged || $force) {
+        $this->inboxMessageLoadError = null;
+        if ($conversationChanged) {
+            // Never show the previous conversation's messages under the new coach.
             $this->messageLastId = null;
             $this->hasMoreMessages = false;
             $this->messages = [];
-            $this->isLoadingConversationMessages = true;
+        }
+        if ($conversationChanged || $force) {
+            // A same-thread refresh must NOT throw away its already visible emails
+            // before HighLevel has returned a successful replacement.
+            $this->isLoadingConversationMessages = empty($this->messages);
             $this->isRefreshingRemoteData = false;
-            $this->activeUiOperation = 'Loading messages';
+            $this->activeUiOperation = empty($this->messages) ? 'Loading messages' : null;
         }
 
         $this->conversations = collect($this->conversations ?? [])->map(function ($row) use ($conversationId) {
@@ -6654,18 +6661,15 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         $loadedFromCache = ! $force && $this->hydrateCachedConversationMessages($conversationId);
 
         if ($loadedFromCache) {
-            $cacheFresh = $this->inboxMessageCacheIsFresh($conversationId, 300);
+            // Cache remains stable until the user explicitly refreshes. Never start
+            // an after-response GHL read that could repaint the Inbox while scrolling.
             $this->isLoadingConversationMessages = false;
             $this->isRefreshingRemoteData = false;
             $this->activeUiOperation = null;
-
-            if (! $cacheFresh) {
-                $this->queueDetachedConversationMessageRefresh($user, $conversationId);
-            }
         } else {
-            // First-ever open still needs one direct HighLevel request. Subsequent opens
-            // use the cache-first path above.
-            $this->loadConversationMessages(true, false);
+            // Only visit/select/reload causes a remote read. Preserve any visible
+            // same-thread history if that request fails.
+            $this->loadConversationMessages(true, ! $conversationChanged);
         }
 
         if ($hadUnread) {
@@ -6921,33 +6925,18 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
         }
 
         $conversationId = (string) $this->selectedConversationId;
-        $keepVisibleMessages = $fresh && $preserveVisibleMessages && ! empty($this->messages);
+        $keepVisibleMessages = $fresh && ! empty($this->messages);
 
-        if ($fresh) {
-            // Normal explicit refreshes keep the existing cache-busting behavior.
-            // A silent background poll preserves the last known-good cache until the
-            // new GHL response succeeds, so a transient API failure cannot blank the
-            // thread on the next render/reload.
-            if (! ($silent && $keepVisibleMessages)) {
-                Cache::forget($this->deferredUiCacheKey('messages', $conversationId));
-                Cache::forget(CoachDatabaseUiSyncService::cacheKey($user, 'messages', $conversationId));
-                Cache::forget(CoachDatabaseUiSyncService::statusKey($user, 'messages', $conversationId));
-                Cache::forget(CoachDatabaseUiSyncService::lockKey($user, 'messages', $conversationId));
-                $this->forgetPersistentRecruitingUiCache('messages', $conversationId);
-            }
-
-            if (! $keepVisibleMessages) {
-                $this->messages = [];
-                $this->messageLastId = null;
-                $this->hasMoreMessages = false;
-            }
-        } else {
+        if (! $fresh) {
             $this->hydrateCachedConversationMessages($conversationId);
-
             if (! $this->hasMoreMessages || blank($this->messageLastId)) {
                 return;
             }
         }
+
+        // Do not delete a known-good cache or empty the visible thread before
+        // a remote response has been validated. Success atomically replaces the
+        // cache; failure leaves both prior emails and pagination intact.
 
         // A fresh refresh always asks for the newest page. When cached messages are
         // already visible, refresh silently instead of replacing them with a loader.
@@ -6967,17 +6956,18 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             );
 
             if (! ($result['success'] ?? false)) {
+                $this->inboxMessageLoadError = (string) ($result['error'] ?? 'Unable to load conversation messages right now.');
                 if (! $silent) {
                     Notification::make()
                         ->title('Inbox')
-                        ->body((string) ($result['error'] ?? 'Unable to load conversation messages right now.'))
+                        ->body($this->inboxMessageLoadError)
                         ->warning()
                         ->send();
                 }
-
                 return;
             }
 
+            $this->inboxMessageLoadError = null;
             $normalizedRows = collect($result['messages'] ?? [])
                 ->filter(fn ($row): bool => is_array($row))
                 ->map(fn (array $row): array => $this->normalizeConversationMessageRow($row));
@@ -7002,7 +6992,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                 })
                 ->values();
 
-            $beforeCount = count($this->messages);
+            $existingMessageIds = collect($this->messages)
+                ->pluck('id')
+                ->map(fn ($id): string => (string) $id)
+                ->all();
+            $addedCount = $rows->filter(fn (array $row): bool =>
+                ! in_array((string) ($row['id'] ?? ''), $existingMessageIds, true)
+            )->count();
 
             $this->messages = collect($this->messages)
                 ->merge($rows)
@@ -7020,14 +7016,13 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
                         return 0;
                     }
                 })
-                ->take(-18)
+                ->take(-200)
                 ->values()
                 ->all();
 
             $nextCursor = filled($result['last_message_id'] ?? null)
                 ? (string) $result['last_message_id']
                 : $requestedCursor;
-            $addedCount = max(0, count($this->messages) - $beforeCount);
             $cursorAdvanced = filled($nextCursor) && $nextCursor !== $requestedCursor;
 
             $this->messageLastId = $nextCursor;
@@ -7052,6 +7047,7 @@ protected function localEmailTemplateToArray(CoachDatabaseEmailTemplate $templat
             // successful direct Inbox fetch. That duplicate refresh caused another
             // loading cycle immediately after the conversation had already loaded.
         } catch (\Throwable $exception) {
+            $this->inboxMessageLoadError = 'Unable to load this conversation right now. Use Refresh to retry.';
             Log::warning('Unable to load conversation messages for inbox.', [
                 'user_id' => $user->id,
                 'conversation_id' => $conversationId,
