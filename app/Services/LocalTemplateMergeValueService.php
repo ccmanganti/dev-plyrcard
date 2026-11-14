@@ -11,7 +11,15 @@ class LocalTemplateMergeValueService
 {
     public function replace(string $content, User $athlete, array $coach = []): string
     {
-        $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        // Do not HTML-decode an already valid document. Doing so turns &amp; in
+        // links and escaped text into raw markup, corrupting the email signature.
+        // Only recover wholly entity-encoded legacy templates when needed.
+        $isHtml = preg_match('/<\\s*[a-z][a-z0-9]*\\b/i', $content) === 1;
+        if (! $isHtml && preg_match('/&lt;\\s*(?:p|div|table|span|a|img|br)\\b/i', $content)) {
+            $content = html_entity_decode($content, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $isHtml = true;
+        }
+
         $school = $this->school($athlete, $coach);
 
         $coachName = $this->text($coach['name'] ?? $coach['full_name'] ?? '');
@@ -77,6 +85,11 @@ class LocalTemplateMergeValueService
 
         foreach ($values as $canonical => $rawValue) {
             $value = $this->text($rawValue);
+            // Merge values are untrusted profile data. Escape for both HTML text
+            // and HTML attributes (including href); retain raw values for plain text.
+            if ($isHtml) {
+                $value = htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            }
             $names = collect([$canonical, lcfirst($canonical), Str::snake($canonical)])
                 ->merge($aliases[$canonical] ?? [])
                 ->unique();
