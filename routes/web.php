@@ -55,18 +55,21 @@ Route::middleware('auth')->group(function (): void {
         ->name('billing.point-packs.status');
     Route::get('/locker-room/points/history', PlyrPointsHistoryController::class)
         ->name('locker-room.points.history');
-    Route::get('/locker-room/plyr-lab', [PlyrLabController::class, 'index'])
-        ->name('locker-room.plyr-lab');
-    Route::post('/locker-room/plyr-lab/book', [PlyrLabController::class, 'book'])
-        ->name('locker-room.plyr-lab.book');
-    Route::patch('/locker-room/plyr-lab/booking', [PlyrLabController::class, 'updateBooking'])
-        ->name('locker-room.plyr-lab.booking.update');
-    Route::post('/locker-room/plyr-lab/booking/cancel', [PlyrLabController::class, 'cancelBooking'])
-        ->name('locker-room.plyr-lab.booking.cancel');
-    Route::post('/locker-room/plyr-lab/connect', [PlyrLabController::class, 'connect'])
-        ->name('locker-room.plyr-lab.connect');
-    Route::post('/locker-room/plyr-lab/refresh', [PlyrLabController::class, 'refresh'])
-        ->name('locker-room.plyr-lab.refresh');
+    Route::middleware(\App\Http\Middleware\PlyrLabProductionGate::class)
+        ->group(function (): void {
+        Route::get('/locker-room/plyr-lab', [PlyrLabController::class, 'index'])
+            ->name('locker-room.plyr-lab');
+        Route::post('/locker-room/plyr-lab/book', [PlyrLabController::class, 'book'])
+            ->name('locker-room.plyr-lab.book');
+        Route::patch('/locker-room/plyr-lab/booking', [PlyrLabController::class, 'updateBooking'])
+            ->name('locker-room.plyr-lab.booking.update');
+        Route::post('/locker-room/plyr-lab/booking/cancel', [PlyrLabController::class, 'cancelBooking'])
+            ->name('locker-room.plyr-lab.booking.cancel');
+        Route::post('/locker-room/plyr-lab/connect', [PlyrLabController::class, 'connect'])
+            ->name('locker-room.plyr-lab.connect');
+        Route::post('/locker-room/plyr-lab/refresh', [PlyrLabController::class, 'refresh'])
+            ->name('locker-room.plyr-lab.refresh');
+        });
     // Native Stripe registration retry. The initial registration POST logs the
     // new user in before the browser calls this endpoint.
     Route::post('/registration/stripe/start', [RegistrationController::class, 'startStripePayment'])
