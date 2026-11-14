@@ -29,31 +29,9 @@ class Schedule extends Model
         'is_home' => 'boolean',
     ];
 
-    protected static function booted(): void
-    {
-        static::created(function (Schedule $schedule): void {
-            /*
-             * Default safety behavior:
-             * When a schedule is created by a player/user that already has
-             * club_id + league_id + team_name, attach the same schedule to the
-             * rest of that team.
-             *
-             * Club Admin dashboard creation calls syncToTeamMembers() directly
-             * because a Club Manager's own account may not have a league/team.
-             */
-            $creator = $schedule->creator;
-
-            if (! $creator || blank($creator->club_id) || blank($creator->league_id) || blank($creator->team_name)) {
-                return;
-            }
-
-            $schedule->syncToTeamMembers(
-                clubId: (int) $creator->club_id,
-                leagueId: (int) $creator->league_id,
-                teamName: (string) $creator->team_name,
-            );
-        });
-    }
+    // Personal schedule creation is intentionally owner-only. Team schedules must
+    // be shared explicitly by a club administrator via syncToTeamMembers(), not
+    // automatically whenever any athlete adds an event.
 
     public function creator(): BelongsTo
     {
