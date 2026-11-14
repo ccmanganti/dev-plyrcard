@@ -1,3 +1,12 @@
+@if (request()->getHost() === 'plyrcard.com')
+<x-filament-panels::page>
+    <div style="max-width:760px;margin:4rem auto;text-align:center;padding:3rem 2rem;border:1px solid rgba(255,99,72,.25);border-radius:20px;background:linear-gradient(145deg,#16181d,#101215);color:#f3f0ec;">
+        <div style="font-size:.72rem;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#ff6348;">PLYRCARD Performance</div>
+        <h1 style="font-size:clamp(2.1rem,5vw,3.5rem);font-weight:900;line-height:1.08;margin:1rem 0;">PLYRLab is coming soon</h1>
+        <p style="max-width:34rem;margin:0 auto;color:#c3c4c9;line-height:1.7;">We're getting athlete performance tracking and trainer booking ready. All your PLYRLab functionality is being preserved for launch.</p>
+    </div>
+</x-filament-panels::page>
+@else
 
 <style id="plyrlab-recruiting-layout-v2">
     .plyrlab-recruiting-page{width:100%;max-width:1240px;margin:0 auto}
@@ -1237,3 +1246,5 @@
     load(false);
 })();
 </script>
+
+@endif
