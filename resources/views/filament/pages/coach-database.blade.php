@@ -9970,27 +9970,24 @@ discoverSelectedIds: [],
             <style>
                 .rc-inbox-shell-v56{grid-template-columns:19.5rem minmax(0,1fr)20rem;min-height:34rem;height:calc(100vh - 11.5rem);max-height:calc(100vh - 8rem)}
                 .rc-inbox-panel-head-v56{padding:.8rem .95rem .58rem}.rc-inbox-panel-head-v56 h2{font-size:1rem}.rc-inbox-search-v56{padding:0 .95rem .55rem}.rc-inbox-search-v56 input{height:2.15rem;font-size:.78rem}.rc-inbox-tabs-v56{padding:0 .95rem .55rem;gap:.72rem}.rc-inbox-tab-v56{font-size:.74rem}.rc-thread-card-v56{grid-template-columns:2.05rem minmax(0,1fr)auto;padding:.7rem .9rem;gap:.55rem}.rc-thread-logo-v56{width:1.9rem;height:1.9rem}.rc-thread-name-v56{font-size:.8rem}.rc-thread-school-v56,.rc-thread-preview-v56{font-size:.7rem}.rc-thread-status-v56{font-size:.62rem;padding:.12rem .34rem;margin-top:.35rem}.rc-inbox-mid-head-v56{min-height:4.25rem;padding:.62rem .95rem}.rc-inbox-coach-title-v56{grid-template-columns:2.15rem minmax(0,1fr)}.rc-inbox-school-logo-v56{width:2rem;height:2rem}.rc-inbox-coach-title-v56 h3{font-size:.9rem}.rc-inbox-coach-title-v56 p{font-size:.72rem}.rc-inbox-open-composer-v56{min-height:1.9rem;font-size:.72rem;padding:0 .58rem}.rc-inbox-icon-btn-v56{width:1.9rem;height:1.9rem}.rc-message-stream-v56{overflow:auto;max-height:none;height:100%;padding:.9rem;scroll-behavior:auto}.rc-inbox-message-v56{grid-template-columns:2rem minmax(0,1fr);gap:.55rem}.rc-msg-avatar-v56{width:1.9rem;height:1.9rem;font-size:.68rem}.rc-msg-meta-v56{font-size:.68rem;margin-bottom:.35rem}.rc-msg-bubble-v56{width:min(100%,36rem);max-width:100%;padding:.78rem .85rem;font-size:.82rem;line-height:1.5;overflow-wrap:anywhere;word-break:break-word;white-space:normal}.rc-msg-bubble-v56 a{color:#2563eb;text-decoration:underline;overflow-wrap:break-word;word-break:normal}.rc-msg-bubble-v56 a.rc-message-link-short{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom;white-space:nowrap}.rc-msg-bubble-v56 img{max-width:100%;height:auto;border-radius:.55rem;display:block;margin:.5rem 0}.rc-msg-bubble-v56 p{margin:.35rem 0}.rc-msg-bubble-v56 pre{white-space:pre-wrap;overflow-wrap:anywhere}.rc-message-attachment-image{max-width:100%;height:auto;display:block}.rc-message-attachment-link{max-width:100%;overflow-wrap:anywhere}.rc-inbox-right-v56{min-width:0}.rc-coach-cover-v56{height:5rem}.rc-profile-content-v56{padding:0 .9rem .9rem}.rc-profile-avatar-v56{width:3.3rem;height:3.3rem;margin-top:-1.7rem}.rc-profile-name-v56 h3{font-size:.9rem}.rc-profile-sub-v56,.rc-contact-line-v56{font-size:.72rem}.rc-profile-actions-v56{gap:.45rem}.rc-profile-action-v56{min-height:2.8rem;font-size:.7rem}.rc-about-grid-v56{grid-template-columns:1fr;gap:.55rem}.rc-about-item-v56{font-size:.68rem}.rc-inbox-icon-btn-v56.is-starred{color:#facc15!important;background:rgba(250,204,21,.16)!important;border-color:rgba(250,204,21,.34)!important}.rc-inbox-icon-btn-v56.is-starred svg{fill:currentColor}.rc-inbox-star-spinner-v114{width:.9rem!important;height:.9rem!important;border-width:2px!important}.rc-compose-history{font-family:Arial,Helvetica,sans-serif}.rc-compose-history-message a{color:#2563eb;text-decoration:underline}.rc-compose-history-message img{max-width:100%;height:auto;border-radius:.5rem;margin:.4rem 0}.rc-compose-history-message p{margin:.25rem 0}
-                .rc-inbox-shell-v56,
-                .rc-inbox-list-v56,
-                .rc-message-stream-v56 {
+                /* Variable-height HTML emails must not use content-visibility or
+                   layout containment. Both cause scroll jumps while reading history. */
+                .rc-inbox-shell-v56, .rc-inbox-list-v56, .rc-message-stream-v56 {
                     scroll-behavior: auto !important;
                     overscroll-behavior: contain;
-                    contain: layout paint style;
                 }
-                .rc-inbox-list-v56,
-                .rc-message-stream-v56 {
-                    transform: translateZ(0);
-                    will-change: auto;
-                }
+                .rc-message-stream-v56 { overflow-anchor: auto; }
                 .rc-inbox-message-v56 {
-                    content-visibility: auto;
-                    contain-intrinsic-size: 9rem;
-                    contain: layout paint style;
+                    content-visibility: visible;
+                    contain: none;
+                    contain-intrinsic-size: auto;
                 }
-                .rc-msg-bubble-v56,
-                .rc-msg-bubble-v56 * {
-                    max-width: 100%;
-                }
+                .rc-msg-bubble-v56 { max-width: 100%; }
+                .rc-msg-bubble-v56 img,
+                .rc-msg-bubble-v56 iframe,
+                .rc-msg-bubble-v56 video,
+                .rc-msg-bubble-v56 table { max-width: 100%; }
+                .rc-email-direct-body-v11320 table { border-collapse: collapse; table-layout: auto; }
                 .rc-msg-bubble-v56 a {
                     overflow-wrap: anywhere;
                     word-break: break-word;
@@ -10548,25 +10545,36 @@ CSS;
                                     // v10.114: keep Inbox live without a page reload. The timer only runs
                                     // while this panel is actually visible and pauses during user interaction.
                                     this.startRealtimePolling();
+                                    this.installScrollInteractionGuard();
                                 },
                                 conversationHasRenderedMessages() {
                                     const stream = document.querySelector('[data-rc-inbox-message-stream]');
                                     return !! (stream && stream.querySelector('.rc-inbox-message-v56'));
                                 },
-                                scrollToNewestMessage() {
-                                    const run = () => {
-                                        const stream = document.querySelector('[data-rc-inbox-message-stream]');
-                                        if (stream) stream.scrollTop = stream.scrollHeight;
-                                    };
-                                    window.requestAnimationFrame(() => {
-                                        window.requestAnimationFrame(() => {
-                                            run();
-                                            window.setTimeout(run, 90);
-                                            window.setTimeout(run, 260);
-                                        });
-                                    });
-                                },
-                                realtimeInboxPanel() {
+                                installScrollInteractionGuard() {
+                                     if (window.__rcInboxScrollGuardInstalled) return;
+                                     window.__rcInboxScrollGuardInstalled = true;
+                                     const record = (event) => {
+                                         const target = event.target;
+                                         if (target && typeof target.closest === 'function'
+                                             && target.closest('[data-rc-inbox-message-stream]')) {
+                                             window.__rcInboxLastManualScrollAt = Date.now();
+                                         }
+                                     };
+                                     document.addEventListener('wheel', record, {passive:true,capture:true});
+                                     document.addEventListener('touchstart', record, {passive:true,capture:true});
+                                     document.addEventListener('pointerdown', record, {passive:true,capture:true});
+                                 },
+                                 scrollToNewestMessage(id, requestedAt) {
+                                     // Position only when a NEW thread is chosen, never on re-render.
+                                     window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+                                         if (String(window.__rcInboxPendingConversationId || this.selectedConversationId || '') !== String(id)) return;
+                                         if (Number(window.__rcInboxLastManualScrollAt || 0) > Number(requestedAt || 0)) return;
+                                         const stream = document.querySelector('[data-rc-inbox-message-stream]');
+                                         if (stream) stream.scrollTop = stream.scrollHeight;
+                                     }));
+                                 },
+                                 realtimeInboxPanel() {
                                     return document.querySelector('[data-rc-client-section=conversations]');
                                 },
                                 realtimeInboxIsVisible() {
@@ -10641,64 +10649,16 @@ CSS;
                                         });
                                     });
                                 },
-                                async pollRealtimeInbox() {
-                                    // A skipped pass must ALWAYS schedule another pass. Previously the
-                                    // one-shot timer was consumed when the user happened to be typing,
-                                    // switching threads, or the Inbox was temporarily hidden. After that,
-                                    // automatic Inbox updates silently stopped until a page reload.
-                                    // Keep polling even while the reply editor/search field has focus.
-                                    // The quick-reply editor is wire:ignore and its draft is mirrored into
-                                    // window.__rcInboxReplyDrafts, so an incoming message should never wait
-                                    // for the user to blur the editor. Only defer while another thread/load
-                                    // operation is actively mutating Inbox state.
-                                    const shouldDefer = this.realtimePollBusy
-                                        || !this.realtimeInboxIsVisible()
-                                        || this.selectedLoadingId
-                                        || window.__rcInboxMessageLoader?.busy
-                                        || document.documentElement.hasAttribute('data-rc-thread-autoloading');
-                                    if (shouldDefer) {
-                                        this.startRealtimePolling();
-                                        return;
-                                    }
-                                    this.realtimePollBusy = true;
-                                    window.__rcInboxRealtimeLastPollAt = Date.now();
-                                    const scrollState = this.captureRealtimeScrollState();
-                                    try {
-                                        await this.$wire.pollConversationUpdates();
-                                    } catch (error) {
-                                        // Background refresh is deliberately silent. Manual Refresh remains
-                                        // available if GHL is temporarily unreachable.
-                                    } finally {
-                                        this.realtimePollBusy = false;
-                                        this.restoreRealtimeScrollState(scrollState);
-                                        // Livewire may preserve this Alpine island in-place. If so, schedule
-                                        // the next pass here. If it rebuilt the island, init() already did it.
-                                        if (this.$el && this.$el.isConnected) {
-                                            this.startRealtimePolling();
-                                        }
-                                    }
-                                },
-                                startRealtimePolling() {
-                                    if (window.__rcInboxRealtimeTimer) {
-                                        window.clearTimeout(window.__rcInboxRealtimeTimer);
-                                    }
-                                    window.__rcInboxRealtimeOwner = this;
-                                    const lastPollAt = Number(window.__rcInboxRealtimeLastPollAt || 0);
-                                    const elapsed = lastPollAt > 0 ? Date.now() - lastPollAt : Number.MAX_SAFE_INTEGER;
-                                    // Messenger-style cadence: check shortly after Inbox opens, then
-                                    // every ~20 seconds while the Inbox panel is visible. This is fast enough
-                                    // for replies to feel live without hammering HighLevel continuously.
-                                    const delay = lastPollAt > 0
-                                        ? Math.max(3000, 20000 - elapsed)
-                                        : 5000;
-                                    window.__rcInboxRealtimeTimer = window.setTimeout(() => {
-                                        const owner = window.__rcInboxRealtimeOwner;
-                                        if (owner && typeof owner.pollRealtimeInbox === 'function') {
-                                            owner.pollRealtimeInbox();
-                                        }
-                                    }, delay);
-                                },
-                                setThreadLoading(id) {
+                                // No recurring Inbox reads: only tab entry or explicit Reload/selection.
+                                 async pollRealtimeInbox() { return; },
+                                 startRealtimePolling() {
+                                     if (window.__rcInboxRealtimeTimer) {
+                                         window.clearTimeout(window.__rcInboxRealtimeTimer);
+                                     }
+                                     window.__rcInboxRealtimeTimer = null;
+                                     window.__rcInboxRealtimeOwner = null;
+                                 },
+                                 setThreadLoading(id) {
                                     this.selectedLoadingId = id;
                                     window.__rcInboxPendingConversationId = id;
                                     document.documentElement.removeAttribute('data-rc-inbox-loading');
@@ -10742,6 +10702,8 @@ CSS;
                                         return Promise.resolve();
                                     }
                                     const token = ++this.requestToken;
+                                    const scrollRequestStartedAt = Date.now();
+                                    const shouldScrollToNew = boot || previousId !== id;
                                     loader.busy = true;
                                     loader.queued = '';
                                     loader.promise = new Promise((resolve) => {
@@ -10759,7 +10721,9 @@ CSS;
                                             loader.lastAt = Date.now();
                                             window.requestAnimationFrame(() => {
                                                 this.clearThreadLoading(id, token);
-                                                this.scrollToNewestMessage();
+                                                if (shouldScrollToNew && String(this.selectedConversationId) === id) {
+                                                    this.scrollToNewestMessage(id, scrollRequestStartedAt);
+                                                }
                                             });
                                             const queued = String(loader.queued || '');
                                             loader.queued = '';
@@ -10775,7 +10739,7 @@ CSS;
                                     this.loadConversation(id, false, false);
                                 },
                             }"
-                            x-init="init()"
+                            
                         >
                             @forelse($inboxConversations as $inboxConversation)
                                 @php
@@ -10886,8 +10850,21 @@ CSS;
                                 @if(empty($threadMessages))
                                     <div class="rc-inbox-empty-v56">
                                         <div>
-                                            <strong>Messages are loading.</strong><br>
-                                            <span>The latest messages will appear automatically.</span>
+                                            @if($isLoadingConversationMessages)
+                                                <strong>Loading conversation…</strong><br>
+                                                <span>Retrieving the latest emails.</span>
+                                            @elseif($inboxMessageLoadError)
+                                                <strong>Messages could not be loaded.</strong><br>
+                                                <span>{{ $inboxMessageLoadError }}</span>
+                                            @else
+                                                <strong>No emails to display.</strong><br>
+                                                <span>Select Refresh to check for newer messages.</span>
+                                            @endif
+                                            <button type="button" class="rc-inbox-open-composer-v56"
+                                                style="margin:12px auto 0"
+                                                wire:click="refreshConversationMessagesForClient(@js((string) ($selectedConversationId ?? '')))"
+                                                wire:loading.attr="disabled"
+                                                wire:target="refreshConversationMessagesForClient">Retry loading</button>
                                         </div>
                                     </div>
                                 @else
